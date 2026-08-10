@@ -1,0 +1,406 @@
+// Variation registry. Each entry emits a WGSL snippet that accumulates into `v`.
+// Available in scope: t (vec2f, post-affine point), r2, r, th = atan2(x,y),
+// ph = atan2(y,x), rs (ptr to rng state, use rnd(rs)), cp (ptr<function, f32>
+// to the walker's palette coordinate — direct-color variations write *cp),
+// mmod(a,b), PI. `w` is the weight expression, `p[i]` are parameter
+// expressions, `A(i)` gives this xform's affine coefficients (0..5 = a..f).
+
+export interface VariationDef {
+  params?: { name: string; def: number }[];
+  code: (w: string, p: string[], A: (i: number) => string) => string;
+}
+
+export const VARIATIONS: Record<string, VariationDef> = {
+  linear: { code: (w) => `v += ${w} * t;` },
+
+  sinusoidal: { code: (w) => `v += ${w} * sin(t);` },
+
+  spherical: { code: (w) => `v += (${w} / r2) * t;` },
+
+  swirl: {
+    code: (w) => `{ let sw_s = sin(r2); let sw_c = cos(r2);
+  v += ${w} * vec2f(t.x*sw_s - t.y*sw_c, t.x*sw_c + t.y*sw_s); }`,
+  },
+
+  horseshoe: {
+    code: (w) => `v += (${w} / r) * vec2f((t.x - t.y)*(t.x + t.y), 2.0*t.x*t.y);`,
+  },
+
+  polar: { code: (w) => `v += ${w} * vec2f(th / PI, r - 1.0);` },
+
+  handkerchief: { code: (w) => `v += ${w} * r * vec2f(sin(th + r), cos(th - r));` },
+
+  heart: { code: (w) => `v += ${w} * r * vec2f(sin(th * r), -cos(th * r));` },
+
+  disc: {
+    code: (w) => `v += ${w} * (th / PI) * vec2f(sin(PI * r), cos(PI * r));`,
+  },
+
+  spiral: {
+    code: (w) => `v += (${w} / r) * vec2f(cos(th) + sin(r), sin(th) - cos(r));`,
+  },
+
+  hyperbolic: { code: (w) => `v += ${w} * vec2f(sin(th) / r, r * cos(th));` },
+
+  diamond: { code: (w) => `v += ${w} * vec2f(sin(th) * cos(r), cos(th) * sin(r));` },
+
+  ex: {
+    code: (w) => `{ let ex_a = sin(th + r); let ex_b = cos(th - r);
+  let ex_a3 = ex_a*ex_a*ex_a; let ex_b3 = ex_b*ex_b*ex_b;
+  v += ${w} * r * vec2f(ex_a3 + ex_b3, ex_a3 - ex_b3); }`,
+  },
+
+  julia: {
+    code: (w) => `{ let jl_o = select(0.0, PI, rnd(rs) < 0.5);
+  v += ${w} * sqrt(r) * vec2f(cos(0.5*th + jl_o), sin(0.5*th + jl_o)); }`,
+  },
+
+  bent: {
+    code: (w) => `v += ${w} * vec2f(select(t.x, 2.0*t.x, t.x < 0.0), select(t.y, 0.5*t.y, t.y < 0.0));`,
+  },
+
+  waves: {
+    code: (w, _p, A) => `v += ${w} * vec2f(
+  t.x + ${A(1)} * sin(t.y / (${A(2)}*${A(2)} + 1e-6)),
+  t.y + ${A(4)} * sin(t.x / (${A(5)}*${A(5)} + 1e-6)));`,
+  },
+
+  fisheye: { code: (w) => `v += (${w} * 2.0 / (r + 1.0)) * vec2f(t.y, t.x);` },
+
+  popcorn: {
+    code: (w, _p, A) => `v += ${w} * vec2f(
+  t.x + ${A(2)} * sin(tan(3.0*t.y)),
+  t.y + ${A(5)} * sin(tan(3.0*t.x)));`,
+  },
+
+  exponential: {
+    code: (w) => `{ let xp_e = exp(t.x - 1.0);
+  v += ${w} * xp_e * vec2f(cos(PI * t.y), sin(PI * t.y)); }`,
+  },
+
+  power: {
+    code: (w) => `v += ${w} * pow(r, sin(th)) * vec2f(cos(th), sin(th));`,
+  },
+
+  cosine: {
+    code: (w) => `v += ${w} * vec2f(cos(PI*t.x) * cosh(t.y), -sin(PI*t.x) * sinh(t.y));`,
+  },
+
+  rings: {
+    code: (w, _p, A) => `{ let rg_d = ${A(2)}*${A(2)} + 1e-6;
+  let rg_r = mmod(r + rg_d, 2.0*rg_d) - rg_d + r*(1.0 - rg_d);
+  v += ${w} * rg_r * vec2f(cos(ph), sin(ph)); }`,
+  },
+
+  fan: {
+    code: (w, _p, A) => `{ let fn_t = PI * (${A(2)}*${A(2)} + 1e-6); let fn_h = 0.5*fn_t;
+  var fn_a = ph + fn_h;
+  if (mmod(ph + ${A(5)}, fn_t) > fn_h) { fn_a = ph - fn_h; }
+  v += ${w} * r * vec2f(cos(fn_a), sin(fn_a)); }`,
+  },
+
+  blob: {
+    params: [{ name: 'high', def: 1 }, { name: 'low', def: 0.3 }, { name: 'waves', def: 4 }],
+    code: (w, p) => `{ let bl_r = r * (${p[1]} + 0.5*(${p[0]} - ${p[1]})*(1.0 + sin(${p[2]} * th)));
+  v += ${w} * bl_r * vec2f(sin(th), cos(th)); }`,
+  },
+
+  pdj: {
+    params: [{ name: 'a', def: 1 }, { name: 'b', def: 2 }, { name: 'c', def: 1 }, { name: 'd', def: 2 }],
+    code: (w, p) => `v += ${w} * vec2f(sin(${p[0]}*t.y) - cos(${p[1]}*t.x), sin(${p[2]}*t.x) - cos(${p[3]}*t.y));`,
+  },
+
+  fan2: {
+    params: [{ name: 'x', def: 0.5 }, { name: 'y', def: 1.2 }],
+    code: (w, p) => `{ let f2_t = PI * (${p[0]}*${p[0]} + 1e-6); let f2_h = 0.5*f2_t;
+  var f2_a = ph + f2_h;
+  if (mmod(ph + ${p[1]}, f2_t) > f2_h) { f2_a = ph - f2_h; }
+  v += ${w} * r * vec2f(sin(f2_a), cos(f2_a)); }`,
+  },
+
+  eyefish: { code: (w) => `v += (${w} * 2.0 / (r + 1.0)) * t;` },
+
+  bubble: { code: (w) => `v += (${w} * 4.0 / (r2 + 4.0)) * t;` },
+
+  cylinder: { code: (w) => `v += ${w} * vec2f(sin(t.x), t.y);` },
+
+  perspective: {
+    params: [{ name: 'angle', def: 0.62 }, { name: 'dist', def: 2.2 }],
+    code: (w, p) => `{ let ps_t = ${w} * ${p[1]} / max(${p[1]} - t.y * sin(${p[0]}), 1e-6);
+  v += ps_t * vec2f(t.x, t.y * cos(${p[0]})); }`,
+  },
+
+  noise: {
+    code: (w) => `{ let nz_r = rnd(rs); let nz_a = rnd(rs) * 2.0 * PI;
+  v += ${w} * nz_r * vec2f(t.x * cos(nz_a), t.y * sin(nz_a)); }`,
+  },
+
+  julian: {
+    params: [{ name: 'power', def: 3 }, { name: 'dist', def: 1 }],
+    code: (w, p) => `{ let jn_p = select(${p[0]}, 2.0, abs(${p[0]}) < 1e-6);
+  let jn_k = floor(abs(jn_p) * rnd(rs));
+  let jn_a = (ph + 2.0*PI*jn_k) / jn_p;
+  let jn_r = pow(r2, 0.5 * ${p[1]} / jn_p);
+  v += ${w} * jn_r * vec2f(cos(jn_a), sin(jn_a)); }`,
+  },
+
+  juliascope: {
+    params: [{ name: 'power', def: 3 }, { name: 'dist', def: 1 }],
+    code: (w, p) => `{ let js_p = select(${p[0]}, 2.0, abs(${p[0]}) < 1e-6);
+  let js_k = floor(abs(js_p) * rnd(rs));
+  var js_a = (2.0*PI*js_k + ph) / js_p;
+  if (mmod(js_k, 2.0) > 0.5) { js_a = (2.0*PI*js_k - ph) / js_p; }
+  let js_r = pow(r2, 0.5 * ${p[1]} / js_p);
+  v += ${w} * js_r * vec2f(cos(js_a), sin(js_a)); }`,
+  },
+
+  blur: {
+    code: (w) => `{ let bu_a = rnd(rs) * 2.0 * PI; let bu_r = rnd(rs);
+  v += ${w} * bu_r * vec2f(cos(bu_a), sin(bu_a)); }`,
+  },
+
+  gaussian_blur: {
+    code: (w) => `{ let gb_a = rnd(rs) * 2.0 * PI;
+  let gb_r = rnd(rs) + rnd(rs) + rnd(rs) + rnd(rs) - 2.0;
+  v += ${w} * gb_r * vec2f(cos(gb_a), sin(gb_a)); }`,
+  },
+
+  ngon: {
+    params: [
+      { name: 'power', def: 2 }, { name: 'sides', def: 5 },
+      { name: 'corners', def: 1 }, { name: 'circle', def: 1 },
+    ],
+    code: (w, p) => `{ let ng_b = 2.0*PI / max(${p[1]}, 1.0);
+  var ng_phi = ph - ng_b * floor(ph / ng_b);
+  if (ng_phi > 0.5 * ng_b) { ng_phi -= ng_b; }
+  let ng_amp = (${p[2]} * (1.0/max(cos(ng_phi), 1e-6) - 1.0) + ${p[3]}) / max(pow(r2, 0.5*${p[0]}), 1e-9);
+  v += ${w} * ng_amp * t; }`,
+  },
+
+  curl: {
+    params: [{ name: 'c1', def: 0.5 }, { name: 'c2', def: 0.25 }],
+    code: (w, p) => `{ let cu_1 = 1.0 + ${p[0]}*t.x + ${p[1]}*(t.x*t.x - t.y*t.y);
+  let cu_2 = ${p[0]}*t.y + 2.0*${p[1]}*t.x*t.y;
+  let cu_r = ${w} / max(cu_1*cu_1 + cu_2*cu_2, 1e-9);
+  v += cu_r * vec2f(t.x*cu_1 + t.y*cu_2, t.y*cu_1 - t.x*cu_2); }`,
+  },
+
+  rectangles: {
+    params: [{ name: 'x', def: 1 }, { name: 'y', def: 1 }],
+    code: (w, p) => `{ let rc_x = ${p[0]} + select(0.0, 1e-6, abs(${p[0]}) < 1e-6);
+  let rc_y = ${p[1]} + select(0.0, 1e-6, abs(${p[1]}) < 1e-6);
+  v += ${w} * vec2f((2.0*floor(t.x/rc_x) + 1.0)*rc_x - t.x, (2.0*floor(t.y/rc_y) + 1.0)*rc_y - t.y); }`,
+  },
+
+  tangent: {
+    code: (w) => `v += ${w} * vec2f(sin(t.x) / (sign(cos(t.y)) * max(abs(cos(t.y)), 1e-6)), tan(t.y));`,
+  },
+
+  square: { code: (w) => `v += ${w} * vec2f(rnd(rs) - 0.5, rnd(rs) - 0.5);` },
+
+  cross: {
+    code: (w) => `{ let cr_s = t.x*t.x - t.y*t.y;
+  v += ${w} * sqrt(1.0 / max(cr_s*cr_s, 1e-12)) * t; }`,
+  },
+
+  arch: {
+    code: (w) => `{ let ar_a = rnd(rs) * PI * ${w}; let ar_s = sin(ar_a); let ar_c = cos(ar_a);
+  v += ${w} * vec2f(ar_s, ar_s*ar_s / (sign(ar_c) * max(abs(ar_c), 1e-6))); }`,
+  },
+  rings2: {
+    params: [{ name: 'val', def: 0.5 }],
+    code: (w, p) => `{ let r2_d = ${p[0]}*${p[0]} + 1e-6;
+  let r2_r = r - 2.0*r2_d*floor((r + r2_d)/(2.0*r2_d)) + r*(1.0 - r2_d);
+  v += ${w} * r2_r * vec2f(sin(th), cos(th)); }`,
+  },
+
+  butterfly: {
+    code: (w) => `{ let bf_y2 = 2.0*t.y;
+  let bf_r = ${w} * 1.30294 * sqrt(abs(t.y * t.x) / max(t.x*t.x + bf_y2*bf_y2, 1e-9));
+  v += bf_r * vec2f(t.x, bf_y2); }`,
+  },
+
+  cpow: {
+    params: [{ name: 'r', def: 1 }, { name: 'i', def: 0.1 }, { name: 'power', def: 1.5 }],
+    code: (w, p) => `{ let cp_p = select(${p[2]}, 1.0, abs(${p[2]}) < 1e-6);
+  let cp_vc = ${p[0]} / cp_p; let cp_vd = ${p[1]} / cp_p;
+  let cp_lnr = 0.5 * log(r2);
+  let cp_a = cp_vc*ph + cp_vd*cp_lnr + (2.0*PI/cp_p) * floor(rnd(rs) * abs(cp_p));
+  let cp_m = ${w} * exp(cp_vc*cp_lnr - cp_vd*ph);
+  v += cp_m * vec2f(cos(cp_a), sin(cp_a)); }`,
+  },
+
+  elliptic: {
+    code: (w) => `{ let el_t = r2 + 1.0; let el_x2 = 2.0*t.x;
+  let el_xm = 0.5*(sqrt(max(el_t + el_x2, 0.0)) + sqrt(max(el_t - el_x2, 0.0)));
+  let el_a = clamp(t.x / max(el_xm, 1e-9), -1.0, 1.0);
+  let el_w = ${w} / (PI * 0.5);
+  v += vec2f(el_w * asin(el_a), sign(t.y) * el_w * log(el_xm + sqrt(max(el_xm - 1.0, 0.0)))); }`,
+  },
+
+  escher: {
+    params: [{ name: 'beta', def: 0.3 }],
+    code: (w, p) => `{ let es_lnr = 0.5*log(r2);
+  let es_vc = 0.5*(1.0 + cos(${p[0]}));
+  let es_vd = 0.5*sin(${p[0]});
+  let es_m = ${w} * exp(es_vc*es_lnr - es_vd*ph);
+  let es_n = es_vc*ph + es_vd*es_lnr;
+  v += es_m * vec2f(cos(es_n), sin(es_n)); }`,
+  },
+
+  exp: {
+    code: (w) => `{ let xq_d = ${w} * exp(t.x); v += xq_d * vec2f(cos(t.y), sin(t.y)); }`,
+  },
+
+  log: {
+    code: (w) => `v += ${w} * vec2f(0.5 * log(r2), ph);`,
+  },
+
+  foci: {
+    code: (w) => `{ let fc_ex = exp(t.x) * 0.5; let fc_en = 0.25 / fc_ex;
+  let fc_t = ${w} / max(fc_ex + fc_en - cos(t.y), 1e-6);
+  v += fc_t * vec2f(fc_ex - fc_en, sin(t.y)); }`,
+  },
+
+  loonie: {
+    code: (w) => `{ let lo_w2 = ${w}*${w};
+  if (r2 < lo_w2) { v += ${w} * sqrt(max(lo_w2/r2 - 1.0, 0.0)) * t; }
+  else { v += ${w} * t; } }`,
+  },
+
+  modulus: {
+    params: [{ name: 'x', def: 0.5 }, { name: 'y', def: 0.5 }],
+    code: (w, p) => `{ let mo_x = max(abs(${p[0]}), 1e-6); let mo_y = max(abs(${p[1]}), 1e-6);
+  v += ${w} * vec2f(mmod(t.x + mo_x, 2.0*mo_x) - mo_x, mmod(t.y + mo_y, 2.0*mo_y) - mo_y); }`,
+  },
+
+  polar2: {
+    code: (w) => `v += (${w} / PI) * vec2f(th, 0.5 * log(r2));`,
+  },
+
+  popcorn2: {
+    params: [{ name: 'x', def: 0.5 }, { name: 'y', def: 0.5 }, { name: 'c', def: 3 }],
+    code: (w, p) => `v += ${w} * vec2f(t.x + ${p[0]}*sin(tan(t.y*${p[2]})), t.y + ${p[1]}*sin(tan(t.x*${p[2]})));`,
+  },
+
+  scry: {
+    code: (w) => `{ let sy_d = r * (r2 + 1.0/max(${w}, 1e-6));
+  v += t / max(sy_d, 1e-9); }`,
+  },
+
+  separation: {
+    params: [
+      { name: 'x', def: 0.5 }, { name: 'y', def: 0.25 },
+      { name: 'xinside', def: 0.05 }, { name: 'yinside', def: 0.05 },
+    ],
+    code: (w, p) => `{ let se_bx = sqrt(t.x*t.x + ${p[0]}*${p[0]});
+  let se_by = sqrt(t.y*t.y + ${p[1]}*${p[1]});
+  let se_x = select(-(se_bx + t.x*${p[2]}), se_bx - t.x*${p[2]}, t.x > 0.0);
+  let se_y = select(-(se_by + t.y*${p[3]}), se_by - t.y*${p[3]}, t.y > 0.0);
+  v += ${w} * vec2f(se_x, se_y); }`,
+  },
+
+  splits: {
+    params: [{ name: 'x', def: 0.3 }, { name: 'y', def: 0.3 }],
+    code: (w, p) => `v += ${w} * vec2f(t.x + sign(t.x)*${p[0]}, t.y + sign(t.y)*${p[1]});`,
+  },
+
+  stripes: {
+    params: [{ name: 'space', def: 0.5 }, { name: 'warp', def: 0.5 }],
+    code: (w, p) => `{ let st_rx = floor(t.x + 0.5);
+  let st_ox = t.x - st_rx;
+  v += ${w} * vec2f(st_ox*(1.0 - ${p[0]}) + st_rx, t.y + st_ox*st_ox*${p[1]}); }`,
+  },
+
+  whorl: {
+    params: [{ name: 'inside', def: 0.5 }, { name: 'outside', def: 0.5 }],
+    code: (w, p) => `{ let wh_d = ${w} - r;
+  let wh_g = select(wh_d, 1e-6, abs(wh_d) < 1e-6);
+  let wh_a = ph + select(${p[1]}, ${p[0]}, r < ${w}) / wh_g;
+  v += ${w} * r * vec2f(cos(wh_a), sin(wh_a)); }`,
+  },
+
+  waves2: {
+    params: [
+      { name: 'scalex', def: 0.5 }, { name: 'scaley', def: 0.5 },
+      { name: 'freqx', def: 2 }, { name: 'freqy', def: 2 },
+    ],
+    code: (w, p) => `v += ${w} * vec2f(t.x + ${p[0]}*sin(t.y*${p[2]}), t.y + ${p[1]}*sin(t.x*${p[3]}));`,
+  },
+
+  flower: {
+    params: [{ name: 'petals', def: 5 }, { name: 'holes', def: 0.4 }],
+    code: (w, p) => `{ let fl_r = (rnd(rs) - ${p[1]}) * cos(${p[0]} * ph);
+  v += ${w} * fl_r * t / r; }`,
+  },
+
+  conic: {
+    params: [{ name: 'eccentricity', def: 1 }, { name: 'holes', def: 0 }],
+    code: (w, p) => `{ let co_ct = t.x / r;
+  let co_r = ${w} * (rnd(rs) - ${p[1]}) * ${p[0]} / max(abs(1.0 + ${p[0]}*co_ct), 1e-6) * sign(1.0 + ${p[0]}*co_ct);
+  v += co_r * t / r; }`,
+  },
+
+  parabola: {
+    params: [{ name: 'height', def: 0.5 }, { name: 'width', def: 1 }],
+    code: (w, p) => `{ let pa_sr = sin(r); let pa_cr = cos(r);
+  v += ${w} * vec2f(${p[0]}*pa_sr*pa_sr*rnd(rs), ${p[1]}*pa_cr*rnd(rs)); }`,
+  },
+
+  bent2: {
+    params: [{ name: 'x', def: 1.5 }, { name: 'y', def: 1 }],
+    code: (w, p) => `v += ${w} * vec2f(select(t.x, t.x*${p[0]}, t.x < 0.0), select(t.y, t.y*${p[1]}, t.y < 0.0));`,
+  },
+
+  pie: {
+    params: [
+      { name: 'slices', def: 6 }, { name: 'rotation', def: 0 }, { name: 'thickness', def: 0.5 },
+    ],
+    code: (w, p) => `{ let pi_n = max(${p[0]}, 1.0);
+  let pi_s = floor(rnd(rs) * pi_n + 0.5);
+  let pi_a = ${p[1]} + (2.0*PI / pi_n) * (pi_s + rnd(rs)*${p[2]});
+  v += ${w} * rnd(rs) * vec2f(cos(pi_a), sin(pi_a)); }`,
+  },
+
+  hemisphere: {
+    code: (w) => `v += (${w} / sqrt(r2 + 1.0)) * t;`,
+  },
+
+  // ---- Direct-color variations: paint the palette coordinate from geometry ----
+  dc_linear: {
+    params: [{ name: 'offset', def: 0 }, { name: 'angle', def: 0 }, { name: 'scale', def: 0.5 }],
+    code: (w, p) => `{ v += ${w} * t;
+  *cp = fract((cos(${p[1]})*t.x + sin(${p[1]})*t.y) * ${p[2]} + ${p[0]}); }`,
+  },
+
+  dc_radial: {
+    params: [{ name: 'scale', def: 0.7 }, { name: 'offset', def: 0 }],
+    code: (w, p) => `{ v += ${w} * t;
+  *cp = fract(r * ${p[0]} + ${p[1]}); }`,
+  },
+
+  dc_angle: {
+    params: [{ name: 'count', def: 2 }, { name: 'offset', def: 0 }],
+    code: (w, p) => `{ v += ${w} * t;
+  *cp = fract((ph / (2.0 * PI) + 0.5) * ${p[0]} + ${p[1]}); }`,
+  },
+
+  dc_bubble: {
+    params: [{ name: 'scale', def: 1 }, { name: 'offset', def: 0 }],
+    code: (w, p) => `{ let dcb = 4.0 / (r2 + 4.0);
+  v += ${w} * dcb * t;
+  *cp = fract(dcb * ${p[0]} + ${p[1]}); }`,
+  },
+};
+
+export const VARIATION_NAMES = Object.keys(VARIATIONS);
+
+export function variationParamCount(name: string): number {
+  return VARIATIONS[name]?.params?.length ?? 0;
+}
+
+export function defaultParams(name: string): Record<string, number> {
+  const out: Record<string, number> = {};
+  for (const p of VARIATIONS[name]?.params ?? []) out[p.name] = p.def;
+  return out;
+}

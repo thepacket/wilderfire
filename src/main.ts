@@ -1,0 +1,254 @@
+import './style.css';
+import { App, el } from './ui/common';
+import { FlameRenderer } from './gpu/renderer';
+import { PRESETS } from './core/presets';
+import { randomFlame } from './core/random';
+import { buildTransformsPanel } from './ui/transformsPanel';
+import { buildRenderPanel } from './ui/renderPanel';
+import { buildPalettePanel } from './ui/palettePanel';
+import { buildAIPanel } from './ui/aiPanel';
+import { buildAnimPanel, type AnimState } from './ui/animPanel';
+import { buildLibrary, loadAutosave, restoreFlame } from './ui/library';
+import { buildMutate } from './ui/mutate';
+import { buildOverlay } from './ui/overlay';
+
+const LS_THEME = 'wilderfire.theme';
+
+function initTheme() {
+  const saved = localStorage.getItem(LS_THEME);
+  const prefersLight = window.matchMedia?.('(prefers-color-scheme: light)').matches;
+  const theme = saved ?? (prefersLight ? 'light' : 'dark');
+  document.documentElement.dataset.theme = theme;
+  return theme;
+}
+
+function fatal(msg: string) {
+  const div = el('div', 'fatal');
+  const box = el('div', 'box');
+  box.append(el('h2', '', 'WilderFire needs WebGPU'), el('p', '', msg));
+  box.append(el('p', 'hint', 'Use a recent Chrome, Edge, or Safari 18+ (Firefox: enable dom.webgpu.enabled).'));
+  div.append(box);
+  document.body.append(div);
+}
+
+async function boot() {
+  initTheme();
+  const app = new App();
+  const root = document.getElementById('app')!;
+
+  // ---------- Header ----------
+  const header = el('div', 'header');
+  const logo = el('div', 'logo');
+  const w1 = el('span', 'wf-wilder', 'Wilder');
+  const w2 = el('span', 'wf-fire', 'Fire');
+  logo.append(w1, w2);
+
+  const presetSel = el('select') as HTMLSelectElement;
+  {
+    const o = el('option', '', 'Presets…') as HTMLOptionElement;
+    o.value = '';
+    presetSel.append(o);
+  }
+  const ogWf = document.createElement('optgroup');
+  ogWf.label = 'WilderFire';
+  PRESETS.forEach((p, i) => {
+    const o = el('option', '', p.name) as HTMLOptionElement;
+    o.value = 'p:' + i;
+    ogWf.append(o);
+  });
+  const ogJwf = document.createElement('optgroup');
+  ogJwf.label = 'JWildfire samples';
+  const { JWF_SAMPLES } = await import('./core/samples');
+  JWF_SAMPLES.forEach((s, i) => {
+    const o = el('option', '', s.name) as HTMLOptionElement;
+    o.value = 'j:' + i;
+    ogJwf.append(o);
+  });
+  presetSel.append(ogWf, ogJwf);
+  presetSel.onchange = async () => {
+    const v = presetSel.value;
+    presetSel.value = '';
+    if (v.startsWith('p:')) {
+      const p = PRESETS[parseInt(v.slice(2))];
+      if (p) app.setFlame(p.make());
+    } else if (v.startsWith('j:')) {
+      const s = JWF_SAMPLES[parseInt(v.slice(2))];
+      if (!s) return;
+      try {
+        const { importFlameText } = await import('./core/flameXML');
+        const text = await (await fetch('/flames/' + s.file)).text();
+        const { flame } = importFlameText(text, app.activeLayer.palette);
+        flame.name = s.name;
+        app.setFlame(flame);
+      } catch (e) {
+        console.error('Sample load failed:', e);
+      }
+    }
+  };
+
+  const randBtn = el('button', 'primary', '🎲 Randomize');
+  randBtn.onclick = () => app.setFlame(randomFlame());
+
+  const mutBtn = el('button', '', '🧬 Mutate');
+  mutBtn.title = 'Explore mutations of the current flame';
+  const saveBtn = el('button', 'icon', '💾');
+  saveBtn.title = 'Save to library';
+  const libBtn = el('button', '', '📚 Library');
+
+  const undoBtn = el('button', 'icon', '↩');
+  undoBtn.title = 'Undo (Ctrl/Cmd+Z)';
+  undoBtn.onclick = () => app.undo();
+  const redoBtn = el('button', 'icon', '↪');
+  redoBtn.title = 'Redo (Ctrl/Cmd+Shift+Z)';
+  redoBtn.onclick = () => app.redo();
+  app.on('history', () => {
+    undoBtn.disabled = !app.canUndo();
+    redoBtn.disabled = !app.canRedo();
+    undoBtn.style.opacity = app.canUndo() ? '1' : '0.4';
+    redoBtn.style.opacity = app.canRedo() ? '1' : '0.4';
+  });
+  window.addEventListener('keydown', (e) => {
+    const tag = (e.target as HTMLElement)?.tagName;
+    if (tag === 'INPUT' || tag === 'TEXTAREA' || tag === 'SELECT') return;
+    if ((e.metaKey || e.ctrlKey) && e.key.toLowerCase() === 'z') {
+      e.preventDefault();
+      if (e.shiftKey) app.redo();
+      else app.undo();
+      return;
+    }
+    // Arrow keys nudge the selected transform's translation (Shift = coarse)
+    const nudges: Record<string, [number, number]> = {
+      ArrowLeft: [-1, 0], ArrowRight: [1, 0], ArrowUp: [0, 1], ArrowDown: [0, -1],
+    };
+    const n = nudges[e.key];
+    if (n) {
+      const ly = app.activeLayer;
+      const x = app.selected === -1 ? ly.final : ly.xforms[app.selected];
+      if (!x) return;
+      e.preventDefault();
+      const step = e.shiftKey ? 0.1 : 0.02;
+      x.affine[2] += n[0] * step;
+      x.affine[5] += n[1] * step;
+      app.commit('nudge');
+    }
+  });
+
+  const triBtn = el('button', '', '△ Triangles');
+  const themeBtn = el('button', '', document.documentElement.dataset.theme === 'dark' ? '☀' : '🌙');
+  themeBtn.title = 'Toggle theme';
+  themeBtn.onclick = () => {
+    const next = document.documentElement.dataset.theme === 'dark' ? 'light' : 'dark';
+    document.documentElement.dataset.theme = next;
+    localStorage.setItem(LS_THEME, next);
+    themeBtn.textContent = next === 'dark' ? '☀' : '🌙';
+  };
+
+  const spacer = el('div', 'spacer');
+  header.append(logo, presetSel, randBtn, mutBtn, undoBtn, redoBtn, spacer, saveBtn, libBtn, triBtn, themeBtn);
+
+  // ---------- Layout ----------
+  const main = el('div', 'main');
+  const left = el('div', 'panel panel-left');
+  const wrap = el('div', 'canvas-wrap');
+  const right = el('div', 'panel panel-right');
+
+  const canvas = el('canvas') as HTMLCanvasElement;
+  canvas.id = 'render';
+  const overlayCanvas = el('canvas') as HTMLCanvasElement;
+  overlayCanvas.id = 'overlay';
+  const status = el('div', 'statusbar', '—');
+  wrap.append(canvas, overlayCanvas, status);
+
+  main.append(left, wrap, right);
+  root.append(header, main);
+
+  // ---------- Right panel tabs ----------
+  const tabs = el('div', 'tabs');
+  const tabDefs = ['Render', 'Gradient', 'Anim', 'AI'] as const;
+  const bodies: HTMLElement[] = [];
+  tabDefs.forEach((name, i) => {
+    const b = el('button', i === 0 ? 'active' : '', name);
+    b.onclick = () => {
+      tabs.querySelectorAll('button').forEach((x, k) => x.classList.toggle('active', k === i));
+      bodies.forEach((x, k) => x.classList.toggle('active', k === i));
+    };
+    tabs.append(b);
+    const body = el('div', 'tab-body' + (i === 0 ? ' active' : ''));
+    bodies.push(body);
+  });
+  right.append(tabs, ...bodies);
+
+  // ---------- Renderer ----------
+  const renderer = new FlameRenderer(canvas);
+  app.renderer = renderer;
+  const saved = loadAutosave();
+  app.flame = saved ? restoreFlame(saved as { flame: unknown }, PRESETS[0].make()) : PRESETS[0].make();
+
+  try {
+    await renderer.init();
+  } catch (e) {
+    fatal((e as Error).message);
+    return;
+  }
+
+  // Size canvas to container
+  const fit = () => {
+    const dpr = Math.min(window.devicePixelRatio || 1, 2);
+    const r = wrap.getBoundingClientRect();
+    // Even dimensions keep video encoders happy.
+    renderer.resize(Math.round(r.width * dpr) & ~1, Math.round(r.height * dpr) & ~1);
+    overlay.sync();
+  };
+
+  renderer.onError = (msg) => { status.textContent = '⚠ ' + msg; };
+  renderer.onFrame = (s) => {
+    const mps = s.samplesPerSec / 1e6;
+    status.textContent =
+      `quality ${s.spp.toFixed(0)} spp` +
+      (s.converged ? ' · done' : s.paused ? ' · paused' : ` · ${mps.toFixed(0)} M iters/s`) +
+      ` · ${renderer.width}×${renderer.height}`;
+  };
+
+  // ---------- Panels ----------
+  const overlay = buildOverlay(app, overlayCanvas, wrap);
+  buildTransformsPanel(app, left);
+  buildRenderPanel(app, bodies[0]);
+  buildPalettePanel(app, bodies[1]);
+  const anim = buildAnimPanel(app, bodies[2], overlay);
+  buildAIPanel(app, bodies[3]);
+  if (saved?.anim) anim.setState(saved.anim as AnimState);
+  const library = buildLibrary(app, anim);
+  saveBtn.onclick = () => {
+    library.save();
+    saveBtn.textContent = '✓';
+    setTimeout(() => { saveBtn.textContent = '💾'; }, 900);
+  };
+  libBtn.onclick = () => library.open();
+  const mutate = buildMutate(app);
+  mutBtn.onclick = () => { mutate.open(); };
+
+  triBtn.onclick = () => {
+    overlay.setVisible(!overlay.visible);
+    triBtn.classList.toggle('primary', overlay.visible);
+  };
+  triBtn.classList.add('primary');
+
+  new ResizeObserver(fit).observe(wrap);
+  fit();
+  app.setFlame(app.flame);
+
+  // Scripting / testing hook
+  const { importFlameText, flameToXML } = await import('./core/flameXML');
+  (window as any).wilderfire = {
+    app,
+    anim,
+    importText: (text: string) => {
+      const { flame, count } = importFlameText(text, app.activeLayer.palette);
+      app.setFlame(flame);
+      return count;
+    },
+    exportXML: () => flameToXML(app.flame),
+  };
+}
+
+boot();

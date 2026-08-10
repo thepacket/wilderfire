@@ -1,0 +1,487 @@
+// Left panel: layer stack + xform list + editor for the selected transform.
+// All transform edits operate on the active layer.
+import { App, el, slider, numberInput, formatNum, XFORM_COLORS } from './common';
+import type { XForm } from '../core/flame';
+import {
+  defaultXForm, defaultLayer, cloneXForm, cloneLayer,
+  rotateAffine, scaleAffine, IDENTITY, MAX_LAYERS, MAX_XFORMS,
+} from '../core/flame';
+import { randomPalette } from '../core/palette';
+import { VARIATION_NAMES, VARIATIONS, defaultParams } from '../core/variations';
+
+const SRC = 'transforms';
+
+export function buildTransformsPanel(app: App, root: HTMLElement) {
+  const layerSec = el('div', 'section');
+  layerSec.append(el('h3', '', 'Layers'));
+  const layerList = el('div', 'xform-list');
+  layerSec.append(layerList);
+  const layerBtns = el('div', 'btn-row');
+  const addLayerBtn = el('button', '', '+ Layer');
+  const dupLayerBtn = el('button', '', 'Duplicate');
+  const delLayerBtn = el('button', 'danger', 'Delete');
+  const upLayerBtn = el('button', 'icon', '↑');
+  const dnLayerBtn = el('button', 'icon', '↓');
+  upLayerBtn.title = 'Move layer up';
+  dnLayerBtn.title = 'Move layer down';
+  layerBtns.append(addLayerBtn, dupLayerBtn, delLayerBtn, upLayerBtn, dnLayerBtn);
+  layerSec.append(layerBtns);
+  const layerWeightWrap = el('div');
+  layerSec.append(layerWeightWrap);
+
+  const listSec = el('div', 'section');
+  listSec.append(el('h3', '', 'Transforms'));
+  const list = el('div', 'xform-list');
+  listSec.append(list);
+
+  const btnRow = el('div', 'btn-row');
+  const addBtn = el('button', '', '+ Add');
+  const dupBtn = el('button', '', 'Duplicate');
+  const delBtn = el('button', 'danger', 'Delete');
+  const finalBtn = el('button', '', '');
+  btnRow.append(addBtn, dupBtn, delBtn, finalBtn);
+  listSec.append(btnRow);
+
+  const btnRow2 = el('div', 'btn-row');
+  const upBtn = el('button', 'icon', '↑');
+  const dnBtn = el('button', 'icon', '↓');
+  upBtn.title = 'Move transform up (reorders xaos too)';
+  dnBtn.title = 'Move transform down (reorders xaos too)';
+  const copyBtn = el('button', 'icon', '⎘');
+  copyBtn.title = 'Copy transform (paste into any layer or flame)';
+  const pasteBtn = el('button', 'icon', '📋');
+  pasteBtn.title = 'Paste copied transform';
+  const symSel = el('select') as HTMLSelectElement;
+  for (const n of [2, 3, 4, 5, 6, 8]) {
+    const o = el('option', '', `×${n}`) as HTMLOptionElement;
+    o.value = String(n);
+    if (n === 3) o.selected = true;
+    symSel.append(o);
+  }
+  symSel.title = 'Symmetry order';
+  const symBtn = el('button', 'icon', '❋ Sym');
+  symBtn.title = 'Add rotational symmetry transforms';
+  const mirBtn = el('button', 'icon', '⇋ Mirror');
+  mirBtn.title = 'Add a horizontal mirror transform';
+  btnRow2.append(upBtn, dnBtn, copyBtn, pasteBtn, symSel, symBtn, mirBtn);
+  listSec.append(btnRow2);
+
+  const editorSec = el('div', 'section');
+  root.append(layerSec, listSec, editorSec);
+
+  const layer = () => app.activeLayer;
+
+  const selectedXForm = (): XForm | null => {
+    if (app.selected === -1) return layer().final;
+    return layer().xforms[app.selected] ?? null;
+  };
+
+  // ---------- Layer actions ----------
+  addLayerBtn.onclick = () => {
+    if (app.flame.layers.length >= MAX_LAYERS) return;
+    const ly = defaultLayer(randomPalette());
+    ly.weight = 0.5;
+    ly.xforms = [defaultXForm()];
+    ly.xforms[0].affine = [0.5, 0, Math.random() - 0.5, 0, 0.5, Math.random() - 0.5];
+    app.flame.layers.push(ly);
+    app.layerIdx = app.flame.layers.length - 1;
+    app.selected = 0;
+    app.commit();
+    app.emit('select');
+    rebuild();
+  };
+  dupLayerBtn.onclick = () => {
+    if (app.flame.layers.length >= MAX_LAYERS) return;
+    app.flame.layers.push(cloneLayer(layer()));
+    app.layerIdx = app.flame.layers.length - 1;
+    app.selected = 0;
+    app.commit();
+    app.emit('select');
+    rebuild();
+  };
+  delLayerBtn.onclick = () => {
+    if (app.flame.layers.length <= 1) return;
+    app.flame.layers.splice(app.layerIdx, 1);
+    app.layerIdx = Math.max(0, app.layerIdx - 1);
+    app.selected = 0;
+    app.commit();
+    app.emit('select');
+    rebuild();
+  };
+  const moveLayer = (dir: number) => {
+    const i = app.layerIdx, j = i + dir;
+    const ls = app.flame.layers;
+    if (j < 0 || j >= ls.length) return;
+    [ls[i], ls[j]] = [ls[j], ls[i]];
+    app.layerIdx = j;
+    app.commit();
+    app.emit('select');
+    rebuild();
+  };
+  upLayerBtn.onclick = () => moveLayer(-1);
+  dnLayerBtn.onclick = () => moveLayer(1);
+
+  function rebuildLayers() {
+    layerList.textContent = '';
+    const multi = app.flame.layers.length > 1;
+    layerSec.style.display = '';
+    app.flame.layers.forEach((ly, li) => {
+      const item = el('div', 'xform-item' + (app.layerIdx === li ? ' selected' : ''));
+      const vis = el('input') as HTMLInputElement;
+      vis.type = 'checkbox';
+      vis.checked = ly.visible;
+      vis.title = 'visible';
+      vis.addEventListener('click', (e) => e.stopPropagation());
+      vis.addEventListener('change', () => {
+        ly.visible = vis.checked;
+        app.commit();
+      });
+      const sw = el('span', 'xform-swatch');
+      const mid = ly.palette[128] ?? [0.5, 0.5, 0.5];
+      sw.style.background = `rgb(${mid.map((v) => Math.round(v * 255)).join(',')})`;
+      const name = el('span', 'xname', `L${li + 1}`);
+      const info = el('span', 'xinfo',
+        `${ly.xforms.length} xform${ly.xforms.length === 1 ? '' : 's'} · w ${formatNum(ly.weight)}`);
+      item.append(vis, sw, name, info);
+      item.onclick = () => { app.selectLayer(li); rebuild(); };
+      layerList.append(item);
+    });
+    delLayerBtn.disabled = !multi;
+
+    layerWeightWrap.textContent = '';
+    if (multi) {
+      layerWeightWrap.append(slider({
+        label: `L${app.layerIdx + 1} weight`, min: 0, max: 2, step: 0.02, value: layer().weight,
+        onInput: (v) => { layer().weight = v; app.commit(SRC); rebuildLayersInfoOnly(); },
+      }).root);
+    }
+  }
+
+  function rebuildLayersInfoOnly() {
+    // Light refresh of the weight text without rebuilding inputs mid-drag.
+    const items = layerList.querySelectorAll('.xform-item .xinfo');
+    app.flame.layers.forEach((ly, li) => {
+      const n = items[li];
+      if (n) n.textContent = `${ly.xforms.length} xform${ly.xforms.length === 1 ? '' : 's'} · w ${formatNum(ly.weight)}`;
+    });
+  }
+
+  // ---------- XForm actions ----------
+  addBtn.onclick = () => {
+    if (layer().xforms.length >= MAX_XFORMS) return;
+    const x = defaultXForm();
+    x.color = Math.random();
+    x.affine = [0.5, 0, Math.random() - 0.5, 0, 0.5, Math.random() - 0.5];
+    layer().xforms.push(x);
+    app.selected = layer().xforms.length - 1;
+    app.commit();
+    app.emit('select');
+    rebuild();
+  };
+  dupBtn.onclick = () => {
+    const x = selectedXForm();
+    if (!x || app.selected === -1 || layer().xforms.length >= MAX_XFORMS) return;
+    layer().xforms.push(cloneXForm(x));
+    app.selected = layer().xforms.length - 1;
+    app.commit();
+    app.emit('select');
+    rebuild();
+  };
+  delBtn.onclick = () => {
+    if (app.selected === -1) {
+      layer().final = null;
+      app.selected = 0;
+    } else {
+      if (layer().xforms.length <= 1) return;
+      layer().xforms.splice(app.selected, 1);
+      app.selected = Math.max(0, app.selected - 1);
+    }
+    app.commit();
+    app.emit('select');
+    rebuild();
+  };
+  finalBtn.onclick = () => {
+    if (layer().final) {
+      app.selected = -1;
+    } else {
+      const fx = defaultXForm();
+      fx.colorSpeed = 0.2;
+      layer().final = fx;
+      app.selected = -1;
+      app.commit();
+    }
+    app.emit('select');
+    rebuild();
+  };
+
+  /** Swap two transforms and keep every xaos row consistent. */
+  const swapXForms = (i: number, j: number) => {
+    const ly = layer();
+    [ly.xforms[i], ly.xforms[j]] = [ly.xforms[j], ly.xforms[i]];
+    for (const x of ly.xforms) {
+      if (!x.xaos) continue;
+      while (x.xaos.length < ly.xforms.length) x.xaos.push(1);
+      [x.xaos[i], x.xaos[j]] = [x.xaos[j], x.xaos[i]];
+    }
+  };
+  const moveXForm = (dir: number) => {
+    if (app.selected === -1) return;
+    const i = app.selected, j = i + dir;
+    if (j < 0 || j >= layer().xforms.length) return;
+    swapXForms(i, j);
+    app.selected = j;
+    app.commit();
+    app.emit('select');
+    rebuild();
+  };
+  upBtn.onclick = () => moveXForm(-1);
+  dnBtn.onclick = () => moveXForm(1);
+
+  copyBtn.onclick = () => {
+    const x = selectedXForm();
+    if (x) {
+      app.xformClipboard = cloneXForm(x);
+      copyBtn.textContent = '✓';
+      setTimeout(() => { copyBtn.textContent = '⎘'; }, 700);
+    }
+  };
+  pasteBtn.onclick = () => {
+    if (!app.xformClipboard || layer().xforms.length >= MAX_XFORMS) return;
+    layer().xforms.push(cloneXForm(app.xformClipboard));
+    app.selected = layer().xforms.length - 1;
+    app.commit();
+    app.emit('select');
+    rebuild();
+  };
+
+  symBtn.onclick = () => {
+    const n = parseInt(symSel.value);
+    const ly = layer();
+    for (let k = 1; k < n && ly.xforms.length < MAX_XFORMS; k++) {
+      const a = (2 * Math.PI * k) / n;
+      const x = defaultXForm();
+      x.affine = [Math.cos(a), -Math.sin(a), 0, Math.sin(a), Math.cos(a), 0];
+      x.colorSpeed = 0; // symmetry transforms shouldn't shift color (flam3 convention)
+      x.weight = 1;
+      x.color = k / n;
+      ly.xforms.push(x);
+    }
+    app.commit();
+    app.emit('select');
+    rebuild();
+  };
+  mirBtn.onclick = () => {
+    const ly = layer();
+    if (ly.xforms.length >= MAX_XFORMS) return;
+    const x = defaultXForm();
+    x.affine = [-1, 0, 0, 0, 1, 0];
+    x.colorSpeed = 0;
+    x.weight = 1;
+    ly.xforms.push(x);
+    app.commit();
+    app.emit('select');
+    rebuild();
+  };
+
+  function rebuildList() {
+    list.textContent = '';
+    layer().xforms.forEach((x, i) => {
+      const item = el('div', 'xform-item' + (app.selected === i ? ' selected' : ''));
+      const sw = el('span', 'xform-swatch');
+      sw.style.background = XFORM_COLORS[i % XFORM_COLORS.length];
+      const name = el('span', 'xname', `T${i + 1}`);
+      const info = el('span', 'xinfo',
+        `${x.variations.map((v) => v.name).join(', ') || '—'} · w ${formatNum(x.weight)}`);
+      item.append(sw, name, info);
+      item.onclick = () => { app.select(i); rebuild(); };
+      list.append(item);
+    });
+    if (layer().final) {
+      const item = el('div', 'xform-item' + (app.selected === -1 ? ' selected' : ''));
+      const sw = el('span', 'xform-swatch');
+      sw.style.background = '#ffffff';
+      item.append(sw, el('span', 'xname', 'Final'),
+        el('span', 'xinfo', layer().final!.variations.map((v) => v.name).join(', ')));
+      item.onclick = () => { app.select(-1); rebuild(); };
+      list.append(item);
+    }
+    finalBtn.textContent = layer().final ? 'Final ✓' : '+ Final';
+  }
+
+  function rebuildEditor() {
+    editorSec.textContent = '';
+    const x = selectedXForm();
+    if (!x) return;
+    const isFinal = app.selected === -1;
+    editorSec.append(el('h3', '', isFinal ? 'Final Transform' : `Transform T${app.selected + 1}`));
+
+    if (!isFinal) {
+      editorSec.append(slider({
+        label: 'Weight', min: 0.01, max: 4, step: 0.01, value: x.weight,
+        onInput: (v) => { x.weight = v; app.commit(SRC); },
+      }).root);
+    }
+    editorSec.append(slider({
+      label: 'Color', min: 0, max: 1, step: 0.005, value: x.color,
+      onInput: (v) => { x.color = v; app.commit(SRC); },
+    }).root);
+    editorSec.append(slider({
+      label: 'Color speed', min: 0, max: 1, step: 0.01, value: x.colorSpeed,
+      onInput: (v) => { x.colorSpeed = v; app.commit(SRC); },
+    }).root);
+    editorSec.append(slider({
+      label: 'Opacity', min: 0, max: 1, step: 0.01, value: x.opacity,
+      onInput: (v) => { x.opacity = v; app.commit(SRC); },
+    }).root);
+
+    // Affine grid
+    editorSec.append(el('h3', '', 'Affine  (a b c / d e f)'));
+    const grid = el('div', 'affine-grid');
+    x.affine.forEach((v, i) => {
+      const inp = numberInput(v, 0.01, (nv) => { x.affine[i] = nv; app.commit(SRC); });
+      grid.append(inp);
+    });
+    editorSec.append(grid);
+
+    const aRow = el('div', 'btn-row');
+    const mk = (label: string, fn: () => void) => {
+      const b = el('button', 'icon', label);
+      b.onclick = () => { fn(); app.commit(); rebuildEditor(); };
+      return b;
+    };
+    aRow.append(
+      mk('⟲ 15°', () => { x.affine = rotateAffine(x.affine, Math.PI / 12); }),
+      mk('⟳ 15°', () => { x.affine = rotateAffine(x.affine, -Math.PI / 12); }),
+      mk('× 1.1', () => { x.affine = scaleAffine(x.affine, 1.1); }),
+      mk('÷ 1.1', () => { x.affine = scaleAffine(x.affine, 1 / 1.1); }),
+      mk('Reset', () => { x.affine = [...IDENTITY] as typeof x.affine; }),
+    );
+    editorSec.append(aRow);
+
+    // Post affine (collapsed unless non-identity)
+    const postIsId = x.post.every((v, i) => Math.abs(v - IDENTITY[i]) < 1e-9);
+    const postHead = el('h3', '', `Post affine ${postIsId ? '(identity)' : ''}`);
+    postHead.style.cursor = 'pointer';
+    editorSec.append(postHead);
+    const postGrid = el('div', 'affine-grid');
+    postGrid.style.display = postIsId ? 'none' : 'grid';
+    postHead.onclick = () => {
+      postGrid.style.display = postGrid.style.display === 'none' ? 'grid' : 'none';
+    };
+    x.post.forEach((v, i) => {
+      postGrid.append(numberInput(v, 0.01, (nv) => { x.post[i] = nv; app.commit(SRC); }));
+    });
+    editorSec.append(postGrid);
+
+    // Variations (pre stage / main / post stage)
+    const renderVarGroup = (title: string, arr: () => XForm['variations'], removable: boolean) => {
+      const list = arr();
+      if (!list.length && removable) return; // hide empty pre/post groups
+      editorSec.append(el('h3', '', title));
+      const wrap = el('div');
+      list.forEach((vi, vidx) => {
+        const item = el('div', 'var-item');
+        const head = el('div', 'var-head');
+        head.append(el('span', 'vname', vi.name));
+        const wInp = numberInput(vi.weight, 0.05, (nv) => { vi.weight = nv; app.commit(SRC); });
+        wInp.title = 'weight';
+        const rm = el('button', 'icon danger', '✕');
+        rm.onclick = () => {
+          arr().splice(vidx, 1);
+          if (!arr().length && title.startsWith('Pre')) delete x.preVariations;
+          if (!arr().length && title.startsWith('Post')) delete x.postVariations;
+          app.commit();
+          rebuildEditor();
+        };
+        head.append(wInp, rm);
+        item.append(head);
+        const defs = VARIATIONS[vi.name]?.params ?? [];
+        if (defs.length) {
+          const pw = el('div', 'var-params');
+          for (const pd of defs) {
+            const vp = el('span', 'vp');
+            vp.append(el('span', '', pd.name));
+            vp.append(numberInput(vi.params[pd.name] ?? pd.def, 0.05, (nv) => {
+              vi.params[pd.name] = nv;
+              app.commit(SRC);
+            }));
+            pw.append(vp);
+          }
+          item.append(pw);
+        }
+        wrap.append(item);
+      });
+      editorSec.append(wrap);
+    };
+    renderVarGroup('Pre variations', () => x.preVariations ?? [], true);
+    renderVarGroup('Variations', () => x.variations, false);
+    renderVarGroup('Post variations', () => x.postVariations ?? [], true);
+
+    // Xaos row (per-pair transition weights)
+    if (!isFinal && layer().xforms.length > 1) {
+      const xh = el('h3', '', 'Xaos → next transform');
+      xh.title = 'Weight multiplier for choosing each transform right after this one (flam3 "chaos")';
+      editorSec.append(xh);
+      const xg = el('div', 'affine-grid');
+      layer().xforms.forEach((_, j) => {
+        const wrap2 = el('div');
+        wrap2.style.display = 'flex';
+        wrap2.style.flexDirection = 'column';
+        wrap2.style.gap = '2px';
+        const lab = el('span', '', `→ T${j + 1}`);
+        lab.style.fontSize = '10px';
+        lab.style.color = 'var(--fg-dim)';
+        const inp = numberInput(x.xaos?.[j] ?? 1, 0.1, (nv) => {
+          if (!x.xaos) x.xaos = layer().xforms.map(() => 1);
+          while (x.xaos.length < layer().xforms.length) x.xaos.push(1);
+          x.xaos[j] = Math.max(0, nv);
+          app.commit(SRC);
+        });
+        wrap2.append(lab, inp);
+        xg.append(wrap2);
+      });
+      editorSec.append(xg);
+    }
+
+    const addRow = el('div', 'btn-row');
+    const sel = el('select') as HTMLSelectElement;
+    for (const n of VARIATION_NAMES) {
+      const o = el('option', '', n) as HTMLOptionElement;
+      o.value = n;
+      sel.append(o);
+    }
+    const mkVar = () => ({ name: sel.value, weight: 0.5, params: defaultParams(sel.value) });
+    const addVar = el('button', '', '+ Variation');
+    addVar.onclick = () => {
+      x.variations.push(mkVar());
+      app.commit();
+      rebuildEditor();
+    };
+    const addPre = el('button', 'icon', '+ Pre');
+    addPre.title = 'Add to the pre stage (transforms the affine result before the main variations; add linear 1 to keep a pass-through)';
+    addPre.onclick = () => {
+      (x.preVariations ??= []).push(mkVar());
+      app.commit();
+      rebuildEditor();
+    };
+    const addPost = el('button', 'icon', '+ Post');
+    addPost.title = 'Add to the post stage (transforms the main variation output)';
+    addPost.onclick = () => {
+      (x.postVariations ??= []).push(mkVar());
+      app.commit();
+      rebuildEditor();
+    };
+    addRow.append(sel, addVar, addPre, addPost);
+    editorSec.append(addRow);
+  }
+
+  function rebuild() {
+    rebuildLayers();
+    rebuildList();
+    rebuildEditor();
+  }
+
+  app.on('flame', (src) => { if (src !== SRC && src !== 'overlay-view') rebuild(); });
+  app.on('select', (src) => { if (src !== SRC) rebuild(); });
+  rebuild();
+}
