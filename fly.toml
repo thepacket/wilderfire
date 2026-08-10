@@ -1,0 +1,22 @@
+# Fly.io configuration for WilderFire (static site, zero server-side processing)
+app = "wilderfire"
+primary_region = "yyz"
+
+[build]
+  dockerfile = "Dockerfile"
+
+[http_service]
+  internal_port = 80
+  force_https = true          # WebGPU requires a secure context
+  auto_stop_machines = "stop" # scale to zero when idle — it's just static files
+  auto_start_machines = true
+  min_machines_running = 0
+
+[[vm]]
+  size = "shared-cpu-1x"
+  memory = "256mb"
+
+[http_service.concurrency]
+  type = "requests"
+  soft_limit = 200
+  hard_limit = 250
