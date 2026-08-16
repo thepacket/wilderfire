@@ -1,6 +1,7 @@
 // Tiny DOM helpers + the shared App context that panels talk to.
 import type { Flame, Layer, XForm } from '../core/flame';
 import type { FlameRenderer } from '../gpu/renderer';
+import type { MotionCurve } from '../core/motion';
 
 export function el<K extends keyof HTMLElementTagNameMap>(
   tag: K, cls?: string, text?: string,
@@ -73,6 +74,9 @@ export class App {
   layerIdx = 0; // active layer
   selected = 0; // xform index within the active layer; -1 => final xform
   xformClipboard: XForm | null = null; // survives flame switches
+  /** Motion-curve bridge, registered by the Anim panel (used by .flame export/import). */
+  getCurves: () => MotionCurve[] = () => [];
+  setCurves: (curves: MotionCurve[]) => void = () => {};
   private listeners: { ev: AppEvent; fn: (source: string) => void }[] = [];
 
   // Undo/redo: JSON snapshots with slider-gesture coalescing.

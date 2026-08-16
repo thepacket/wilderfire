@@ -14,6 +14,7 @@
 import type { Flame, XForm, Layer, Affine, RGB } from './flame';
 import { defaultXForm, defaultFlame, normalizeFlame, MAX_LAYERS, MAX_XFORMS } from './flame';
 import { VARIATIONS } from './variations';
+import type { MotionCurve, CurvePoint, CurveInterp } from './motion';
 
 const NON_VARIATION_ATTRS = new Set([
   'weight', 'color', 'symmetry', 'color_speed', 'opacity', 'coefs', 'post',
@@ -62,8 +63,65 @@ const fmt = (v: number) => {
 /** Variation names the last import could not resolve (reset per parseFlameXML call). */
 export const lastImportUnknown: string[] = [];
 const noteUnknown = (name: string) => { if (!lastImportUnknown.includes(name)) lastImportUnknown.push(name); };
+/** Motion curves found by the last import (JWildfire `<prop>Curve_*` attributes), as WilderFire curves. */
+export const lastImportCurves: MotionCurve[] = [];
 
-function parseXFormEl(elm: Element): XForm {
+// ---- JWildfire motion curves ----
+// JWildfire serialises a curve as a family of attributes sharing a prefix:
+//   <prefix>_enabled, _view_xmin/xmax/ymin/ymax, _interpolation (SPLINE|BEZIER|LINEAR),
+//   _selected_idx, _locked, _point_count, _x<i> (frame, int), _y<i> (value)
+// The prefix is `<javaField>Curve` for flame/layer/xform fields (camPitchCurve,
+// weightCurve, xyCoeff00Curve, …), `<var>_amountCurve` for a variation weight and
+// `<var>_<param>` for a variation parameter. Time is frames at the flame's `fps`.
+const CURVE_SUFFIX_RE = /^(.+)_(enabled|view_xmin|view_xmax|view_ymin|view_ymax|interpolation|selected_idx|locked|point_count|parent_curve|x\d+|y\d+)$/;
+interface RawCurve { prefix: string; points: CurvePoint[]; interp: CurveInterp; enabled: boolean }
+
+/** Prefixes of every curve on the element (those with a `_point_count`). */
+function curvePrefixes(elm: Element): Set<string> {
+  const s = new Set<string>();
+  for (const a of Array.from(elm.attributes)) if (a.name.endsWith('_point_count')) s.add(a.name.slice(0, -'_point_count'.length));
+  return s;
+}
+function isCurveAttr(name: string, prefixes: Set<string>): boolean {
+  const m = CURVE_SUFFIX_RE.exec(name);
+  return !!m && prefixes.has(m[1]);
+}
+function readCurves(elm: Element, fps: number): RawCurve[] {
+  const out: RawCurve[] = [];
+  for (const prefix of curvePrefixes(elm)) {
+    const get = (s: string) => elm.getAttribute(`${prefix}_${s}`);
+    const n = parseInt(get('point_count') ?? '0');
+    if (!isFinite(n) || n <= 0) continue;
+    const points: CurvePoint[] = [];
+    for (let i = 0; i < n; i++) {
+      const x = parseFloat(get('x' + i) ?? ''), y = parseFloat(get('y' + i) ?? '');
+      if (isFinite(x) && isFinite(y)) points.push({ t: x / fps, v: y });
+    }
+    if (!points.length) continue;
+    const ji = (get('interpolation') ?? 'SPLINE').toUpperCase();
+    const interp: CurveInterp = ji === 'LINEAR' ? 'linear' : 'spline';
+    out.push({ prefix, points, interp, enabled: get('enabled') !== 'false' });
+  }
+  return out;
+}
+const pushCurve = (raw: RawCurve, path: string, map: (v: number) => number = (v) => v) => {
+  lastImportCurves.push({ path, points: raw.points.map((p) => ({ t: p.t, v: map(p.v) })), interp: raw.interp, enabled: raw.enabled });
+};
+/** affine index for JWildfire xyCoeff{00,01,10,11,20,21} (XML "a d b e c f" order). */
+const COEFF_IDX: Record<string, number> = { '00': 0, '01': 3, '10': 1, '11': 4, '20': 2, '21': 5 };
+const XFORM_CURVE_MAP: Record<string, { key: string; map?: (v: number) => number }> = {
+  weightCurve: { key: 'weight' }, colorCurve: { key: 'color' }, opacityCurve: { key: 'opacity' },
+  colorSymmetryCurve: { key: 'colorSpeed', map: (v) => (1 - v) / 2 },
+};
+for (const [ij, idx] of Object.entries(COEFF_IDX)) {
+  XFORM_CURVE_MAP[`xyCoeff${ij}Curve`] = { key: `affine.${idx}` };
+  XFORM_CURVE_MAP[`xyPostCoeff${ij}Curve`] = { key: `post.${idx}` };
+}
+
+/** Curve-import context: where this element lives in the Flame + timebase. */
+interface CurveCtx { pathBase: string; fps: number }
+
+function parseXFormEl(elm: Element, ctx?: CurveCtx): XForm {
   const x = defaultXForm();
   x.variations = [];
   x.affine = parseCoefs(elm.getAttribute('coefs'), x.affine);
@@ -102,11 +160,13 @@ function parseXFormEl(elm: Element): XForm {
   const params: Record<string, Record<string, number>> = {}; // keyed by raw attr prefix
   const weights: { raw: string; stage: Stage; vname: string; weight: number }[] = [];
   const unresolved: string[] = [];
+  const cprefixes = curvePrefixes(elm);
   for (const attr of Array.from(elm.attributes)) {
     // Duplicate variation instances on one xform were renamed name__dup<k> by
     // the lenient pre-parser; strip the marker to resolve them.
     const name = attr.name.replace(/__dup\d+/, '');
     if (NON_VARIATION_ATTRS.has(name) || isFxPriorityAttr(name) || name.startsWith('wfield_')) continue;
+    if (isCurveAttr(attr.name, cprefixes)) continue;
     const val = parseFloat(attr.value);
     if (!isFinite(val)) continue;
     const direct = resolve(name);
@@ -134,6 +194,7 @@ function parseXFormEl(elm: Element): XForm {
     if (unresolved.some((o) => o !== u && u.startsWith(o + '_'))) continue;
     noteUnknown(u);
   }
+  const instByRaw = new Map<string, { inst: XForm['variations'][number]; list: 'variations' | 'preVariations' | 'postVariations' }>();
   for (const { raw, stage, vname, weight } of weights) {
     if (weight === 0) continue;
     const p: Record<string, number> = {};
@@ -141,9 +202,9 @@ function parseXFormEl(elm: Element): XForm {
       p[pd.name] = params[raw]?.[pd.name] ?? pd.def;
     }
     const inst = { name: vname, weight, params: p };
-    if (stage === 'pre') (x.preVariations ??= []).push(inst);
-    else if (stage === 'post') (x.postVariations ??= []).push(inst);
-    else x.variations.push(inst);
+    if (stage === 'pre') { (x.preVariations ??= []).push(inst); instByRaw.set(raw, { inst, list: 'preVariations' }); }
+    else if (stage === 'post') { (x.postVariations ??= []).push(inst); instByRaw.set(raw, { inst, list: 'postVariations' }); }
+    else { x.variations.push(inst); instByRaw.set(raw, { inst, list: 'variations' }); }
   }
   // flam3 pre/post variations ADD to a pass-through point; our stages are pure
   // sums, so inject linear 1 to reproduce that unless one is already present.
@@ -154,6 +215,29 @@ function parseXFormEl(elm: Element): XForm {
   }
   if (!x.variations.length) {
     x.variations.push({ name: 'linear', weight: 1, params: {} });
+  }
+  // Motion curves on this xform → WilderFire curve paths.
+  if (ctx && cprefixes.size) {
+    for (const rc of readCurves(elm, ctx.fps)) {
+      const m = XFORM_CURVE_MAP[rc.prefix];
+      if (m) { pushCurve(rc, `${ctx.pathBase}.${m.key}`, m.map); continue; }
+      // `<raw>_amountCurve` (weight) or `<raw>_<param>`
+      let raw: string | null = null, key = '';
+      if (rc.prefix.endsWith('_amountCurve')) { raw = rc.prefix.slice(0, -'_amountCurve'.length); key = 'weight'; }
+      else {
+        for (const r of instByRaw.keys()) {
+          if (rc.prefix.startsWith(r + '_')) {
+            const pn = rc.prefix.slice(r.length + 1);
+            const e = instByRaw.get(r)!;
+            if (VARIATIONS[e.inst.name]?.params?.some((pd) => pd.name === pn)) { raw = r; key = `params.${pn}`; break; }
+          }
+        }
+      }
+      const e = raw ? instByRaw.get(raw) : undefined;
+      if (!e) continue;
+      const idx = (x[e.list] ?? []).indexOf(e.inst);
+      if (idx >= 0) pushCurve(rc, `${ctx.pathBase}.${e.list}.${idx}.${key}`);
+    }
   }
   return x;
 }
@@ -244,6 +328,7 @@ function dedupeAttributes(text: string): string {
 
 export function parseFlameXML(text: string, fallbackPalette: RGB[]): Flame[] {
   lastImportUnknown.length = 0;
+  lastImportCurves.length = 0;
   let doc = new DOMParser().parseFromString(text, 'application/xml');
   if (doc.querySelector('parsererror')) doc = new DOMParser().parseFromString(dedupeAttributes(text), 'application/xml');
   if (doc.querySelector('parsererror')) {
@@ -293,12 +378,35 @@ export function parseFlameXML(text: string, fallbackPalette: RGB[]): Flame[] {
       const mx = Math.max(...bg);
       f.background = bg.map((v) => (mx > 1 ? v / 255 : v)) as RGB;
     }
-    const parseLayerContent = (elm: Element): Omit<Layer, 'weight' | 'visible'> => {
-      const xf = Array.from(elm.querySelectorAll(':scope > xform')).slice(0, MAX_XFORMS).map(parseXFormEl);
+    // Motion curves (only the first flame's curves are surfaced)
+    const fpsA = parseFloat(fe.getAttribute('fps') ?? '');
+    const fps = isFinite(fpsA) && fpsA > 0 ? fpsA : 25;
+    const isFirst = fe === flameEls[0];
+    if (isFirst) {
+      const zoomPerUnit = 1 / (0.25 * sizeMin);
+      const FLAME_MAP: Record<string, { key: string; map?: (v: number) => number }> = {
+        camPitchCurve: { key: 'camPitch' }, camYawCurve: { key: 'camYaw' }, camBankCurve: { key: 'camBank' },
+        camPerspectiveCurve: { key: 'camPersp' }, camRollCurve: { key: 'rotation', map: (v) => (v * Math.PI) / 180 },
+        centreXCurve: { key: 'centerX' }, centreYCurve: { key: 'centerY' },
+        camPosXCurve: { key: 'camPosX' }, camPosYCurve: { key: 'camPosY' }, camPosZCurve: { key: 'camPosZ' },
+        brightnessCurve: { key: 'brightness' }, gammaCurve: { key: 'gamma' }, gammaThresholdCurve: { key: 'gammaThreshold' },
+        vibrancyCurve: { key: 'vibrancy' },
+        camZoomCurve: { key: 'zoom', map: (v) => v * (isFinite(scale) && scale > 0 ? scale : 1) * zoomPerUnit },
+        pixelsPerUnitCurve: { key: 'zoom', map: (v) => v * zoomMul * zoomPerUnit },
+      };
+      for (const rc of readCurves(fe, fps)) {
+        const m = FLAME_MAP[rc.prefix];
+        if (m) pushCurve(rc, m.key, m.map);
+      }
+    }
+    const parseLayerContent = (elm: Element, li: number): Omit<Layer, 'weight' | 'visible'> => {
+      const ctx = (base: string): CurveCtx | undefined => (isFirst ? { pathBase: base, fps } : undefined);
+      const xf = Array.from(elm.querySelectorAll(':scope > xform')).slice(0, MAX_XFORMS)
+        .map((xe, xi) => parseXFormEl(xe, ctx(`layers.${li}.xforms.${xi}`)));
       const fin = elm.querySelector(':scope > finalxform');
       return {
         xforms: xf.length ? xf : [defaultXForm()],
-        final: fin ? parseXFormEl(fin) : null,
+        final: fin ? parseXFormEl(fin, ctx(`layers.${li}.final`)) : null,
         palette: parsePaletteEl(elm) ?? fallbackPalette,
       };
     };
@@ -306,24 +414,99 @@ export function parseFlameXML(text: string, fallbackPalette: RGB[]): Flame[] {
     // JWildfire layered flames use <layer> children; flam3/Apophysis are flat.
     const layerEls = Array.from(fe.querySelectorAll(':scope > layer')).slice(0, MAX_LAYERS);
     if (layerEls.length) {
-      f.layers = layerEls.map((le) => {
+      f.layers = layerEls.map((le, li) => {
         const w = parseFloat(le.getAttribute('weight') ?? le.getAttribute('density') ?? '');
         const visAttr = le.getAttribute('visible');
+        if (isFirst) for (const rc of readCurves(le, fps)) if (rc.prefix === 'weightCurve') pushCurve(rc, `layers.${li}.weight`);
         return {
-          ...parseLayerContent(le),
+          ...parseLayerContent(le, li),
           weight: isFinite(w) && w >= 0 ? w : 1,
           visible: visAttr !== '0' && visAttr !== 'false',
         };
       });
     } else {
-      f.layers = [{ ...parseLayerContent(fe), weight: 1, visible: true }];
+      f.layers = [{ ...parseLayerContent(fe, 0), weight: 1, visible: true }];
     }
     // Re-run through the normalizer for clamping / defaults.
     return normalizeFlame(f, fallbackPalette);
   });
 }
 
-function xformToXML(x: XForm, tag: string, nXForms: number): string {
+// ---- export ----
+
+export interface XMLExportOpts {
+  /** motion curves to embed as JWildfire `*Curve_*` attributes */
+  curves?: MotionCurve[];
+  /** timebase for curve frames (JWildfire default 25) */
+  fps?: number;
+}
+
+/** JWildfire attribute family for one curve. Frames are integers; duplicate frames collapse (last wins). */
+function curveAttrs(prefix: string, c: MotionCurve, fps: number): string[] {
+  const byFrame = new Map<number, number>();
+  for (const p of [...c.points].sort((a, b) => a.t - b.t)) byFrame.set(Math.round(p.t * fps), p.v);
+  const pts = Array.from(byFrame.entries());
+  if (!pts.length) return [];
+  const xs = pts.map((p) => p[0]), ys = pts.map((p) => p[1]);
+  const interp = c.interp === 'linear' || c.interp === 'step' ? 'LINEAR' : 'SPLINE';
+  const a: string[] = [
+    `${prefix}_enabled="${c.enabled === false ? 'false' : 'true'}"`,
+    `${prefix}_view_xmin="${Math.min(0, ...xs) - 10}"`, `${prefix}_view_xmax="${Math.max(...xs) + 10}"`,
+    `${prefix}_view_ymin="${fmt(Math.min(...ys) - 1)}"`, `${prefix}_view_ymax="${fmt(Math.max(...ys) + 1)}"`,
+    `${prefix}_interpolation="${interp}"`, `${prefix}_selected_idx="0"`, `${prefix}_locked="false"`,
+    `${prefix}_point_count="${pts.length}"`,
+  ];
+  pts.forEach(([x, y], i) => a.push(`${prefix}_x${i}="${x}"`, `${prefix}_y${i}="${fmt(y)}"`));
+  return a;
+}
+
+/** Curves grouped by the element they belong to: '' (flame), 'layers.L', 'layers.L.xforms.i', 'layers.L.final'. */
+type CurveBuckets = Map<string, { rest: string; curve: MotionCurve }[]>;
+function bucketCurves(curves: MotionCurve[] | undefined): CurveBuckets {
+  const b: CurveBuckets = new Map();
+  for (const c of curves ?? []) {
+    if (!c.points.length) continue;
+    const m = /^layers\.(\d+)(?:\.(final|xforms\.\d+))?\.(.+)$/.exec(c.path);
+    const key = m ? (m[2] ? `layers.${m[1]}.${m[2]}` : `layers.${m[1]}`) : '';
+    const rest = m ? m[3] : c.path;
+    (b.get(key) ?? b.set(key, []).get(key)!).push({ rest, curve: c });
+  }
+  return b;
+}
+const AFFINE_TO_COEFF = ['00', '10', '20', '01', '11', '21']; // affine idx → JWildfire xyCoeff{ij}
+const FLAME_CURVE_PREFIX: Record<string, { prefix: string; map?: (v: number) => number }> = {
+  camPitch: { prefix: 'camPitchCurve' }, camYaw: { prefix: 'camYawCurve' }, camBank: { prefix: 'camBankCurve' },
+  camPersp: { prefix: 'camPerspectiveCurve' }, rotation: { prefix: 'camRollCurve', map: (v) => (v * 180) / Math.PI },
+  centerX: { prefix: 'centreXCurve' }, centerY: { prefix: 'centreYCurve' },
+  camPosX: { prefix: 'camPosXCurve' }, camPosY: { prefix: 'camPosYCurve' }, camPosZ: { prefix: 'camPosZCurve' },
+  brightness: { prefix: 'brightnessCurve' }, gamma: { prefix: 'gammaCurve' }, gammaThreshold: { prefix: 'gammaThresholdCurve' },
+  vibrancy: { prefix: 'vibrancyCurve' },
+};
+function mapped(c: MotionCurve, map?: (v: number) => number): MotionCurve {
+  return map ? { ...c, points: c.points.map((p) => ({ t: p.t, v: map(p.v) })) } : c;
+}
+function xformCurveAttrs(x: XForm, items: { rest: string; curve: MotionCurve }[], fps: number): string[] {
+  const out: string[] = [];
+  const listPrefix: Record<string, string> = { variations: '', preVariations: 'pre_', postVariations: 'post_' };
+  for (const { rest, curve } of items) {
+    let m: RegExpExecArray | null;
+    if (rest === 'weight') out.push(...curveAttrs('weightCurve', curve, fps));
+    else if (rest === 'color') out.push(...curveAttrs('colorCurve', curve, fps));
+    else if (rest === 'opacity') out.push(...curveAttrs('opacityCurve', curve, fps));
+    else if (rest === 'colorSpeed') out.push(...curveAttrs('colorSymmetryCurve', mapped(curve, (v) => 1 - 2 * v), fps));
+    else if ((m = /^(affine|post)\.([0-5])$/.exec(rest))) {
+      out.push(...curveAttrs(`${m[1] === 'affine' ? 'xyCoeff' : 'xyPostCoeff'}${AFFINE_TO_COEFF[+m[2]]}Curve`, curve, fps));
+    } else if ((m = /^(variations|preVariations|postVariations)\.(\d+)\.(weight|params\.(.+))$/.exec(rest))) {
+      const vi = (x as any)[m[1]]?.[+m[2]];
+      if (!vi || !VARIATIONS[vi.name]) continue;
+      const vname = listPrefix[m[1]] + vi.name;
+      out.push(...curveAttrs(m[3] === 'weight' ? `${vname}_amountCurve` : `${vname}_${m[4]}`, curve, fps));
+    }
+  }
+  return out;
+}
+
+function xformToXML(x: XForm, tag: string, nXForms: number, extraAttrs: string[] = []): string {
   const attrs: string[] = [];
   if (tag === 'xform') attrs.push(`weight="${fmt(x.weight)}"`);
   attrs.push(`color="${fmt(x.color)}"`);
@@ -349,6 +532,7 @@ function xformToXML(x: XForm, tag: string, nXForms: number): string {
     const row = Array.from({ length: nXForms }, (_, j) => fmt(x.xaos![j] ?? 1));
     attrs.push(`chaos="${row.join(' ')}"`);
   }
+  attrs.push(...extraAttrs);
   return `   <${tag} ${attrs.join(' ')}/>`;
 }
 
@@ -362,46 +546,70 @@ function paletteToXML(palette: RGB[], indent: string): string {
   return `${indent}<palette count="256" format="RGB">\n${indent}   ${hex.trimEnd()}\n${indent}</palette>`;
 }
 
-export function flameToXML(f: Flame): string {
+export function flameToXML(f: Flame, opts: XMLExportOpts = {}): string {
   const size = 1024;
   const scale = 0.25 * size * f.zoom;
+  const fps = opts.fps && opts.fps > 0 ? opts.fps : 25;
+  const buckets = bucketCurves(opts.curves);
   const esc = (s: string) => s.replace(/&/g, '&amp;').replace(/"/g, '&quot;').replace(/</g, '&lt;');
   const lines: string[] = [];
+  // Flame-level curves + timebase
+  const flameCurveAttrs: string[] = [];
+  for (const { rest, curve } of buckets.get('') ?? []) {
+    const m = FLAME_CURVE_PREFIX[rest];
+    if (m) flameCurveAttrs.push(...curveAttrs(m.prefix, mapped(curve, m.map), fps));
+    else if (rest === 'zoom') flameCurveAttrs.push(...curveAttrs('camZoomCurve', mapped(curve, (v) => v / f.zoom), fps));
+  }
+  let timeAttrs = '';
+  if (opts.curves?.some((c) => c.points.length)) {
+    let end = 0;
+    for (const c of opts.curves) for (const p of c.points) end = Math.max(end, p.t);
+    timeAttrs = ` fps="${fps}" frame="0" frame_count="${Math.max(1, Math.round(end * fps) + 1)}"`;
+  }
   lines.push(
     `<flame version="WilderFire 0.1" name="${esc(f.name)}" size="${size} ${size}" ` +
     `center="${fmt(f.centerX)} ${fmt(f.centerY)}" scale="${fmt(scale)}" rotate="${fmt((f.rotation * 180) / Math.PI)}" ` +
     `cam_pitch="${fmt((f.camPitch * Math.PI) / 180)}" cam_yaw="${fmt((f.camYaw * Math.PI) / 180)}" cam_roll="${fmt((f.camBank * Math.PI) / 180)}" cam_persp="${fmt(f.camPersp)}" ` +
     `cam_pos_x="${fmt(f.camPosX)}" cam_pos_y="${fmt(f.camPosY)}" cam_pos_z="${fmt(f.camPosZ)}" preserve_z="${f.preserveZ ? 1 : 0}" ` +
     `filter="0.5" quality="200" brightness="${fmt(f.brightness)}" gamma="${fmt(f.gamma)}" gamma_threshold="${fmt(f.gammaThreshold)}" ` +
-    `vibrancy="${fmt(f.vibrancy)}" background="${fmt(f.background[0])} ${fmt(f.background[1])} ${fmt(f.background[2])}">`,
+    `vibrancy="${fmt(f.vibrancy)}" background="${fmt(f.background[0])} ${fmt(f.background[1])} ${fmt(f.background[2])}"` +
+    timeAttrs + (flameCurveAttrs.length ? ' ' + flameCurveAttrs.join(' ') : '') + '>',
   );
-  const writeLayerBody = (ly: Layer, indent: string) => {
-    for (const x of ly.xforms) lines.push(indent + xformToXML(x, 'xform', ly.xforms.length).trim());
-    if (ly.final) lines.push(indent + xformToXML(ly.final, 'finalxform', ly.xforms.length).trim());
+  const writeLayerBody = (ly: Layer, li: number, indent: string) => {
+    ly.xforms.forEach((x, xi) => {
+      const extra = xformCurveAttrs(x, buckets.get(`layers.${li}.xforms.${xi}`) ?? [], fps);
+      lines.push(indent + xformToXML(x, 'xform', ly.xforms.length, extra).trim());
+    });
+    if (ly.final) {
+      const extra = xformCurveAttrs(ly.final, buckets.get(`layers.${li}.final`) ?? [], fps);
+      lines.push(indent + xformToXML(ly.final, 'finalxform', ly.xforms.length, extra).trim());
+    }
     lines.push(paletteToXML(ly.palette, indent));
   };
   if (f.layers.length > 1) {
     // JWildfire layered form
-    for (const ly of f.layers) {
-      lines.push(`   <layer weight="${fmt(ly.weight)}" visible="${ly.visible ? 1 : 0}" density="1">`);
-      writeLayerBody(ly, '      ');
+    f.layers.forEach((ly, li) => {
+      const lc = (buckets.get(`layers.${li}`) ?? []).filter((c) => c.rest === 'weight');
+      const extra = lc.length ? ' ' + curveAttrs('weightCurve', lc[0].curve, fps).join(' ') : '';
+      lines.push(`   <layer weight="${fmt(ly.weight)}" visible="${ly.visible ? 1 : 0}" density="1"${extra}>`);
+      writeLayerBody(ly, li, '      ');
       lines.push('   </layer>');
-    }
+    });
   } else {
     // Flat flam3/Apophysis-compatible form
-    writeLayerBody(f.layers[0], '   ');
+    writeLayerBody(f.layers[0], 0, '   ');
   }
   lines.push('</flame>');
   return lines.join('\n');
 }
 
 /** Import from text: sniffs JSON vs .flame XML. Returns the first flame. */
-export function importFlameText(text: string, fallbackPalette: RGB[]): { flame: Flame; count: number; unknown: string[] } {
+export function importFlameText(text: string, fallbackPalette: RGB[]): { flame: Flame; count: number; unknown: string[]; curves: MotionCurve[] } {
   const trimmed = text.trim();
   if (trimmed.startsWith('<')) {
     const flames = parseFlameXML(trimmed, fallbackPalette);
-    return { flame: flames[0], count: flames.length, unknown: [...lastImportUnknown] };
+    return { flame: flames[0], count: flames.length, unknown: [...lastImportUnknown], curves: [...lastImportCurves] };
   }
   const obj = JSON.parse(trimmed);
-  return { flame: normalizeFlame(obj, fallbackPalette), count: 1, unknown: [] };
+  return { flame: normalizeFlame(obj, fallbackPalette), count: 1, unknown: [], curves: [] };
 }

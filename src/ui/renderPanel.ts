@@ -190,7 +190,7 @@ export function buildRenderPanel(app: App, root: HTMLElement) {
   const xmlBtn = el('button', '', '⬇ .flame');
   xmlBtn.title = 'Export as .flame XML (flam3 / Apophysis compatible)';
   xmlBtn.onclick = () =>
-    download(flameToXML(app.flame), `${app.flame.name || 'wilderfire'}.flame`, 'application/xml');
+    download(flameToXML(app.flame, { curves: app.getCurves() }), `${app.flame.name || 'wilderfire'}.flame`, 'application/xml');
   const loadBtn = el('button', '', '⬆ Load');
   loadBtn.title = 'Load a WilderFire JSON or a .flame XML (flam3 / Apophysis compatible)';
   const fileInp = el('input') as HTMLInputElement;
@@ -201,8 +201,12 @@ export function buildRenderPanel(app: App, root: HTMLElement) {
     const f = fileInp.files?.[0];
     if (!f) return;
     try {
-      const { flame, count, unknown } = importFlameText(await f.text(), app.activeLayer.palette);
+      const { flame, count, unknown, curves } = importFlameText(await f.text(), app.activeLayer.palette);
       app.setFlame(flame);
+      if (curves.length) {
+        app.setCurves(curves);
+        console.info(`Loaded ${curves.length} motion curve${curves.length > 1 ? 's' : ''} from the file (Anim tab).`);
+      }
       if (count > 1) {
         console.info(`File contained ${count} flames — loaded the first ("${flame.name}").`);
       }

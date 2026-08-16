@@ -276,11 +276,12 @@ async function boot() {
     app,
     anim,
     importText: (text: string) => {
-      const { flame, count } = importFlameText(text, app.activeLayer.palette);
+      const { flame, count, curves } = importFlameText(text, app.activeLayer.palette);
       app.setFlame(flame);
+      if (curves.length) app.setCurves(curves);
       return count;
     },
-    exportXML: () => flameToXML(app.flame),
+    exportXML: () => flameToXML(app.flame, { curves: app.getCurves() }),
     // Variation oracle test (dev only; see scripts/jwf-port/README.md)
     varTest: async (opts?: { only?: string[]; verbose?: boolean; tol?: number }) => {
       const { runVarTest } = await import('./dev/varTest');

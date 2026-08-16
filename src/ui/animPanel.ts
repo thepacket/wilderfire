@@ -526,6 +526,9 @@ export function buildAnimPanel(app: App, root: HTMLElement, overlay: OverlayHand
   rebuildCurves();
   rebuildList();
   app.on('flame', (src) => { if (src !== 'preview' && !playing) rebuildCurves(); });
+  // Bridge for .flame XML export/import (Render panel) — curves live here.
+  app.getCurves = () => getState().curves ?? [];
+  app.setCurves = (cs) => { setState({ keys: getState().keys, easing: easing(), curves: cs }); onChange(); };
 
   return {
     addKey: () => capBtn.click(),
