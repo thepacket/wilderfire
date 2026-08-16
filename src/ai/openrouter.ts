@@ -20,17 +20,64 @@ export interface StreamOptions {
 
 export const OPENROUTER_URL = 'https://openrouter.ai/api/v1/chat/completions';
 
+/** Offline fallback for the model picker (the live list comes from fetchModels()).
+ *  IDs verified against https://openrouter.ai/api/v1/models on 2026-08-16. */
 export const SUGGESTED_MODELS = [
-  'anthropic/claude-sonnet-4.5',
-  'anthropic/claude-opus-4.1',
-  'anthropic/claude-3.5-haiku',
+  'anthropic/claude-sonnet-5',
+  'anthropic/claude-opus-5',
+  'anthropic/claude-fable-5',
+  'anthropic/claude-haiku-4.5',
   'openai/gpt-5',
-  'openai/gpt-4o-mini',
   'google/gemini-2.5-pro',
   'google/gemini-2.5-flash',
-  'meta-llama/llama-3.3-70b-instruct',
   'deepseek/deepseek-chat-v3.1',
 ];
+
+export interface ORModel {
+  id: string;
+  name: string;
+  provider: string;       // id prefix, e.g. "anthropic"
+  context: number;        // tokens
+  promptPerM: number;     // USD per 1M input tokens
+  completionPerM: number; // USD per 1M output tokens
+  vision: boolean;        // accepts image input
+  created: number;        // unix seconds
+}
+
+const MODELS_URL = 'https://openrouter.ai/api/v1/models';
+const LS_MODELS = 'wilderfire.openrouter.models';
+const MODELS_TTL_MS = 24 * 3600 * 1000;
+
+/** Live model catalogue (public endpoint, no key), cached in localStorage for a day.
+ *  Excludes `:batch` variants (not usable for interactive chat). */
+export async function fetchModels(opts: { force?: boolean } = {}): Promise<ORModel[]> {
+  if (!opts.force) {
+    try {
+      const raw = localStorage.getItem(LS_MODELS);
+      if (raw) {
+        const c = JSON.parse(raw) as { at: number; models: ORModel[] };
+        if (Date.now() - c.at < MODELS_TTL_MS && Array.isArray(c.models) && c.models.length) return c.models;
+      }
+    } catch { /* ignore cache errors */ }
+  }
+  const res = await fetch(MODELS_URL);
+  if (!res.ok) throw new Error(`OpenRouter models: HTTP ${res.status}`);
+  const j = await res.json() as { data: any[] };
+  const models: ORModel[] = (j.data ?? [])
+    .filter((m) => typeof m?.id === 'string' && !m.id.endsWith(':batch'))
+    .map((m) => ({
+      id: m.id,
+      name: String(m.name ?? m.id),
+      provider: String(m.id).split('/')[0],
+      context: Number(m.context_length ?? 0),
+      promptPerM: Number(m.pricing?.prompt ?? 0) * 1e6,
+      completionPerM: Number(m.pricing?.completion ?? 0) * 1e6,
+      vision: Array.isArray(m.architecture?.input_modalities) && m.architecture.input_modalities.includes('image'),
+      created: Number(m.created ?? 0),
+    }));
+  try { localStorage.setItem(LS_MODELS, JSON.stringify({ at: Date.now(), models })); } catch { /* quota */ }
+  return models;
+}
 
 export async function streamChat(opts: StreamOptions): Promise<string> {
   const res = await fetch(OPENROUTER_URL, {

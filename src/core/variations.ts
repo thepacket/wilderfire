@@ -411,11 +411,21 @@ const HAND_VARIATIONS: Record<string, VariationDef> = {
   },
 };
 
-/** Hand-written entries first (fallbacks), then verified JWildfire ports override. */
+/** Verified JWildfire ports that we deliberately do NOT let override the
+ *  hand-written entry, with the reason. Keep this list short and justified. */
+export const PREFER_HAND: Record<string, string> = {
+  // JWildfire's rings ignores the variation weight (Java: no pAmount; its GPU
+  // code likewise). flam3/Apophysis multiply by weight and so do our presets
+  // (Clockwork mixes linear .6 + rings .35) — keep flam3 semantics.
+  rings: 'JWildfire ignores the weight; flam3/Apophysis apply it',
+};
+
+/** Hand-written entries first (fallbacks), then verified JWildfire ports override
+ *  (except PREFER_HAND). */
 export const VARIATIONS: Record<string, VariationDef> = (() => {
   const out: Record<string, VariationDef> = { ...HAND_VARIATIONS };
   for (const [name, def] of Object.entries(JWF_VARIATIONS) as [string, JwfVariationDef][]) {
-    if (def.verified) out[name] = def;
+    if (def.verified && !(name in PREFER_HAND && name in HAND_VARIATIONS)) out[name] = def;
   }
   return out;
 })();

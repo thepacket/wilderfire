@@ -5,6 +5,7 @@ import { App, el } from './common';
 import { normalizeFlame, flameToJSON } from '../core/flame';
 import { VARIATIONS } from '../core/variations';
 import { streamChat, SUGGESTED_MODELS, type ChatMessage, type ChatPart } from '../ai/openrouter';
+import { createModelPicker } from './modelPicker';
 
 const LS_KEY = 'wilderfire.openrouter.key';
 const LS_MODEL = 'wilderfire.openrouter.model';
@@ -56,20 +57,14 @@ export function buildAIPanel(app: App, root: HTMLElement) {
 
   const modelRow = el('div', 'row');
   modelRow.append(el('label', '', 'Model'));
-  const modelInp = el('input') as HTMLInputElement;
-  modelInp.type = 'text';
-  modelInp.style.flex = '1';
-  modelInp.setAttribute('list', 'wf-models');
-  const dl = el('datalist') as HTMLDataListElement;
-  dl.id = 'wf-models';
-  for (const m of SUGGESTED_MODELS) {
-    const o = el('option') as HTMLOptionElement;
-    o.value = m;
-    dl.append(o);
-  }
-  modelInp.value = localStorage.getItem(LS_MODEL) ?? SUGGESTED_MODELS[0];
-  modelInp.addEventListener('change', () => localStorage.setItem(LS_MODEL, modelInp.value.trim()));
-  modelRow.append(modelInp, dl);
+  // Searchable picker fed by OpenRouter's live catalogue; any custom ID is accepted too.
+  const modelPicker = createModelPicker(
+    localStorage.getItem(LS_MODEL) || SUGGESTED_MODELS[0],
+    (id) => localStorage.setItem(LS_MODEL, id),
+  );
+  modelPicker.root.style.flex = '1';
+  modelPicker.root.style.maxWidth = 'none';
+  modelRow.append(modelPicker.root);
 
   const visRow = el('div', 'row');
   const visChk = el('input') as HTMLInputElement;
@@ -88,7 +83,7 @@ export function buildAIPanel(app: App, root: HTMLElement) {
   visRow.append(visLab, autoSel);
 
   cfg.append(keyRow, modelRow, visRow);
-  cfg.append(el('div', 'hint', 'Runs fully in your browser via OpenRouter.ai — any model ID works. Get a key at openrouter.ai/keys.'));
+  cfg.append(el('div', 'hint', 'Runs fully in your browser via OpenRouter.ai — pick a model or type any model ID. Get a key at openrouter.ai/keys.'));
 
   const msgs = el('div', 'ai-msgs');
   const inputRow = el('div', 'ai-input-row');
@@ -173,7 +168,7 @@ export function buildAIPanel(app: App, root: HTMLElement) {
       ];
       await streamChat({
         apiKey: key,
-        model: modelInp.value.trim() || SUGGESTED_MODELS[0],
+        model: modelPicker.value.trim() || SUGGESTED_MODELS[0],
         messages,
         onDelta: (d) => {
           acc += d;
