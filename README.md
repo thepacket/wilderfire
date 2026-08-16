@@ -109,9 +109,14 @@ in the stack.
   the current flame JSON **and a screenshot of the current render** (vision
   models can look at the result and iterate — including an optional
   **auto-refine loop** that re-captures the render and self-critiques for up
-  to 3 extra rounds), editing the flame live via a ```flame fenced block. The
-  key is stored in `localStorage` and requests go straight from your browser
-  to OpenRouter.
+  to 3 extra rounds), editing the flame live. **Context controls** let you
+  trim what is sent (flame as compact summary / full JSON / nothing, palette
+  as 8 stops / full, variation catalogue in-use / all / none, screenshot,
+  conversation memory) and what comes back (**edit commands** — a few lines
+  like `set T2.weight 0.8`, `addvar T1 julian 0.7 power=3` — or complete
+  flame JSON, or text only), with a live per-turn token estimate; the
+  defaults are ~1.6k tokens/turn instead of ~19k. The key is stored in
+  `localStorage` and requests go straight from your browser to OpenRouter.
 
 ## Keyboard shortcuts
 

@@ -2,24 +2,29 @@
 // The model edits the flame by emitting a ```flame fenced JSON block, which we
 // parse, normalize, and apply live.
 import { App, el } from './common';
-import { normalizeFlame, flameToJSON } from '../core/flame';
-import { VARIATIONS } from '../core/variations';
+import { normalizeFlame, type Flame } from '../core/flame';
 import { streamChat, SUGGESTED_MODELS, type ChatMessage, type ChatPart } from '../ai/openrouter';
 import { createModelPicker } from './modelPicker';
+import {
+  DEFAULT_CONTEXT, EDITS_SPEC, applyEdits, estimateTokens, flameJSONFor, flameSummary, variationCatalogue,
+  type ContextOpts, type FlameMode, type PaletteMode, type VarsMode, type ReplyMode,
+} from '../ai/context';
 
 const LS_KEY = 'wilderfire.openrouter.key';
 const LS_MODEL = 'wilderfire.openrouter.model';
+const LS_CTX = 'wilderfire.ai.context';
 
-function systemPrompt(): string {
-  const varList = Object.entries(VARIATIONS)
-    .map(([name, def]) => {
-      const ps = (def.params ?? []).map((p) => `${p.name}=${p.def}`).join(', ');
-      return ps ? `${name}(${ps})` : name;
-    })
-    .join(', ');
-  return `You are the WilderFire assistant inside a browser-based fractal flame editor (WebGPU, .flame-compatible with flam3 / Apophysis). You see the user's current flame as JSON (and usually a screenshot of the current render) and you can change it. When a screenshot is attached, look at it and let what you actually see guide your edits.
-
-TO APPLY CHANGES: reply with exactly one fenced code block tagged \`flame\` containing the COMPLETE updated flame JSON (not a diff). The app parses and renders it instantly. Keep prose outside the block brief and friendly. If the user only asks a question, answer without a block.
+/** System prompt assembled from the user's context choices (see ../ai/context.ts). */
+function systemPrompt(flame: Flame, o: ContextOpts): string {
+  const intro = `You are the WilderFire assistant inside a browser-based fractal flame editor (WebGPU, .flame-compatible with flam3 / Apophysis). ` +
+    (o.flame !== 'none' ? `You see the user's current flame${o.screenshot ? ' and a screenshot of the current render' : ''} and you can change it. ` : `You may get a screenshot of the current render. `) +
+    (o.screenshot ? 'When a screenshot is attached, look at it and let what you actually see guide your edits. ' : '');
+  const reply = o.reply === 'text'
+    ? 'Answer questions and give advice in prose only; do NOT output flame JSON or edit blocks (the user has disabled edits).'
+    : o.reply === 'edits'
+      ? EDITS_SPEC
+      : `TO APPLY CHANGES: reply with exactly one fenced code block tagged \`flame\` containing the COMPLETE updated flame JSON (not a diff). The app parses and renders it instantly. Keep prose outside the block brief and friendly. If the user only asks a question, answer without a block.`;
+  const shape = o.reply === 'json' || o.flame === 'json' ? `
 
 FLAME JSON SHAPE:
 {
@@ -32,11 +37,19 @@ XFORM SHAPE: { "affine": [a,b,c,d,e,f], "post": [1,0,0,0,1,0], "weight": 0.5-1.5
 PALETTE: "paletteStops": [[pos0..1, r, g, b], ...] with 3-8 stops, rgb 0..1 — preferred way to set colors (per layer).
 For simple single-layer flames you may instead put "xforms" / "final" / "paletteStops" at the top level (the app wraps them into one layer).
 
-Affine convention: x' = a·x + b·y + c, y' = d·x + e·y + f. Keep linear parts contractive (|scale| mostly < 1) or the attractor escapes. 2-5 xforms per layer is typical. Spread "color" values across xforms for rich gradients. Layers are great for combining a structural base with a soft glow layer (low weight, blur variations) in different colors.
+Affine convention: x' = a·x + b·y + c, y' = d·x + e·y + f.` : '';
+  const vars = variationCatalogue(flame, o.vars);
+  return `${intro}
 
-AVAILABLE VARIATIONS (params with defaults): ${varList}.
+${reply}${shape}
 
+Keep linear parts of affines contractive (|scale| mostly < 1) or the attractor escapes. 2-5 xforms per layer is typical. Spread "color" values across xforms for rich gradients. Layers combine a structural base with a soft glow layer (low weight, blur variations) in different colors.
+${vars ? '\n' + vars + '\n' : ''}
 Design tips: pair a structural variation (linear/spherical/julian/curl) with a flavor one at lower weight; julian power should be a small integer; blur/gaussian_blur make soft glows on low-weight xforms; a "final" xform with spherical or julia wraps everything in a lens.`;
+}
+
+function loadCtx(): ContextOpts {
+  try { return { ...DEFAULT_CONTEXT, ...JSON.parse(localStorage.getItem(LS_CTX) ?? '{}') }; } catch { return { ...DEFAULT_CONTEXT }; }
 }
 
 interface Turn { role: 'user' | 'assistant'; content: string; }
@@ -66,23 +79,72 @@ export function buildAIPanel(app: App, root: HTMLElement) {
   modelPicker.root.style.maxWidth = 'none';
   modelRow.append(modelPicker.root);
 
-  const visRow = el('div', 'row');
-  const visChk = el('input') as HTMLInputElement;
-  visChk.type = 'checkbox';
-  visChk.checked = true;
-  const visLab = el('label', '', ' attach render (vision models see the result)');
-  visLab.prepend(visChk);
-  visLab.style.color = 'var(--fg-dim)';
+  // ---- Context: what goes in, what comes back (each choice costs tokens) ----
+  const ctx = loadCtx();
+  const saveCtx = () => { localStorage.setItem(LS_CTX, JSON.stringify(ctx)); updateEstimate(); };
+  const ctxBox = el('div', 'ai-ctx');
+  const mkSel = <T extends string>(label: string, opts: [T, string][], cur: T, on: (v: T) => void, title: string) => {
+    const row = el('div', 'row');
+    const lab = el('label', '', label);
+    lab.title = title;
+    const sel = el('select') as HTMLSelectElement;
+    for (const [v, txt] of opts) { const o = el('option', '', txt) as HTMLOptionElement; o.value = v; sel.append(o); }
+    sel.value = cur;
+    sel.onchange = () => { on(sel.value as T); saveCtx(); };
+    sel.title = title;
+    row.append(lab, sel);
+    ctxBox.append(row);
+    return sel;
+  };
+  const mkChk = (label: string, cur: boolean, on: (v: boolean) => void, title: string) => {
+    const row = el('div', 'row');
+    const chk = el('input') as HTMLInputElement;
+    chk.type = 'checkbox'; chk.checked = cur;
+    const lab = el('label', 'check', ' ' + label);
+    lab.prepend(chk); lab.title = title;
+    chk.onchange = () => { on(chk.checked); saveCtx(); };
+    row.append(lab);
+    ctxBox.append(row);
+    return chk;
+  };
+  ctxBox.append(el('div', 'ai-ctx-head', 'Send'));
+  mkSel<FlameMode>('Flame', [['summary', 'summary (compact)'], ['json', 'full JSON'], ['none', 'nothing']], ctx.flame, (v) => { ctx.flame = v; },
+    'How the current flame is described to the model. Summary is a few hundred tokens with the paths edits use; full JSON is thousands.');
+  mkSel<PaletteMode>('Palette', [['stops', '8 stops'], ['full', 'full'], ['none', 'nothing']], ctx.palette, (v) => { ctx.palette = v; },
+    'Gradient detail sent with the flame. 8 stops is enough for colour work; full = 256 colours.');
+  mkSel<VarsMode>('Variations', [['used', 'in use + classics'], ['all', `all (${'≈10k tokens'})`], ['none', 'nothing']], ctx.vars, (v) => { ctx.vars = v; },
+    'Which variation names/params the model is told about. "All" lets it pick from the whole catalogue but costs ~10k tokens per turn.');
+  const visChk = mkChk('Screenshot of the render (vision models)', ctx.screenshot, (v) => { ctx.screenshot = v; },
+    'Attach a small JPEG of the current render so vision models can see what they are editing (~800 tokens).');
+  mkChk('Conversation memory (earlier turns)', ctx.memory, (v) => { ctx.memory = v; },
+    'Send the previous messages of this conversation. Off = every request stands alone (cheapest); use Clear to reset when on.');
+  ctxBox.append(el('div', 'ai-ctx-head', 'Reply'));
+  mkSel<ReplyMode>('Edits as', [['edits', 'edit commands (fast, cheap)'], ['json', 'complete flame JSON'], ['text', 'text only, no edits']], ctx.reply, (v) => { ctx.reply = v; },
+    'Edit commands: the model only lists what changes (a few lines). Complete JSON: it re-emits the whole flame (slow, thousands of tokens). Text only: questions and advice, nothing is applied.');
+  const autoRow = el('div', 'row');
+  autoRow.append(el('label', '', 'Auto-refine'));
   const autoSel = el('select') as HTMLSelectElement;
-  for (const [label, v] of [['no auto-refine', '0'], ['auto-refine ×1', '1'], ['auto-refine ×2', '2'], ['auto-refine ×3', '3']] as const) {
+  for (const [label, v] of [['off', '0'], ['×1', '1'], ['×2', '2'], ['×3', '3']] as const) {
     const o = el('option', '', label) as HTMLOptionElement;
     o.value = v;
     autoSel.append(o);
   }
-  autoSel.title = 'After applying an edit, show the model its own render and ask it to improve — this many extra rounds';
-  visRow.append(visLab, autoSel);
+  autoSel.title = 'After applying an edit, show the model its own render and ask it to improve — this many extra rounds (each is a full extra request)';
+  autoRow.append(autoSel);
+  ctxBox.append(autoRow);
+  const estimate = el('div', 'hint ai-estimate', '');
+  ctxBox.append(estimate);
+  const updateEstimate = () => {
+    const f = app.flame;
+    const sys = systemPrompt(f, ctx).length;
+    const body = ctx.flame === 'json' ? flameJSONFor(f, ctx.palette).length : ctx.flame === 'summary' ? flameSummary(f, ctx.palette).length : 0;
+    const hist = ctx.memory ? history.reduce((a, t) => a + t.content.length, 0) : 0;
+    const tok = estimateTokens(sys + body + hist, ctx.screenshot ? 1 : 0);
+    const out = ctx.reply === 'json' ? '2–8k' : ctx.reply === 'edits' ? '~50–300' : '~100–500';
+    estimate.textContent = `≈ ${tok >= 1000 ? (tok / 1000).toFixed(1) + 'k' : tok} tokens sent per turn · reply ${out} tokens`;
+  };
 
-  cfg.append(keyRow, modelRow, visRow);
+  cfg.append(keyRow, modelRow, ctxBox);
   cfg.append(el('div', 'hint', 'Runs fully in your browser via OpenRouter.ai — pick a model or type any model ID. Get a key at openrouter.ai/keys.'));
 
   const msgs = el('div', 'ai-msgs');
@@ -111,6 +173,21 @@ export function buildAIPanel(app: App, root: HTMLElement) {
   addMsg('system', 'Describe the fractal you want — the assistant edits the flame live.');
 
   function tryApplyFlameBlocks(text: string): boolean {
+    if (ctx.reply === 'text') return false;
+    // edits block(s) — apply all, in order
+    const er = /```edits?\s*\n([\s\S]*?)```/g;
+    let em: RegExpExecArray | null;
+    let editsApplied = false;
+    let f = app.flame;
+    const errs: string[] = [];
+    let n = 0;
+    while ((em = er.exec(text))) {
+      const r = applyEdits(f, em[1], app.layerIdx);
+      f = r.flame; n += r.applied; errs.push(...r.errors);
+    }
+    if (n > 0) { app.setFlame(f, 'ai'); editsApplied = true; }
+    if (errs.length) addMsg('system', 'Some edits were not understood: ' + errs.slice(0, 4).join(' · ') + (errs.length > 4 ? ` (+${errs.length - 4} more)` : ''));
+    if (editsApplied) return true;
     const re = /```(?:flame|json)\s*\n([\s\S]*?)```/g;
     let applied = false;
     let match: RegExpExecArray | null;
@@ -133,7 +210,7 @@ export function buildAIPanel(app: App, root: HTMLElement) {
 
   /** Hide big JSON blocks in the visible transcript. */
   const displayText = (text: string) =>
-    text.replace(/```(?:flame|json)\s*\n[\s\S]*?```/g, '⟨flame updated⟩').trim();
+    text.replace(/```(?:flame|json)\s*\n[\s\S]*?```/g, '⟨flame updated⟩').replace(/```edits?\s*\n([\s\S]*?)```/g, (_m, b: string) => '⟨edits⟩\n' + b.trim()).trim();
 
   const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
 
@@ -147,7 +224,10 @@ export function buildAIPanel(app: App, root: HTMLElement) {
     let acc = '';
     let applied = false;
     try {
-      const finalText = `Current flame JSON:\n\`\`\`json\n${flameToJSON(app.flame)}\n\`\`\`\n\nRequest: ${q}`;
+      const desc = ctx.flame === 'json'
+        ? `Current flame JSON:\n\`\`\`json\n${flameJSONFor(app.flame, ctx.palette)}\n\`\`\`\n\n`
+        : ctx.flame === 'summary' ? `Current flame:\n${flameSummary(app.flame, ctx.palette)}\n\n` : '';
+      const finalText = `${desc}Request: ${q}`;
       let finalContent: string | ChatPart[] = finalText;
       if (visChk.checked) {
         try {
@@ -166,8 +246,8 @@ export function buildAIPanel(app: App, root: HTMLElement) {
         } catch { /* capture failed — send text only */ }
       }
       const messages: ChatMessage[] = [
-        { role: 'system', content: systemPrompt() },
-        ...history.slice(0, -1),
+        { role: 'system', content: systemPrompt(app.flame, ctx) },
+        ...(ctx.memory ? history.slice(0, -1) : []),
         { role: 'user', content: finalContent },
       ];
       await streamChat({
@@ -234,7 +314,10 @@ export function buildAIPanel(app: App, root: HTMLElement) {
     history.length = 0;
     msgs.textContent = '';
     addMsg('system', 'Context cleared — the assistant no longer remembers earlier messages.');
+    updateEstimate();
   };
+  updateEstimate();
+  app.on('flame', () => updateEstimate());
   ta.addEventListener('keydown', (e) => {
     if (e.key === 'Enter' && !e.shiftKey) {
       e.preventDefault();

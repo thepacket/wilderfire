@@ -212,6 +212,12 @@ input[type="range"]::-moz-range-thumb {
 .ai-msg.assistant { background: var(--bg3); align-self: flex-start; max-width: 96%; }
 .ai-msg.system { color: var(--fg-dim); font-style: italic; font-size: 11px; padding: 2px 4px; }
 .ai-msg .applied { color: var(--accent2); font-style: italic; font-size: 11px; display: block; margin-top: 4px; }
+.ai-ctx { margin: 6px 0 2px; padding: 6px 8px; background: var(--bg3); border: 1px solid var(--border); border-radius: 6px; }
+.ai-ctx .row { margin: 3px 0; }
+.ai-ctx .row label { flex: 0 0 74px; }
+.ai-ctx select { font-size: 11px; padding: 2px 4px; flex: 1; }
+.ai-ctx-head { font-size: 10px; text-transform: uppercase; letter-spacing: 1px; color: var(--fg-dim); margin: 4px 0 2px; }
+.ai-estimate { margin: 4px 0 0; }
 .ai-input-row { display: flex; gap: 6px; padding: 10px 12px; border-top: 1px solid var(--border); }
 .ai-input-row textarea { flex: 1; resize: none; height: 54px; }
 .ai-btn-col { display: flex; flex-direction: column; gap: 4px; }
