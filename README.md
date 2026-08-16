@@ -33,10 +33,11 @@ in the stack.
   coordinate from geometry
 - **Variation picker** — searchable popover with type chips (2D, 3D, blur,
   DC, pre, post, crop, …) and pinned classics, replacing a 700-entry dropdown
-- **3D** — points carry z, every variation stage can read/write depth, plus a
-  JWildfire-compatible camera: pitch / yaw / bank, perspective, camera
-  position and `preserve_z`; `.flame` files round-trip `cam_pitch`,
-  `cam_yaw`, `cam_roll`, `cam_persp`, `cam_pos_*`, `preserve_z`
+- **3D** — points carry z, every variation stage can read/write depth,
+  per-transform **yz / zx affine planes** (+ post), a JWildfire-compatible
+  camera (pitch / yaw / bank, perspective, position, `preserve_z`),
+  **depth of field** (focus point or focus plane, area, fade) and
+  **dimish-z** depth fade; all of it round-trips through `.flame`
 - **Layers** (up to 8) — each with its own transforms, final transform,
   gradient, density weight, and visibility, blended in one histogram; walker
   threads are partitioned across layers on the GPU
@@ -47,9 +48,12 @@ in the stack.
   JWildfire, so imported flames are not mirrored)
 - Transform editor: weights, palette color / color-speed / opacity, affine +
   post-affine matrices, optional **final transform**
-- **flam3 tonemap** — log-density with `gamma_threshold`, brightness, gamma,
-  vibrancy; **density-estimation filtering** (Off / Subtle / Medium / Strong /
-  Max) and **2× oversampling** for anti-aliased edges
+- **JWildfire-exact tonemap** — the same log-density curve (contrast,
+  brightness, white level, low-density glow, gamma threshold, vibrancy),
+  the same **density estimation** (`de_radius` / `de_curve` similar-density
+  gather), **spatial filter** (Mitchell / Gaussian) and antialias jitter,
+  verified pixel-for-pixel against headless JWildfire on synthetic flames;
+  plus **2× oversampling**
 - **Undo/redo** with slider-gesture coalescing (Ctrl/Cmd+Z, Shift+Ctrl/Cmd+Z)
 - **Animation** — capture keyframes, morph between them (structure-merging
   interpolation that keeps the GPU kernel hot within each segment;
@@ -57,11 +61,13 @@ in the stack.
   live looping playback with scrubbing, per-keyframe easing
   (linear/smooth/in/out), timeline save/load, and **WebM (VP9) or MP4 (H.264)
   export** rendered client-side via WebCodecs
-- **Motion curves** — animate any numeric parameter (camera, tone, transform
-  weight/color/affine, any variation weight or parameter) with (time, value)
-  keys and Catmull-Rom / linear / smooth / step interpolation, layered on top
-  of the keyframe morphs; sparkline preview, editable point table, persisted
-  with the timeline
+- **Motion curves** — animate any numeric parameter (camera, DOF, tone,
+  transform weight/color/affine, any variation weight or parameter) with
+  (time, value) keys and Catmull-Rom / linear / smooth / step interpolation,
+  layered on top of the keyframe morphs; **drag points on the graph**
+  (double-click adds, Alt-click removes), editable point table, persisted
+  with the timeline **and written into `.flame` files in JWildfire's
+  `*Curve_*` format** (JWildfire animates them; its curves import back)
 - **Pre/post variation stages** per transform — weighted variation lists
   evaluated before and after the main sum (include `linear 1` in a stage for a
   pass-through); `pre_*`/`post_*` variation names in imported `.flame` files
@@ -86,8 +92,10 @@ in the stack.
   transparent background), flame **JSON save/load**, and **.flame XML
   import/export** compatible with flam3 / Apophysis / JWildfire (coefs, chaos,
   color_speed / symmetry, all three palette encodings, `<layer>` blocks,
-  3D camera, `cam_zoom` folded into zoom; unsupported variations are skipped
-  and reported)
+  3D camera, DOF, dimish-z, tonemap/filter/DE settings, motion curves,
+  `cam_zoom` folded into zoom; unsupported variations are skipped and
+  reported). Exports open a real **Save as… dialog** where the browser
+  supports it (Chrome/Edge), falling back to a download elsewhere
 - **Dark & light themes**
 - **AI assistant** via [OpenRouter.ai](https://openrouter.ai) — bring your own
   key and pick any model from a **live, searchable model picker** (provider
