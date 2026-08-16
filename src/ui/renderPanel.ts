@@ -40,10 +40,9 @@ export function buildRenderPanel(app: App, root: HTMLElement) {
   const pzChk = el('input') as HTMLInputElement;
   pzChk.type = 'checkbox';
   pzChk.checked = app.flame.preserveZ;
-  const pzLab = el('label', '', ' preserve Z (2D variations keep depth)');
+  const pzLab = el('label', 'check', ' Preserve Z');
   pzLab.prepend(pzChk);
-  pzLab.style.color = 'var(--fg-dim)';
-  pzLab.title = "JWildfire preserve_z: 2D variations pass the point's z through instead of flattening it";
+  pzLab.title = "JWildfire preserve_z: 2D variations keep the point's depth instead of flattening it";
   pzChk.onchange = () => { app.flame.preserveZ = pzChk.checked; app.commit(SRC); };
   pzRow.append(pzLab);
   cam.append(zoomS.root, rotS.root, pitchS.root, yawS.root, perspS.root, camZS.root, pzRow);
