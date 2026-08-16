@@ -307,3 +307,14 @@ a { color: var(--accent2); }
 .mpick-id { font-size: 10px; color: var(--fg-dim); font-family: ui-monospace, SFMono-Regular, Menlo, monospace; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .mpick-foot { display: flex; align-items: center; justify-content: space-between; gap: 8px; padding-top: 4px; border-top: 1px solid var(--border); }
 .mpick-foot .hint { margin: 0; }
+
+/* ---- motion curves ---- */
+.mc-list { display: flex; flex-direction: column; gap: 6px; margin-top: 6px; }
+.mc-row { background: var(--bg3); border: 1px solid var(--border); border-radius: 6px; padding: 6px; }
+.mc-head { display: flex; align-items: center; gap: 6px; }
+.mc-head .vname { flex: 1; font-weight: 600; color: var(--accent2); font-size: 12px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.mc-head select { font-size: 11px; padding: 2px 4px; }
+.mc-canvas { display: block; width: 100%; height: 40px; margin: 6px 0 4px; background: var(--bg2); border-radius: 4px; }
+.mc-points { display: flex; flex-wrap: wrap; gap: 4px; }
+.mc-points .vp { display: inline-flex; align-items: center; gap: 2px; }
+.mc-points input[type="number"] { width: 58px; font-size: 11px; padding: 2px 4px; }

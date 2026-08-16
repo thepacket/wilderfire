@@ -6,12 +6,15 @@ import { Muxer as Mp4Muxer, ArrayBufferTarget as Mp4Target } from 'mp4-muxer';
 import { App, el, slider } from './common';
 import { cloneFlame, normalizeFlame } from '../core/flame';
 import { flameAt, sortKeys, type Keyframe, type Easing } from '../core/animate';
+import { applyCurves, curvesEnd, evalCurve, getParam, paramPaths, setPoint, INTERPS, type MotionCurve, type CurveInterp } from '../core/motion';
 
 interface OverlayHandle { setVisible(v: boolean): void; readonly visible: boolean; }
 
 export interface AnimState {
   keys: { time: number; flame: unknown; ease?: Easing }[];
   easing: Easing;
+  /** per-parameter motion curves (see core/motion.ts) */
+  curves?: MotionCurve[];
 }
 
 export interface AnimAPI {
@@ -26,6 +29,7 @@ export interface AnimAPI {
 
 export function buildAnimPanel(app: App, root: HTMLElement, overlay: OverlayHandle): AnimAPI {
   let keys: Keyframe[] = [];
+  let curves: MotionCurve[] = [];
   let playing = false;
   let raf = 0;
   let wasTriangles = true;
@@ -84,13 +88,136 @@ export function buildAnimPanel(app: App, root: HTMLElement, overlay: OverlayHand
     label: 'Scrub', min: 0, max: 1, step: 0.002, value: 0,
     fmt: (v) => (v * 100).toFixed(0) + '%',
     onInput: (v) => {
-      if (playing || exporting || keys.length < 2) return;
-      const ks = sortKeys(keys);
-      const t = ks[0].time + v * (ks[ks.length - 1].time - ks[0].time);
-      app.applyPreview(flameAt(ks, t, easing()));
+      if (playing || exporting || !isReady()) return;
+      const [t0, t1] = timeRange();
+      curT = t0 + v * (t1 - t0);
+      app.applyPreview(evalAt(curT));
+      curveSec.querySelector('.mc-now')!.textContent = `t = ${curT.toFixed(2)} s`;
     },
   });
   pbSec.append(scrub.root);
+
+  const onChange = () => app.emit('history'); // nudge autosave listeners
+
+  // ---------- Timeline evaluation (keyframe morph + motion curves) ----------
+  let curT = 0; // scrub position in seconds
+  const isReady = () => keys.length >= 2 || curves.some((c) => c.enabled !== false && c.points.length > 0);
+  /** [start, end] of the timeline in seconds: keyframes ∪ curve points. */
+  const timeRange = (): [number, number] => {
+    const ks = sortKeys(keys);
+    const t0 = ks.length ? ks[0].time : 0;
+    const t1 = Math.max(ks.length ? ks[ks.length - 1].time : 0, curvesEnd(curves), t0 + 0.01);
+    return [t0, t1];
+  };
+  /** Flame at time t: keyframe morph (or the editor flame when < 2 keys) with curves applied. */
+  const evalAt = (t: number) => {
+    const ks = sortKeys(keys);
+    const base = ks.length >= 2 ? flameAt(ks, t, easing()) : ks.length === 1 ? cloneFlame(ks[0].flame) : app.flame;
+    return applyCurves(base, curves, t);
+  };
+
+  // ---------- Motion curves ----------
+  const curveSec = el('div', 'section');
+  curveSec.append(el('h3', '', 'Motion curves'));
+  const mcTop = el('div', 'btn-row');
+  const paramSel = el('select') as HTMLSelectElement;
+  paramSel.style.maxWidth = '190px';
+  const addCurveBtn = el('button', '', '+ Curve');
+  addCurveBtn.title = 'Animate this parameter with its own curve (independent of keyframes)';
+  mcTop.append(paramSel, addCurveBtn, el('span', 'hint mc-now', 't = 0.00 s'));
+  const curveList = el('div', 'mc-list');
+  curveSec.append(mcTop, curveList);
+  curveSec.append(el('div', 'hint', 'A curve drives one parameter over time. Scrub to a time, adjust the parameter in the editor, then “+ key” to record its value there. Curves layer on top of keyframe morphs.'));
+
+  function rebuildParamSel() {
+    const cur = paramSel.value;
+    paramSel.textContent = '';
+    let grp: HTMLOptGroupElement | null = null;
+    for (const p of paramPaths(app.flame)) {
+      if (!grp || grp.label !== p.group) { grp = el('optgroup') as HTMLOptGroupElement; grp.label = p.group; paramSel.append(grp); }
+      const o = el('option', '', p.label) as HTMLOptionElement;
+      o.value = p.path;
+      grp.append(o);
+    }
+    if (cur && [...paramSel.options].some((o) => o.value === cur)) paramSel.value = cur;
+  }
+  addCurveBtn.onclick = () => {
+    const path = paramSel.value;
+    if (!path) return;
+    let c = curves.find((k) => k.path === path);
+    if (!c) { c = { path, points: [], interp: 'spline' }; curves.push(c); }
+    const v = getParam(app.flame, path);
+    if (v !== undefined) setPoint(c, curT, v);
+    rebuildCurves(); rebuildList(); onChange();
+  };
+  function drawCurve(cv: HTMLCanvasElement, c: MotionCurve) {
+    const ctx = cv.getContext('2d')!;
+    const W = cv.width, H = cv.height;
+    ctx.clearRect(0, 0, W, H);
+    if (!c.points.length) return;
+    const [t0, t1] = timeRange();
+    let lo = Infinity, hi = -Infinity;
+    for (const p of c.points) { lo = Math.min(lo, p.v); hi = Math.max(hi, p.v); }
+    if (hi - lo < 1e-9) { lo -= 0.5; hi += 0.5; }
+    const X = (t: number) => 2 + (t - t0) / (t1 - t0) * (W - 4);
+    const Y = (v: number) => H - 3 - (v - lo) / (hi - lo) * (H - 6);
+    ctx.strokeStyle = getComputedStyle(cv).getPropertyValue('--accent') || '#ff7a3c';
+    ctx.lineWidth = 1.5;
+    ctx.beginPath();
+    for (let i = 0; i <= W; i += 2) {
+      const t = t0 + (i / W) * (t1 - t0);
+      const v = evalCurve(c, t) ?? lo;
+      i === 0 ? ctx.moveTo(X(t), Y(v)) : ctx.lineTo(X(t), Y(v));
+    }
+    ctx.stroke();
+    ctx.fillStyle = '#fff';
+    for (const p of c.points) { ctx.beginPath(); ctx.arc(X(p.t), Y(p.v), 2.5, 0, Math.PI * 2); ctx.fill(); }
+    ctx.strokeStyle = 'rgba(255,255,255,0.35)';
+    ctx.lineWidth = 1;
+    ctx.beginPath(); ctx.moveTo(X(curT), 0); ctx.lineTo(X(curT), H); ctx.stroke();
+  }
+  function rebuildCurves() {
+    rebuildParamSel();
+    curveList.textContent = '';
+    const labels = new Map(paramPaths(app.flame).map((p) => [p.path, p.label]));
+    for (const c of curves) {
+      const row = el('div', 'mc-row');
+      const head = el('div', 'mc-head');
+      const en = el('input') as HTMLInputElement;
+      en.type = 'checkbox'; en.checked = c.enabled !== false; en.title = 'enabled';
+      en.onchange = () => { c.enabled = en.checked; onChange(); };
+      const nm = el('span', 'vname', labels.get(c.path) ?? c.path);
+      nm.title = c.path;
+      const interp = el('select') as HTMLSelectElement;
+      for (const it of INTERPS) { const o = el('option', '', it) as HTMLOptionElement; o.value = it; interp.append(o); }
+      interp.value = c.interp;
+      interp.onchange = () => { c.interp = interp.value as CurveInterp; drawCurve(cv, c); onChange(); };
+      const keyBtn = el('button', 'icon', '+ key');
+      keyBtn.title = 'Record the parameter’s current editor value at the scrub time';
+      keyBtn.onclick = () => { const v = getParam(app.flame, c.path); if (v !== undefined) { setPoint(c, curT, v); rebuildCurves(); rebuildList(); onChange(); } };
+      const rm = el('button', 'icon danger', '✕');
+      rm.onclick = () => { curves = curves.filter((k) => k !== c); rebuildCurves(); rebuildList(); onChange(); };
+      head.append(en, nm, interp, keyBtn, rm);
+      const cv = el('canvas') as HTMLCanvasElement;
+      cv.className = 'mc-canvas'; cv.width = 260; cv.height = 40;
+      drawCurve(cv, c);
+      // point table
+      const pts = el('div', 'mc-points');
+      c.points.forEach((p, i) => {
+        const pr = el('span', 'vp');
+        const ti = el('input') as HTMLInputElement; ti.type = 'number'; ti.step = '0.1'; ti.value = String(Math.round(p.t * 1000) / 1000); ti.title = 'time (s)';
+        const vi = el('input') as HTMLInputElement; vi.type = 'number'; vi.step = '0.01'; vi.value = String(Math.round(p.v * 10000) / 10000); vi.title = 'value';
+        ti.onchange = () => { p.t = Math.max(0, parseFloat(ti.value) || 0); c.points.sort((a, b) => a.t - b.t); rebuildCurves(); rebuildList(); onChange(); };
+        vi.onchange = () => { p.v = parseFloat(vi.value) || 0; drawCurve(cv, c); onChange(); };
+        const del = el('button', 'icon', '✕'); del.title = 'remove point';
+        del.onclick = () => { c.points.splice(i, 1); rebuildCurves(); rebuildList(); onChange(); };
+        pr.append(ti, vi, del);
+        pts.append(pr);
+      });
+      row.append(head, cv, pts);
+      curveList.append(row);
+    }
+  }
 
   // ---------- Export ----------
   const exSec = el('div', 'section');
@@ -123,7 +250,7 @@ export function buildAnimPanel(app: App, root: HTMLElement, overlay: OverlayHand
   const exStatus = el('div', 'hint', 'Rendered fully in your browser via WebCodecs.');
   exSec.append(exStatus);
 
-  root.append(kfSec, pbSec, exSec);
+  root.append(kfSec, curveSec, pbSec, exSec);
 
   function rebuildList() {
     list.textContent = '';
@@ -168,7 +295,7 @@ export function buildAnimPanel(app: App, root: HTMLElement, overlay: OverlayHand
       item.append(sw, name, tIn, easeIn, goBtn, setBtn, rmBtn);
       list.append(item);
     });
-    const ready = keys.length >= 2;
+    const ready = isReady();
     playBtn.disabled = !ready || exporting;
     exBtn.disabled = !ready || exporting;
     loopBtn.disabled = keys.length < 1;
@@ -198,10 +325,8 @@ export function buildAnimPanel(app: App, root: HTMLElement, overlay: OverlayHand
 
   function play() {
     if (playing) { stop(); return; }
-    if (keys.length < 2 || exporting) return;
-    const ks = sortKeys(keys);
-    const t0 = ks[0].time;
-    const t1 = ks[ks.length - 1].time;
+    if (!isReady() || exporting) return;
+    const [t0, t1] = timeRange();
     const total = Math.max(t1 - t0, 0.01);
     const stepFps = parseInt(fpsSel.value);
     playing = true;
@@ -218,7 +343,7 @@ export function buildAnimPanel(app: App, root: HTMLElement, overlay: OverlayHand
       if (loopChk.checked) {
         elapsed = elapsed % total;
       } else if (elapsed >= total) {
-        app.applyPreview(flameAt(ks, t1, easing()));
+        app.applyPreview(evalAt(t1));
         stop();
         return;
       }
@@ -228,7 +353,8 @@ export function buildAnimPanel(app: App, root: HTMLElement, overlay: OverlayHand
       if (step !== lastStep) {
         lastStep = step;
         const t = t0 + elapsed;
-        app.applyPreview(flameAt(ks, t, easing()));
+        curT = t;
+        app.applyPreview(evalAt(t));
         scrub.set(elapsed / total);
       }
     };
@@ -239,7 +365,7 @@ export function buildAnimPanel(app: App, root: HTMLElement, overlay: OverlayHand
 
   // ---------- WebM export ----------
   async function exportWebM(opts?: { fps?: number; passes?: number; download?: boolean; format?: 'webm' | 'mp4' }): Promise<Blob> {
-    if (keys.length < 2) throw new Error('Need at least 2 keyframes.');
+    if (!isReady()) throw new Error('Need at least 2 keyframes or a motion curve.');
     if (!('VideoEncoder' in window)) {
       throw new Error('WebCodecs (VideoEncoder) is not available in this browser.');
     }
@@ -247,9 +373,8 @@ export function buildAnimPanel(app: App, root: HTMLElement, overlay: OverlayHand
     const passes = opts?.passes ?? parseInt(qSel.value);
     const download = opts?.download ?? true;
     const format = opts?.format ?? (fmtSel.value as 'webm' | 'mp4');
-    const ks = sortKeys(keys);
-    const t0 = ks[0].time;
-    const total = Math.max(ks[ks.length - 1].time - t0, 0.01);
+    const [t0, t1] = timeRange();
+    const total = Math.max(t1 - t0, 0.01);
     const nFrames = Math.max(2, Math.round(total * fps) + 1);
 
     const renderer = app.renderer;
@@ -309,7 +434,7 @@ export function buildAnimPanel(app: App, root: HTMLElement, overlay: OverlayHand
 
       for (let i = 0; i < nFrames; i++) {
         const t = t0 + (i / fps);
-        renderer.setFlame(flameAt(ks, Math.min(t, t0 + total), easing()));
+        renderer.setFlame(evalAt(Math.min(t, t0 + total)));
         await renderer.stepExport(passes);
         // Capture must stay in the same task as the tonemap submit.
         const frame = renderer.captureSync((cv) => new VideoFrame(cv, {
@@ -354,6 +479,7 @@ export function buildAnimPanel(app: App, root: HTMLElement, overlay: OverlayHand
   const getState = (): AnimState => ({
     keys: keys.map((k) => ({ time: k.time, flame: k.flame, ...(k.ease ? { ease: k.ease } : {}) })),
     easing: easing(),
+    curves: curves.map((c) => ({ path: c.path, interp: c.interp, points: c.points.map((p) => ({ t: p.t, v: p.v })), ...(c.enabled === false ? { enabled: false } : {}) })),
   });
   const setState = (state: AnimState | null | undefined) => {
     if (!state || !Array.isArray(state.keys)) return;
@@ -365,9 +491,17 @@ export function buildAnimPanel(app: App, root: HTMLElement, overlay: OverlayHand
       keys.push(kf);
     }
     if (state.easing === 'smooth' || state.easing === 'linear') easeSel.value = state.easing;
+    curves = Array.isArray(state.curves)
+      ? state.curves.filter((c) => c && typeof c.path === 'string' && Array.isArray(c.points)).map((c) => ({
+          path: c.path,
+          interp: INTERPS.includes(c.interp) ? c.interp : 'spline',
+          points: c.points.filter((p) => typeof p?.t === 'number' && typeof p?.v === 'number').map((p) => ({ t: p.t, v: p.v })).sort((a, b) => a.t - b.t),
+          ...(c.enabled === false ? { enabled: false } : {}),
+        }))
+      : [];
+    rebuildCurves();
     rebuildList();
   };
-  const onChange = () => app.emit('history'); // nudge autosave listeners
 
   saveAnimBtn.onclick = () => {
     const a = document.createElement('a');
@@ -389,7 +523,9 @@ export function buildAnimPanel(app: App, root: HTMLElement, overlay: OverlayHand
     animFile.value = '';
   };
 
+  rebuildCurves();
   rebuildList();
+  app.on('flame', (src) => { if (src !== 'preview' && !playing) rebuildCurves(); });
 
   return {
     addKey: () => capBtn.click(),
