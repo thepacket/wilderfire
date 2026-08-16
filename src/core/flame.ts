@@ -48,6 +48,9 @@ export interface Flame {
   rotation: number;  // radians
   brightness: number;
   gamma: number;
+  /** flam3 gamma_threshold: linear ramp below this alpha, pow(1/gamma) above —
+   *  prevents gamma from amplifying single-sample speckle. */
+  gammaThreshold: number;
   vibrancy: number;
   background: RGB;
 }
@@ -86,8 +89,9 @@ export function defaultFlame(palette: RGB[]): Flame {
     centerY: 0,
     zoom: 1,
     rotation: 0,
-    brightness: 1.4,
-    gamma: 2.4,
+    brightness: 3,
+    gamma: 3.2,
+    gammaThreshold: 0.04,
     vibrancy: 1,
     background: [0, 0, 0],
   };
@@ -255,8 +259,9 @@ export function normalizeFlame(obj: any, fallbackPalette: RGB[]): Flame {
     centerY: num(obj?.centerY, 0),
     zoom: Math.max(0.01, num(obj?.zoom, 1)),
     rotation: num(obj?.rotation, 0),
-    brightness: Math.max(0.05, num(obj?.brightness, 1.4)),
-    gamma: Math.max(0.5, num(obj?.gamma, 2.4)),
+    brightness: Math.max(0.05, num(obj?.brightness, 3)),
+    gamma: Math.max(0.5, num(obj?.gamma, 3.2)),
+    gammaThreshold: Math.min(0.5, Math.max(0, num(obj?.gammaThreshold, 0.04))),
     vibrancy: clamp01(num(obj?.vibrancy, 1)),
     background: bg,
   };

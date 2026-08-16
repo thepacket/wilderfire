@@ -24,12 +24,17 @@ export function buildRenderPanel(app: App, root: HTMLElement) {
   const tone = el('div', 'section');
   tone.append(el('h3', '', 'Tone'));
   const brS = slider({
-    label: 'Brightness', min: 0.1, max: 4, step: 0.05, value: app.flame.brightness,
+    label: 'Brightness', min: 0.1, max: 6, step: 0.05, value: app.flame.brightness,
     onInput: (v) => { app.flame.brightness = v; app.commitTone(SRC); },
   });
   const gaS = slider({
-    label: 'Gamma', min: 1, max: 5, step: 0.05, value: app.flame.gamma,
+    label: 'Gamma', min: 1, max: 6, step: 0.05, value: app.flame.gamma,
     onInput: (v) => { app.flame.gamma = v; app.commitTone(SRC); },
+  });
+  const gtS = slider({
+    label: 'Gamma thresh', min: 0, max: 0.2, step: 0.005, value: app.flame.gammaThreshold ?? 0.04,
+    fmt: (v) => v.toFixed(3),
+    onInput: (v) => { app.flame.gammaThreshold = v; app.commitTone(SRC); },
   });
   const viS = slider({
     label: 'Vibrancy', min: 0, max: 1, step: 0.01, value: app.flame.vibrancy,
@@ -51,7 +56,7 @@ export function buildRenderPanel(app: App, root: HTMLElement) {
     app.commitTone(SRC);
   });
   bgRow.append(bgInp);
-  tone.append(brS.root, gaS.root, viS.root, bgRow);
+  tone.append(brS.root, gaS.root, gtS.root, viS.root, bgRow);
 
   const perf = el('div', 'section');
   perf.append(el('h3', '', 'Engine'));
@@ -169,10 +174,14 @@ export function buildRenderPanel(app: App, root: HTMLElement) {
     const f = fileInp.files?.[0];
     if (!f) return;
     try {
-      const { flame, count } = importFlameText(await f.text(), app.activeLayer.palette);
+      const { flame, count, unknown } = importFlameText(await f.text(), app.activeLayer.palette);
       app.setFlame(flame);
       if (count > 1) {
         console.info(`File contained ${count} flames — loaded the first ("${flame.name}").`);
+      }
+      if (unknown.length) {
+        console.warn(`Unsupported variations skipped: ${unknown.join(', ')}`);
+        alert(`Loaded, but ${unknown.length} variation${unknown.length > 1 ? 's are' : ' is'} not supported and ${unknown.length > 1 ? 'were' : 'was'} skipped:\n${unknown.join(', ')}`);
       }
     } catch (e) {
       alert('Could not import flame: ' + (e as Error).message);
@@ -277,6 +286,7 @@ export function buildRenderPanel(app: App, root: HTMLElement) {
     rotS.set((app.flame.rotation * 180) / Math.PI);
     brS.set(app.flame.brightness);
     gaS.set(app.flame.gamma);
+    gtS.set(app.flame.gammaThreshold ?? 0.04);
     viS.set(app.flame.vibrancy);
     bgInp.value = toHex(app.flame.background);
   });

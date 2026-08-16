@@ -46,41 +46,88 @@ function blockSize(x: XForm): number {
   return n;
 }
 
+/** Module-scope WGSL (helper fns/consts) required by the variations of a flame, deduped by name. */
+function collectFuncs(flame: Flame): string {
+  const seen = new Set<string>();
+  const parts: string[] = [];
+  for (const ly of visibleLayers(flame)) {
+    const xs = ly.final ? [...ly.xforms, ly.final] : ly.xforms;
+    for (const x of xs) {
+      for (const list of varLists(x)) {
+        for (const vi of list) {
+          const def = VARIATIONS[vi.name];
+          if (!def?.funcs || !def.funcNames) continue;
+          const key = def.funcNames.join('|');
+          if (seen.has(key)) continue;
+          // Item-level dedupe: two variations may share a helper (e.g. sqr, Complex struct)
+          const items = splitItems(def.funcs);
+          for (const [nm, text] of items) {
+            if (seen.has('item:' + nm)) continue;
+            seen.add('item:' + nm);
+            parts.push(text);
+          }
+          seen.add(key);
+        }
+      }
+    }
+  }
+  return parts.join('\n\n');
+}
+
+/** Splits a funcs blob into [name, text] items (struct/fn/const/var<private>). */
+function splitItems(blob: string): [string, string][] {
+  const out: [string, string][] = [];
+  const chunks = blob.split(/\n\n(?=(?:struct|fn|const|var<private>) )/);
+  for (const c of chunks) {
+    const m = /^(?:struct|fn|const|var<private>) ([A-Za-z_]\w*)/.exec(c.trim());
+    if (m) out.push([m[1], c.trim()]);
+  }
+  return out;
+}
+
 function genXformFn(name: string, x: XForm, B: number): string {
   const A = (i: number) => `xd[${B + i}u]`;
   const [pre, main, post] = varLists(x);
   let off = B + HEADER;
 
-  // Emits one weighted-sum stage: reads `input`, assigns the sum to `output`.
-  const genStage = (list: VarInstance[], input: string, output: string): string => {
-    let snips = '';
-    for (const vi of list) {
+  // Emits one stage. The point (t), its polar precalcs and the accumulator (v)
+  // are all mutable so JWildfire-style pre-priority variations can rewrite the
+  // input and post-priority ones can rewrite the output; snippets run in
+  // priority order (pre → normal → post), list order within a priority.
+  const genStage = (list: VarInstance[], input: string, output: string, initV: string): string => {
+    // xd layout follows list order (writeData mirrors it), so bind offsets first…
+    const bound = list.map((vi) => {
       const def = VARIATIONS[vi.name];
-      if (!def) continue;
+      if (!def) return null;
       const w = `xd[${off}u]`;
       const p = (def.params ?? []).map((_, k) => `xd[${off + 1 + k}u]`);
-      snips += '    ' + def.code(w, p, A) + '\n';
       off += 1 + (def.params?.length ?? 0);
+      return { def, w, p, prio: def.priority ?? 0 };
+    }).filter((b): b is NonNullable<typeof b> => b !== null);
+    // …then emit in priority order.
+    let snips = '';
+    for (const prio of [-2, -1, 0, 1, 2]) {
+      for (const b of bound) if (b.prio === prio) snips += '    ' + b.def.code(b.w, b.p, A) + '\n';
     }
     return `  {
-    let t = ${input};
-    let r2 = max(dot(t, t), 1e-12);
-    let r = sqrt(r2);
-    let th = atan2(t.x, t.y);
-    let ph = atan2(t.y, t.x);
-    var v = vec2f(0.0, 0.0);
+    var t = ${input};
+    var r2 = max(dot(t, t), 1e-12);
+    var r = sqrt(r2);
+    var th = atan2(t.x, t.y);
+    var ph = atan2(t.y, t.x);
+    var v = ${initV};
 ${snips}    ${output} = v;
   }
 `;
   };
 
   let body = `  var t0 = vec2f(${A(0)}*pin.x + ${A(1)}*pin.y + ${A(2)}, ${A(3)}*pin.x + ${A(4)}*pin.y + ${A(5)});\n`;
-  if (pre.length) body += genStage(pre, 't0', 't0');
+  if (pre.length) body += genStage(pre, 't0', 't0', 'vec2f(0.0, 0.0)');
   body += '  var vout = vec2f(0.0, 0.0);\n';
-  body += genStage(main, 't0', 'vout');
-  if (post.length) body += genStage(post, 'vout', 'vout');
+  body += genStage(main, 't0', 'vout', 'vec2f(0.0, 0.0)');
+  if (post.length) body += genStage(post, 'vout', 'vout', 'vec2f(0.0, 0.0)');
 
-  return `fn ${name}(pin: vec2f, cp: ptr<function, f32>, rs: ptr<function, u32>) -> vec2f {
+  return `fn ${name}(pin: vec2f, cp: ptr<function, f32>, rs: ptr<function, u32>, hd: ptr<function, bool>) -> vec2f {
 ${body}  return vec2f(${A(6)}*vout.x + ${A(7)}*vout.y + ${A(8)}, ${A(9)}*vout.x + ${A(10)}*vout.y + ${A(11)});
 }`;
 }
@@ -123,7 +170,7 @@ export function compileFlame(flame: Flame, nPoints: number): CompiledFlame {
         let cs = xd[${b + 13}u];
         c = c * (1.0 - cs) + xd[${b + 12}u] * cs;
         op = xd[${b + 14}u];
-        np = applyX${li}_${i}(p, &c, &rs);
+        np = applyX${li}_${i}(p, &c, &rs, &hide);
       }`;
     }).join('\n');
     const finalBlock = ly.final ? `
@@ -131,7 +178,7 @@ export function compileFlame(flame: Flame, nPoints: number): CompiledFlame {
         let fcs = xd[${info.finalBase + 13}u];
         dc = dc * (1.0 - fcs) + xd[${info.finalBase + 12}u] * fcs;
       }
-      dp = applyF${li}(p, &dc, &rs);` : '';
+      dp = applyF${li}(p, &dc, &rs, &hide);` : '';
 
     iterFns += `
 fn iterLayer${li}(idx: u32) {
@@ -151,6 +198,7 @@ fn iterLayer${li}(idx: u32) {
 ${sel}
     var np = p;
     var op = 1.0;
+    var hide = false;
     switch xi {
 ${cases}
       default: {}
@@ -171,13 +219,15 @@ ${cases}
 
     var dp = p;
     var dc = c;${finalBlock}
+    if (hide) { op = 0.0; }
 
     let ox = dp.x - P.centerX;
     let oy = dp.y - P.centerY;
     let rx = ox * ca - oy * sa;
     let ry = ox * sa + oy * ca;
+    // flam3/JWildfire raster convention: +y grows downward on the image.
     let fx = rx * P.ppu + offX;
-    let fy = -ry * P.ppu + offY;
+    let fy = ry * P.ppu + offY;
     if (fx >= 0.0 && fy >= 0.0 && fx < f32(P.width) && fy < f32(P.height)) {
       let hi = (u32(fy) * P.width + u32(fx)) * 4u;
       let col = pal[${li * 256}u + min(u32(clamp(dc, 0.0, 1.0) * 255.99), 255u)];
@@ -236,6 +286,8 @@ fn rnd(state: ptr<function, u32>) -> f32 {
 }
 
 fn mmod(a: f32, b: f32) -> f32 { return a - b * floor(a / b); }
+
+${collectFuncs(flame)}
 
 ${funcs}${iterFns}
 @compute @workgroup_size(256)
@@ -402,18 +454,43 @@ fn fs(@builtin(position) fragPos: vec4f) -> @location(0) vec4f {
   if (cnt <= 0.0) {
     return bgOut;
   }
-  let avg = rgb / (255.0 * cnt);
-  let d = cnt / T.spp; // density relative to the mean
-  let ls = T.brightness * 0.36 * log2(1.0 + d * 7.0);
+
+  // ---- flam3-style tone mapping ----
+  // Log-density alpha: a = brightness * log10(1 + d), d = density relative to
+  // the expected samples-per-cell (flam3's k1*log10(1 + count*k2)).
+  let d = cnt / T.spp;
+  let a = T.brightness * 0.43429448 * log(1.0 + d);
+  let avg = rgb / (255.0 * cnt); // mean palette color, 0..1
+  let crgb = avg * a;            // log-scaled color
+
+  // Gamma with flam3's gamma_threshold: a linear ramp below the threshold so
+  // gamma never amplifies single-sample speckle into visible noise.
   let g = 1.0 / max(T.gamma, 0.1);
-  let lin = avg * ls;
-  let sgamma = pow(max(ls, 1e-9), g) / max(ls, 1e-9);
-  let col = mix(
-    pow(max(lin, vec3f(0.0)), vec3f(g)),
-    lin * sgamma,
+  let thr = T.bg.w;
+  var aG: f32;
+  if (thr > 0.0 && a < thr) {
+    let frac = a / thr;
+    aG = (1.0 - frac) * a * (pow(thr, g) / thr) + frac * pow(a, g);
+  } else {
+    aG = pow(max(a, 0.0), g);
+  }
+
+  // flam3 vibrancy: scale channels by the gamma'd alpha ratio (saturation-
+  // preserving) blended against per-channel gamma.
+  let ls2 = select(0.0, aG / a, a > 0.0);
+  var col = mix(
+    pow(max(crgb, vec3f(0.0)), vec3f(g)),
+    crgb * ls2,
     clamp(T.vibrancy, 0.0, 1.0)
   );
-  let alpha = clamp(pow(max(ls, 0.0), g), 0.0, 1.0);
+
+  // Highlights roll toward white instead of clipping per-channel (hue shift).
+  let m = max(col.r, max(col.g, col.b));
+  if (m > 1.0) {
+    col = mix(col / m, vec3f(1.0), clamp((m - 1.0) * 0.6, 0.0, 1.0));
+  }
+
+  let alpha = clamp(aG, 0.0, 1.0);
   let ccol = clamp(col, vec3f(0.0), vec3f(1.0));
   if (transparent) {
     return vec4f(ccol, alpha);

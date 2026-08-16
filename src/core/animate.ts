@@ -145,6 +145,7 @@ export function interpFlame(a: Flame, b: Flame, t: number): Flame {
     rotation: lerp(a.rotation, b.rotation, t),
     brightness: lerp(a.brightness, b.brightness, t),
     gamma: lerp(a.gamma, b.gamma, t),
+    gammaThreshold: lerp(a.gammaThreshold ?? 0.04, b.gammaThreshold ?? 0.04, t),
     vibrancy: lerp(a.vibrancy, b.vibrancy, t),
     background: [
       lerp(a.background[0], b.background[0], t),

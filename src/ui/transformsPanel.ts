@@ -315,6 +315,39 @@ export function buildTransformsPanel(app: App, root: HTMLElement) {
     const isFinal = app.selected === -1;
     editorSec.append(el('h3', '', isFinal ? 'Final Transform' : `Transform T${app.selected + 1}`));
 
+    // Add-variation controls (select + Variation / Pre / Post) sit at the top of the editor.
+    const addRow = el('div', 'btn-row');
+    const sel = el('select') as HTMLSelectElement;
+    for (const n of VARIATION_NAMES) {
+      const o = el('option', '', n) as HTMLOptionElement;
+      o.value = n;
+      sel.append(o);
+    }
+    sel.value = 'linear';
+    const mkVar = () => ({ name: sel.value, weight: 0.5, params: defaultParams(sel.value) });
+    const addVar = el('button', '', '+ Variation');
+    addVar.onclick = () => {
+      x.variations.push(mkVar());
+      app.commit();
+      rebuildEditor();
+    };
+    const addPre = el('button', 'icon', '+ Pre');
+    addPre.title = 'Add to the pre stage (transforms the affine result before the main variations; add linear 1 to keep a pass-through)';
+    addPre.onclick = () => {
+      (x.preVariations ??= []).push(mkVar());
+      app.commit();
+      rebuildEditor();
+    };
+    const addPost = el('button', 'icon', '+ Post');
+    addPost.title = 'Add to the post stage (transforms the main variation output)';
+    addPost.onclick = () => {
+      (x.postVariations ??= []).push(mkVar());
+      app.commit();
+      rebuildEditor();
+    };
+    addRow.append(sel, addVar, addPre, addPost);
+    editorSec.append(addRow);
+
     if (!isFinal) {
       editorSec.append(slider({
         label: 'Weight', min: 0.01, max: 4, step: 0.01, value: x.weight,
@@ -442,37 +475,6 @@ export function buildTransformsPanel(app: App, root: HTMLElement) {
       });
       editorSec.append(xg);
     }
-
-    const addRow = el('div', 'btn-row');
-    const sel = el('select') as HTMLSelectElement;
-    for (const n of VARIATION_NAMES) {
-      const o = el('option', '', n) as HTMLOptionElement;
-      o.value = n;
-      sel.append(o);
-    }
-    const mkVar = () => ({ name: sel.value, weight: 0.5, params: defaultParams(sel.value) });
-    const addVar = el('button', '', '+ Variation');
-    addVar.onclick = () => {
-      x.variations.push(mkVar());
-      app.commit();
-      rebuildEditor();
-    };
-    const addPre = el('button', 'icon', '+ Pre');
-    addPre.title = 'Add to the pre stage (transforms the affine result before the main variations; add linear 1 to keep a pass-through)';
-    addPre.onclick = () => {
-      (x.preVariations ??= []).push(mkVar());
-      app.commit();
-      rebuildEditor();
-    };
-    const addPost = el('button', 'icon', '+ Post');
-    addPost.title = 'Add to the post stage (transforms the main variation output)';
-    addPost.onclick = () => {
-      (x.postVariations ??= []).push(mkVar());
-      app.commit();
-      rebuildEditor();
-    };
-    addRow.append(sel, addVar, addPre, addPost);
-    editorSec.append(addRow);
   }
 
   function rebuild() {

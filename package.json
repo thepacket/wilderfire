@@ -6,7 +6,9 @@
   "scripts": {
     "dev": "vite",
     "build": "tsc --noEmit && vite build",
-    "preview": "vite preview"
+    "preview": "vite preview",
+    "jwf:gen": "node scripts/jwf-port/gen.ts",
+    "jwf:spec": "node scripts/jwf-port/oracle-spec.ts"
   },
   "devDependencies": {
     "@webgpu/types": "^0.1.44",

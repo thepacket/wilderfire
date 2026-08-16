@@ -19,7 +19,13 @@ const NON_VARIATION_ATTRS = new Set([
   'weight', 'color', 'symmetry', 'color_speed', 'opacity', 'coefs', 'post',
   'chaos', 'animate', 'motion_frequency', 'motion_function', 'var_color',
   'name', 'mirror_pre_post_translations',
+  // JWildfire per-xform extras we do not model
+  'material', 'material_speed', 'mod_gamma', 'mod_gamma_speed', 'mod_contrast', 'mod_contrast_speed',
+  'mod_saturation', 'mod_saturation_speed', 'mod_hue', 'mod_hue_speed', 'color_type', 'target_color',
+  'draw_mode', 'weighting_field_type', 'weighting_field_input', 'yzCoefs', 'zxCoefs', 'yzPost', 'zxPost',
 ]);
+/** JWildfire writes `<var>_fx_priority` per instance (priority override); we keep definition priorities. */
+const isFxPriorityAttr = (n: string) => n.endsWith('_fx_priority');
 
 /** JWildfire 3D-flavored variation names whose z=0 projections map onto our 2D
  *  set — lets JWildfire's bundled sample flames load with close fidelity. */
@@ -52,6 +58,10 @@ const fmt = (v: number) => {
   const r = Math.round(v * 1e6) / 1e6;
   return Object.is(r, -0) ? '0' : String(r);
 };
+
+/** Variation names the last import could not resolve (reset per parseFlameXML call). */
+export const lastImportUnknown: string[] = [];
+const noteUnknown = (name: string) => { if (!lastImportUnknown.includes(name)) lastImportUnknown.push(name); };
 
 function parseXFormEl(elm: Element): XForm {
   const x = defaultXForm();
@@ -91,26 +101,38 @@ function parseXFormEl(elm: Element): XForm {
   };
   const params: Record<string, Record<string, number>> = {}; // keyed by raw attr prefix
   const weights: { raw: string; stage: Stage; vname: string; weight: number }[] = [];
+  const unresolved: string[] = [];
   for (const attr of Array.from(elm.attributes)) {
-    const name = attr.name;
-    if (NON_VARIATION_ATTRS.has(name)) continue;
+    // Duplicate variation instances on one xform were renamed name__dup<k> by
+    // the lenient pre-parser; strip the marker to resolve them.
+    const name = attr.name.replace(/__dup\d+/, '');
+    if (NON_VARIATION_ATTRS.has(name) || isFxPriorityAttr(name) || name.startsWith('wfield_')) continue;
     const val = parseFloat(attr.value);
     if (!isFinite(val)) continue;
     const direct = resolve(name);
     if (direct) {
-      weights.push({ raw: name, ...direct, weight: val });
+      weights.push({ raw: attr.name, ...direct, weight: val });
       continue;
     }
-    // `${var}_${param}` — match against the parameter list (raw name keeps its prefix)
-    const us = name.lastIndexOf('_');
-    if (us > 0) {
+    // `${var}_${param}` — params may themselves contain underscores, so try
+    // every split point against the known variations' parameter lists.
+    let matched = false;
+    for (let us = name.lastIndexOf('_'); us > 0; us = name.lastIndexOf('_', us - 1)) {
       const vn = name.slice(0, us);
       const pn = name.slice(us + 1);
       const res = resolve(vn);
       if (res && VARIATIONS[res.vname]?.params?.some((p) => p.name === pn)) {
-        (params[vn] ??= {})[pn] = val;
+        (params[attr.name.slice(0, attr.name.length - name.length + us)] ??= {})[pn] = val;
+        matched = true;
+        break;
       }
     }
+    if (!matched) unresolved.push(name);
+  }
+  // Report unknown variations (drop their `${var}_${param}` attributes from the list).
+  for (const u of unresolved) {
+    if (unresolved.some((o) => o !== u && u.startsWith(o + '_'))) continue;
+    noteUnknown(u);
   }
   for (const { raw, stage, vname, weight } of weights) {
     if (weight === 0) continue;
@@ -195,12 +217,40 @@ function resample(colors: RGB[]): RGB[] {
   return out;
 }
 
+/** JWildfire writes one attribute per variation instance, so an xform with two
+ *  `bubble` variations yields a duplicate attribute (invalid XML). Rename the
+ *  later occurrences (and their trailing params) to `name__dup<k>`. */
+function dedupeAttributes(text: string): string {
+  // JWildfire's own marker for repeated instances: bubble#1#="…" bubble#1#_param="…"
+  text = text.replace(/([A-Za-z_]\w*)#(\d+)#/g, (_m, n: string, k: string) => `${n}__dup${Number(k) + 1}`);
+  return text.replace(/<(xform|finalxform)\b([^>]*)>/g, (m, tag: string, attrs: string) => {
+    // Attribute names may contain spaces or punctuation ("foo_show/hide(1/0)",
+    // "glsl_x_Density Pixels"): tokenize on name="value" pairs and sanitize.
+    attrs = attrs.replace(/([^\s"=][^"=]*?)\s*=\s*"([^"]*)"/g, (_m, name: string, val: string) => ` ${name.trim().replace(/[^\w.-]/g, '_')}="${val}"`);
+    const seen = new Map<string, number>();
+    let cur: { base: string; k: number } | null = null;
+    const out = attrs.replace(/([A-Za-z_][\w.-]*)(\s*=\s*"[^"]*")/g, (_m, name: string, rest: string) => {
+      const n = seen.get(name) ?? 0;
+      seen.set(name, n + 1);
+      if (n > 0 && !name.includes('_')) { cur = { base: name, k: n + 1 }; return `${name}__dup${n + 1}${rest}`; }
+      if (n > 0 && cur && name.startsWith(cur.base + '_')) return `${cur.base}__dup${cur.k}${name.slice(cur.base.length)}${rest}`;
+      if (n > 0) { const us = name.indexOf('_'); const base = us > 0 ? name.slice(0, us) : name; cur = { base, k: n + 1 }; return `${base}__dup${n + 1}${name.slice(base.length)}${rest}`; }
+      if (cur && !name.startsWith(cur.base + '_') && !name.startsWith(cur.base + '__dup')) cur = null;
+      return name + rest;
+    });
+    return `<${tag}${out}>`;
+  });
+}
+
 export function parseFlameXML(text: string, fallbackPalette: RGB[]): Flame[] {
-  const doc = new DOMParser().parseFromString(text, 'application/xml');
+  lastImportUnknown.length = 0;
+  let doc = new DOMParser().parseFromString(text, 'application/xml');
+  if (doc.querySelector('parsererror')) doc = new DOMParser().parseFromString(dedupeAttributes(text), 'application/xml');
   if (doc.querySelector('parsererror')) {
     throw new Error('Not valid XML: ' + (doc.querySelector('parsererror')?.textContent ?? '').slice(0, 120));
   }
-  const flameEls = Array.from(doc.querySelectorAll('flame'));
+  // flam3/Apophysis/JWildfire use <flame>; newer JWildfire files may use <jwf-flame>.
+  const flameEls = Array.from(doc.querySelectorAll('flame, jwf-flame'));
   if (!flameEls.length) throw new Error('No <flame> element found.');
 
   return flameEls.map((fe) => {
@@ -211,13 +261,18 @@ export function parseFlameXML(text: string, fallbackPalette: RGB[]): Flame[] {
     const center = nums(fe.getAttribute('center'));
     if (center.length === 2) { f.centerX = center[0]; f.centerY = center[1]; }
     const scale = parseFloat(fe.getAttribute('scale') ?? '');
-    if (isFinite(scale) && scale > 0) f.zoom = scale / (0.25 * sizeMin);
+    // JWildfire's effective pixels-per-unit is scale × cam_zoom (LogScaleCalculator).
+    const camZoom = parseFloat(fe.getAttribute('cam_zoom') ?? '');
+    const zoomMul = isFinite(camZoom) && camZoom > 0 ? camZoom : 1;
+    if (isFinite(scale) && scale > 0) f.zoom = (scale * zoomMul) / (0.25 * sizeMin);
     const rot = parseFloat(fe.getAttribute('rotate') ?? '');
     if (isFinite(rot)) f.rotation = (rot * Math.PI) / 180;
     const br = parseFloat(fe.getAttribute('brightness') ?? '');
     if (isFinite(br) && br > 0) f.brightness = Math.min(br, 6);
     const ga = parseFloat(fe.getAttribute('gamma') ?? '');
     if (isFinite(ga) && ga > 0) f.gamma = Math.min(ga, 8);
+    const gt = parseFloat(fe.getAttribute('gamma_threshold') ?? '');
+    if (isFinite(gt) && gt >= 0) f.gammaThreshold = Math.min(gt, 0.5);
     const vi = parseFloat(fe.getAttribute('vibrancy') ?? '');
     if (isFinite(vi)) f.vibrancy = Math.min(1, Math.max(0, vi));
     const bg = nums(fe.getAttribute('background'));
@@ -303,7 +358,7 @@ export function flameToXML(f: Flame): string {
   lines.push(
     `<flame version="WilderFire 0.1" name="${esc(f.name)}" size="${size} ${size}" ` +
     `center="${fmt(f.centerX)} ${fmt(f.centerY)}" scale="${fmt(scale)}" rotate="${fmt((f.rotation * 180) / Math.PI)}" ` +
-    `filter="0.5" quality="200" brightness="${fmt(f.brightness)}" gamma="${fmt(f.gamma)}" ` +
+    `filter="0.5" quality="200" brightness="${fmt(f.brightness)}" gamma="${fmt(f.gamma)}" gamma_threshold="${fmt(f.gammaThreshold)}" ` +
     `vibrancy="${fmt(f.vibrancy)}" background="${fmt(f.background[0])} ${fmt(f.background[1])} ${fmt(f.background[2])}">`,
   );
   const writeLayerBody = (ly: Layer, indent: string) => {
@@ -327,12 +382,12 @@ export function flameToXML(f: Flame): string {
 }
 
 /** Import from text: sniffs JSON vs .flame XML. Returns the first flame. */
-export function importFlameText(text: string, fallbackPalette: RGB[]): { flame: Flame; count: number } {
+export function importFlameText(text: string, fallbackPalette: RGB[]): { flame: Flame; count: number; unknown: string[] } {
   const trimmed = text.trim();
   if (trimmed.startsWith('<')) {
     const flames = parseFlameXML(trimmed, fallbackPalette);
-    return { flame: flames[0], count: flames.length };
+    return { flame: flames[0], count: flames.length, unknown: [...lastImportUnknown] };
   }
   const obj = JSON.parse(trimmed);
-  return { flame: normalizeFlame(obj, fallbackPalette), count: 1 };
+  return { flame: normalizeFlame(obj, fallbackPalette), count: 1, unknown: [] };
 }

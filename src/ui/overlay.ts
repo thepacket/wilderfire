@@ -31,14 +31,15 @@ export function buildOverlay(app: App, overlay: HTMLCanvasElement, wrap: HTMLEle
     const ca = Math.cos(f.rotation), sa = Math.sin(f.rotation);
     const rx = ox * ca - oy * sa;
     const ry = ox * sa + oy * ca;
-    return [rx * ppu() + overlay.width / 2, -ry * ppu() + overlay.height / 2];
+    // +y is down on screen (flam3/JWildfire convention; matches the render kernel)
+    return [rx * ppu() + overlay.width / 2, ry * ppu() + overlay.height / 2];
   }
 
   // device px -> world
   function s2w(px: number, py: number): [number, number] {
     const f = flameOf();
     const rx = (px - overlay.width / 2) / ppu();
-    const ry = -(py - overlay.height / 2) / ppu();
+    const ry = (py - overlay.height / 2) / ppu();
     const ca = Math.cos(-f.rotation), sa = Math.sin(-f.rotation);
     return [rx * ca - ry * sa + f.centerX, rx * sa + ry * ca + f.centerY];
   }
@@ -151,7 +152,7 @@ export function buildOverlay(app: App, overlay: HTMLCanvasElement, wrap: HTMLEle
       const f = flameOf();
       const scale = ppu();
       const dx = (px - drag.startX) / scale;
-      const dy = -(py - drag.startY) / scale;
+      const dy = (py - drag.startY) / scale;
       const ca = Math.cos(-f.rotation), sa = Math.sin(-f.rotation);
       f.centerX = drag.startCX - (dx * ca - dy * sa);
       f.centerY = drag.startCY - (dx * sa + dy * ca);

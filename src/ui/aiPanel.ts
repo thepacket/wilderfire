@@ -25,7 +25,7 @@ FLAME JSON SHAPE:
   "name": string,
   "layers": [ { "xforms": [...], "final": null | xform, "paletteStops": [...], "weight": 0-2, "visible": true } ],  // 1-8 layers; each layer has its own transforms + gradient; weight = density share
   "centerX": 0, "centerY": 0, "zoom": ~0.6-1.5, "rotation": radians,
-  "brightness": ~1-2, "gamma": ~2-3, "vibrancy": 0..1, "background": [r,g,b]
+  "brightness": ~3-4.5, "gamma": ~3-4, "gammaThreshold": ~0.04, "vibrancy": 0..1, "background": [r,g,b]  // flam3-style tone mapping
 }
 XFORM SHAPE: { "affine": [a,b,c,d,e,f], "post": [1,0,0,0,1,0], "weight": 0.5-1.5, "color": 0..1, "colorSpeed": 0..1, "opacity": 0..1, "xaos": [per-target multipliers, optional], "variations": [ { "name": "...", "weight": number, "params": { ... } } ], "preVariations": optional list evaluated on the affine result BEFORE the main sum (include linear 1 for a pass-through), "postVariations": optional list evaluated on the main output }
 PALETTE: "paletteStops": [[pos0..1, r, g, b], ...] with 3-8 stops, rgb 0..1 — preferred way to set colors (per layer).

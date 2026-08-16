@@ -65,6 +65,9 @@ export class FlameRenderer {
     this.canvas = canvas;
   }
 
+  /** The GPU device (available after init). Used by dev tooling. */
+  get gpuDevice(): GPUDevice { return this.device; }
+
   async init(): Promise<void> {
     if (!navigator.gpu) throw new Error('WebGPU is not available in this browser.');
     const adapter = await navigator.gpu.requestAdapter({ powerPreference: 'high-performance' });
@@ -265,7 +268,8 @@ export class FlameRenderer {
     tf32[8] = this.deMaxRadius; tf32[9] = this.deAlpha;
     tf32[10] = transparent ? 1 : 0;
     tf32[11] = os;
-    tf32[12] = f.background[0]; tf32[13] = f.background[1]; tf32[14] = f.background[2]; tf32[15] = 1;
+    tf32[12] = f.background[0]; tf32[13] = f.background[1]; tf32[14] = f.background[2];
+    tf32[15] = f.gammaThreshold ?? 0.04; // packed into bg.w
     this.device.queue.writeBuffer(this.tmBuf, 0, tu32);
   }
 

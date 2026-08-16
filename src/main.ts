@@ -248,6 +248,17 @@ async function boot() {
       return count;
     },
     exportXML: () => flameToXML(app.flame),
+    // Variation oracle test (dev only; see scripts/jwf-port/README.md)
+    varTest: async (opts?: { only?: string[]; verbose?: boolean; tol?: number }) => {
+      const { runVarTest } = await import('./dev/varTest');
+      return runVarTest(renderer.gpuDevice, opts);
+    },
+    varShader: async (name: string, source?: 'hand' | 'jwf') => (await import('./dev/varTest')).shaderFor(name, source),
+    // Import + compile every JWildfire fixture flame (scripts/jwf-port/testflames)
+    flameTest: async (opts?: { files?: string[]; verbose?: boolean }) => {
+      const { runFlameTest } = await import('./dev/flameTest');
+      return runFlameTest(renderer.gpuDevice, app.activeLayer.palette, opts);
+    },
   };
 }
 
