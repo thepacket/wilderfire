@@ -107,7 +107,8 @@ const FLAME_PARAMS: [string, string][] = [
   ['camPosX', 'Cam X'], ['camPosY', 'Cam Y'], ['camPosZ', 'Cam Z'],
   ['camDOF', 'DOF amount'], ['camDOFArea', 'DOF area'], ['focusZ', 'Focus Z'], ['camZ', 'Focus plane (legacy)'],
   ['dimishZ', 'Dimish Z'], ['dimZDist', 'Dimish distance'],
-  ['brightness', 'Brightness'], ['gamma', 'Gamma'], ['vibrancy', 'Vibrancy'],
+  ['brightness', 'Brightness'], ['gamma', 'Gamma'], ['gammaThreshold', 'Gamma threshold'], ['vibrancy', 'Vibrancy'],
+  ['contrast', 'Contrast'], ['whiteLevel', 'White level'], ['filterRadius', 'Filter radius'], ['deRadius', 'DE radius'],
 ];
 const AFF = ['a', 'b', 'c', 'd', 'e', 'f'];
 const AFF3 = ['yz', 'zx', 'yzPost', 'zxPost'] as const;

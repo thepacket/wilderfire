@@ -303,8 +303,15 @@ ${cases}
       ry = ox * sa + oy * ca;
     }
     // flam3/JWildfire raster convention: +y grows downward on the image.
-    let fx = rx * P.ppu + offX;
-    let fy = ry * P.ppu + offY;
+    var fx = rx * P.ppu + offX;
+    var fy = ry * P.ppu + offY;
+    // JWildfire antialiasing: some samples get a random jitter (raster pixels)
+    if (P.aa.x > 0.0 && rnd(&rs) > 1.0 - P.aa.x) {
+      let dr = exp(P.aa.y * sqrt(-log(max(rnd(&rs), 1e-12)))) - 1.0;
+      let da = 6.28318530718 * rnd(&rs);
+      fx = fx + dr * cos(da);
+      fy = fy + dr * sin(da);
+    }
     if (visible && fx >= 0.0 && fy >= 0.0 && fx < f32(P.width) && fy < f32(P.height)) {
       let hi = (u32(fy) * P.width + u32(fx)) * 4u;
       var col = pal[${li * 256}u + min(u32(clamp(dc, 0.0, 1.0) * 255.99), 255u)];
@@ -357,6 +364,7 @@ struct Params {
   dof: vec4f,    // x: 0.1·camDOF·scale, y: exponent, z: fade, w: newDOF flag
   dimZ: vec4f,   // x: dimishZ, y: dimZDist
   dimColor: vec4f,
+  aa: vec4f,     // x: antialias amount, y: antialias radius
 };
 
 @group(0) @binding(0) var<uniform> P: Params;
@@ -468,23 +476,37 @@ export const TONEMAP_WGSL = `// WilderFire tonemap: density-estimation filter + 
 struct TP {
   width: u32,
   height: u32,
-  _a: u32,
-  _b: u32,
+  filterN: u32, // colour filter size (odd; <= 1 = off), weights at sfilt[0..]
+  filterNI: u32, // intensity filter size (JWildfire: gaussian 0.75 for sharpening kernels), weights at sfilt[128..]
   brightness: f32,
   gamma: f32,
   vibrancy: f32,
   spp: f32,
-  de: vec4f, // x: max radius (0 = off), y: density falloff alpha, z: transparent bg flag, w: oversample factor
-  bg: vec4f,
+  de: vec4f, // x: DE estimator radius in px (0 = off), y: deCurve, z: transparent bg flag, w: oversample factor
+  bg: vec4f, // rgb: background, w: gamma threshold
+  jw: vec4f, // x: world area of the image (W·H/ppu²), y: contrast, z: colour scale 199.2/whiteLevel, w: low-density brightness
 };
 
+// Two passes: fsA = DE + log-scale per pixel into an rgba16float texture,
+// fsB = spatial filter + gamma/vibrancy/background from that texture.
 @group(0) @binding(0) var<uniform> T: TP;
 @group(0) @binding(1) var<storage, read> hist: array<u32>;
+@group(0) @binding(2) var<storage, read> sfilt: array<f32>;
+@group(0) @binding(3) var midTex: texture_2d<f32>;
 
 @vertex
 fn vs(@builtin(vertex_index) vi: u32) -> @builtin(position) vec4f {
   var pos = array<vec2f, 3>(vec2f(-1.0, -3.0), vec2f(3.0, 1.0), vec2f(-1.0, 1.0));
   return vec4f(pos[vi], 0.0, 1.0);
+}
+
+// Abramowitz–Stegun 7.1.26 erf (max err 1.5e-7)
+fn erf1(x: f32) -> f32 {
+  let s = sign(x);
+  let ax = abs(x);
+  let t = 1.0 / (1.0 + 0.3275911 * ax);
+  let y = 1.0 - (((((1.061405429 * t - 1.453152027) * t) + 1.421413741) * t - 0.284496736) * t + 0.254829592) * t * exp(-ax * ax);
+  return s * y;
 }
 
 // (r, g, b, opacity-weighted count) at a clamped supersampled cell
@@ -509,8 +531,81 @@ fn blockAt(bx: i32, by: i32) -> vec4f {
   return acc / f32(os * os);
 }
 
+// Density-estimation + JWildfire log scale for output pixel (x, y):
+// returns (r, g, b, intensity), all zero where nothing landed.
+fn logScaled(x: i32, y: i32) -> vec4f {
+  let c0 = blockAt(x, y);
+  var rgb = c0.rgb;
+  var cnt = c0.w;
+
+  // Density estimation (JWildfire DeCalculator): average neighbours of
+  // *similar* density, weighted 1/(d²+1); a neighbour is accepted when
+  // |erf((n - c)/m1)| <= deCurve^dist · m2 with m1 = sqrt(8c)+5, m2 = (c+1)^-¼.
+  // Empty/sparse pixels gather from a wide area (soft glow), dense ones stay sharp.
+  let R = i32(T.de.x + 0.5);
+  if (R > 0) {
+    let os2 = max(T.de.w, 1.0) * max(T.de.w, 1.0);
+    let cw = c0.w * os2;               // raw hits (per output pixel)
+    let m1 = sqrt(8.0 * cw) + 5.0;
+    let m2 = pow(cw + 1.0, -0.25);
+    let lnc = log(max(T.de.y, 1e-4));  // deCurve
+    var sumRGB = vec3f(0.0);
+    var sumA = 0.0;
+    var wsum = 0.0;
+    for (var dy = -R; dy <= R; dy = dy + 1) {
+      for (var dx = -R; dx <= R; dx = dx + 1) {
+        let d2 = f32(dx * dx + dy * dy);
+        let cc = blockAt(x + dx, y + dy);
+        let la = cc.w * os2;
+        let dev = abs(erf1((la - cw) / m1));
+        if (dev <= exp(lnc * sqrt(d2)) * m2) {
+          let wgt = 1.0 / (d2 + 1.0);
+          sumRGB += cc.rgb * wgt;
+          sumA += cc.w * wgt;
+          wsum += wgt;
+        }
+      }
+    }
+    if (wsum > 1e-9) {
+      rgb = sumRGB / wsum;
+      cnt = sumA / wsum;
+    }
+  }
+
+  if (cnt <= 0.0) {
+    return vec4f(0.0);
+  }
+  // ---- JWildfire / flam3 log-density (LogScaleCalculator) ----
+  // hits per output pixel relative to the expected count (quality), then
+  // divided by the world area the image covers, so the curve is zoom-invariant:
+  //   intensity = 2·contrast·brightness·log10(1 + d/(contrast·area)) + glow/(hits+1)
+  let os = max(T.de.w, 1.0);
+  let hits = cnt * os * os;             // blockAt averages the os×os block
+  let d = hits / T.spp;
+  let contrast = max(T.jw.y, 1e-3);
+  let k1 = 2.0 * contrast * T.brightness;
+  let glow = T.jw.w / (contrast * T.spp) / (hits + 1.0);
+  let a = k1 * 0.43429448 * log(1.0 + d / (contrast * T.jw.x)) + glow;
+  let avg = rgb / (255.0 * cnt);        // mean palette color, 0..1
+  return vec4f(avg * a * T.jw.z, a);    // ×199.2/whiteLevel (JWildfire palette scaling)
+}
+
 @fragment
-fn fs(@builtin(position) fragPos: vec4f) -> @location(0) vec4f {
+fn fsA(@builtin(position) fragPos: vec4f) -> @location(0) vec4f {
+  let x = i32(fragPos.x);
+  let y = i32(fragPos.y);
+  if (x >= i32(T.width) || y >= i32(T.height) || T.spp <= 0.0) { return vec4f(0.0); }
+  return logScaled(x, y);
+}
+
+fn mid(x: i32, y: i32) -> vec4f {
+  let px = clamp(x, 0, i32(T.width) - 1);
+  let py = clamp(y, 0, i32(T.height) - 1);
+  return textureLoad(midTex, vec2i(px, py), 0);
+}
+
+@fragment
+fn fsB(@builtin(position) fragPos: vec4f) -> @location(0) vec4f {
   let transparent = T.de.z > 0.5;
   let bgOut = select(vec4f(T.bg.rgb, 1.0), vec4f(0.0), transparent);
   let x = i32(fragPos.x);
@@ -518,45 +613,38 @@ fn fs(@builtin(position) fragPos: vec4f) -> @location(0) vec4f {
   if (x >= i32(T.width) || y >= i32(T.height) || T.spp <= 0.0) {
     return bgOut;
   }
-  let c0 = blockAt(x, y);
-  var rgb = c0.rgb;
-  var cnt = c0.w;
-
-  // Density-estimation filter: blur radius shrinks as local density grows,
-  // smoothing sparse noise while leaving dense structure crisp (flam3-style).
-  let maxR = i32(T.de.x + 0.5);
-  if (maxR > 0) {
-    let rad = min(i32(f32(maxR) / pow(c0.w + 1.0, T.de.y)), maxR);
-    if (rad > 0) {
-      var wsum = 0.0;
-      var crgb = vec3f(0.0);
-      var ccnt = 0.0;
-      let sigma2 = 0.4 * f32(rad * rad) + 0.3;
-      for (var dy = -rad; dy <= rad; dy = dy + 1) {
-        for (var dx = -rad; dx <= rad; dx = dx + 1) {
-          let cc = blockAt(x + dx, y + dy);
-          let g = exp(-f32(dx * dx + dy * dy) / sigma2);
-          crgb += cc.rgb * g;
-          ccnt += cc.w * g;
-          wsum += g;
+  // Spatial filter (JWildfire LogDensityFilter) over the log-scaled image:
+  // colours with the primary kernel, intensity with its own (smoothing) kernel.
+  var v = vec4f(0.0);
+  let NC = i32(T.filterN);
+  let NI = i32(T.filterNI);
+  if (NC <= 1 && NI <= 1) {
+    v = mid(x, y);
+  } else {
+    let N = max(NC, NI);
+    let h = N / 2;
+    let hc = NC / 2;
+    let hi = NI / 2;
+    for (var j = -h; j <= h; j = j + 1) {
+      for (var i = -h; i <= h; i = i + 1) {
+        var wc = 0.0;
+        var wi = 0.0;
+        if (NC > 1 && abs(i) <= hc && abs(j) <= hc) { wc = sfilt[u32((j + hc) * NC + (i + hc))]; }
+        if (NI > 1 && abs(i) <= hi && abs(j) <= hi) { wi = sfilt[128u + u32((j + hi) * NI + (i + hi))]; }
+        if (NC <= 1 && i == 0 && j == 0) { wc = 1.0; }
+        if (NI <= 1 && i == 0 && j == 0) { wi = 1.0; }
+        if (wc != 0.0 || wi != 0.0) {
+          let s = mid(x + i, y + j);
+          v += vec4f(s.rgb * wc, s.w * wi);
         }
       }
-      rgb = crgb / wsum;
-      cnt = ccnt / wsum;
     }
   }
-
-  if (cnt <= 0.0) {
+  let a = v.w;
+  if (a <= 0.0) {
     return bgOut;
   }
-
-  // ---- flam3-style tone mapping ----
-  // Log-density alpha: a = brightness * log10(1 + d), d = density relative to
-  // the expected samples-per-cell (flam3's k1*log10(1 + count*k2)).
-  let d = cnt / T.spp;
-  let a = T.brightness * 0.43429448 * log(1.0 + d);
-  let avg = rgb / (255.0 * cnt); // mean palette color, 0..1
-  let crgb = avg * a;            // log-scaled color
+  let crgb = v.rgb;
 
   // Gamma with flam3's gamma_threshold: a linear ramp below the threshold so
   // gamma never amplifies single-sample speckle into visible noise.
@@ -579,17 +667,15 @@ fn fs(@builtin(position) fragPos: vec4f) -> @location(0) vec4f {
     clamp(T.vibrancy, 0.0, 1.0)
   );
 
-  // Highlights roll toward white instead of clipping per-channel (hue shift).
-  let m = max(col.r, max(col.g, col.b));
-  if (m > 1.0) {
-    col = mix(col / m, vec3f(1.0), clamp((m - 1.0) * 0.6, 0.0, 1.0));
-  }
-
+  // col is already alpha-scaled (flam3/JWildfire: logScl = alpha / intensity),
+  // so composite as col + bg*(1 - alpha), NOT mix(bg, col, alpha), which would
+  // apply alpha twice. Per-channel clip like JWildfire (whiteLevel < 255 fades to white).
   let alpha = clamp(aG, 0.0, 1.0);
   let ccol = clamp(col, vec3f(0.0), vec3f(1.0));
   if (transparent) {
-    return vec4f(ccol, alpha);
+    // straight (un-premultiplied) colour for the PNG alpha channel
+    return vec4f(select(ccol, clamp(col / max(alpha, 1e-6), vec3f(0.0), vec3f(1.0)), alpha > 1e-6), alpha);
   }
-  return vec4f(mix(T.bg.rgb, ccol, alpha), 1.0);
+  return vec4f(clamp(ccol + T.bg.rgb * (1.0 - alpha), vec3f(0.0), vec3f(1.0)), 1.0);
 }
 `;

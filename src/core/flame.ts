@@ -90,6 +90,21 @@ export interface Flame {
   gammaThreshold: number;
   vibrancy: number;
   background: RGB;
+  /** JWildfire log-density constants: intensity = 2·contrast·brightness·log10(1 + d/(contrast·area))
+   *  + lowDensityBrightness glow; colours scaled by 255/whiteLevel (fade to white). */
+  contrast: number;
+  whiteLevel: number;
+  lowDensityBrightness: number;
+  /** Spatial filter over the log-scaled image (JWildfire `filter` radius, 0 = off) and kernel. */
+  filterRadius: number;
+  filterKernel: 'mitchell' | 'gaussian';
+  /** JWildfire antialiasing: a fraction of samples get a random sub-pixel-ish jitter. */
+  antialiasAmount: number;
+  antialiasRadius: number;
+  /** JWildfire density estimation (DeCalculator): estimator radius = deRadius·9 px
+   *  (0 = off), deCurve = acceptance falloff with distance (0.8 default). */
+  deRadius: number;
+  deCurve: number;
 }
 
 export const IDENTITY: Affine = [1, 0, 0, 0, 1, 0];
@@ -136,6 +151,10 @@ export function defaultFlame(palette: RGB[]): Flame {
     gammaThreshold: 0.04,
     vibrancy: 1,
     background: [0, 0, 0],
+    contrast: 1, whiteLevel: 220, lowDensityBrightness: 0.24,
+    filterRadius: 0, filterKernel: 'mitchell',
+    antialiasAmount: 0.25, antialiasRadius: 0.5,
+    deRadius: 1, deCurve: 0.8,
   };
 }
 
@@ -321,6 +340,15 @@ export function normalizeFlame(obj: any, fallbackPalette: RGB[]): Flame {
     gammaThreshold: Math.min(0.5, Math.max(0, num(obj?.gammaThreshold, 0.04))),
     vibrancy: clamp01(num(obj?.vibrancy, 1)),
     background: bg,
+    contrast: Math.max(0.05, num(obj?.contrast, 1)),
+    whiteLevel: Math.max(1, num(obj?.whiteLevel, 220)),
+    lowDensityBrightness: Math.max(0, num(obj?.lowDensityBrightness, 0.24)),
+    filterRadius: Math.min(3, Math.max(0, num(obj?.filterRadius, 0))),
+    filterKernel: obj?.filterKernel === 'gaussian' ? 'gaussian' : 'mitchell',
+    antialiasAmount: clamp01(num(obj?.antialiasAmount, 0.25)),
+    antialiasRadius: Math.max(0, num(obj?.antialiasRadius, 0.5)),
+    deRadius: Math.min(2, Math.max(0, num(obj?.deRadius, 1))),
+    deCurve: Math.min(1, Math.max(0.01, num(obj?.deCurve, 0.8))),
   };
 }
 

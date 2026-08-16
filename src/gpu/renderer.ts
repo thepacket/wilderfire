@@ -7,6 +7,7 @@ import { flameSignature, visibleLayers, MAX_LAYERS } from '../core/flame';
 import { compileFlame, TONEMAP_WGSL, type CompiledFlame } from './codegen';
 
 const XD_FLOATS = 8192;
+const FILT_FLOATS = 256; // spatial filter weights (N ≤ 15)
 
 export interface RenderStats {
   spp: number;           // samples per pixel accumulated
@@ -28,9 +29,18 @@ export class FlameRenderer {
   private palBuf!: GPUBuffer;
   private paramsBuf!: GPUBuffer;
   private tmBuf!: GPUBuffer;
+  private filtBuf!: GPUBuffer;
+  private filtKey = '';
 
   private computePipeline: GPUComputePipeline | null = null;
-  private renderPipeline!: GPURenderPipeline;
+  private renderPipeline!: GPURenderPipeline; // pass B → canvas
+  private pipeA!: GPURenderPipeline;           // pass A → mid texture
+  private tmModule!: GPUShaderModule;
+  private midTex: GPUTexture | null = null;
+  private midW = 0;
+  private midH = 0;
+  private bgB: GPUBindGroup | null = null;      // pass B for the canvas format
+  private bgBExport: GPUBindGroup | null = null; // pass B for rgba8 export
   private computeBG: GPUBindGroup | null = null;
   private renderBG: GPUBindGroup | null = null;
 
@@ -45,8 +55,8 @@ export class FlameRenderer {
   itersPerPass = 64;
   passesPerFrame = 2;
   targetQuality = 4000; // spp cap
-  deMaxRadius = 1;      // density-estimation filter radius (0 = off)
-  deAlpha = 0.4;        // how fast the DE radius shrinks with density
+  /** Live-preview cap on the DE estimator radius (px); exports use the flame's full radius. */
+  deLiveCap = 6;
   oversample = 1;       // 1 or 2 — supersampled histogram, box-downsampled in tonemap
   private maxHistBytes = 128 << 20;
 
@@ -96,14 +106,23 @@ export class FlameRenderer {
     this.rngBuf = d.createBuffer({ size: this.nPoints * 8, usage: GPUBufferUsage.STORAGE | GPUBufferUsage.COPY_DST });
     this.xdBuf = d.createBuffer({ size: XD_FLOATS * 4, usage: GPUBufferUsage.STORAGE | GPUBufferUsage.COPY_DST });
     this.palBuf = d.createBuffer({ size: MAX_LAYERS * 256 * 16, usage: GPUBufferUsage.STORAGE | GPUBufferUsage.COPY_DST });
-    this.paramsBuf = d.createBuffer({ size: 192, usage: GPUBufferUsage.UNIFORM | GPUBufferUsage.COPY_DST });
-    this.tmBuf = d.createBuffer({ size: 64, usage: GPUBufferUsage.UNIFORM | GPUBufferUsage.COPY_DST });
+    this.paramsBuf = d.createBuffer({ size: 256, usage: GPUBufferUsage.UNIFORM | GPUBufferUsage.COPY_DST });
+    this.tmBuf = d.createBuffer({ size: 128, usage: GPUBufferUsage.UNIFORM | GPUBufferUsage.COPY_DST });
+    this.filtBuf = d.createBuffer({ size: FILT_FLOATS * 4, usage: GPUBufferUsage.STORAGE | GPUBufferUsage.COPY_DST });
 
     const tmModule = d.createShaderModule({ code: TONEMAP_WGSL });
+    this.tmModule = tmModule;
+    // Two-pass tonemap: A (DE + log scale) → rgba16float, B (filter + gamma) → target
+    this.pipeA = d.createRenderPipeline({
+      layout: 'auto',
+      vertex: { module: tmModule, entryPoint: 'vs' },
+      fragment: { module: tmModule, entryPoint: 'fsA', targets: [{ format: 'rgba16float' }] },
+      primitive: { topology: 'triangle-list' },
+    });
     this.renderPipeline = d.createRenderPipeline({
       layout: 'auto',
       vertex: { module: tmModule, entryPoint: 'vs' },
-      fragment: { module: tmModule, entryPoint: 'fs', targets: [{ format: this.format }] },
+      fragment: { module: tmModule, entryPoint: 'fsB', targets: [{ format: this.format }] },
       primitive: { topology: 'triangle-list' },
     });
 
@@ -131,10 +150,10 @@ export class FlameRenderer {
     this.histBuf?.destroy();
     this.histBuf = this.device.createBuffer({
       size,
-      usage: GPUBufferUsage.STORAGE | GPUBufferUsage.COPY_DST,
+      usage: GPUBufferUsage.STORAGE | GPUBufferUsage.COPY_DST | GPUBufferUsage.COPY_SRC,
     });
     this.renderBG = this.device.createBindGroup({
-      layout: this.renderPipeline.getBindGroupLayout(0),
+      layout: this.pipeA.getBindGroupLayout(0),
       entries: [
         { binding: 0, resource: { buffer: this.tmBuf } },
         { binding: 1, resource: { buffer: this.histBuf } },
@@ -251,7 +270,7 @@ export class FlameRenderer {
     const fullW = tile ? tile.fullW : w;
     const fullH = tile ? tile.fullH : h;
     const ppu = 0.25 * Math.min(fullW, fullH) * f.zoom;
-    const pu32 = new Uint32Array(48);
+    const pu32 = new Uint32Array(52);
     const pf32 = new Float32Array(pu32.buffer);
     const dofOn = Math.abs(f.camDOF ?? 0) > 1e-9;
     const dimOn = (f.dimishZ ?? 0) > 1e-9;
@@ -287,20 +306,126 @@ export class FlameRenderer {
     pf32.set([f.dimishZ ?? 0, f.dimZDist ?? 0, 0, 0], 40);
     const dc = f.dimZColor ?? [0, 0, 0];
     pf32.set([dc[0], dc[1], dc[2], 0], 44);
+    pf32.set([f.antialiasAmount ?? 0.25, f.antialiasRadius ?? 0.5, 0, 0], 48);
     this.device.queue.writeBuffer(this.paramsBuf, 0, pu32);
 
-    const tu32 = new Uint32Array(16);
+    const tu32 = new Uint32Array(24);
     const tf32 = new Float32Array(tu32.buffer);
     tu32[0] = tile ? tile.tileW : this.width; // output pixels; hist rows are width×os
     tu32[1] = tile ? tile.tileH : this.height;
+    { const [nc, ni] = this.uploadFilters(f.filterRadius ?? 0, f.filterKernel ?? 'mitchell'); tu32[2] = nc; tu32[3] = ni; }
+    // world area covered by the full image (zoom-invariant density normalisation)
+    const ppuOut = ppu / os;
+    tf32[16] = (fullW / os) * (fullH / os) / (ppuOut * ppuOut);
+    tf32[17] = f.contrast ?? 1;
+    // JWildfire RenderColor pre-scales palette entries by 200/256, then divides by whiteLevel
+    tf32[18] = (255 * 200 / 256) / Math.max(f.whiteLevel ?? 220, 1);
+    tf32[19] = f.lowDensityBrightness ?? 0.24;
     tf32[4] = f.brightness; tf32[5] = f.gamma; tf32[6] = f.vibrancy;
     tf32[7] = Math.max(spp, 1e-6);
-    tf32[8] = this.deMaxRadius; tf32[9] = this.deAlpha;
+    {
+      // JWildfire: estimatorRadius = de_radius · 9 · pixelsPerUnitScale (capped 18)
+      const scl = tile ? tile.fullW / this.width : 1;
+      let R = Math.round((f.deRadius ?? 1) * 9 * scl);
+      R = Math.min(R, 18);
+      if (!tile && this.deLiveCap >= 0) R = Math.min(R, this.deLiveCap);
+      tf32[8] = R; tf32[9] = f.deCurve ?? 0.8;
+    }
     tf32[10] = transparent ? 1 : 0;
     tf32[11] = os;
     tf32[12] = f.background[0]; tf32[13] = f.background[1]; tf32[14] = f.background[2];
     tf32[15] = f.gammaThreshold ?? 0.04; // packed into bg.w
     this.device.queue.writeBuffer(this.tmBuf, 0, tu32);
+  }
+
+  /** Intermediate rgba16float texture for the two-pass tonemap, sized to the target. */
+  private ensureMid(w: number, h: number) {
+    if (this.midTex && this.midW === w && this.midH === h) return;
+    this.midTex?.destroy();
+    this.midTex = this.device.createTexture({
+      size: { width: Math.max(w, 1), height: Math.max(h, 1) },
+      format: 'rgba16float',
+      usage: GPUTextureUsage.RENDER_ATTACHMENT | GPUTextureUsage.TEXTURE_BINDING,
+    });
+    this.midW = w; this.midH = h;
+    this.bgB = null; this.bgBExport = null;
+  }
+
+  /** Encode both tonemap passes: histogram (via bgA) → mid → `target`. */
+  private encodeTonemap(enc: GPUCommandEncoder, bgA: GPUBindGroup, pipeB: GPURenderPipeline, target: GPUTextureView, w: number, h: number, exportFmt: boolean, clear: GPUColor) {
+    this.ensureMid(w, h);
+    const rpA = enc.beginRenderPass({
+      colorAttachments: [{ view: this.midTex!.createView(), loadOp: 'clear', clearValue: { r: 0, g: 0, b: 0, a: 0 }, storeOp: 'store' }],
+    });
+    rpA.setPipeline(this.pipeA);
+    rpA.setBindGroup(0, bgA);
+    rpA.draw(3);
+    rpA.end();
+    let bgB = exportFmt ? this.bgBExport : this.bgB;
+    if (!bgB) {
+      bgB = this.device.createBindGroup({
+        layout: pipeB.getBindGroupLayout(0),
+        entries: [
+          { binding: 0, resource: { buffer: this.tmBuf } },
+          { binding: 2, resource: { buffer: this.filtBuf } },
+          { binding: 3, resource: this.midTex!.createView() },
+        ],
+      });
+      if (exportFmt) this.bgBExport = bgB; else this.bgB = bgB;
+    }
+    const rpB = enc.beginRenderPass({
+      colorAttachments: [{ view: target, loadOp: 'clear', clearValue: clear, storeOp: 'store' }],
+    });
+    rpB.setPipeline(pipeB);
+    rpB.setBindGroup(0, bgB);
+    rpB.draw(3);
+    rpB.end();
+  }
+
+  /** JWildfire spatial filters. FilterHolder builds an N×N kernel from a radius
+   *  (N = int(2·support·r)+1, odd) with the Mitchell-smooth (b=.42 c=.29, support 2)
+   *  or flam3 gaussian (support 1.5) coefficient. For "sharpening" kernels
+   *  (Mitchell) LogDensityFilter filters colours with the primary kernel and the
+   *  intensity with a gaussian of radius 0.75. Returns [Ncolour, Nintensity]. */
+  private uploadFilters(radius: number, kernel: 'mitchell' | 'gaussian'): [number, number] {
+    if (radius < 1e-6) return [0, 0];
+    const key = `${kernel}:${radius.toFixed(4)}`;
+    const w = new Float32Array(FILT_FLOATS);
+    const build = (r: number, k: 'mitchell' | 'gaussian', at: number): number => {
+      const support = k === 'gaussian' ? 1.5 : 2.0;
+      const fw = Math.floor(2 * support * r);
+      if (fw <= 0) return 0;
+      let N = fw + 1;
+      if (N % 2 === 0) N++;
+      N = Math.min(N, 11);
+      const adjust = (support * N) / fw;
+      const coeff = (t: number): number => {
+        if (k === 'gaussian') return Math.exp(-2 * t * t) * Math.sqrt(2 / Math.PI);
+        const b = 0.42, c = 0.29, tt = t * t;
+        if (t < 1) return (((12 - 9 * b - 6 * c) * (t * tt)) + ((-18 + 12 * b + 6 * c) * tt) + (6 - 2 * b)) / 6;
+        if (t < 2) return (((-b - 6 * c) * (t * tt)) + ((6 * b + 30 * c) * tt) + ((-12 * b - 48 * c) * t) + (8 * b + 24 * c)) / 6;
+        return 0;
+      };
+      let sum = 0;
+      for (let j = 0; j < N; j++) {
+        for (let i = 0; i < N; i++) {
+          const ii = ((2 * i + 1) / N - 1) * adjust;
+          const jj = ((2 * j + 1) / N - 1) * adjust;
+          const v = coeff(Math.sqrt(ii * ii + jj * jj));
+          w[at + j * N + i] = v;
+          sum += v;
+        }
+      }
+      if (sum > 0) for (let q = 0; q < N * N; q++) w[at + q] /= sum;
+      return N;
+    };
+    const nc = build(radius, kernel, 0);
+    const ni = kernel === 'mitchell' ? build(0.75, 'gaussian', 128) : build(radius, kernel, 128);
+    if (key !== this.filtKey) {
+      this.filtKey = key;
+      this.device.queue.writeBuffer(this.filtBuf, 0, w);
+    }
+    return [nc, ni];
   }
 
   /** Offline stepping for video export: accumulate `passes` compute dispatches
@@ -364,16 +489,15 @@ export class FlameRenderer {
       ],
     });
     if (!this.exportPipeline) {
-      const tmModule = d.createShaderModule({ code: TONEMAP_WGSL });
       this.exportPipeline = d.createRenderPipeline({
         layout: 'auto',
-        vertex: { module: tmModule, entryPoint: 'vs' },
-        fragment: { module: tmModule, entryPoint: 'fs', targets: [{ format: 'rgba8unorm' }] },
+        vertex: { module: this.tmModule, entryPoint: 'vs' },
+        fragment: { module: this.tmModule, entryPoint: 'fsB', targets: [{ format: 'rgba8unorm' }] },
         primitive: { topology: 'triangle-list' },
       });
     }
     const renderBG = d.createBindGroup({
-      layout: this.exportPipeline.getBindGroupLayout(0),
+      layout: this.pipeA.getBindGroupLayout(0),
       entries: [
         { binding: 0, resource: { buffer: this.tmBuf } },
         { binding: 1, resource: { buffer: this.offHist } },
@@ -418,16 +542,7 @@ export class FlameRenderer {
     const bpr = Math.ceil((o.tileW * 4) / 256) * 256;
     const rb = d.createBuffer({ size: bpr * o.tileH, usage: GPUBufferUsage.COPY_DST | GPUBufferUsage.MAP_READ });
     const enc = d.createCommandEncoder();
-    const rp = enc.beginRenderPass({
-      colorAttachments: [{
-        view: this.offTex.createView(),
-        loadOp: 'clear', clearValue: { r: 0, g: 0, b: 0, a: 0 }, storeOp: 'store',
-      }],
-    });
-    rp.setPipeline(this.exportPipeline);
-    rp.setBindGroup(0, renderBG);
-    rp.draw(3);
-    rp.end();
+    this.encodeTonemap(enc, renderBG, this.exportPipeline, this.offTex.createView(), o.tileW, o.tileH, true, { r: 0, g: 0, b: 0, a: 0 });
     enc.copyTextureToBuffer(
       { texture: this.offTex },
       { buffer: rb, bytesPerRow: bpr, rowsPerImage: o.tileH },
@@ -453,13 +568,7 @@ export class FlameRenderer {
     this.writeUniforms(this.samples / Math.max(this.width * this.height, 1));
     const enc = this.device.createCommandEncoder();
     const view = this.context.getCurrentTexture().createView();
-    const rp = enc.beginRenderPass({
-      colorAttachments: [{ view, loadOp: 'clear', clearValue: { r: 0, g: 0, b: 0, a: 1 }, storeOp: 'store' }],
-    });
-    rp.setPipeline(this.renderPipeline);
-    rp.setBindGroup(0, this.renderBG!);
-    rp.draw(3);
-    rp.end();
+    this.encodeTonemap(enc, this.renderBG!, this.renderPipeline, view, this.width, this.height, false, { r: 0, g: 0, b: 0, a: 1 });
     this.device.queue.submit([enc.finish()]);
     return fn(this.canvas);
   }
@@ -493,13 +602,7 @@ export class FlameRenderer {
       this.samples += this.nPoints * this.itersPerPass * this.passesPerFrame;
     }
     const view = this.context.getCurrentTexture().createView();
-    const rp = enc.beginRenderPass({
-      colorAttachments: [{ view, loadOp: 'clear', clearValue: { r: 0, g: 0, b: 0, a: 1 }, storeOp: 'store' }],
-    });
-    rp.setPipeline(this.renderPipeline);
-    rp.setBindGroup(0, this.renderBG);
-    rp.draw(3);
-    rp.end();
+    this.encodeTonemap(enc, this.renderBG, this.renderPipeline, view, w, h, false, { r: 0, g: 0, b: 0, a: 1 });
     this.device.queue.submit([enc.finish()]);
 
     if (accumulate && dt > 0 && dt < 0.5) {
@@ -508,6 +611,23 @@ export class FlameRenderer {
     }
     this.onFrame?.({ spp, samplesPerSec: this.emaSps, paused: this.paused, converged });
   };
+
+  /** Dev diagnostic: total opacity-weighted hits in the live histogram and the count at a pixel. */
+  async debugHistStats(px = -1, py = -1): Promise<{ hits: number; atPixel: number; cells: number }> {
+    const os = this.oversample;
+    const cells = this.width * os * this.height * os;
+    const staging = this.device.createBuffer({ size: cells * 16, usage: GPUBufferUsage.COPY_DST | GPUBufferUsage.MAP_READ });
+    const enc = this.device.createCommandEncoder();
+    enc.copyBufferToBuffer(this.histBuf, 0, staging, 0, cells * 16);
+    this.device.queue.submit([enc.finish()]);
+    await staging.mapAsync(GPUMapMode.READ);
+    const u = new Uint32Array(staging.getMappedRange());
+    let hits = 0;
+    for (let i = 3; i < u.length; i += 4) hits += u[i];
+    const at = px >= 0 ? u[((py * os) * this.width * os + px * os) * 4 + 3] / 256 : -1;
+    staging.unmap(); staging.destroy();
+    return { hits: hits / 256, atPixel: at, cells };
+  }
 
   async exportPNG(): Promise<Blob | null> {
     return new Promise((resolve) => {

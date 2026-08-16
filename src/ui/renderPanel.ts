@@ -110,6 +110,20 @@ export function buildRenderPanel(app: App, root: HTMLElement) {
     label: 'Vibrancy', min: 0, max: 1, step: 0.01, value: app.flame.vibrancy,
     onInput: (v) => { app.flame.vibrancy = v; app.commitTone(SRC); },
   });
+  const ctS = slider({
+    label: 'Contrast', min: 0.1, max: 3, step: 0.05, value: app.flame.contrast ?? 1,
+    onInput: (v) => { app.flame.contrast = v; app.commitTone(SRC); },
+  });
+  const wlS = slider({
+    label: 'White level', min: 100, max: 255, step: 1, value: app.flame.whiteLevel ?? 220,
+    fmt: (v) => v.toFixed(0),
+    onInput: (v) => { app.flame.whiteLevel = v; app.commitTone(SRC); },
+  });
+  const sfS = slider({
+    label: 'Filter', min: 0, max: 2, step: 0.05, value: app.flame.filterRadius ?? 0,
+    onInput: (v) => { app.flame.filterRadius = v; app.commitTone(SRC); },
+  });
+  sfS.root.title = 'Spatial filter radius (Mitchell kernel over the log-scaled image); 0 = off';
   const bgRow = el('div', 'row');
   bgRow.append(el('label', '', 'Background'));
   const bgInp = el('input') as HTMLInputElement;
@@ -126,7 +140,7 @@ export function buildRenderPanel(app: App, root: HTMLElement) {
     app.commitTone(SRC);
   });
   bgRow.append(bgInp);
-  tone.append(brS.root, gaS.root, gtS.root, viS.root, bgRow);
+  tone.append(brS.root, gaS.root, gtS.root, viS.root, ctS.root, wlS.root, sfS.root, bgRow);
 
   const perf = el('div', 'section');
   perf.append(el('h3', '', 'Engine'));
@@ -145,25 +159,29 @@ export function buildRenderPanel(app: App, root: HTMLElement) {
   };
   speedRow.append(speedSel);
 
-  const deRow = el('div', 'row');
-  deRow.append(el('label', '', 'DE filter'));
-  const deSel = el('select') as HTMLSelectElement;
-  const DE_MODES: [string, number, number][] = [
-    ['Off', 0, 0.4], ['Subtle', 1, 0.4], ['Medium', 2, 0.35], ['Strong', 4, 0.3], ['Max', 7, 0.28],
-  ];
-  DE_MODES.forEach(([label], i) => {
-    const o = el('option', '', label) as HTMLOptionElement;
-    o.value = String(i);
-    if (label === 'Subtle') o.selected = true;
-    deSel.append(o);
+  // Density estimation lives on the flame (JWildfire de_radius / de_curve); the
+  // live preview caps the estimator radius for speed, exports use it in full.
+  const deS = slider({
+    label: 'DE radius', min: 0, max: 2, step: 0.05, value: app.flame.deRadius ?? 1,
+    onInput: (v) => { app.flame.deRadius = v; app.commitTone(SRC); },
   });
-  deSel.title = 'Density-estimation filter: smooths sparse regions, keeps dense structure crisp';
-  deSel.onchange = () => {
-    const [, r, a] = DE_MODES[parseInt(deSel.value)];
-    app.renderer.deMaxRadius = r;
-    app.renderer.deAlpha = a;
-  };
-  deRow.append(deSel);
+  deS.root.title = 'Density estimation: sparse regions gather from up to radius×9 px of similar density (soft glow), dense structure stays sharp. 0 = off';
+  const deCurveS = slider({
+    label: 'DE curve', min: 0.05, max: 1, step: 0.05, value: app.flame.deCurve ?? 0.8,
+    onInput: (v) => { app.flame.deCurve = v; app.commitTone(SRC); },
+  });
+  const deLiveRow = el('div', 'row');
+  deLiveRow.append(el('label', '', 'DE preview'));
+  const deLiveSel = el('select') as HTMLSelectElement;
+  for (const [label, v] of [['Fast (r ≤ 4)', '4'], ['Balanced (r ≤ 6)', '6'], ['Full', '-1']] as const) {
+    const o = el('option', '', label) as HTMLOptionElement;
+    o.value = v;
+    if (v === '6') o.selected = true;
+    deLiveSel.append(o);
+  }
+  deLiveSel.title = 'Cap on the DE radius while previewing (exports always use the full radius)';
+  deLiveSel.onchange = () => { app.renderer.deLiveCap = parseInt(deLiveSel.value); };
+  deLiveRow.append(deLiveSel);
 
   const osRow = el('div', 'row');
   osRow.append(el('label', '', 'Oversample'));
@@ -205,7 +223,7 @@ export function buildRenderPanel(app: App, root: HTMLElement) {
   restartBtn.onclick = () => app.renderer.resetAccumulation();
   const pRow = el('div', 'btn-row');
   pRow.append(pauseBtn, restartBtn);
-  perf.append(speedRow, deRow, osRow, qRow, pRow);
+  perf.append(speedRow, deS.root, deCurveS.root, deLiveRow, osRow, qRow, pRow);
 
   const io = el('div', 'section');
   io.append(el('h3', '', 'Export / Import'));
@@ -356,6 +374,8 @@ export function buildRenderPanel(app: App, root: HTMLElement) {
     gaS.set(app.flame.gamma);
     gtS.set(app.flame.gammaThreshold ?? 0.04);
     viS.set(app.flame.vibrancy);
+    ctS.set(app.flame.contrast ?? 1); wlS.set(app.flame.whiteLevel ?? 220); sfS.set(app.flame.filterRadius ?? 0);
+    deS.set(app.flame.deRadius ?? 1); deCurveS.set(app.flame.deCurve ?? 0.8);
     bgInp.value = toHex(app.flame.background);
   });
 }

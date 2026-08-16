@@ -396,6 +396,16 @@ export function parseFlameXML(text: string, fallbackPalette: RGB[]): Flame[] {
     if (isFinite(gt) && gt >= 0) f.gammaThreshold = Math.min(gt, 0.5);
     const vi = parseFloat(fe.getAttribute('vibrancy') ?? '');
     if (isFinite(vi)) f.vibrancy = Math.min(1, Math.max(0, vi));
+    // JWildfire tonemap constants + spatial filter + antialiasing (defaults = JWildfire's)
+    f.contrast = Math.max(0.05, numOr('contrast', 1));
+    f.whiteLevel = Math.max(1, numOr('white_level', 220));
+    f.lowDensityBrightness = Math.max(0, numOr('low_density_brightness', 0.24));
+    f.filterRadius = Math.min(3, Math.max(0, numOr('filter', 0.75)));
+    f.filterKernel = /GAUSS/i.test(fe.getAttribute('filter_kernel') ?? '') ? 'gaussian' : 'mitchell';
+    f.antialiasAmount = Math.min(1, Math.max(0, numOr('antialias_amount', 0.25)));
+    f.antialiasRadius = Math.max(0, numOr('antialias_radius', 0.5));
+    f.deRadius = Math.min(2, Math.max(0, numOr('de_radius', 1)));
+    f.deCurve = Math.min(1, Math.max(0.01, numOr('de_curve', 0.8)));
     const bg = nums(fe.getAttribute('background'));
     if (bg.length === 3) {
       // Old files use 0-255, new ones 0-1 — sniff by magnitude.
@@ -414,7 +424,7 @@ export function parseFlameXML(text: string, fallbackPalette: RGB[]): Flame[] {
         centreXCurve: { key: 'centerX' }, centreYCurve: { key: 'centerY' },
         camPosXCurve: { key: 'camPosX' }, camPosYCurve: { key: 'camPosY' }, camPosZCurve: { key: 'camPosZ' },
         brightnessCurve: { key: 'brightness' }, gammaCurve: { key: 'gamma' }, gammaThresholdCurve: { key: 'gammaThreshold' },
-        vibrancyCurve: { key: 'vibrancy' },
+        vibrancyCurve: { key: 'vibrancy' }, contrastCurve: { key: 'contrast' }, whiteLevelCurve: { key: 'whiteLevel' },
         camZoomCurve: { key: 'zoom', map: (v) => v * (isFinite(scale) && scale > 0 ? scale : 1) * zoomPerUnit },
         pixelsPerUnitCurve: { key: 'zoom', map: (v) => v * zoomMul * zoomPerUnit },
         camDOFCurve: { key: 'camDOF' }, camDOFAreaCurve: { key: 'camDOFArea' }, camDOFExponentCurve: { key: 'camDOFExponent' },
@@ -508,7 +518,7 @@ const FLAME_CURVE_PREFIX: Record<string, { prefix: string; map?: (v: number) => 
   centerX: { prefix: 'centreXCurve' }, centerY: { prefix: 'centreYCurve' },
   camPosX: { prefix: 'camPosXCurve' }, camPosY: { prefix: 'camPosYCurve' }, camPosZ: { prefix: 'camPosZCurve' },
   brightness: { prefix: 'brightnessCurve' }, gamma: { prefix: 'gammaCurve' }, gammaThreshold: { prefix: 'gammaThresholdCurve' },
-  vibrancy: { prefix: 'vibrancyCurve' },
+  vibrancy: { prefix: 'vibrancyCurve' }, contrast: { prefix: 'contrastCurve' }, whiteLevel: { prefix: 'whiteLevelCurve' },
   camDOF: { prefix: 'camDOFCurve' }, camDOFArea: { prefix: 'camDOFAreaCurve' }, camDOFExponent: { prefix: 'camDOFExponentCurve' },
   camDOFScale: { prefix: 'camDOFScaleCurve' }, camDOFFade: { prefix: 'camDOFFadeCurve' },
   focusX: { prefix: 'focusXCurve' }, focusY: { prefix: 'focusYCurve' }, focusZ: { prefix: 'focusZCurve' }, camZ: { prefix: 'camZCurve' },
@@ -612,7 +622,11 @@ export function flameToXML(f: Flame, opts: XMLExportOpts = {}): string {
     `cam_dof="${fmt(f.camDOF ?? 0)}" cam_dof_area="${fmt(f.camDOFArea ?? 0.5)}" cam_dof_exponent="${fmt(f.camDOFExponent ?? 2)}" new_dof="${f.newDOF ? 1 : 0}" ` +
     `cam_dof_shape="BUBBLE" cam_dof_scale="${fmt(f.camDOFScale ?? 1)}" cam_dof_rotate="0" cam_dof_fade="${fmt(f.camDOFFade ?? 1)}" ` +
     `cam_zdimish="${fmt(f.dimishZ ?? 0)}" cam_zdimdist="${fmt(f.dimZDist ?? 0)}" cam_zdimcolor="${(f.dimZColor ?? [0, 0, 0]).map(fmt).join(' ')}" ` +
-    `filter="0.5" quality="200" brightness="${fmt(f.brightness)}" gamma="${fmt(f.gamma)}" gamma_threshold="${fmt(f.gammaThreshold)}" ` +
+    `filter="${fmt(f.filterRadius ?? 0)}" filter_kernel="${(f.filterKernel ?? 'mitchell') === 'gaussian' ? 'GAUSSIAN' : 'MITCHELL_SMOOTH'}" ` +
+    `antialias_amount="${fmt(f.antialiasAmount ?? 0.25)}" antialias_radius="${fmt(f.antialiasRadius ?? 0.5)}" ` +
+    `de_radius="${fmt(f.deRadius ?? 1)}" de_curve="${fmt(f.deCurve ?? 0.8)}" ` +
+    `quality="200" brightness="${fmt(f.brightness)}" gamma="${fmt(f.gamma)}" gamma_threshold="${fmt(f.gammaThreshold)}" ` +
+    `contrast="${fmt(f.contrast ?? 1)}" white_level="${fmt(f.whiteLevel ?? 220)}" low_density_brightness="${fmt(f.lowDensityBrightness ?? 0.24)}" ` +
     `vibrancy="${fmt(f.vibrancy)}" background="${fmt(f.background[0])} ${fmt(f.background[1])} ${fmt(f.background[2])}"` +
     timeAttrs + (flameCurveAttrs.length ? ' ' + flameCurveAttrs.join(' ') : '') + '>',
   );
