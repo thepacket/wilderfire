@@ -51,9 +51,11 @@ in the stack.
 - **JWildfire-exact tonemap** — the same log-density curve (contrast,
   brightness, white level, low-density glow, gamma threshold, vibrancy),
   the same **density estimation** (`de_radius` / `de_curve` similar-density
-  gather), **spatial filter** (Mitchell / Gaussian) and antialias jitter,
-  verified pixel-for-pixel against headless JWildfire on synthetic flames;
-  plus **2× oversampling**
+  gather; the live preview caps its radius, exports use it in full),
+  **spatial filter** (Mitchell / Gaussian) and antialias jitter, verified
+  pixel-for-pixel against headless JWildfire on synthetic flames; two-pass
+  tonemap so filtering is free; plus **2× oversampling**. Presets and the
+  randomizer use JWildfire's brightness 4 / gamma 4 baseline
 - **Undo/redo** with slider-gesture coalescing (Ctrl/Cmd+Z, Shift+Ctrl/Cmd+Z)
 - **Animation** — capture keyframes, morph between them (structure-merging
   interpolation that keeps the GPU kernel hot within each segment;
@@ -80,7 +82,11 @@ in the stack.
   up to 48 flames
 - **Mutation grid** (MutaGen-style) — 3×3 explorer of random mutations
   rendered offscreen; click to adopt and keep exploring
-- Progressive refinement with quality cap, speed presets, pause/re-render
+- Progressive refinement with quality cap, speed presets, pause/re-render,
+  and a **preview hold** (Engine → Preview hold): after each edit the last
+  image stays on screen until the new one has accumulated N samples per
+  pixel (a bounded burst of extra passes gets it there within a frame), so
+  dragging a triangle never shows the sparse first frames
 - Gradient presets, IQ-cosine **random palettes**, hue rotation, a
   **draggable stop editor**, and **.ugr / .map gradient import**
 - **26 presets**: 10 authored WilderFire presets (showcasing xaos, layers,
