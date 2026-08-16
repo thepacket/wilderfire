@@ -90,7 +90,11 @@ export function buildAIPanel(app: App, root: HTMLElement) {
   const ta = el('textarea') as HTMLTextAreaElement;
   ta.placeholder = 'e.g. "make it look like a frozen galaxy with icy blues"';
   const sendBtn = el('button', 'primary', 'Send');
-  inputRow.append(ta, sendBtn);
+  const clearBtn = el('button', '', 'Clear');
+  clearBtn.title = 'Forget the conversation so far — the next message starts a fresh context (the flame is untouched)';
+  const btnCol = el('div', 'ai-btn-col');
+  btnCol.append(clearBtn, sendBtn);
+  inputRow.append(ta, btnCol);
 
   root.append(cfg, msgs, inputRow);
 
@@ -225,6 +229,12 @@ export function buildAIPanel(app: App, root: HTMLElement) {
   }
 
   sendBtn.onclick = send;
+  clearBtn.onclick = () => {
+    if (busy) return;
+    history.length = 0;
+    msgs.textContent = '';
+    addMsg('system', 'Context cleared — the assistant no longer remembers earlier messages.');
+  };
   ta.addEventListener('keydown', (e) => {
     if (e.key === 'Enter' && !e.shiftKey) {
       e.preventDefault();

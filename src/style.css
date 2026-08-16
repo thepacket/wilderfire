@@ -214,6 +214,8 @@ input[type="range"]::-moz-range-thumb {
 .ai-msg .applied { color: var(--accent2); font-style: italic; font-size: 11px; display: block; margin-top: 4px; }
 .ai-input-row { display: flex; gap: 6px; padding: 10px 12px; border-top: 1px solid var(--border); }
 .ai-input-row textarea { flex: 1; resize: none; height: 54px; }
+.ai-btn-col { display: flex; flex-direction: column; gap: 4px; }
+.ai-btn-col button { white-space: nowrap; }
 
 .hint { font-size: 11px; color: var(--fg-dim); line-height: 1.45; margin: 4px 0; }
 a { color: var(--accent2); }
