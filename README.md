@@ -5,6 +5,10 @@ A GPU-native fractal flame editor for the browser — a WebGPU reimagining of
 Everything runs client-side; nothing ever touches a server.
 Live at [wilderfire.fly.dev](https://wilderfire.fly.dev).
 
+Free software under the **LGPL-2.1-or-later** · © 2026 Andre Paquette ·
+**pull requests are not accepted** (issues and forks are welcome — see
+[CONTRIBUTING.md](CONTRIBUTING.md)).
+
 ## Why WebGPU (and no wasm)
 
 The fractal flame algorithm is a chaos game: billions of tiny independent
@@ -140,3 +144,20 @@ then per-xform blocks: affine, post, color, then variation weights/params), so
 numeric edits are a single `writeBuffer` and only *structural* edits (adding
 variations/transforms) trigger a pipeline rebuild. Motion curves and keyframe
 morphs only touch numbers, so playback never recompiles within a segment.
+
+## Licence and copyright
+
+Copyright © 2026 Andre Paquette. WilderFire is free software, released under
+the [GNU Lesser General Public License v2.1 or later](LICENSE). Large parts
+of it (the ported variations, the GPU helper library, the sample and fixture
+flames) are derived from [JWildfire](https://github.com/thargor6/JWildfire)
+(© Andreas Maschke and contributors, LGPL-2.1-or-later), which is why the
+whole project carries that licence rather than a permissive one. The full
+list of third-party material is in [NOTICE.md](NOTICE.md).
+
+## Contributing
+
+**Pull requests are not accepted** and are closed automatically. Bug reports,
+fidelity gaps (a `.flame` that renders differently than in flam3 / Apophysis /
+JWildfire) and feature ideas are welcome as issues; forks are welcome under
+the licence. Details in [CONTRIBUTING.md](CONTRIBUTING.md).

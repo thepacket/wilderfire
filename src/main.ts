@@ -1,3 +1,6 @@
+// WilderFire — GPU-native fractal flame editor for the browser.
+// Copyright © 2026 Andre Paquette. SPDX-License-Identifier: LGPL-2.1-or-later
+// See LICENSE and NOTICE.md (third-party material, notably JWildfire-derived code).
 import './style.css';
 import { App, el } from './ui/common';
 import { FlameRenderer } from './gpu/renderer';

@@ -2,6 +2,14 @@
   "name": "wilderfire",
   "private": true,
   "version": "0.1.0",
+  "description": "GPU-native fractal flame editor for the browser (WebGPU)",
+  "license": "LGPL-2.1-or-later",
+  "author": "Andre Paquette",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/thepacket/wilderfire.git"
+  },
+  "homepage": "https://wilderfire.fly.dev",
   "type": "module",
   "scripts": {
     "dev": "vite",
