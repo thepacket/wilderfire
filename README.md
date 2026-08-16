@@ -3,6 +3,7 @@
 A GPU-native fractal flame editor for the browser — a WebGPU reimagining of
 [JWildfire](https://github.com/thargor6/JWildfire) / Apophysis / flam3.
 Everything runs client-side; nothing ever touches a server.
+Live at [wilderfire.fly.dev](https://wilderfire.fly.dev).
 
 ## Why WebGPU (and no wasm)
 
@@ -19,21 +20,32 @@ in the stack.
 
 ## Features
 
-- **69 variations** (linear, spherical, swirl, julia/julian/juliascope, pdj,
-  curl, ngon, elliptic, escher, cpow, waves2, blur, …) with parametric
-  controls, including **direct-color `dc_*` variations** that paint the
-  palette coordinate from geometry
-- **Layers** (up to 8, JWildfire-style) — each with its own transforms, final
-  transform, gradient, density weight, and visibility, blended in one
-  histogram; walker threads are partitioned across layers on the GPU
+- **672 variations** — 70 hand-written flam3 classics plus **668 JWildfire
+  variations ported mechanically** from JWildfire's own GPU snippets by a
+  CUDA→WGSL transpiler and **numerically verified in 3D against headless
+  JWildfire** (see [`scripts/jwf-port/README.md`](scripts/jwf-port/README.md)).
+  Parametric controls for every one, JWildfire-style **pre / normal / post
+  priority**, and **direct-color `dc_*` variations** that paint the palette
+  coordinate from geometry
+- **Variation picker** — searchable popover with type chips (2D, 3D, blur,
+  DC, pre, post, crop, …) and pinned classics, replacing a 700-entry dropdown
+- **3D** — points carry z, every variation stage can read/write depth, plus a
+  JWildfire-compatible camera: pitch / yaw / bank, perspective, camera
+  position and `preserve_z`; `.flame` files round-trip `cam_pitch`,
+  `cam_yaw`, `cam_roll`, `cam_persp`, `cam_pos_*`, `preserve_z`
+- **Layers** (up to 8) — each with its own transforms, final transform,
+  gradient, density weight, and visibility, blended in one histogram; walker
+  threads are partitioned across layers on the GPU
 - **Xaos** (flam3 "chaos") — per-pair transition weight matrix between
   transforms, evaluated natively in the GPU kernel via per-source CDF rows
-- **JWildfire-style triangle editor** — drag O/X/Y handles directly on the
-  canvas; pan by dragging, zoom with the wheel
+- **Triangle editor** — drag O/X/Y handles directly on the canvas; pan by
+  dragging, zoom with the wheel (raster +y down, like flam3 / Apophysis /
+  JWildfire, so imported flames are not mirrored)
 - Transform editor: weights, palette color / color-speed / opacity, affine +
   post-affine matrices, optional **final transform**
-- **Density-estimation filtering** — density-adaptive gaussian smoothing in
-  the tonemap pass (Off / Subtle / Medium / Strong)
+- **flam3 tonemap** — log-density with `gamma_threshold`, brightness, gamma,
+  vibrancy; **density-estimation filtering** (Off / Subtle / Medium / Strong /
+  Max) and **2× oversampling** for anti-aliased edges
 - **Undo/redo** with slider-gesture coalescing (Ctrl/Cmd+Z, Shift+Ctrl/Cmd+Z)
 - **Animation** — capture keyframes, morph between them (structure-merging
   interpolation that keeps the GPU kernel hot within each segment;
@@ -41,15 +53,18 @@ in the stack.
   live looping playback with scrubbing, per-keyframe easing
   (linear/smooth/in/out), timeline save/load, and **WebM (VP9) or MP4 (H.264)
   export** rendered client-side via WebCodecs
+- **Motion curves** — animate any numeric parameter (camera, tone, transform
+  weight/color/affine, any variation weight or parameter) with (time, value)
+  keys and Catmull-Rom / linear / smooth / step interpolation, layered on top
+  of the keyframe morphs; sparkline preview, editable point table, persisted
+  with the timeline
 - **Pre/post variation stages** per transform — weighted variation lists
   evaluated before and after the main sum (include `linear 1` in a stage for a
   pass-through); `pre_*`/`post_*` variation names in imported `.flame` files
   map onto these stages automatically
-- **2× oversampling** (supersampled histogram, box-downsampled in the tonemap)
-  for anti-aliased edges, plus DE filter strengths up to radius 7
 - **Editor niceties** — reorder transforms (xaos-aware) and layers, copy/paste
   transforms across layers and flames, rotational/mirror **symmetry
-  generators**, arrow-key nudging
+  generators**, arrow-key nudging, **collapsible side panes** (`[` / `]`)
 - **Session autosave + flame library** — the working flame and animation
   timeline persist across reloads; a thumbnail library (localStorage) stores
   up to 48 flames
@@ -61,48 +76,67 @@ in the stack.
 - **26 presets**: 10 authored WilderFire presets (showcasing xaos, layers,
   pre-stages, direct color, symmetry) plus 16 sample flames bundled from the
   [JWildfire repository](https://github.com/thargor6/JWildfire)
-  (`resources/flames/`, © Andreas Maschke, LGPL 2.1+ — loaded through the
-  `.flame` importer with JWildfire's 3D variation names alias-mapped to their
-  2D equivalents), and a curated **randomizer**
+  (`resources/flames/`, © Andreas Maschke, LGPL 2.1+, loaded through the
+  `.flame` importer), and a curated **randomizer**
 - PNG export, **hi-res tiled export** (2-4× screen resolution, optional
   transparent background), flame **JSON save/load**, and **.flame XML
   import/export** compatible with flam3 / Apophysis / JWildfire (coefs, chaos,
-  color_speed / symmetry, all three palette encodings, JWildfire `<layer>`
-  blocks; unsupported variations are skipped)
+  color_speed / symmetry, all three palette encodings, `<layer>` blocks,
+  3D camera, `cam_zoom` folded into zoom; unsupported variations are skipped
+  and reported)
 - **Dark & light themes**
 - **AI assistant** via [OpenRouter.ai](https://openrouter.ai) — bring your own
-  key, pick any model; the model sees the current flame JSON **and a
-  screenshot of the current render** (vision models can look at the result and
-  iterate — including an optional **auto-refine loop** that re-captures the
-  render and self-critiques for up to 3 extra rounds), editing the flame live
-  via a ```flame fenced block. The key is
-  stored in `localStorage` and requests go straight from your browser to
-  OpenRouter.
+  key and pick any model from a **live, searchable model picker** (provider
+  chips, context length, price, vision support, custom IDs); the model sees
+  the current flame JSON **and a screenshot of the current render** (vision
+  models can look at the result and iterate — including an optional
+  **auto-refine loop** that re-captures the render and self-critiques for up
+  to 3 extra rounds), editing the flame live via a ```flame fenced block. The
+  key is stored in `localStorage` and requests go straight from your browser
+  to OpenRouter.
+
+## Keyboard shortcuts
+
+| key | action |
+|---|---|
+| `Ctrl/Cmd+Z`, `Shift+Ctrl/Cmd+Z` | undo / redo |
+| arrow keys (`Shift` = coarse) | nudge the selected transform |
+| `[` / `]` | collapse / expand the left / right pane |
 
 ## Run it
 
 ```bash
 npm install
 npm run dev      # dev server
-npm run build    # production build in dist/
+npm run build    # typecheck + production build in dist/
 ```
 
 Requires a browser with WebGPU (Chrome/Edge 113+, Safari 18+, Firefox behind
 `dom.webgpu.enabled`).
 
+Deploy: the site is static (`dist/`); `fly.toml` + `Dockerfile` serve it via
+nginx on Fly.io with `fly deploy`.
+
 ## Architecture
 
 ```
 src/
-  core/       flame model, variation registry (WGSL snippets), palettes,
-              presets, randomizer
+  core/       flame model (flame.ts), variation registry (variations.ts:
+              hand-written WGSL + generated variations.jwf.ts ports),
+              palettes, presets, randomizer, .flame XML I/O (flameXML.ts),
+              keyframe morphing (animate.ts), motion curves (motion.ts)
   gpu/        codegen.ts  — flame → WGSL compute kernel + data layout
-              renderer.ts — WebGPU pipelines, atomic histogram, tonemap
-  ui/         panels (transforms, render, gradient, AI), triangle overlay
-  ai/         OpenRouter streaming chat client
+              renderer.ts — WebGPU pipelines, atomic histogram, tonemap, camera
+  ui/         panels (transforms, render, gradient, anim, AI), triangle
+              overlay, variation + model pickers, library, mutation grid
+  ai/         OpenRouter streaming chat client + model catalogue
+  dev/        browser harnesses (variation oracle diff, fixture-flame compile)
+scripts/
+  jwf-port/   CUDA→WGSL transpiler, JWildfire oracle, generator (README inside)
 ```
 
 The flame → shader compiler emits a fixed data layout (CDF of xform weights,
 then per-xform blocks: affine, post, color, then variation weights/params), so
 numeric edits are a single `writeBuffer` and only *structural* edits (adding
-variations/transforms) trigger a pipeline rebuild.
+variations/transforms) trigger a pipeline rebuild. Motion curves and keyframe
+morphs only touch numbers, so playback never recompiles within a segment.

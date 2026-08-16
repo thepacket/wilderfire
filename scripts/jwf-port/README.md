@@ -67,12 +67,24 @@ java -Djava.awt.headless=true -cp "jwf/tools/out:$CP" Oracle scripts/jwf-port/or
 node scripts/jwf-port/gen.ts            # re-emit with the new verdicts
 ```
 
+## Status
+
+Of JWildfire's 1026 variations, 726 transpile; **668 verify against the Java
+oracle in 3D** and ship in `variations.jwf.ts` (`pre_flatten` is force-verified
+in `gen.ts` since it only zeroes z), 58 transpile but diverge (f32 hashes,
+solids, missing helpers) and stay in `variations.jwf.unverified.ts`, and the
+rest have no GPU snippet or need resources/custom code. Together with the 70
+hand-written flam3 entries the app registry has 672 variations. Run
+`await window.wilderfire.varTest()` in the dev console for the current verdicts
+and `await window.wilderfire.flameTest()` to import + compile every fixture flame.
+
 ## Semantics worth knowing
 
 * **Snippet scope** (`variations.ts` header): `t` (input point, mutable), `r2 r th=atan2(x,y) ph=atan2(y,x)`, `v` (output accumulator), `rs` rng, `cp` palette-coordinate pointer, `hd` hide-flag pointer, `A(i)` affine coefficients. JWildfire's `__phi` is our `th` and `__theta` our `ph`.
 * **Priority.** JWildfire pre-variations (`pre_blur`, priority −1) mutate the input point in place and post-variations (`post_curl`, +1) mutate the accumulated output; they are *not* weighted sums. Codegen runs an xform's variation list in priority order (pre → normal → post) inside one mutable stage. WilderFire's own pre/post *stages* (weighted sums) still exist alongside.
-* **2D scope.** `__z` reads as 0 and `__pz` writes are dropped (flag `z`); 3D solids that depend on z fail the oracle and stay unverified. Direct RGB colour output, weighting fields, resource-backed variations (images/text) and `custom_wf` are not ported.
+* **3D.** Points carry z: `__z` reads the input depth and `__pz` writes go to the output; codegen exposes `z_`/`pz_` in every stage and applies `preserve_z` (JWildfire semantics: 2D variations pass z through scaled by weight). The oracle grid is 3D and the harness diffs z as well as x/y. Direct RGB colour output, weighting fields, resource-backed variations (images/text) and `custom_wf` are not ported.
 * **Precision.** WGSL is f32, JWildfire is f64. Hash-style variations (`sin(x)*43758.5453`) are inherently divergent and stay unverified.
 * **JWildfire GPU ≠ CPU.** The oracle caught several JWildfire GPU snippets that disagree with the Java (see `overrides.ts`); overrides restore CPU semantics.
 * **Duplicate instances.** JWildfire writes a second `bubble` on one xform as `bubble#1#="…"` (invalid XML); the importer's lenient pre-parser normalises this and attribute names with spaces/punctuation.
-* **Camera.** JWildfire's effective pixels-per-unit is `scale × cam_zoom`; the importer folds `cam_zoom` in. flam3/JWildfire raster +y points *down*; the kernel and overlay follow that convention.
+* **Camera.** JWildfire's effective pixels-per-unit is `scale × cam_zoom`; the importer folds `cam_zoom` in. flam3/JWildfire raster +y points *down*; the kernel and overlay follow that convention. The 3D camera reproduces JWildfire's matrix (yaw → pitch → bank, then perspective `1/(1 − cam_persp·z + cam_pos_z)`); `cam_pitch`/`cam_yaw`/`cam_roll` in the XML are radians and `cam_roll` is the bank axis. `testflames/cam3d.flame` is the reference composition.
+* **Weight semantics.** JWildfire's `rings` ignores its weight while flam3/Apophysis apply it; `PREFER_HAND` in `variations.ts` keeps the flam3 behaviour for such cases even when the port verifies.
