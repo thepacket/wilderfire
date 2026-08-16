@@ -335,7 +335,7 @@ a { color: var(--accent2); }
 .mc-head { display: flex; align-items: center; gap: 6px; }
 .mc-head .vname { flex: 1; font-weight: 600; color: var(--accent2); font-size: 12px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .mc-head select { font-size: 11px; padding: 2px 4px; }
-.mc-canvas { display: block; width: 100%; height: 40px; margin: 6px 0 4px; background: var(--bg2); border-radius: 4px; }
+.mc-canvas { display: block; width: 100%; height: 64px; margin: 6px 0 4px; background: var(--bg2); border-radius: 4px; touch-action: none; }
 .mc-points { display: flex; flex-wrap: wrap; gap: 4px; }
 .mc-points .vp { display: inline-flex; align-items: center; gap: 2px; }
 .mc-points input[type="number"] { width: 58px; font-size: 11px; padding: 2px 4px; }

@@ -7,7 +7,7 @@ import { App, el, slider } from './common';
 import { cloneFlame, normalizeFlame } from '../core/flame';
 import { flameAt, sortKeys, type Keyframe, type Easing } from '../core/animate';
 import { pickSave, saveText, type SaveTarget } from './saveFile';
-import { applyCurves, curvesEnd, evalCurve, getParam, paramPaths, setPoint, INTERPS, type MotionCurve, type CurveInterp } from '../core/motion';
+import { applyCurves, curvesEnd, evalCurve, getParam, paramPaths, setPoint, INTERPS, type MotionCurve, type CurveInterp, type CurvePoint } from '../core/motion';
 
 interface OverlayHandle { setVisible(v: boolean): void; readonly visible: boolean; }
 
@@ -128,7 +128,7 @@ export function buildAnimPanel(app: App, root: HTMLElement, overlay: OverlayHand
   mcTop.append(paramSel, addCurveBtn, el('span', 'hint mc-now', 't = 0.00 s'));
   const curveList = el('div', 'mc-list');
   curveSec.append(mcTop, curveList);
-  curveSec.append(el('div', 'hint', 'A curve drives one parameter over time. Scrub to a time, adjust the parameter in the editor, then “+ key” to record its value there. Curves layer on top of keyframe morphs.'));
+  curveSec.append(el('div', 'hint', 'A curve drives one parameter over time. Scrub to a time, adjust the parameter in the editor, then “+ key” to record its value there — or drag points on the graph (double-click adds, Alt-click removes). Curves layer on top of keyframe morphs.'));
 
   function rebuildParamSel() {
     const cur = paramSel.value;
@@ -151,18 +151,40 @@ export function buildAnimPanel(app: App, root: HTMLElement, overlay: OverlayHand
     if (v !== undefined) setPoint(c, curT, v);
     rebuildCurves(); rebuildList(); onChange();
   };
-  function drawCurve(cv: HTMLCanvasElement, c: MotionCurve) {
-    const ctx = cv.getContext('2d')!;
-    const W = cv.width, H = cv.height;
-    ctx.clearRect(0, 0, W, H);
-    if (!c.points.length) return;
-    const [t0, t1] = timeRange();
+  // Value range shown for a curve: its points ± 10 % (frozen while dragging so
+  // a point can be pulled outside the initial range without the axis jumping).
+  const curveRange = (c: MotionCurve): [number, number] => {
     let lo = Infinity, hi = -Infinity;
     for (const p of c.points) { lo = Math.min(lo, p.v); hi = Math.max(hi, p.v); }
+    if (!c.points.length) { lo = 0; hi = 1; }
     if (hi - lo < 1e-9) { lo -= 0.5; hi += 0.5; }
-    const X = (t: number) => 2 + (t - t0) / (t1 - t0) * (W - 4);
-    const Y = (v: number) => H - 3 - (v - lo) / (hi - lo) * (H - 6);
-    ctx.strokeStyle = getComputedStyle(cv).getPropertyValue('--accent') || '#ff7a3c';
+    const pad = (hi - lo) * 0.1;
+    return [lo - pad, hi + pad];
+  };
+  const frozenRange = new WeakMap<MotionCurve, [number, number]>();
+  function curveMap(cv: HTMLCanvasElement, c: MotionCurve) {
+    const W = cv.width, H = cv.height;
+    const [t0, t1] = timeRange();
+    const [lo, hi] = frozenRange.get(c) ?? curveRange(c);
+    const X = (t: number) => 4 + (t - t0) / (t1 - t0) * (W - 8);
+    const Y = (v: number) => H - 4 - (v - lo) / (hi - lo) * (H - 8);
+    const invX = (x: number) => t0 + ((x - 4) / (W - 8)) * (t1 - t0);
+    const invY = (y: number) => lo + ((H - 4 - y) / (H - 8)) * (hi - lo);
+    return { W, H, t0, t1, lo, hi, X, Y, invX, invY };
+  }
+  function drawCurve(cv: HTMLCanvasElement, c: MotionCurve, hot?: CurvePoint) {
+    const ctx = cv.getContext('2d')!;
+    const { W, H, t0, t1, lo, X, Y } = curveMap(cv, c);
+    ctx.clearRect(0, 0, W, H);
+    if (!c.points.length) return;
+    const css = getComputedStyle(cv);
+    const accent = css.getPropertyValue('--accent').trim() || '#ff7a3c';
+    // zero line if in range
+    if (Y(0) > 0 && Y(0) < H) {
+      ctx.strokeStyle = 'rgba(128,128,128,0.25)'; ctx.lineWidth = 1;
+      ctx.beginPath(); ctx.moveTo(0, Y(0)); ctx.lineTo(W, Y(0)); ctx.stroke();
+    }
+    ctx.strokeStyle = accent;
     ctx.lineWidth = 1.5;
     ctx.beginPath();
     for (let i = 0; i <= W; i += 2) {
@@ -171,11 +193,83 @@ export function buildAnimPanel(app: App, root: HTMLElement, overlay: OverlayHand
       i === 0 ? ctx.moveTo(X(t), Y(v)) : ctx.lineTo(X(t), Y(v));
     }
     ctx.stroke();
-    ctx.fillStyle = '#fff';
-    for (const p of c.points) { ctx.beginPath(); ctx.arc(X(p.t), Y(p.v), 2.5, 0, Math.PI * 2); ctx.fill(); }
+    for (const p of c.points) {
+      ctx.fillStyle = p === hot ? accent : '#fff';
+      ctx.beginPath(); ctx.arc(X(p.t), Y(p.v), p === hot ? 4 : 3, 0, Math.PI * 2); ctx.fill();
+    }
     ctx.strokeStyle = 'rgba(255,255,255,0.35)';
     ctx.lineWidth = 1;
     ctx.beginPath(); ctx.moveTo(X(curT), 0); ctx.lineTo(X(curT), H); ctx.stroke();
+  }
+  /** Mouse editing on the sparkline: drag points, double-click to add, Alt/right-click to delete. */
+  function attachCurveEditing(cv: HTMLCanvasElement, c: MotionCurve, refresh: () => void) {
+    const toCanvas = (e: PointerEvent | MouseEvent) => {
+      const r = cv.getBoundingClientRect();
+      return { x: ((e.clientX - r.left) / r.width) * cv.width, y: ((e.clientY - r.top) / r.height) * cv.height };
+    };
+    const hit = (x: number, y: number): CurvePoint | null => {
+      const { X, Y } = curveMap(cv, c);
+      let best: CurvePoint | null = null, bd = 8;
+      for (const p of c.points) { const d = Math.hypot(X(p.t) - x, Y(p.v) - y); if (d < bd) { bd = d; best = p; } }
+      return best;
+    };
+    let drag: CurvePoint | null = null;
+    let moved = false;
+    cv.style.cursor = 'crosshair';
+    cv.onpointerdown = (e) => {
+      if (e.button !== 0) return;
+      const { x, y } = toCanvas(e);
+      const p = hit(x, y);
+      if (!p) return;
+      if (e.altKey) { // delete
+        c.points.splice(c.points.indexOf(p), 1);
+        refresh(); onChange();
+        return;
+      }
+      drag = p; moved = false;
+      frozenRange.set(c, curveRange(c));
+      cv.setPointerCapture(e.pointerId);
+      cv.style.cursor = 'grabbing';
+      drawCurve(cv, c, p);
+      e.preventDefault();
+    };
+    cv.onpointermove = (e) => {
+      const { x, y } = toCanvas(e);
+      if (!drag) { cv.style.cursor = hit(x, y) ? 'grab' : 'crosshair'; return; }
+      const { invX, invY } = curveMap(cv, c);
+      // Shift = value only, Ctrl/Cmd = time only
+      if (!e.ctrlKey && !e.metaKey) drag.v = Math.round(invY(y) * 1e4) / 1e4;
+      if (!e.shiftKey) drag.t = Math.max(0, Math.round(invX(x) * 100) / 100);
+      moved = true;
+      c.points.sort((a, b) => a.t - b.t);
+      drawCurve(cv, c, drag);
+      // live preview at the scrub time
+      app.applyPreview(evalAt(curT));
+    };
+    const end = () => {
+      if (!drag) return;
+      drag = null;
+      frozenRange.delete(c);
+      cv.style.cursor = 'crosshair';
+      if (moved) { refresh(); onChange(); } else drawCurve(cv, c);
+    };
+    cv.onpointerup = end;
+    cv.onpointercancel = end;
+    cv.ondblclick = (e) => {
+      const { x, y } = toCanvas(e);
+      if (hit(x, y)) return;
+      const { invX, invY } = curveMap(cv, c);
+      setPoint(c, Math.max(0, Math.round(invX(x) * 100) / 100), Math.round(invY(y) * 1e4) / 1e4);
+      refresh(); onChange();
+    };
+    cv.oncontextmenu = (e) => {
+      const { x, y } = toCanvas(e);
+      const p = hit(x, y);
+      if (!p) return;
+      e.preventDefault();
+      c.points.splice(c.points.indexOf(p), 1);
+      refresh(); onChange();
+    };
   }
   function rebuildCurves() {
     rebuildParamSel();
@@ -200,8 +294,10 @@ export function buildAnimPanel(app: App, root: HTMLElement, overlay: OverlayHand
       rm.onclick = () => { curves = curves.filter((k) => k !== c); rebuildCurves(); rebuildList(); onChange(); };
       head.append(en, nm, interp, keyBtn, rm);
       const cv = el('canvas') as HTMLCanvasElement;
-      cv.className = 'mc-canvas'; cv.width = 260; cv.height = 40;
+      cv.className = 'mc-canvas'; cv.width = 300; cv.height = 64;
+      cv.title = 'Drag points · double-click to add · Alt/right-click to delete · Shift: value only · Ctrl/⌘: time only';
       drawCurve(cv, c);
+      attachCurveEditing(cv, c, () => { rebuildCurves(); rebuildList(); });
       // point table
       const pts = el('div', 'mc-points');
       c.points.forEach((p, i) => {
