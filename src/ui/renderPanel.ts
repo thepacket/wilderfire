@@ -42,11 +42,11 @@ export function buildRenderPanel(app: App, root: HTMLElement) {
   pzChk.checked = app.flame.preserveZ;
   const pzLab = el('label', 'check', ' Preserve Z');
   pzLab.prepend(pzChk);
-  pzLab.title = "JWildfire preserve_z: 2D variations keep the point's depth instead of flattening it";
+  pzLab.title = "2D variations keep the point's depth instead of flattening it (preserve_z)";
   pzChk.onchange = () => { app.flame.preserveZ = pzChk.checked; app.commit(SRC); };
   pzRow.append(pzLab);
   cam.append(zoomS.root, rotS.root, pitchS.root, yawS.root, perspS.root, camZS.root, pzRow);
-  cam.append(el('div', 'hint', 'Drag the canvas to pan · scroll to zoom · drag triangle handles to edit transforms. Pitch/yaw/perspective view the flame in 3D (JWildfire camera).'));
+  cam.append(el('div', 'hint', 'Drag the canvas to pan · scroll to zoom · drag triangle handles to edit transforms. Pitch/yaw/perspective view the flame in 3D.'));
 
   const tone = el('div', 'section');
   tone.append(el('h3', '', 'Tone'));
@@ -188,11 +188,11 @@ export function buildRenderPanel(app: App, root: HTMLElement) {
   jsonBtn.onclick = () =>
     download(flameToJSON(app.flame), `${app.flame.name || 'wilderfire'}.json`, 'application/json');
   const xmlBtn = el('button', '', '⬇ .flame');
-  xmlBtn.title = 'Export as flam3 / Apophysis / JWildfire XML';
+  xmlBtn.title = 'Export as .flame XML (flam3 / Apophysis compatible)';
   xmlBtn.onclick = () =>
     download(flameToXML(app.flame), `${app.flame.name || 'wilderfire'}.flame`, 'application/xml');
   const loadBtn = el('button', '', '⬆ Load');
-  loadBtn.title = 'Load a WilderFire JSON or a .flame XML (flam3 / Apophysis / JWildfire)';
+  loadBtn.title = 'Load a WilderFire JSON or a .flame XML (flam3 / Apophysis compatible)';
   const fileInp = el('input') as HTMLInputElement;
   fileInp.type = 'file';
   fileInp.accept = '.json,.flame,.xml,application/json,application/xml,text/xml';
@@ -244,7 +244,7 @@ export function buildRenderPanel(app: App, root: HTMLElement) {
   hiRow.append(hiBtn, hiScale, hiQ, alphaLab);
   io.append(hiRow);
   const hiStatus = el('div', 'hint',
-    'Load accepts WilderFire JSON and .flame XML from flam3 / Apophysis / JWildfire. Hi-res renders tiled at up to 4× screen resolution.');
+    'Load accepts WilderFire JSON and .flame XML (flam3 / Apophysis compatible). Hi-res renders tiled at up to 4× screen resolution.');
   io.append(hiStatus);
 
   hiBtn.onclick = async () => {

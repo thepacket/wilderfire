@@ -57,7 +57,7 @@ async function boot() {
     ogWf.append(o);
   });
   const ogJwf = document.createElement('optgroup');
-  ogJwf.label = 'JWildfire samples';
+  ogJwf.label = 'Sample flames';
   const { JWF_SAMPLES } = await import('./core/samples');
   JWF_SAMPLES.forEach((s, i) => {
     const o = el('option', '', s.name) as HTMLOptionElement;

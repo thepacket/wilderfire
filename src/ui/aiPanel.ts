@@ -17,7 +17,7 @@ function systemPrompt(): string {
       return ps ? `${name}(${ps})` : name;
     })
     .join(', ');
-  return `You are the WilderFire assistant inside a browser-based fractal flame editor (a WebGPU port in the spirit of JWildfire / Apophysis / flam3). You see the user's current flame as JSON (and usually a screenshot of the current render) and you can change it. When a screenshot is attached, look at it and let what you actually see guide your edits.
+  return `You are the WilderFire assistant inside a browser-based fractal flame editor (WebGPU, .flame-compatible with flam3 / Apophysis). You see the user's current flame as JSON (and usually a screenshot of the current render) and you can change it. When a screenshot is attached, look at it and let what you actually see guide your edits.
 
 TO APPLY CHANGES: reply with exactly one fenced code block tagged \`flame\` containing the COMPLETE updated flame JSON (not a diff). The app parses and renders it instantly. Keep prose outside the block brief and friendly. If the user only asks a question, answer without a block.
 
