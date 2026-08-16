@@ -150,7 +150,7 @@ export function buildAIPanel(app: App, root: HTMLElement) {
   const msgs = el('div', 'ai-msgs');
   const inputRow = el('div', 'ai-input-row');
   const ta = el('textarea') as HTMLTextAreaElement;
-  ta.placeholder = 'e.g. "make it look like a frozen galaxy with icy blues"';
+  ta.placeholder = 'e.g. "what does the julian variation do, and what do power and dist control?"';
   const sendBtn = el('button', 'primary', 'Send');
   const clearBtn = el('button', '', 'Clear');
   clearBtn.title = 'Forget the conversation so far — the next message starts a fresh context (the flame is untouched)';
@@ -170,7 +170,7 @@ export function buildAIPanel(app: App, root: HTMLElement) {
     return m;
   };
 
-  addMsg('system', 'Describe the fractal you want — the assistant edits the flame live.');
+  addMsg('system', 'Ask about a transform or variation, or ask for a change — the assistant can edit the flame live.');
 
   function tryApplyFlameBlocks(text: string): boolean {
     if (ctx.reply === 'text') return false;
