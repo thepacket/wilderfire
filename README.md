@@ -9,6 +9,8 @@ Free software under the **LGPL-2.1-or-later** · © 2026 Andre Paquette ·
 **pull requests are not accepted** (issues and forks are welcome — see
 [CONTRIBUTING.md](CONTRIBUTING.md)).
 
+![WilderFire — a julian/spherical flame in the editor, with the transform panel, triangle overlay and AI assistant](docs/hero.jpg)
+
 ## Why WebGPU (and no wasm)
 
 The fractal flame algorithm is a chaos game: billions of tiny independent
