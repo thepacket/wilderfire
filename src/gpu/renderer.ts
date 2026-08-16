@@ -588,7 +588,12 @@ export class FlameRenderer {
     const dt = this.lastT ? (t - this.lastT) / 1000 : 0;
     this.lastT = t;
 
-    this.writeUniforms(spp);
+    // The tonemap must see the sample count *including* this frame's passes:
+    // the compute pass runs before the tonemap in the same submission, and
+    // using the pre-dispatch count (0 right after a reset, i.e. on every frame
+    // while a triangle is being dragged) blows the whole image out to white.
+    if (accumulate) this.samples += this.nPoints * this.itersPerPass * this.passesPerFrame;
+    this.writeUniforms(this.samples / Math.max(w * h, 1)); // tonemap spp is per output pixel
 
     const enc = this.device.createCommandEncoder();
     if (accumulate) {
@@ -599,7 +604,6 @@ export class FlameRenderer {
         pass.dispatchWorkgroups(Math.ceil(this.nPoints / 256));
       }
       pass.end();
-      this.samples += this.nPoints * this.itersPerPass * this.passesPerFrame;
     }
     const view = this.context.getCurrentTexture().createView();
     this.encodeTonemap(enc, this.renderBG, this.renderPipeline, view, w, h, false, { r: 0, g: 0, b: 0, a: 1 });
