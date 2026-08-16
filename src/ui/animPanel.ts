@@ -6,6 +6,7 @@ import { Muxer as Mp4Muxer, ArrayBufferTarget as Mp4Target } from 'mp4-muxer';
 import { App, el, slider } from './common';
 import { cloneFlame, normalizeFlame } from '../core/flame';
 import { flameAt, sortKeys, type Keyframe, type Easing } from '../core/animate';
+import { pickSave, saveText, type SaveTarget } from './saveFile';
 import { applyCurves, curvesEnd, evalCurve, getParam, paramPaths, setPoint, INTERPS, type MotionCurve, type CurveInterp } from '../core/motion';
 
 interface OverlayHandle { setVisible(v: boolean): void; readonly visible: boolean; }
@@ -373,6 +374,16 @@ export function buildAnimPanel(app: App, root: HTMLElement, overlay: OverlayHand
     const passes = opts?.passes ?? parseInt(qSel.value);
     const download = opts?.download ?? true;
     const format = opts?.format ?? (fmtSel.value as 'webm' | 'mp4');
+    // Pick the destination now (needs the click's user gesture); write after encoding.
+    let target: SaveTarget | null = null;
+    if (download) {
+      const name = (app.flame.name || 'wilderfire').replace(/[\\/:*?"<>|]+/g, '_');
+      target = await pickSave({
+        suggestedName: `${name}-anim.${format}`, description: format === 'mp4' ? 'MP4 video' : 'WebM video',
+        mime: format === 'mp4' ? 'video/mp4' : 'video/webm', ext: `.${format}`,
+      });
+      if (!target) throw new Error('Export cancelled.');
+    }
     const [t0, t1] = timeRange();
     const total = Math.max(t1 - t0, 0.01);
     const nFrames = Math.max(2, Math.round(total * fps) + 1);
@@ -452,13 +463,7 @@ export function buildAnimPanel(app: App, root: HTMLElement, overlay: OverlayHand
       await encoder.flush();
       const blob = new Blob([finalize()], { type: mime });
       exStatus.textContent = `Done — ${(blob.size / 1e6).toFixed(1)} MB, ${nFrames} frames @ ${fps} fps.`;
-      if (download) {
-        const a = document.createElement('a');
-        a.href = URL.createObjectURL(blob);
-        a.download = `${savedFlame.name || 'wilderfire'}-anim.${format}`;
-        a.click();
-        URL.revokeObjectURL(a.href);
-      }
+      if (target) await target.write(blob);
       return blob;
     } finally {
       exporting = false;
@@ -504,11 +509,9 @@ export function buildAnimPanel(app: App, root: HTMLElement, overlay: OverlayHand
   };
 
   saveAnimBtn.onclick = () => {
-    const a = document.createElement('a');
-    a.href = URL.createObjectURL(new Blob([JSON.stringify(getState(), null, 1)], { type: 'application/json' }));
-    a.download = `${app.flame.name || 'wilderfire'}-anim.json`;
-    a.click();
-    URL.revokeObjectURL(a.href);
+    saveText(JSON.stringify(getState(), null, 1), {
+      suggestedName: `${app.flame.name || 'wilderfire'}-anim.json`, description: 'WilderFire animation (JSON)', mime: 'application/json', ext: '.json',
+    });
   };
   loadAnimBtn.onclick = () => animFile.click();
   animFile.onchange = async () => {

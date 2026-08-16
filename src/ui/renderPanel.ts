@@ -2,6 +2,7 @@
 import { App, el, slider } from './common';
 import { flameToJSON } from '../core/flame';
 import { flameToXML, importFlameText } from '../core/flameXML';
+import { pickSave, saveBlob, saveText } from './saveFile';
 
 const SRC = 'render';
 
@@ -168,29 +169,21 @@ export function buildRenderPanel(app: App, root: HTMLElement) {
   io.append(el('h3', '', 'Export / Import'));
   const ioRow = el('div', 'btn-row');
   const pngBtn = el('button', 'primary', '⬇ Save PNG');
+  const baseName = () => (app.flame.name || 'wilderfire').replace(/[\\/:*?"<>|]+/g, '_');
   pngBtn.onclick = async () => {
+    // Ask for the destination first: the dialog needs the click's user gesture.
+    const target = await pickSave({ suggestedName: `${baseName()}.png`, description: 'PNG image', mime: 'image/png', ext: '.png' });
+    if (!target) return;
     const blob = await app.renderer.exportPNG();
-    if (!blob) return;
-    const a = document.createElement('a');
-    a.href = URL.createObjectURL(blob);
-    a.download = `${app.flame.name || 'wilderfire'}.png`;
-    a.click();
-    URL.revokeObjectURL(a.href);
-  };
-  const download = (content: string, filename: string, type: string) => {
-    const a = document.createElement('a');
-    a.href = URL.createObjectURL(new Blob([content], { type }));
-    a.download = filename;
-    a.click();
-    URL.revokeObjectURL(a.href);
+    if (blob) await target.write(blob);
   };
   const jsonBtn = el('button', '', '⬇ JSON');
   jsonBtn.onclick = () =>
-    download(flameToJSON(app.flame), `${app.flame.name || 'wilderfire'}.json`, 'application/json');
+    saveText(flameToJSON(app.flame), { suggestedName: `${baseName()}.json`, description: 'WilderFire flame (JSON)', mime: 'application/json', ext: '.json' });
   const xmlBtn = el('button', '', '⬇ .flame');
   xmlBtn.title = 'Export as .flame XML (flam3 / Apophysis compatible)';
   xmlBtn.onclick = () =>
-    download(flameToXML(app.flame, { curves: app.getCurves() }), `${app.flame.name || 'wilderfire'}.flame`, 'application/xml');
+    saveText(flameToXML(app.flame, { curves: app.getCurves() }), { suggestedName: `${baseName()}.flame`, description: 'Flame XML', mime: 'application/xml', ext: '.flame' });
   const loadBtn = el('button', '', '⬆ Load');
   loadBtn.title = 'Load a WilderFire JSON or a .flame XML (flam3 / Apophysis compatible)';
   const fileInp = el('input') as HTMLInputElement;
@@ -259,6 +252,8 @@ export function buildRenderPanel(app: App, root: HTMLElement) {
     const fullW = (r.width * scale) & ~1;
     const fullH = (r.height * scale) & ~1;
     const TILE = 1024, PAD = 8;
+    const target = await pickSave({ suggestedName: `${baseName()}-${fullW}x${fullH}.png`, description: 'PNG image', mime: 'image/png', ext: '.png' });
+    if (!target) return;
     hiBtn.disabled = true;
     r.exporting = true;
     try {
@@ -293,11 +288,7 @@ export function buildRenderPanel(app: App, root: HTMLElement) {
       hiStatus.textContent = 'Encoding PNG…';
       const blob = await new Promise<Blob | null>((res) => out.toBlob(res, 'image/png'));
       if (blob) {
-        const a = document.createElement('a');
-        a.href = URL.createObjectURL(blob);
-        a.download = `${app.flame.name || 'wilderfire'}-${fullW}x${fullH}.png`;
-        a.click();
-        URL.revokeObjectURL(a.href);
+        await target.write(blob);
         hiStatus.textContent = `Saved ${fullW}×${fullH} PNG (${(blob.size / 1e6).toFixed(1)} MB).`;
       }
     } catch (e) {
