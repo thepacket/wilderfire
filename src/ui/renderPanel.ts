@@ -170,6 +170,19 @@ export function buildRenderPanel(app: App, root: HTMLElement) {
     label: 'DE curve', min: 0.05, max: 1, step: 0.05, value: app.flame.deCurve ?? 0.8,
     onInput: (v) => { app.flame.deCurve = v; app.commitTone(SRC); },
   });
+  const holdRow = el('div', 'row');
+  holdRow.append(el('label', '', 'Preview'));
+  const holdSel = el('select') as HTMLSelectElement;
+  for (const [label, v] of [['Instant', '0'], ['Smooth (hold to 10 spp)', '10'], ['Steady (hold to 25 spp)', '25']] as const) {
+    const o = el('option', '', label) as HTMLOptionElement;
+    o.value = v;
+    if (v === '10') o.selected = true;
+    holdSel.append(o);
+  }
+  holdSel.title = 'After each edit keep the previous image on screen until the new one has accumulated this many samples per pixel (avoids the sparse first frames while dragging)';
+  holdSel.onchange = () => { app.renderer.minDisplaySpp = parseInt(holdSel.value); };
+  holdRow.append(holdSel);
+
   const deLiveRow = el('div', 'row');
   deLiveRow.append(el('label', '', 'DE preview'));
   const deLiveSel = el('select') as HTMLSelectElement;
@@ -223,7 +236,7 @@ export function buildRenderPanel(app: App, root: HTMLElement) {
   restartBtn.onclick = () => app.renderer.resetAccumulation();
   const pRow = el('div', 'btn-row');
   pRow.append(pauseBtn, restartBtn);
-  perf.append(speedRow, deS.root, deCurveS.root, deLiveRow, osRow, qRow, pRow);
+  perf.append(speedRow, holdRow, deS.root, deCurveS.root, deLiveRow, osRow, qRow, pRow);
 
   const io = el('div', 'section');
   io.append(el('h3', '', 'Export / Import'));

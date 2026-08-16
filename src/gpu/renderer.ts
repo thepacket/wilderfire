@@ -57,6 +57,10 @@ export class FlameRenderer {
   targetQuality = 4000; // spp cap
   /** Live-preview cap on the DE estimator radius (px); exports use the flame's full radius. */
   deLiveCap = 6;
+  /** Don't present a freshly reset accumulation until it has this many samples per
+   *  pixel; the previous image stays on screen meanwhile (0 = present every frame). */
+  minDisplaySpp = 10;
+  private hasPresented = false;
   oversample = 1;       // 1 or 2 — supersampled histogram, box-downsampled in tonemap
   private maxHistBytes = 128 << 20;
 
@@ -183,6 +187,7 @@ export class FlameRenderer {
     this.canvas.height = Math.max(2, h);
     this.allocHistogram();
     this.resetAccumulation();
+    this.hasPresented = false; // canvas was cleared by the resize: present right away
   }
 
   /** Push the current flame to the GPU. Recompiles the kernel on structural change. */
@@ -592,7 +597,16 @@ export class FlameRenderer {
     // the compute pass runs before the tonemap in the same submission, and
     // using the pre-dispatch count (0 right after a reset, i.e. on every frame
     // while a triangle is being dragged) blows the whole image out to white.
-    if (accumulate) this.samples += this.nPoints * this.itersPerPass * this.passesPerFrame;
+    // Burst: right after a reset run extra passes (bounded) so the new image
+    // reaches minDisplaySpp within a frame or two instead of freezing the view
+    // during a fast drag.
+    const perPass = this.nPoints * this.itersPerPass;
+    let passes = this.passesPerFrame;
+    if (accumulate && this.minDisplaySpp > 0) {
+      const need = Math.ceil((this.minDisplaySpp * w * h - this.samples) / perPass);
+      if (need > passes) passes = Math.min(need, this.passesPerFrame * 4);
+    }
+    if (accumulate) this.samples += perPass * passes;
     this.writeUniforms(this.samples / Math.max(w * h, 1)); // tonemap spp is per output pixel
 
     const enc = this.device.createCommandEncoder();
@@ -600,17 +614,27 @@ export class FlameRenderer {
       const pass = enc.beginComputePass();
       pass.setPipeline(this.computePipeline);
       pass.setBindGroup(0, this.computeBG);
-      for (let i = 0; i < this.passesPerFrame; i++) {
+      for (let i = 0; i < passes; i++) {
         pass.dispatchWorkgroups(Math.ceil(this.nPoints / 256));
       }
       pass.end();
     }
-    const view = this.context.getCurrentTexture().createView();
-    this.encodeTonemap(enc, this.renderBG, this.renderPipeline, view, w, h, false, { r: 0, g: 0, b: 0, a: 1 });
+    // Present gate: after a reset (every frame while a triangle is dragged) the
+    // first few frames are too sparse to look like anything. Keep accumulating
+    // in the background and leave the last presented image on the canvas until
+    // the new one has reached minDisplaySpp — a WebGPU canvas keeps its last
+    // frame as long as we don't fetch a new current texture.
+    const sppAfter = this.samples / Math.max(w * h, 1);
+    const present = !accumulate || sppAfter >= this.minDisplaySpp || !this.hasPresented;
+    if (present) {
+      const view = this.context.getCurrentTexture().createView();
+      this.encodeTonemap(enc, this.renderBG, this.renderPipeline, view, w, h, false, { r: 0, g: 0, b: 0, a: 1 });
+      this.hasPresented = true;
+    }
     this.device.queue.submit([enc.finish()]);
 
     if (accumulate && dt > 0 && dt < 0.5) {
-      const sps = (this.nPoints * this.itersPerPass * this.passesPerFrame) / dt;
+      const sps = (perPass * passes) / dt;
       this.emaSps = this.emaSps ? this.emaSps * 0.95 + sps * 0.05 : sps;
     }
     this.onFrame?.({ spp, samplesPerSec: this.emaSps, paused: this.paused, converged });
