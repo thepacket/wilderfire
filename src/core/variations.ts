@@ -24,6 +24,8 @@ export interface VariationDef {
   funcNames?: string[];
   /** Descriptive flags (z, hide, dc, state, 3d, affine). */
   flags?: string[];
+  /** JWildfire type tags (2D, 3D, BLUR, DC, PRE, POST, CROP, BASE_SHAPE, SIMULATION, …). */
+  types?: string[];
 }
 
 const HAND_VARIATIONS: Record<string, VariationDef> = {
@@ -422,6 +424,32 @@ export const VARIATIONS: Record<string, VariationDef> = (() => {
 export { HAND_VARIATIONS };
 
 export const VARIATION_NAMES = Object.keys(VARIATIONS).sort((a, b) => a.localeCompare(b));
+
+/** The flam3 core set — what most flames are built from; pinned first in the picker. */
+export const CLASSIC_VARIATIONS = [
+  'linear', 'sinusoidal', 'spherical', 'swirl', 'horseshoe', 'polar', 'handkerchief', 'heart', 'disc',
+  'spiral', 'hyperbolic', 'diamond', 'ex', 'julia', 'bent', 'waves', 'fisheye', 'popcorn', 'exponential',
+  'power', 'cosine', 'rings', 'fan', 'blob', 'pdj', 'fan2', 'rings2', 'eyefish', 'bubble', 'cylinder',
+  'perspective', 'noise', 'julian', 'juliascope', 'blur', 'gaussian_blur', 'radial_blur', 'pie', 'ngon',
+  'curl', 'rectangles', 'arch', 'tangent', 'square', 'rays', 'blade', 'secant', 'twintrian', 'cross',
+  'polar2', 'elliptic', 'escher', 'foci', 'lazysusan', 'loonie', 'pre_blur', 'modulus', 'oscilloscope',
+  'popcorn2', 'scry', 'separation', 'split', 'splits', 'stripes', 'wedge', 'whorl', 'waves2', 'exp', 'log',
+  'sin', 'cos', 'tan', 'sec', 'csc', 'cot', 'sinh', 'cosh', 'tanh', 'auger', 'flux', 'mobius', 'bwraps',
+  'hemisphere', 'dc_linear', 'crop', 'post_curl',
+].filter((n) => n in VARIATIONS);
+
+/** Type tags for a variation (JWildfire's where known, inferred for hand-written entries). */
+export function variationTypes(name: string): string[] {
+  const def = VARIATIONS[name];
+  if (!def) return [];
+  if (def.types?.length) return def.types;
+  const t = ['2D'];
+  if (name.startsWith('dc_')) t.push('DC');
+  if (/blur/.test(name)) t.push('BLUR');
+  if (name.startsWith('pre_')) t.push('PRE');
+  if (name.startsWith('post_')) t.push('POST');
+  return t;
+}
 
 export function variationParamCount(name: string): number {
   return VARIATIONS[name]?.params?.length ?? 0;

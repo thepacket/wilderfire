@@ -7,11 +7,13 @@ import {
   rotateAffine, scaleAffine, IDENTITY, MAX_LAYERS, MAX_XFORMS,
 } from '../core/flame';
 import { randomPalette } from '../core/palette';
-import { VARIATION_NAMES, VARIATIONS, defaultParams } from '../core/variations';
+import { VARIATIONS, defaultParams } from '../core/variations';
+import { createVariationPicker } from './variationPicker';
 
 const SRC = 'transforms';
 
 export function buildTransformsPanel(app: App, root: HTMLElement) {
+  let lastPicked = 'linear'; // picker selection survives editor rebuilds
   const layerSec = el('div', 'section');
   layerSec.append(el('h3', '', 'Layers'));
   const layerList = el('div', 'xform-list');
@@ -315,16 +317,11 @@ export function buildTransformsPanel(app: App, root: HTMLElement) {
     const isFinal = app.selected === -1;
     editorSec.append(el('h3', '', isFinal ? 'Final Transform' : `Transform T${app.selected + 1}`));
 
-    // Add-variation controls (select + Variation / Pre / Post) sit at the top of the editor.
+    // Add-variation controls (picker + Variation / Pre / Post) sit at the top of the editor.
     const addRow = el('div', 'btn-row');
-    const sel = el('select') as HTMLSelectElement;
-    for (const n of VARIATION_NAMES) {
-      const o = el('option', '', n) as HTMLOptionElement;
-      o.value = n;
-      sel.append(o);
-    }
-    sel.value = 'linear';
-    const mkVar = () => ({ name: sel.value, weight: 0.5, params: defaultParams(sel.value) });
+    const picker = createVariationPicker(lastPicked, (n) => { lastPicked = n; });
+    const sel = picker.root;
+    const mkVar = () => ({ name: picker.value, weight: 0.5, params: defaultParams(picker.value) });
     const addVar = el('button', '', '+ Variation');
     addVar.onclick = () => {
       x.variations.push(mkVar());
