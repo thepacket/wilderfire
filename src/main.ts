@@ -159,7 +159,37 @@ async function boot() {
   const status = el('div', 'statusbar', '—');
   wrap.append(canvas, overlayCanvas, status);
 
-  main.append(left, wrap, right);
+  // Collapse handles: a slim strip on the inner edge of each pane that stays
+  // visible when the pane is hidden, so it can always be brought back.
+  const makeHandle = (panel: HTMLElement, side: 'left' | 'right') => {
+    const key = `wilderfire.pane.${side}`;
+    const h = el('div', `pane-handle pane-handle-${side}`);
+    const glyph = el('span', 'glyph');
+    h.append(glyph);
+    const apply = (collapsed: boolean) => {
+      panel.classList.toggle('collapsed', collapsed);
+      h.classList.toggle('collapsed', collapsed);
+      const open = side === 'left' ? '‹' : '›';
+      const closed = side === 'left' ? '›' : '‹';
+      glyph.textContent = collapsed ? closed : open;
+      h.title = `${collapsed ? 'Show' : 'Hide'} ${side} panel (${side === 'left' ? '[' : ']'})`;
+      localStorage.setItem(key, collapsed ? '1' : '0');
+    };
+    const toggle = () => apply(!panel.classList.contains('collapsed'));
+    h.onclick = toggle;
+    apply(localStorage.getItem(key) === '1');
+    return { el: h, toggle };
+  };
+  const leftHandle = makeHandle(left, 'left');
+  const rightHandle = makeHandle(right, 'right');
+  window.addEventListener('keydown', (e) => {
+    const tag = (e.target as HTMLElement)?.tagName;
+    if (tag === 'INPUT' || tag === 'TEXTAREA' || tag === 'SELECT' || e.metaKey || e.ctrlKey || e.altKey) return;
+    if (e.key === '[') { e.preventDefault(); leftHandle.toggle(); }
+    else if (e.key === ']') { e.preventDefault(); rightHandle.toggle(); }
+  });
+
+  main.append(left, leftHandle.el, wrap, rightHandle.el, right);
   root.append(header, main);
 
   // ---------- Right panel tabs ----------

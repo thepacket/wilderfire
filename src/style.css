@@ -64,6 +64,21 @@ html, body {
 }
 .panel-left { width: 292px; border-right: 1px solid var(--border); }
 .panel-right { width: 330px; border-left: 1px solid var(--border); }
+.panel.collapsed { display: none; }
+
+/* Slim strip on the inner edge of each pane; click to collapse/expand. */
+.pane-handle {
+  flex: 0 0 12px; width: 12px;
+  display: flex; align-items: center; justify-content: center;
+  background: var(--bg2); color: var(--fg-dim);
+  cursor: pointer; user-select: none;
+  transition: background 0.12s, color 0.12s;
+}
+.pane-handle-left { border-right: 1px solid var(--border); }
+.pane-handle-right { border-left: 1px solid var(--border); }
+.pane-handle .glyph { font-size: 14px; line-height: 1; }
+.pane-handle:hover { background: color-mix(in srgb, var(--bg3) 70%, var(--accent) 12%); color: var(--accent); }
+.pane-handle.collapsed { color: var(--accent); }
 
 .canvas-wrap {
   flex: 1; position: relative; min-width: 0;
