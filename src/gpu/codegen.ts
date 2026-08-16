@@ -94,7 +94,11 @@ function genXformFn(name: string, x: XForm, B: number): string {
   // are all mutable so JWildfire-style pre-priority variations can rewrite the
   // input and post-priority ones can rewrite the output; snippets run in
   // priority order (pre → normal → post), list order within a priority.
-  const genStage = (list: VarInstance[], input: string, output: string, initV: string): string => {
+  // `z_` is the stage's input z (mutable, JWildfire's __z), `pz_` its z output
+  // accumulator (__pz). Only the main stage carries z out; the WilderFire pre/post
+  // sum-stages pass z through untouched. With preserve_z, 2D variations at normal
+  // priority add w·z (JWildfire's isPreserveZCoordinate behaviour).
+  const genStage = (list: VarInstance[], input: string, output: string, initV: string, zIn: string, zOut: string | null): string => {
     // xd layout follows list order (writeData mirrors it), so bind offsets first…
     const bound = list.map((vi) => {
       const def = VARIATIONS[vi.name];
@@ -107,28 +111,37 @@ function genXformFn(name: string, x: XForm, B: number): string {
     // …then emit in priority order.
     let snips = '';
     for (const prio of [-2, -1, 0, 1, 2]) {
-      for (const b of bound) if (b.prio === prio) snips += '    ' + b.def.code(b.w, b.p, A) + '\n';
+      for (const b of bound) {
+        if (b.prio !== prio) continue;
+        snips += '    ' + b.def.code(b.w, b.p, A) + '\n';
+        if (prio === 0 && zOut && !(b.def.flags ?? []).includes('z')) {
+          snips += `    if (P.flags & 1u) != 0u { pz_ += ${b.w} * z_; }\n`;
+        }
+      }
     }
     return `  {
     var t = ${input};
+    var z_ = ${zIn};
+    var pz_ = 0.0;
     var r2 = max(dot(t, t), 1e-12);
     var r = sqrt(r2);
     var th = atan2(t.x, t.y);
     var ph = atan2(t.y, t.x);
     var v = ${initV};
-${snips}    ${output} = v;
+${snips}    ${output} = v;${zOut ? `\n    ${zOut} = pz_;` : ''}
   }
 `;
   };
 
   let body = `  var t0 = vec2f(${A(0)}*pin.x + ${A(1)}*pin.y + ${A(2)}, ${A(3)}*pin.x + ${A(4)}*pin.y + ${A(5)});\n`;
-  if (pre.length) body += genStage(pre, 't0', 't0', 'vec2f(0.0, 0.0)');
+  body += '  var zout = pin.z;\n';
+  if (pre.length) body += genStage(pre, 't0', 't0', 'vec2f(0.0, 0.0)', 'pin.z', null);
   body += '  var vout = vec2f(0.0, 0.0);\n';
-  body += genStage(main, 't0', 'vout', 'vec2f(0.0, 0.0)');
-  if (post.length) body += genStage(post, 'vout', 'vout', 'vec2f(0.0, 0.0)');
+  body += genStage(main, 't0', 'vout', 'vec2f(0.0, 0.0)', 'pin.z', 'zout');
+  if (post.length) body += genStage(post, 'vout', 'vout', 'vec2f(0.0, 0.0)', 'zout', null);
 
-  return `fn ${name}(pin: vec2f, cp: ptr<function, f32>, rs: ptr<function, u32>, hd: ptr<function, bool>) -> vec2f {
-${body}  return vec2f(${A(6)}*vout.x + ${A(7)}*vout.y + ${A(8)}, ${A(9)}*vout.x + ${A(10)}*vout.y + ${A(11)});
+  return `fn ${name}(pin: vec3f, cp: ptr<function, f32>, rs: ptr<function, u32>, hd: ptr<function, bool>) -> vec3f {
+${body}  return vec3f(${A(6)}*vout.x + ${A(7)}*vout.y + ${A(8)}, ${A(9)}*vout.x + ${A(10)}*vout.y + ${A(11)}, zout);
 }`;
 }
 
@@ -184,14 +197,15 @@ export function compileFlame(flame: Flame, nPoints: number): CompiledFlame {
 fn iterLayer${li}(idx: u32) {
   var pt = pts[idx];
   var rs = rngs[idx].x;
-  var prev = min(rngs[idx].y, ${info.n - 1}u);
-  var p = pt.xy;
-  var c = pt.z;
-  var fuse = pt.w;
+  var prev = min(rngs[idx].y & 255u, ${info.n - 1}u);
+  var fuse = f32(rngs[idx].y >> 8u);
+  var p = pt.xyz;
+  var c = pt.w;
   let ca = cos(P.rotation);
   let sa = sin(P.rotation);
   let offX = P.fullW * 0.5 - P.tileX;
   let offY = P.fullH * 0.5 - P.tileY;
+  let cam3d = (P.flags & 2u) != 0u;
 
   for (var it = 0u; it < P.iters; it = it + 1u) {
     let rw = rnd(&rs);
@@ -206,8 +220,8 @@ ${cases}
     prev = xi;
     p = np;
 
-    if (p.x != p.x || p.y != p.y || abs(p.x) > 1e10 || abs(p.y) > 1e10) {
-      p = vec2f(rnd(&rs) * 2.0 - 1.0, rnd(&rs) * 2.0 - 1.0);
+    if (p.x != p.x || p.y != p.y || p.z != p.z || abs(p.x) > 1e10 || abs(p.y) > 1e10 || abs(p.z) > 1e10) {
+      p = vec3f(rnd(&rs) * 2.0 - 1.0, rnd(&rs) * 2.0 - 1.0, 0.0);
       c = rnd(&rs);
       fuse = 20.0;
       continue;
@@ -221,14 +235,29 @@ ${cases}
     var dc = c;${finalBlock}
     if (hide) { op = 0.0; }
 
-    let ox = dp.x - P.centerX;
-    let oy = dp.y - P.centerY;
-    let rx = ox * ca - oy * sa;
-    let ry = ox * sa + oy * ca;
+    var rx: f32;
+    var ry: f32;
+    var visible = true;
+    if (cam3d) {
+      // JWildfire 3D camera: rotate by the camera matrix (yaw/pitch/roll), offset,
+      // then perspective-divide; the centre offset applies after projection.
+      let cx = P.m0.x * dp.x + P.m0.y * dp.y + P.m0.z * dp.z + P.camPos.x;
+      let cy = P.m1.x * dp.x + P.m1.y * dp.y + P.m1.z * dp.z + P.camPos.y;
+      let cz = P.m2.x * dp.x + P.m2.y * dp.y + P.m2.z * dp.z + P.camPos.z;
+      let zr = 1.0 - P.camPersp * cz + P.camPos.z;
+      visible = zr >= 1e-9;
+      rx = cx / zr - P.centerX;
+      ry = cy / zr - P.centerY;
+    } else {
+      let ox = dp.x - P.centerX;
+      let oy = dp.y - P.centerY;
+      rx = ox * ca - oy * sa;
+      ry = ox * sa + oy * ca;
+    }
     // flam3/JWildfire raster convention: +y grows downward on the image.
     let fx = rx * P.ppu + offX;
     let fy = ry * P.ppu + offY;
-    if (fx >= 0.0 && fy >= 0.0 && fx < f32(P.width) && fy < f32(P.height)) {
+    if (visible && fx >= 0.0 && fy >= 0.0 && fx < f32(P.width) && fy < f32(P.height)) {
       let hi = (u32(fy) * P.width + u32(fx)) * 4u;
       let col = pal[${li * 256}u + min(u32(clamp(dc, 0.0, 1.0) * 255.99), 255u)];
       atomicAdd(&hist[hi + 0u], u32(col.x * op * 255.0));
@@ -238,8 +267,8 @@ ${cases}
     }
   }
 
-  pts[idx] = vec4f(p, c, fuse);
-  rngs[idx] = vec2u(rs, prev);
+  pts[idx] = vec4f(p, c);
+  rngs[idx] = vec2u(rs, prev | (u32(fuse) << 8u));
 }
 `;
   });
@@ -258,7 +287,7 @@ struct Params {
   width: u32,   // bounds of the target (tile) in pixels
   height: u32,
   iters: u32,
-  _pad: u32,
+  flags: u32,   // bit0: preserve_z, bit1: 3D camera active
   centerX: f32,
   centerY: f32,
   ppu: f32,
@@ -267,6 +296,14 @@ struct Params {
   tileY: f32,
   fullW: f32,   // full image dimensions the camera maps onto
   fullH: f32,
+  m0: vec4f,    // camera matrix rows (JWildfire yaw/pitch/bank/roll), w unused
+  m1: vec4f,
+  m2: vec4f,
+  camPos: vec4f, // xyz: camera position offset, w: camPersp
+  camPersp: f32,
+  _p1: f32,
+  _p2: f32,
+  _p3: f32,
 };
 
 @group(0) @binding(0) var<uniform> P: Params;

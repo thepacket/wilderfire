@@ -18,8 +18,36 @@ export function buildRenderPanel(app: App, root: HTMLElement) {
     fmt: (v) => v.toFixed(0) + '°',
     onInput: (v) => { app.flame.rotation = (v * Math.PI) / 180; app.commit(SRC); },
   });
-  cam.append(zoomS.root, rotS.root);
-  cam.append(el('div', 'hint', 'Drag the canvas to pan · scroll to zoom · drag triangle handles to edit transforms.'));
+  const pitchS = slider({
+    label: 'Pitch', min: -180, max: 180, step: 1, value: app.flame.camPitch,
+    fmt: (v) => v.toFixed(0) + '°',
+    onInput: (v) => { app.flame.camPitch = v; app.commit(SRC); },
+  });
+  const yawS = slider({
+    label: 'Yaw', min: -180, max: 180, step: 1, value: app.flame.camYaw,
+    fmt: (v) => v.toFixed(0) + '°',
+    onInput: (v) => { app.flame.camYaw = v; app.commit(SRC); },
+  });
+  const perspS = slider({
+    label: 'Perspective', min: 0, max: 1, step: 0.01, value: app.flame.camPersp,
+    onInput: (v) => { app.flame.camPersp = v; app.commit(SRC); },
+  });
+  const camZS = slider({
+    label: 'Cam Z', min: -2, max: 2, step: 0.01, value: app.flame.camPosZ,
+    onInput: (v) => { app.flame.camPosZ = v; app.commit(SRC); },
+  });
+  const pzRow = el('div', 'row');
+  const pzChk = el('input') as HTMLInputElement;
+  pzChk.type = 'checkbox';
+  pzChk.checked = app.flame.preserveZ;
+  const pzLab = el('label', '', ' preserve Z (2D variations keep depth)');
+  pzLab.prepend(pzChk);
+  pzLab.style.color = 'var(--fg-dim)';
+  pzLab.title = "JWildfire preserve_z: 2D variations pass the point's z through instead of flattening it";
+  pzChk.onchange = () => { app.flame.preserveZ = pzChk.checked; app.commit(SRC); };
+  pzRow.append(pzLab);
+  cam.append(zoomS.root, rotS.root, pitchS.root, yawS.root, perspS.root, camZS.root, pzRow);
+  cam.append(el('div', 'hint', 'Drag the canvas to pan · scroll to zoom · drag triangle handles to edit transforms. Pitch/yaw/perspective view the flame in 3D (JWildfire camera).'));
 
   const tone = el('div', 'section');
   tone.append(el('h3', '', 'Tone'));
@@ -284,6 +312,8 @@ export function buildRenderPanel(app: App, root: HTMLElement) {
     if (src === SRC) return;
     zoomS.set(Math.log2(app.flame.zoom));
     rotS.set((app.flame.rotation * 180) / Math.PI);
+    pitchS.set(app.flame.camPitch); yawS.set(app.flame.camYaw); perspS.set(app.flame.camPersp); camZS.set(app.flame.camPosZ);
+    pzChk.checked = app.flame.preserveZ;
     brS.set(app.flame.brightness);
     gaS.set(app.flame.gamma);
     gtS.set(app.flame.gammaThreshold ?? 0.04);

@@ -9,8 +9,10 @@
 import { writeFileSync, readFileSync } from 'node:fs';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { VARIATIONS } from '../../src/core/variations.ts';
-import { JWF_VARIATIONS } from '../../src/core/variations.jwf.ts';
+import { HAND_VARIATIONS as VARIATIONS } from '../../src/core/variations.ts';
+import { JWF_VARIATIONS as JWF_VERIFIED } from '../../src/core/variations.jwf.ts';
+import { JWF_VARIATIONS_UNVERIFIED } from '../../src/core/variations.jwf.unverified.ts';
+const JWF_VARIATIONS = { ...JWF_VERIFIED, ...JWF_VARIATIONS_UNVERIFIED };
 
 const here = dirname(fileURLToPath(import.meta.url));
 
@@ -22,12 +24,14 @@ for (const l of readFileSync(join(here, 'data', 'jwf-variations.jsonl'), 'utf8')
 }
 
 // ---- points ----
-const points: [number, number][] = [];
+// 3D points: z varies deterministically so z-reading variations are exercised
+// (2D variations ignore it and must leave pz at 0).
+const points: number[][] = [];
 const N = 11;
 for (let j = 0; j < N; j++) for (let i = 0; i < N; i++) {
-  points.push([-1.6 + 3.2 * i / (N - 1) + 0.0137, -1.6 + 3.2 * j / (N - 1) - 0.0091]);
+  points.push([-1.6 + 3.2 * i / (N - 1) + 0.0137, -1.6 + 3.2 * j / (N - 1) - 0.0091, 0.45 * Math.sin(1.7 * i + 0.9 * j)]);
 }
-for (const p of [[0.05, 0.02], [-0.03, 0.07], [0.5, 0.5], [-0.7071, 0.7071], [2.5, -1.2], [-3.1, 2.4], [0.001, -0.002], [1.0, 0.0], [0.0, 1.0]] as [number, number][]) points.push(p);
+for (const p of [[0.05, 0.02, 0.3], [-0.03, 0.07, -0.2], [0.5, 0.5, 0.5], [-0.7071, 0.7071, 0], [2.5, -1.2, 0.8], [-3.1, 2.4, -0.6], [0.001, -0.002, 0.01], [1.0, 0.0, 0.0], [0.0, 1.0, 1.0]]) points.push(p);
 
 const AFFINE = [0.8, 0.3, 0.1, -0.2, 0.9, -0.15]; // a b c d e f
 
@@ -65,7 +69,7 @@ for (const name of [...names].sort()) {
 
 // text format for Java
 let txt = `POINTS ${points.length}\n`;
-for (const [x, y] of points) txt += `${x} ${y}\n`;
+for (const [x, y, z] of points) txt += `${x} ${y} ${z}\n`;
 txt += `AFFINE ${AFFINE.join(' ')}\n`;
 for (const e of entries) {
   txt += `VAR ${e.name} ${e.priority}\n`;

@@ -2,11 +2,11 @@
 // Variations ported from JWildfire (https://github.com/thargor6/JWildfire, LGPL-2.1,
 // (c) Andreas Maschke and contributors) by transpiling each variation's CUDA GPU
 // snippet to WGSL and verifying it against JWildfire's Java implementation.
-// 672 verified of 726 transpiled (1026 in JWildfire).
+// 668 verified of 726 transpiled (1026 in JWildfire).
 //
-// Snippet scope: t (input point, var), r2, r, th = atan2(x,y), ph = atan2(y,x),
-// v (output accumulator), rs (rng), cp (palette coord ptr), hd (hide-flag ptr).
-// Flags: z = touches z (2D projection), hide = uses hide flag, dc = writes color,
+// Snippet scope: t (input point, var), z_ (input z), r2, r, th = atan2(x,y), ph = atan2(y,x),
+// v (output accumulator), pz_ (output z), rs (rng), cp (palette coord ptr), hd (hide-flag ptr).
+// Flags: z = reads/writes z, hide = uses hide flag, dc = writes color,
 // state = keeps per-thread private state, 3d = JWildfire types it 3D, affine = reads xform coefs.
 
 import type { VariationDef } from './variations';
@@ -94,8 +94,6 @@ v.y += ((-(${w}) * r) * cos((th * r)));
     params: [],
     verified: true, priority: 0, flags: ["3d","z"], types: ["3D"],
     code: (w, _p) => `{
-var pz_: f32 = 0.0;
-var z_: f32 = 0.0;
 v.x += (${w} * t.x);
 v.y += (${w} * t.y);
 pz_ += (${w} * z_);
@@ -105,8 +103,6 @@ pz_ += (${w} * z_);
     params: [{ name: "cx", def: 0 }, { name: "cy", def: 0.05 }, { name: "cz", def: 0.05 }],
     verified: true, priority: 0, flags: ["3d","z"], types: ["3D"],
     code: (w, p) => `{
-var z_: f32 = 0.0;
-var pz_: f32 = 0.0;
 var c2: f32 = (((${p[0]} * ${p[0]}) + (${p[1]} * ${p[1]})) + (${p[2]} * ${p[2]}));
 var r2_: f32 = (((t.x * t.x) + (t.y * t.y)) + (z_ * z_));
 var r_: f32 = (${w} / (((((r2_ * c2) + ((2.0 * ${p[0]}) * t.x)) - ((2.0 * ${p[1]}) * t.y)) + ((2.0 * ${p[2]}) * z_)) + 1.0));
@@ -119,7 +115,6 @@ pz_ += (r_ * (z_ + (${p[2]} * r2_)));
     params: [],
     verified: true, priority: 0, flags: ["z"], types: ["ZTRANSFORM"],
     code: (w, _p) => `{
-var pz_: f32 = 0.0;
 pz_ += ${w};
 }`,
   },
@@ -127,8 +122,6 @@ pz_ += ${w};
     params: [],
     verified: true, priority: 0, flags: ["z"], types: ["ZTRANSFORM"],
     code: (w, _p) => `{
-var pz_: f32 = 0.0;
-var z_: f32 = 0.0;
 pz_ += (${w} * z_);
 }`,
   },
@@ -347,7 +340,6 @@ v.y += ((${w} * (2.0 / (r + 1.0))) * t.y);
     params: [],
     verified: true, priority: 0, flags: ["3d","z"], types: ["3D"],
     code: (w, _p) => `{
-var pz_: f32 = 0.0;
 v.x += ((${w} * (4.0 / (r2 + 4.0))) * t.x);
 v.y += ((${w} * (4.0 / (r2 + 4.0))) * t.y);
 pz_ += (${w} * ((8.0 / (r2 + 4.0)) - 1.0));
@@ -408,7 +400,6 @@ if ((ph > PI)) {
     params: [],
     verified: true, priority: 0, flags: ["z"], types: ["ZTRANSFORM","BLUR"],
     code: (w, _p) => `{
-var pz_: f32 = 0.0;
 pz_ += (${w} * ((((rnd(rs) + rnd(rs)) + rnd(rs)) + rnd(rs)) - 2.0));
 }`,
   },
@@ -416,7 +407,6 @@ pz_ += (${w} * ((((rnd(rs) + rnd(rs)) + rnd(rs)) + rnd(rs)) - 2.0));
     params: [],
     verified: true, priority: 0, flags: ["z"], types: ["BLUR"],
     code: (w, _p) => `{
-var pz_: f32 = 0.0;
 var cosa: f32;
 var sina: f32;
 sina = sin(((rnd(rs) * 2.0) * PI));
@@ -435,7 +425,6 @@ pz_ += (rndG * cosb);
     params: [],
     verified: true, priority: -1, flags: ["z"], types: ["ZTRANSFORM","PRE"],
     code: (w, _p) => `{
-var z_: f32 = 0.0;
 z_ *= ${w};
 }`,
   },
@@ -443,7 +432,6 @@ z_ *= ${w};
     params: [],
     verified: true, priority: -1, flags: ["z"], types: ["ZTRANSFORM","PRE"],
     code: (w, _p) => `{
-var z_: f32 = 0.0;
 z_ += ${w};
 }`,
   },
@@ -451,7 +439,6 @@ z_ += ${w};
     params: [],
     verified: true, priority: -1, flags: ["3d","z"], types: ["3D","PRE"],
     code: (w, _p) => `{
-var z_: f32 = 0.0;
 var rinv_: f32 = 1.0 / r;
 var rx_cos: f32;
 var rx_sin: f32;
@@ -474,7 +461,6 @@ if ((ph > PI)) {
     params: [],
     verified: true, priority: -1, flags: ["z"], types: ["2D","PRE"],
     code: (w, _p) => `{
-var z_: f32 = 0.0;
 var rinv_: f32 = 1.0 / r;
 var ry_cos: f32;
 var ry_sin: f32;
@@ -497,7 +483,6 @@ if ((ph > PI)) {
     params: [],
     verified: true, priority: 1, flags: ["3d","z"], types: ["3D","POST"],
     code: (w, _p) => `{
-var pz_: f32 = 0.0;
 var px_cos: f32;
 var px_sin: f32;
 px_sin = sin((${w} * (PI * 0.5)));
@@ -511,7 +496,6 @@ pz_ = _z;
     params: [],
     verified: true, priority: 1, flags: ["3d","z"], types: ["3D","POST"],
     code: (w, _p) => `{
-var pz_: f32 = 0.0;
 var py_cos: f32;
 var py_sin: f32;
 py_sin = sin((${w} * (PI * 0.5)));
@@ -525,7 +509,6 @@ v.x = x;
     params: [],
     verified: true, priority: 0, flags: ["z"], types: ["ZTRANSFORM"],
     code: (w, _p) => `{
-var pz_: f32 = 0.0;
 pz_ += (${w} * r);
 }`,
   },
@@ -533,7 +516,6 @@ pz_ += (${w} * r);
     params: [],
     verified: true, priority: 0, flags: ["3d","z"], types: ["3D"],
     code: (w, _p) => `{
-var pz_: f32 = 0.0;
 var r_: f32 = (${w} / sqrt((((t.x * t.x) + (t.y * t.y)) + 1.0)));
 v.x += (r_ * t.x);
 v.y += (r_ * t.y);
@@ -592,38 +574,6 @@ v.x += ((${w} * rnew) * cos(t_));
 v.y += ((${w} * rnew) * sin(t_));
 }`,
   },
-  "julia3D": {
-    params: [{ name: "power", def: 3 }],
-    verified: true, priority: 0, flags: ["3d","z"], types: ["3D"],
-    funcNames: ["roundc","powc"],
-    funcs: `fn roundc(x: f32) -> f32 { return sign(x) * floor(abs(x) + 0.5); }
-
-fn powc(x: f32, y: f32) -> f32 {
-  if (x >= 0.0) { return pow(x, y); }
-  let yi = round(y);
-  if (abs(y - yi) > 1e-6) { return pow(x, y); }
-  let m = pow(-x, y);
-  return select(m, -m, (i32(yi) & 1) != 0);
-}`,
-    code: (w, p) => `{
-var z_: f32 = 0.0;
-var pz_: f32 = 0.0;
-var n: f32 = f32(i32(roundc(${p[0]})));
-n = select(n, 1.0, (n == 0.0));
-var absn: f32 = abs(n);
-var cn: f32 = (((1.0 / n) - 1.0) / 2.0);
-var _z: f32 = (z_ / absn);
-var r_: f32 = (${w} * powc((r2 + (z_ * z_)), cn));
-var tmp: f32 = (r_ * r);
-var cosa: f32;
-var sina: f32;
-sina = sin(((atan2(t.y, t.x) + ((2.0 * PI) * f32(i32(roundc(((rnd(rs) * absn) - 0.5)))))) / n));
-cosa = cos(((atan2(t.y, t.x) + ((2.0 * PI) * f32(i32(roundc(((rnd(rs) * absn) - 0.5)))))) / n));
-v.x += (tmp * cosa);
-v.y += (tmp * sina);
-pz_ += (r_ * _z);
-}`,
-  },
   "julia3Dz": {
     params: [{ name: "power", def: 3 }],
     verified: true, priority: 0, flags: ["3d","z"], types: ["3D"],
@@ -638,8 +588,6 @@ fn powc(x: f32, y: f32) -> f32 {
   return select(m, -m, (i32(yi) & 1) != 0);
 }`,
     code: (w, p) => `{
-var pz_: f32 = 0.0;
-var z_: f32 = 0.0;
 var power: i32 = i32(roundc(${p[0]}));
 var absPower: f32;
 var cPower: f32;
@@ -705,8 +653,6 @@ v.y += ((ra * sina) + (rz * t.y));
     params: [],
     verified: true, priority: 0, flags: ["3d","z"], types: ["3D"],
     code: (w, _p) => `{
-var z_: f32 = 0.0;
-var pz_: f32 = 0.0;
 var T: f32 = (((t.x * t.x) + (t.y * t.y)) + (z_ * z_));
 var r_: f32 = (${w} / T);
 v.x += (r_ * t.x);
@@ -726,7 +672,6 @@ v.y += ((${w} * (${p[0]} + (((${p[1]} - ${p[0]}) * 0.5) * (sin((${p[2]} * th)) +
     params: [{ name: "low", def: 0.3 }, { name: "high", def: 1.2 }, { name: "waves", def: 6 }],
     verified: true, priority: 0, flags: ["3d","z"], types: ["3D"],
     code: (w, p) => `{
-var pz_: f32 = 0.0;
 var a: f32 = atan2(t.x, t.y);
 var r_: f32 = sqrt(((t.x * t.x) + (t.y * t.y)));
 r_ = (r_ * (${p[0]} + ((${p[1]} - ${p[0]}) * (0.5 + (0.5 * sin((${p[2]} * a)))))));
@@ -767,7 +712,6 @@ v.y += (rn * sin(t2));
     params: [{ name: "slices", def: 7 }, { name: "rotation", def: 0 }, { name: "thickness", def: 0.5 }],
     verified: true, priority: 0, flags: ["z"], types: ["BASE_SHAPE"],
     code: (w, p) => `{
-var pz_: f32 = 0.0;
 var slices: f32 = ${p[0]};
 var sl: i32 = i32(((rnd(rs) * slices) + 0.5));
 var a: f32 = (${p[1]} + (((2.0 * PI) * (f32(sl) + (rnd(rs) * ${p[2]}))) / slices));
@@ -795,7 +739,6 @@ v.y += ((r0 * 2.0) * t.y);
     params: [],
     verified: true, priority: 0, flags: ["3d","z"], types: ["3D"],
     code: (w, _p) => `{
-var pz_: f32 = 0.0;
 var wx: f32 = (${w} * 1.3029400317411197);
 var y2: f32 = (t.y * 2.0);
 var r_: f32 = (wx * sqrt((abs((t.y * t.x)) / ((0.000001 + (t.x * t.x)) + (y2 * y2)))));
@@ -820,7 +763,6 @@ v.y += (${w} * (rn2 - 0.5));
     params: [],
     verified: true, priority: 0, flags: ["z"], types: ["BASE_SHAPE"],
     code: (w, _p) => `{
-var pz_: f32 = 0.0;
 v.x += (${w} * (rnd(rs) - 0.5));
 v.y += (${w} * (rnd(rs) - 0.5));
 pz_ += (${w} * (rnd(rs) - 0.5));
@@ -838,7 +780,6 @@ v.y += (${w} * tan(t.y));
     params: [],
     verified: true, priority: 0, flags: ["3d","z"], types: ["3D"],
     code: (w, _p) => `{
-var pz_: f32 = 0.0;
 v.x += ((${w} * sin(t.x)) / cos(t.y));
 v.y += (${w} * tan(t.y));
 pz_ += (${w} * tan(t.x));
@@ -859,7 +800,6 @@ v.y += ((v_ * t.x) * (cos(((rn * r) * v_)) - sin(((rn * r) * v_))));
     params: [],
     verified: true, priority: 0, flags: ["3d","z"], types: ["3D"],
     code: (w, _p) => `{
-var pz_: f32 = 0.0;
 var r_: f32 = ((rnd(rs) * ${w}) * r);
 var cosr: f32;
 var sinr: f32;
@@ -1638,7 +1578,6 @@ if ((abs(${p[0]}) < 1.0e-8)) {
     funcNames: ["roundc"],
     funcs: `fn roundc(x: f32) -> f32 { return sign(x) * floor(abs(x) + 0.5); }`,
     code: (w, p) => `{
-var pz_: f32 = 0.0;
 v.x += ((${w} * ${p[0]}) * t.x);
 v.y += ((${w} * ${p[1]}) * t.y);
 var dz: f32 = ((((*cp) * ${p[2]}) * ${w}) + ${p[3]});
@@ -2309,7 +2248,6 @@ if ((abs(${p[0]}) > 0.000001)) {
     params: [],
     verified: true, priority: 0, flags: ["3d","z"], types: ["3D"],
     code: (w, _p) => `{
-var pz_: f32 = 0.0;
 var r_: f32 = ((((t.x * t.x) + (t.y * t.y)) / 4.0) + 1.0);
 var t_: f32 = (${w} / r_);
 v.x += (t_ * t.x);
@@ -2483,27 +2421,6 @@ if ((r_ < 1.0)) {
   }
   v.x += (size * (x + floor(t.x)));
   v.y += (size * (y + floor(t.y)));
-}
-}`,
-  },
-  "post_colorscale_wf": {
-    params: [{ name: "scale_x", def: 0 }, { name: "scale_y", def: 0 }, { name: "scale_z", def: 0.5 }, { name: "offset_z", def: 0 }, { name: "reset_z", def: 0 }, { name: "sides", def: 0 }],
-    verified: true, priority: 1, flags: ["3d","dc","z"], types: ["3D","POST"],
-    funcNames: ["roundc"],
-    funcs: `fn roundc(x: f32) -> f32 { return sign(x) * floor(abs(x) + 0.5); }`,
-    code: (w, p) => `{
-var pz_: f32 = 0.0;
-v.x += ((${w} * ${p[0]}) * v.x);
-v.y += ((${w} * ${p[1]}) * v.y);
-var dz: f32 = ((((*cp) * ${p[2]}) * ${w}) + ${p[3]});
-if ((i32(roundc(${p[4]})) > 0)) {
-  pz_ = dz;
-} else {
-  if ((i32(roundc(${p[5]})) > 0)) {
-    pz_ += (dz * rnd(rs));
-  } else {
-    pz_ += dz;
-  }
 }
 }`,
   },
@@ -2798,8 +2715,6 @@ if ((abs(t.y) <= ${w})) {
   return select(m, -m, (i32(yi) & 1) != 0);
 }`,
     code: (w, p) => `{
-var z_: f32 = 0.0;
-var pz_: f32 = 0.0;
 var _regularForm: f32 = select(0.0, 1.0, (abs((${p[1]} - 2.0)) < 1.0e-10));
 var _dontInvert: bool = (abs(${p[0]}) < 1.0e-8);
 var r_: f32;
@@ -2823,7 +2738,6 @@ if (_dontInvert) {
     params: [],
     verified: true, priority: 1, flags: ["z"], types: ["ZTRANSFORM","POST"],
     code: (w, _p) => `{
-var pz_: f32 = 0.0;
 pz_ += ${w};
 }`,
   },
@@ -2831,7 +2745,6 @@ pz_ += ${w};
     params: [{ name: "ztranslate", def: 0 }],
     verified: true, priority: 0, flags: ["z"], types: ["ZTRANSFORM","POST"],
     code: (w, p) => `{
-var pz_: f32 = 0.0;
 pz_ = ((${w} * pz_) + ${p[0]});
 }`,
   },
@@ -2863,11 +2776,9 @@ v.y += ((select(1.0, -1.0, (t.y < 0.0)) * powc(abs(t.y), ${p[1]})) * ${w});
   return select(m, -m, (i32(yi) & 1) != 0);
 }`,
     code: (w, p) => `{
-var pz_: f32 = 0.0;
-var z_: f32 = 0.0;
 v.x += ((select(1.0, -1.0, (t.x < 0.0)) * powc(abs(t.x), ${p[0]})) * ${w});
 v.y += ((select(1.0, -1.0, (t.y < 0.0)) * powc(abs(t.y), ${p[1]})) * ${w});
-pz_ += ((select(1.0, -1.0, (z_ < 0.0)) * powc(abs(z_), ${p[1]})) * ${w});
+pz_ += ((select(1.0, -1.0, (z_ < 0.0)) * powc(abs(z_), ${p[2]})) * ${w});
 }`,
   },
   "npolar": {
@@ -3005,7 +2916,6 @@ v.y += (${w} * t.x);
     params: [{ name: "x", def: 1 }, { name: "y", def: 1 }, { name: "z", def: 1 }, { name: "x_origin", def: 0 }, { name: "y_origin", def: 0 }, { name: "z_origin", def: 0 }],
     verified: true, priority: 1, flags: ["z"], types: ["BLUR"],
     code: (w, p) => `{
-var pz_: f32 = 0.0;
 var su: f32;
 var cu: f32;
 var sv: f32;
@@ -3228,8 +3138,6 @@ if ((R > 0.000001)) {
     params: [{ name: "freq", def: 2 }, { name: "scale", def: 1 }],
     verified: true, priority: 0, flags: ["3d","z"], types: ["3D"],
     code: (w, p) => `{
-var pz_: f32 = 0.0;
-var z_: f32 = 0.0;
 var avgxy: f32 = ((t.x + t.y) / 2.0);
 v.x += (${w} * (t.x + (${p[1]} * sin((t.y * ${p[0]})))));
 v.y += (${w} * (t.y + (${p[1]} * sin((t.x * ${p[0]})))));
@@ -3240,8 +3148,6 @@ pz_ += (${w} * (z_ + (${p[1]} * sin((avgxy * ${p[0]})))));
     params: [],
     verified: true, priority: 0, flags: ["z"], types: ["2D"],
     code: (w, _p) => `{
-var z_: f32 = 0.0;
-var pz_: f32 = 0.0;
 var inv: f32 = (1.0 / (${w} + 0.000001));
 var t_: f32 = (((t.x * t.x) + (t.y * t.y)) + (z_ * z_));
 var r_: f32 = (1.0 / (sqrt(t_) * (t_ + inv)));
@@ -3263,8 +3169,6 @@ if ((Footzee != 0.0)) {
     params: [],
     verified: true, priority: 0, flags: ["3d","z"], types: ["3D"],
     code: (w, _p) => `{
-var z_: f32 = 0.0;
-var pz_: f32 = 0.0;
 var expx: f32 = (exp(t.x) * 0.5);
 var expnx: f32 = (0.25 / expx);
 var kikr: f32;
@@ -3288,7 +3192,6 @@ pz_ += (sinz * tmp);
     params: [],
     verified: true, priority: 0, flags: ["z"], types: ["ZTRANSFORM"],
     code: (w, _p) => `{
-var pz_: f32 = 0.0;
 var ang: f32 = atan2(t.y, t.x);
 var val1: f32 = (t.y * 2.0);
 pz_ += (${w} * (sin(ang) - val1));
@@ -3298,7 +3201,6 @@ pz_ += (${w} * (sin(ang) - val1));
     params: [],
     verified: true, priority: 0, flags: ["z"], types: ["ZTRANSFORM"],
     code: (w, _p) => `{
-var pz_: f32 = 0.0;
 var val1: f32 = (t.y * 2.0);
 var val2: f32 = (t.x * 2.0);
 var aval: f32 = ((val1 + val2) * 0.333333);
@@ -3309,7 +3211,6 @@ pz_ += (${w} * (0.25 - aval));
     params: [],
     verified: true, priority: 0, flags: ["z"], types: ["ZTRANSFORM"],
     code: (w, _p) => `{
-var pz_: f32 = 0.0;
 var ang: f32 = atan2(t.y, t.x);
 var val1: f32 = ((0.2 * (PI - ang)) * cos(((3.0 * ang) + (t.y - t.x))));
 pz_ += (${w} * val1);
@@ -3319,7 +3220,6 @@ pz_ += (${w} * val1);
     params: [],
     verified: true, priority: 0, flags: ["z"], types: ["ZTRANSFORM"],
     code: (w, _p) => `{
-var pz_: f32 = 0.0;
 var ang1: f32 = atan2(t.y, t.x);
 var rndm: f32 = rnd(rs);
 var val1: f32 = ((PI * 0.5) - ang1);
@@ -3333,7 +3233,6 @@ pz_ += ((${w} * val1) * 0.25);
     params: [],
     verified: true, priority: 0, flags: ["z"], types: ["ZTRANSFORM"],
     code: (w, _p) => `{
-var pz_: f32 = 0.0;
 var ang1: f32 = atan2(t.y, t.x);
 var val1: f32 = (cos(((PI * 0.5) - ang1)) / 2.0);
 pz_ += (${w} * val1);
@@ -3343,7 +3242,6 @@ pz_ += (${w} * val1);
     params: [],
     verified: true, priority: 0, flags: ["z"], types: ["ZTRANSFORM"],
     code: (w, _p) => `{
-var pz_: f32 = 0.0;
 var ang: f32 = atan2(t.y, t.x);
 var adf: f32 = (t.y - t.x);
 var kik: f32 = (ang * sin(adf));
@@ -3354,8 +3252,6 @@ pz_ += (${w} * (1.5 - acos(((sin(ang) * kik) * 0.5))));
     params: [],
     verified: true, priority: 0, flags: ["3d","hide","z"], types: ["3D"],
     code: (w, _p) => `{
-var z_: f32 = 0.0;
-var pz_: f32 = 0.0;
 var sqrvvar: f32 = (${w} * ${w});
 var efTez: f32 = z_;
 var kikr: f32;
@@ -3400,8 +3296,6 @@ v.y = y;
   return (x * x);
 }`,
     code: (w, _p) => `{
-var z_: f32 = 0.0;
-var pz_: f32 = 0.0;
 var inZ: f32 = z_;
 var otherZ: f32 = pz_;
 var f: f32 = sqrt(((t.x * t.x) + (t.y * t.y)));
@@ -3428,8 +3322,6 @@ pz_ = (tempPZ + (${w} * (((${w} / d) * tempTZ) / e)));
     params: [{ name: "pi", def: 3.141592653589793 }],
     verified: true, priority: 0, flags: ["3d","z"], types: ["3D"],
     code: (w, p) => `{
-var pz_: f32 = 0.0;
-var z_: f32 = 0.0;
 var r_: f32 = sqrt((((t.y * t.y) + (t.x * t.x)) + 0.000001));
 var a: f32 = (${p[0]} * r_);
 var sr: f32 = sin(a);
@@ -3444,8 +3336,6 @@ pz_ += (vv * (r_ * cos(z_)));
     params: [{ name: "x", def: 0.1 }, { name: "y", def: 0.1 }, { name: "z", def: 0.1 }, { name: "c", def: 3 }],
     verified: true, priority: 0, flags: ["3d","z"], types: ["3D"],
     code: (w, p) => `{
-var z_: f32 = 0.0;
-var pz_: f32 = 0.0;
 var inZ: f32;
 var otherZ: f32;
 var tempTZ: f32;
@@ -3714,7 +3604,6 @@ if ((r_ > 1.0)) {
     params: [],
     verified: true, priority: 0, flags: ["3d","z"], types: ["3D"],
     code: (w, _p) => `{
-var pz_: f32 = 0.0;
 v.x += (${w} * sin(t.x));
 v.y += (${w} * t.y);
 pz_ += (${w} * cos(t.x));
@@ -3921,62 +3810,6 @@ v.x += ((${w} * coshmu) * cos(nu));
 v.y += ((${w} * sinhmu) * sin(nu));
 }`,
   },
-  "dc_ztransl": {
-    params: [{ name: "x0", def: 0 }, { name: "x1", def: 1 }, { name: "factor", def: 1 }, { name: "overwrite", def: 1 }, { name: "clamp", def: 0 }],
-    verified: true, priority: 0, flags: ["3d","dc","z"], types: ["ZTRANSFORM","3D"],
-    funcNames: ["roundc"],
-    funcs: `fn roundc(x: f32) -> f32 { return sign(x) * floor(abs(x) + 0.5); }`,
-    code: (w, p) => `{
-var pz_: f32 = 0.0;
-var z_: f32 = 0.0;
-var _x0: f32 = select(${p[1]}, ${p[0]}, (${p[0]} < ${p[1]}));
-var _x1: f32 = select(${p[1]}, ${p[0]}, (${p[0]} > ${p[1]}));
-var _x1_m_x0: f32 = select((_x1 - _x0), 0.000001, ((_x1 - _x0) == 0));
-var zf: f32 = ((${p[2]} * ((*cp) - _x0)) / _x1_m_x0);
-if ((i32(roundc(${p[4]})) != 0)) {
-  zf = select(select(zf, 1, (zf > 1)), 0, (zf < 0));
-}
-v.x += (${w} * t.x);
-v.y += (${w} * t.y);
-if ((i32(roundc(${p[3]})) == 0)) {
-  pz_ += ((${w} * z_) * zf);
-} else {
-  pz_ += (${w} * zf);
-}
-}`,
-  },
-  "pre_dcztransl": {
-    params: [{ name: "x0", def: 0 }, { name: "x1", def: 1 }, { name: "factor", def: 1 }, { name: "overwrite", def: 1 }, { name: "clamp", def: 0 }],
-    verified: true, priority: -1, flags: ["3d","dc","z"], types: ["3D","PRE"],
-    funcNames: ["roundc"],
-    funcs: `fn roundc(x: f32) -> f32 { return sign(x) * floor(abs(x) + 0.5); }`,
-    code: (w, p) => `{
-var z_: f32 = 0.0;
-var rinv_: f32 = 1.0 / r;
-var _x0: f32 = select(${p[1]}, ${p[0]}, (${p[0]} < ${p[1]}));
-var _x1: f32 = select(${p[1]}, ${p[0]}, (${p[0]} > ${p[1]}));
-var _x1_m_x0: f32 = select((_x1 - _x0), 0.000001, ((_x1 - _x0) == 0));
-var zf: f32 = ((${p[2]} * ((*cp) - _x0)) / _x1_m_x0);
-if ((i32(roundc(${p[4]})) != 0)) {
-  zf = select(select(zf, 1, (zf > 1)), 0, (zf < 0));
-}
-t.x = (${w} * t.x);
-t.y = (${w} * t.y);
-if ((i32(roundc(${p[3]})) == 0)) {
-  z_ = ((${w} * z_) * zf);
-} else {
-  z_ = (${w} * zf);
-}
-r2 = ((t.x * t.x) + (t.y * t.y));
-r = sqrt(r2);
-rinv_ = (1.0 / r);
-th = atan2(t.x, t.y);
-ph = ((0.5 * PI) - th);
-if ((ph > PI)) {
-  ph -= (2.0 * PI);
-}
-}`,
-  },
   "log_apo": {
     params: [{ name: "base", def: 2.71828182845905 }],
     verified: true, priority: 0, flags: [], types: ["2D"],
@@ -4140,7 +3973,6 @@ v.y = (((y * re) - (x * im)) / r_);
     params: [{ name: "cx", def: 0 }, { name: "cy", def: 0 }, { name: "cz", def: 0 }],
     verified: true, priority: 1, flags: ["3d","z"], types: ["3D","POST"],
     code: (w, p) => `{
-var pz_: f32 = 0.0;
 var _cx: f32;
 var _cy: f32;
 var _cz: f32;
@@ -4182,7 +4014,6 @@ pz_ = (r_ * (pz_ + (_cz * r2_)));
 
 fn roundc(x: f32) -> f32 { return sign(x) * floor(abs(x) + 0.5); }`,
     code: (w, p) => `{
-var pz_: f32 = 0.0;
 var n1n_1: f32;
 var n1n_2: f32;
 var m4_1: f32;
@@ -4263,9 +4094,7 @@ v.y += ((${w} * ((eradius1 * snum1) - (eradius2 * snum2))) * ffive);
     params: [{ name: "x", def: 0.92 }, { name: "y", def: 0.92 }, { name: "z", def: 0.92 }],
     verified: true, priority: 0, flags: ["3d","z"], types: ["3D"],
     code: (w, p) => `{
-var pz_: f32 = 0.0;
-var z_: f32 = 0.0;
-var T: f32 = (r2 + 1.0e-8);
+var T: f32 = ((((t.x * t.x) + (t.y * t.y)) + (z_ * z_)) + 1.0e-8);
 var r_: f32 = (${w} / T);
 v.x += ((t.x * r_) * ${p[0]});
 v.y += ((t.y * r_) * ${p[1]});
@@ -4284,8 +4113,6 @@ pz_ += ((z_ * r_) * ${p[2]});
   return select(m, -m, (i32(yi) & 1) != 0);
 }`,
     code: (w, p) => `{
-var z_: f32 = 0.0;
-var pz_: f32 = 0.0;
 var u: f32 = t.x;
 var v_: f32 = t.y;
 var w_: f32 = z_;
@@ -4311,7 +4138,6 @@ pz_ += (${w} * z);
   return (x * x);
 }`,
     code: (w, p) => `{
-var pz_: f32 = 0.0;
 var _cycle: f32;
 var _optDir: f32;
 var _petalsSign: f32;
@@ -4528,8 +4354,6 @@ if (((x > ${w}) || (y > ${w}))) {
     funcNames: ["roundc"],
     funcs: `fn roundc(x: f32) -> f32 { return sign(x) * floor(abs(x) + 0.5); }`,
     code: (w, p) => `{
-var z_: f32 = 0.0;
-var pz_: f32 = 0.0;
 var c2x: f32;
 var c2y: f32;
 var c2: f32;
@@ -4570,8 +4394,6 @@ pz_ += (d * (z_ * s2z));
     funcNames: ["roundc"],
     funcs: `fn roundc(x: f32) -> f32 { return sign(x) * floor(abs(x) + 0.5); }`,
     code: (w, p) => `{
-var z_: f32 = 0.0;
-var pz_: f32 = 0.0;
 var p_: i32 = i32(roundc(${p[0]}));
 var q: i32 = i32(roundc(${p[1]}));
 var pa: f32;
@@ -4611,8 +4433,6 @@ pz_ += (d * (z_ * s2z));
     funcNames: ["roundc"],
     funcs: `fn roundc(x: f32) -> f32 { return sign(x) * floor(abs(x) + 0.5); }`,
     code: (w, p) => `{
-var z_: f32 = 0.0;
-var pz_: f32 = 0.0;
 var pa: f32;
 var qa: f32;
 var cx: f32;
@@ -4652,8 +4472,6 @@ pz_ += (vr * (z_ * s2z));
     params: [{ name: "r", def: 0 }, { name: "a", def: 0 }, { name: "b", def: 0 }],
     verified: true, priority: 0, flags: ["3d","z"], types: ["3D"],
     code: (w, p) => `{
-var z_: f32 = 0.0;
-var pz_: f32 = 0.0;
 var cx: f32;
 var cy: f32;
 var cz: f32;
@@ -4733,8 +4551,6 @@ v.y += (${w} * out_y);
     params: [],
     verified: true, priority: 0, flags: ["3d","z"], types: ["3D"],
     code: (w, _p) => `{
-var pz_: f32 = 0.0;
-var z_: f32 = 0.0;
 v.x += (${w} * sin(t.x));
 v.y += (${w} * sin(t.y));
 pz_ += (${w} * (atan2((t.x * t.x), (t.y * t.y)) * cos(z_)));
@@ -4744,7 +4560,6 @@ pz_ += (${w} * (atan2((t.x * t.x), (t.y * t.y)) * cos(z_)));
     params: [{ name: "r", def: 3 }, { name: "n", def: 5 }, { name: "inv", def: 1.5 }, { name: "sor", def: 1 }],
     verified: true, priority: 0, flags: ["3d","z"], types: ["3D"],
     code: (w, p) => `{
-var pz_: f32 = 0.0;
 var sx: f32 = sin(t.x);
 var cx: f32 = cos(t.x);
 var sy: f32 = sin(t.y);
@@ -4759,7 +4574,6 @@ pz_ += ((${w} * (${p[3]} * cy)) + ((1.0 - ${p[3]}) * t.y));
     params: [],
     verified: true, priority: -1, flags: ["3d","z"], types: ["3D","PRE"],
     code: (w, _p) => `{
-var z_: f32 = 0.0;
 var rinv_: f32 = 1.0 / r;
 t.x = (${w} * sin(t.x));
 t.y = (${w} * sin(t.y));
@@ -4778,7 +4592,6 @@ if ((ph > PI)) {
     params: [{ name: "pi", def: 3.141592653589793 }],
     verified: true, priority: -1, flags: ["3d","z"], types: ["3D","PRE"],
     code: (w, p) => `{
-var z_: f32 = 0.0;
 var rinv_: f32 = 1.0 / r;
 var r_: f32 = sqrt((((t.y * t.y) + (t.x * t.x)) + 0.000001));
 var a: f32 = (${p[0]} * r_);
@@ -4834,8 +4647,6 @@ v.y += (r_ * s);
     params: [{ name: "x", def: 1 }, { name: "y", def: 1 }, { name: "z", def: 0 }],
     verified: true, priority: 0, flags: ["3d","z"], types: ["3D"],
     code: (w, p) => `{
-var z_: f32 = 0.0;
-var pz_: f32 = 0.0;
 var T: f32;
 var r_: f32;
 T = (((((t.x * t.x) + (t.y * t.y)) + (z_ * z_)) / 4.0) + 1.0);
@@ -4946,8 +4757,6 @@ fn sqrf(x: f32) -> f32 {
   return (x * x);
 }`,
     code: (w, p) => `{
-var z_: f32 = 0.0;
-var pz_: f32 = 0.0;
 var r_: f32 = ((sqrf((t.x * t.x)) + sqrf((t.y * t.y))) + ((2.0 * z_) * z_));
 if ((r_ == 0.0)) {
   r_ = 0.000001;
@@ -5167,8 +4976,6 @@ fn powc(x: f32, y: f32) -> f32 {
   return select(m, -m, (i32(yi) & 1) != 0);
 }`,
     code: (w, p) => `{
-var z_: f32 = 0.0;
-var pz_: f32 = 0.0;
 var power: i32 = i32(roundc(${p[0]}));
 var divisor: i32 = i32(roundc(${p[1]}));
 var inv_power: f32;
@@ -5252,8 +5059,6 @@ v.y += ((${w} * z) * s);
     params: [{ name: "power", def: 1 }],
     verified: true, priority: 1, flags: ["3d","z"], types: ["3D","POST"],
     code: (w, p) => `{
-var z_: f32 = 0.0;
-var pz_: f32 = 0.0;
 var coeff: f32 = abs(z_);
 if (((coeff != 0.0) && (${p[0]} != 1.0))) {
   coeff = exp((log(coeff) * ${p[0]}));
@@ -5310,7 +5115,6 @@ v.y += ((vv * syd) * ((((yrng - f32(i32(yrng))) * syw) + f32(i32(yrng))) + ((0.5
   return flag;
 }`,
     code: (w, p) => `{
-var pz_: f32 = 0.0;
 var P_SINA: f32 = (sqrt(3.0) / 2.0);
 var P_COSA: f32 = 0.5;
 var dx: f32 = 0.0;
@@ -5495,7 +5299,6 @@ switch i32(${p[0]}) {
     params: [],
     verified: true, priority: 1, flags: ["z"], types: ["ZTRANSFORM","POST"],
     code: (_w, _p) => `{
-var pz_: f32 = 0.0;
 pz_ = 0;
 }`,
   },
@@ -5651,7 +5454,7 @@ if ((r_ < 1.0)) {
   },
   "onion": {
     params: [{ name: "centre_x", def: 0 }, { name: "centre_y", def: 0 }],
-    verified: true, priority: 0, flags: ["3d"], types: ["3D"],
+    verified: true, priority: 0, flags: ["3d","z"], types: ["3D"],
     code: (w, p) => `{
 var r0: f32 = ${w};
 var x0: f32 = t.x;
@@ -5683,6 +5486,7 @@ x1 += ${p[0]};
 y1 += ${p[1]};
 v.x += x1;
 v.y += y1;
+pz_ += (z1 + z_);
 }`,
   },
   "bubbleT3D": {
@@ -5704,8 +5508,6 @@ fn sqrf(x: f32) -> f32 {
 var p0_: f32 = ${p[0]};
 var p1_: f32 = ${p[1]};
 var p2_: f32 = ${p[2]};
-var z_: f32 = 0.0;
-var pz_: f32 = 0.0;
 var angHoleComp: f32;
 var angStrip: f32;
 var angStrip1: f32;
@@ -5893,7 +5695,6 @@ pz_ += (${w} * z);
     funcNames: ["rndi"],
     funcs: `fn rndi(state: ptr<function, u32>) -> u32 { var x = *state; x ^= x << 13u; x ^= x >> 17u; x ^= x << 5u; *state = x; return x; }`,
     code: (w, p) => `{
-var pz_: f32 = 0.0;
 if (((f32(((rndi(rs) ^ (rndi(rs) << 15)) & 268435455)) / 268435455) < ${p[0]})) {
   pz_ = select(${w}, 0.0, (${w} < 0.0));
 } else {
@@ -5905,7 +5706,6 @@ if (((f32(((rndi(rs) ^ (rndi(rs) << 15)) & 268435455)) / 268435455) < ${p[0]})) 
     params: [{ name: "delta", def: 0 }, { name: "phi", def: 0 }],
     verified: true, priority: 0, flags: ["z"], types: ["BASE_SHAPE"],
     code: (w, p) => `{
-var pz_: f32 = 0.0;
 var ux: f32 = (cos((${p[0]} * PI)) * cos((${p[1]} * PI)));
 var uy: f32 = (sin((${p[0]} * PI)) * cos((${p[1]} * PI)));
 var uz: f32 = sin((${p[1]} * PI));
@@ -5928,8 +5728,6 @@ pz_ += (uz * rand);
   return val;
 }`,
     code: (w, p) => `{
-var z_: f32 = 0.0;
-var pz_: f32 = 0.0;
 var ini: vec3f = vec3f(t.x, t.y, z_);
 ini = (ini - vec3f(${p[3]}, ${p[4]}, ${p[5]}));
 var r_: f32;
@@ -6469,7 +6267,6 @@ t.y = (((y * re) - (x * im)) * r_);
   return select(m, -m, (i32(yi) & 1) != 0);
 }`,
     code: (w, p) => `{
-var pz_: f32 = 0.0;
 var absN: f32 = abs(${p[0]});
 var cN: f32 = (((${p[1]} / ${p[0]}) - 1.0) / 2.0);
 var z: f32 = (t.x / absN);
@@ -6979,8 +6776,6 @@ v.y = ((sin(sqrt(u)) * tan(t.y)) * ${w});
     params: [{ name: "x", def: 0.1 }, { name: "y", def: 0.3 }, { name: "z", def: 0.2 }],
     verified: true, priority: 0, flags: ["3d","z"], types: ["3D"],
     code: (w, p) => `{
-var z_: f32 = 0.0;
-var pz_: f32 = 0.0;
 if ((t.x >= 0.0)) {
   v.x += (${w} * (t.x + ${p[0]}));
 } else {
@@ -7109,8 +6904,6 @@ v.y += (r_ * sina);
     params: [{ name: "circle_a", def: 1 }, { name: "circle_b", def: 1 }, { name: "shift_x", def: 0 }, { name: "shift_y", def: 0 }, { name: "shift_z", def: 0 }, { name: "stretch", def: 1 }],
     verified: true, priority: 0, flags: ["3d","z"], types: ["3D"],
     code: (w, p) => `{
-var z_: f32 = 0.0;
-var pz_: f32 = 0.0;
 var ini: vec3f;
 ini = vec3f(t.x, t.y, z_);
 ini.x = (ini.x - ${p[2]});
@@ -7218,7 +7011,6 @@ if ((d != 0)) {
   return select(m, -m, (i32(yi) & 1) != 0);
 }`,
     code: (w, p) => `{
-var pz_: f32 = 0.0;
 var ez: f32 = (${p[0]} * pz_);
 if ((${p[1]} != 1.0)) {
   ez = (powc(${p[1]}, ez) - 1);
@@ -7304,8 +7096,6 @@ v.y += (${w} * (ph + fix_atan_period));
     params: [{ name: "x", def: 0.75 }, { name: "y", def: 1 }, { name: "z", def: 0.5 }],
     verified: true, priority: 0, flags: ["3d","z"], types: ["3D"],
     code: (w, p) => `{
-var z_: f32 = 0.0;
-var pz_: f32 = 0.0;
 var epsilon: f32 = 1.0e-29;
 var tx: f32 = t.x;
 var ty: f32 = t.y;
@@ -7353,7 +7143,6 @@ if ((x > 0)) {
     params: [{ name: "a", def: 0.8 }, { name: "b", def: 0.2 }],
     verified: true, priority: 0, flags: ["3d","hide","z"], types: ["3D"],
     code: (w, p) => `{
-var pz_: f32 = 0.0;
 var u: f32 = t.x;
 var v_: f32 = t.y;
 var sinv: f32 = sin(v_);
@@ -7395,7 +7184,6 @@ if ((ph > PI)) {
   return (x * x);
 }`,
     code: (w, p) => `{
-var pz_: f32 = 0.0;
 var xx: f32 = t.x;
 var yy: f32 = t.y;
 var r2_: f32 = (1.0 / ((xx * xx) + (yy * yy)));
@@ -7409,7 +7197,6 @@ pz_ += (((${w} * dxy) * 0.5) * sqrt(r2_));
     params: [],
     verified: true, priority: 0, flags: ["3d","z"], types: ["3D"],
     code: (w, _p) => `{
-var pz_: f32 = 0.0;
 var u: f32 = t.x;
 var v_: f32 = t.y;
 v.x += ((${w} * u) * v_);
@@ -7804,8 +7591,6 @@ v.y += (r_ * s);
   return select(m, -m, (i32(yi) & 1) != 0);
 }`,
     code: (w, p) => `{
-var z_: f32 = 0.0;
-var pz_: f32 = 0.0;
 var rr: f32;
 var theta: f32;
 var phi: f32;
@@ -7888,8 +7673,6 @@ fn curl_sp_spread(a: f32, b: f32) -> f32 {
   return (sqrt(((a * a) + (b * b))) * f32(select(-1, 1, (a > 0))));
 }`,
     code: (w, p) => `{
-var z_: f32 = 0.0;
-var pz_: f32 = 0.0;
 var c2_x2: f32;
 var dc_adjust: f32;
 var power_inv: f32;
@@ -7954,7 +7737,6 @@ v.y += (${w} * (((${A(3)} * x) + (${A(4)} * y)) + ${A(5)}));
     funcNames: ["roundc"],
     funcs: `fn roundc(x: f32) -> f32 { return sign(x) * floor(abs(x) + 0.5); }`,
     code: (w, p) => `{
-var pz_: f32 = 0.0;
 var ang: f32 = ((rnd(rs) * 2.0) * PI);
 var rnd_: f32 = (1.0 - (2.0 * rnd(rs)));
 var r_: f32;
@@ -7991,7 +7773,6 @@ if ((${p[2]} != 0.0)) {
     params: [{ name: "theta_period", def: 0 }, { name: "theta_phase", def: 0 }, { name: "theta_amp", def: 0 }, { name: "phi_period", def: 0 }, { name: "phi_phase", def: 0 }, { name: "phi_amp", def: 0 }, { name: "r_period", def: 0 }, { name: "r_phase", def: 0 }, { name: "r_amp", def: 0 }],
     verified: true, priority: 1, flags: ["3d","z"], types: ["3D","POST"],
     code: (w, p) => `{
-var pz_: f32 = 0.0;
 var tx: f32 = select((1.0 / ${p[0]}), 0.0, (${p[0]} == 0));
 var px: f32 = select((1.0 / ${p[3]}), 0.0, (${p[3]} == 0));
 var rx: f32 = select((1.0 / ${p[6]}), 0.0, (${p[6]} == 0));
@@ -8084,7 +7865,6 @@ v.y += ((${w} * t.y) + result);
     params: [{ name: "petals", def: 6 }, { name: "petal_split", def: 0 }, { name: "petal_spread", def: 1 }, { name: "stem_thickness", def: 1 }, { name: "stem_length", def: 0 }, { name: "petal_fold_strength", def: 0 }, { name: "petal_fold_radius", def: 1 }],
     verified: true, priority: 0, flags: ["z"], types: ["2D"],
     code: (w, p) => `{
-var pz_: f32 = 0.0;
 var r_: f32 = (${w} * sqrt(r2));
 var t_: f32 = ph;
 r_ = (r_ * abs(((${p[2]} + sin((${p[0]} * t_))) * cos(((${p[1]} * ${p[0]}) * t_)))));
@@ -8493,7 +8273,6 @@ if ((t.x > 0.0)) {
     funcNames: ["roundc"],
     funcs: `fn roundc(x: f32) -> f32 { return sign(x) * floor(abs(x) + 0.5); }`,
     code: (w, p) => `{
-var pz_: f32 = 0.0;
 var _sina: f32;
 var _cosa: f32;
 var _halve_dist: f32;
@@ -8697,8 +8476,6 @@ v.y += (${w} * y1);
     funcNames: ["roundc"],
     funcs: `fn roundc(x: f32) -> f32 { return sign(x) * floor(abs(x) + 0.5); }`,
     code: (w, p) => `{
-var pz_: f32 = 0.0;
-var z_: f32 = 0.0;
 var spreadx: f32 = -(${p[0]});
 if ((rnd(rs) < 0.5)) {
   spreadx = ${p[0]};
@@ -8720,8 +8497,6 @@ pz_ += (${w} * (z_ + (spreadz * roundc(log(rnd(rs))))));
     params: [{ name: "qat", def: 1 }, { name: "qax", def: 0 }, { name: "qay", def: 0 }, { name: "qaz", def: 0 }, { name: "qbt", def: 0 }, { name: "qbx", def: 0 }, { name: "qby", def: 0 }, { name: "qbz", def: 0 }, { name: "qct", def: 0 }, { name: "qcx", def: 0 }, { name: "qcy", def: 0 }, { name: "qcz", def: 0 }, { name: "qdt", def: 1 }, { name: "qdx", def: 0 }, { name: "qdy", def: 0 }, { name: "qdz", def: 0 }],
     verified: true, priority: 0, flags: ["3d","z"], types: ["3D"],
     code: (w, p) => `{
-var z_: f32 = 0.0;
-var pz_: f32 = 0.0;
 var t1: f32 = ${p[0]};
 var t2: f32 = t.x;
 var t3: f32 = ${p[4]};
@@ -8787,8 +8562,6 @@ if ((rnd(rs) < 0.5)) {
     funcNames: ["roundc"],
     funcs: `fn roundc(x: f32) -> f32 { return sign(x) * floor(abs(x) + 0.5); }`,
     code: (w, p) => `{
-var pz_: f32 = 0.0;
-var z_: f32 = 0.0;
 var x: f32 = -(${p[0]});
 if ((rnd(rs) < 0.5)) {
   x = ${p[0]};
@@ -8975,8 +8748,6 @@ if ((d != 0)) {
     params: [],
     verified: true, priority: 0, flags: ["3d","z"], types: ["3D"],
     code: (w, _p) => `{
-var z_: f32 = 0.0;
-var pz_: f32 = 0.0;
 var abs_v: f32 = length(vec2f(t.y, z_));
 var s: f32 = sin(t.x);
 var c: f32 = cos(t.x);
@@ -8992,8 +8763,6 @@ pz_ += (C * z_);
     params: [],
     verified: true, priority: 0, flags: ["3d","z"], types: ["3D"],
     code: (w, _p) => `{
-var z_: f32 = 0.0;
-var pz_: f32 = 0.0;
 var abs_v: f32 = length(vec2f(t.y, z_));
 var s: f32 = sin(t.x);
 var c: f32 = cos(t.x);
@@ -9009,8 +8778,6 @@ pz_ += (C * z_);
     params: [],
     verified: true, priority: 0, flags: ["3d","z"], types: ["3D"],
     code: (w, _p) => `{
-var z_: f32 = 0.0;
-var pz_: f32 = 0.0;
 var abs_v: f32 = length(vec2f(t.y, z_));
 var s: f32 = sin(t.x);
 var sysz: f32 = ((t.y * t.y) + (z_ * z_));
@@ -9032,8 +8799,6 @@ pz_ += ((((nstcv * B) * z_) + ((C * z_) * ctcv)) * ni);
     params: [],
     verified: true, priority: 0, flags: ["3d","z"], types: ["3D"],
     code: (w, _p) => `{
-var z_: f32 = 0.0;
-var pz_: f32 = 0.0;
 var abs_v: f32 = length(vec2f(t.y, z_));
 var sysz: f32 = ((t.y * t.y) + (z_ * z_));
 var ni: f32 = (${w} / ((t.x * t.x) + sysz));
@@ -9055,8 +8820,6 @@ pz_ += ((((nstcv * B) * z_) + ((C * z_) * ctcv)) * ni);
     params: [],
     verified: true, priority: 0, flags: ["3d","z"], types: ["3D"],
     code: (w, _p) => `{
-var z_: f32 = 0.0;
-var pz_: f32 = 0.0;
 var abs_v: f32 = length(vec2f(t.y, z_));
 var s: f32 = sin(abs_v);
 var c: f32 = cos(abs_v);
@@ -9072,8 +8835,6 @@ pz_ += (C * z_);
     params: [],
     verified: true, priority: 0, flags: ["3d","z"], types: ["3D"],
     code: (w, _p) => `{
-var z_: f32 = 0.0;
-var pz_: f32 = 0.0;
 var abs_v: f32 = length(vec2f(t.y, z_));
 var s: f32 = sin(abs_v);
 var c: f32 = cos(abs_v);
@@ -9089,8 +8850,6 @@ pz_ += (C * z_);
     params: [],
     verified: true, priority: 0, flags: ["3d","z"], types: ["3D"],
     code: (w, _p) => `{
-var z_: f32 = 0.0;
-var pz_: f32 = 0.0;
 var abs_v: f32 = length(vec2f(t.y, z_));
 var s: f32 = sin(t.x);
 var c: f32 = cos(t.x);
@@ -9112,8 +8871,6 @@ pz_ -= ((((nstcv * B) * z_) + ((C * z_) * ctcv)) * ni);
     params: [],
     verified: true, priority: 0, flags: ["3d","z"], types: ["3D"],
     code: (w, _p) => `{
-var z_: f32 = 0.0;
-var pz_: f32 = 0.0;
 var abs_v: f32 = length(vec2f(t.y, z_));
 var s: f32 = sin(abs_v);
 var c: f32 = cos(abs_v);
@@ -9135,8 +8892,6 @@ pz_ += ((((nstcv * B) * z_) + ((C * z_) * ctcv)) * ni);
     params: [],
     verified: true, priority: 0, flags: ["3d","z"], types: ["3D"],
     code: (w, _p) => `{
-var z_: f32 = 0.0;
-var pz_: f32 = 0.0;
 var abs_v: f32 = length(vec2f(t.y, z_));
 var s: f32 = sin(t.x);
 var c: f32 = cos(t.x);
@@ -9153,8 +8908,6 @@ pz_ -= (C * z_);
     params: [],
     verified: true, priority: 0, flags: ["3d","z"], types: ["3D"],
     code: (w, _p) => `{
-var z_: f32 = 0.0;
-var pz_: f32 = 0.0;
 var abs_v: f32 = length(vec2f(t.y, z_));
 var s: f32 = sin(abs_v);
 var c: f32 = cos(abs_v);
@@ -9171,8 +8924,6 @@ pz_ -= (C * z_);
     params: [],
     verified: true, priority: 0, flags: ["3d","z"], types: ["3D"],
     code: (w, _p) => `{
-var z_: f32 = 0.0;
-var pz_: f32 = 0.0;
 var abs_v: f32 = length(vec2f(t.y, z_));
 var s: f32 = sin(-t.x);
 var c: f32 = cos(-t.x);
@@ -9189,8 +8940,6 @@ pz_ -= (C * z_);
     params: [],
     verified: true, priority: 0, flags: ["3d","z"], types: ["3D"],
     code: (w, _p) => `{
-var z_: f32 = 0.0;
-var pz_: f32 = 0.0;
 var abs_v: f32 = length(vec2f(t.y, z_));
 var s: f32 = sin(abs_v);
 var c: f32 = cos(abs_v);
@@ -9207,8 +8956,6 @@ pz_ -= (C * z_);
     params: [{ name: "base", def: 2.718281828459045 }],
     verified: true, priority: 0, flags: ["3d","z"], types: ["3D"],
     code: (w, p) => `{
-var z_: f32 = 0.0;
-var pz_: f32 = 0.0;
 var denom: f32 = ((0.5 * ${w}) / log(${p[0]}));
 var abs_v: f32 = length(vec2f(t.y, z_));
 var C: f32 = ((${w} * atan2(abs_v, t.x)) / abs_v);
@@ -9221,7 +8968,6 @@ pz_ += (C * z_);
     params: [{ name: "a", def: 1 }, { name: "b", def: -0.3 }, { name: "c", def: 0.4 }, { name: "tmin", def: 0 }, { name: "tmax", def: 1000 }, { name: "width", def: 0 }, { name: "mode", def: 0 }, { name: "direct_color", def: 0 }],
     verified: true, priority: 0, flags: ["3d","dc","z"], types: ["3D","DC"],
     code: (w, p) => `{
-var pz_: f32 = 0.0;
 var t_: f32 = (((${p[4]} - ${p[3]}) * rnd(rs)) + ${p[3]});
 var w1: f32;
 var w2: f32;
@@ -9311,8 +9057,6 @@ if ((rnd(rs) < ${p[0]})) {
   }
 }`,
     code: (w, _p) => `{
-var z_: f32 = 0.0;
-var pz_: f32 = 0.0;
 var r2_: f32 = (((t.x * t.x) + (t.y * t.y)) + (z_ * z_));
 if ((r2_ <= 0.000001)) {
   r2_ = 0.000001;
@@ -9351,8 +9095,6 @@ switch i32(roundc(${p[0]})) {
     params: [{ name: "frequency", def: 1 }],
     verified: true, priority: 0, flags: ["3d","z"], types: ["3D"],
     code: (w, p) => `{
-var z_: f32 = 0.0;
-var pz_: f32 = 0.0;
 var range: f32 = sqrt(((t.x * t.x) + (t.y * t.y)));
 var s: f32 = sin((((z_ * (2.0 * PI)) * ${p[0]}) + atan2(t.y, t.x)));
 var c: f32 = cos((((z_ * (2.0 * PI)) * ${p[0]}) + atan2(t.y, t.x)));
@@ -10416,8 +10158,6 @@ v.y += (${w} * y);
     params: [{ name: "cosqpow", def: 1 }, { name: "cosqx1", def: 1 }, { name: "cosqx2", def: 1 }, { name: "cosqy1", def: 1 }, { name: "cosqy2", def: 1 }, { name: "cosqz1", def: 1 }, { name: "cosqz2", def: 1 }, { name: "coshqpow", def: 0 }, { name: "coshqx1", def: 1 }, { name: "coshqx2", def: 1 }, { name: "coshqy1", def: 1 }, { name: "coshqy2", def: 1 }, { name: "coshqz1", def: 1 }, { name: "coshqz2", def: 1 }, { name: "cotqpow", def: 0 }, { name: "cotqx1", def: 1 }, { name: "cotqx2", def: 1 }, { name: "cotqy1", def: 1 }, { name: "cotqy2", def: 1 }, { name: "cotqz1", def: 1 }, { name: "cotqz2", def: 1 }, { name: "cothqpow", def: 0 }, { name: "cothqx1", def: 1 }, { name: "cothqx2", def: 1 }, { name: "cothqy1", def: 1 }, { name: "cothqy2", def: 1 }, { name: "cothqz1", def: 1 }, { name: "cothqz2", def: 1 }, { name: "cscqpow", def: 0 }, { name: "cscqx1", def: 1 }, { name: "cscqx2", def: 1 }, { name: "cscqy1", def: 1 }, { name: "cscqy2", def: 1 }, { name: "cscqz1", def: 1 }, { name: "cscqz2", def: 1 }, { name: "cschqpow", def: 0 }, { name: "cschqx1", def: 1 }, { name: "cschqx2", def: 1 }, { name: "cschqy1", def: 1 }, { name: "cschqy2", def: 1 }, { name: "cschqz1", def: 1 }, { name: "cschqz2", def: 1 }, { name: "estiqpow", def: 0 }, { name: "estiqx1", def: 1 }, { name: "estiqy1", def: 1 }, { name: "estiqy2", def: 1 }, { name: "estiqz1", def: 1 }, { name: "estiqz2", def: 1 }, { name: "logqpow", def: 0 }, { name: "logqbase", def: 2.718281828459045 }, { name: "secqpow", def: 0 }, { name: "secqx1", def: 1 }, { name: "secqx2", def: 1 }, { name: "secqy1", def: 1 }, { name: "secqy2", def: 1 }, { name: "secqz1", def: 1 }, { name: "secqz2", def: 1 }, { name: "sechqpow", def: 0 }, { name: "sechqx1", def: 1 }, { name: "sechqx2", def: 1 }, { name: "sechqy1", def: 1 }, { name: "sechqy2", def: 1 }, { name: "sechqz1", def: 1 }, { name: "sechqz2", def: 1 }, { name: "sinqpow", def: 0 }, { name: "sinqx1", def: 1 }, { name: "sinqx2", def: 1 }, { name: "sinqy1", def: 1 }, { name: "sinqy2", def: 1 }, { name: "sinqz1", def: 1 }, { name: "sinqz2", def: 1 }, { name: "sinhqpow", def: 0 }, { name: "sinhqx1", def: 1 }, { name: "sinhqx2", def: 1 }, { name: "sinhqy1", def: 1 }, { name: "sinhqy2", def: 1 }, { name: "sinhqz1", def: 1 }, { name: "sinhqz2", def: 1 }, { name: "tanqpow", def: 0 }, { name: "tanqx1", def: 1 }, { name: "tanqx2", def: 1 }, { name: "tanqy1", def: 1 }, { name: "tanqy2", def: 1 }, { name: "tanqz1", def: 1 }, { name: "tanqz2", def: 1 }, { name: "tanhqpow", def: 0 }, { name: "tanhqx1", def: 1 }, { name: "tanhqx2", def: 1 }, { name: "tanhqy1", def: 1 }, { name: "tanhqy2", def: 1 }, { name: "tanhqz1", def: 1 }, { name: "tanhqz2", def: 1 }],
     verified: true, priority: 0, flags: ["3d","z"], types: ["3D"],
     code: (w, p) => `{
-var z_: f32 = 0.0;
-var pz_: f32 = 0.0;
 var x: f32 = 0.0;
 var y: f32 = 0.0;
 var z: f32 = 0.0;
@@ -10608,8 +10348,6 @@ pz_ += z;
     params: [{ name: "radius", def: 1 }, { name: "x", def: 0 }, { name: "y", def: 0 }, { name: "z", def: 0 }, { name: "scatter_area", def: 0 }, { name: "zero", def: 1 }],
     verified: true, priority: 0, flags: ["3d","hide","z"], types: ["3D","CROP"],
     code: (w, p) => `{
-var z_: f32 = 0.0;
-var pz_: f32 = 0.0;
 var cA: f32 = max(-1.0, min(${p[4]}, 1.0));
 var x0: f32 = ${p[1]};
 var y0: f32 = ${p[2]};
@@ -10734,7 +10472,6 @@ fn Complex_Mag2(c: ptr<function, Complex>) -> f32 {
   return (((*c).re * (*c).re) + ((*c).im * (*c).im));
 }`,
     code: (w, p) => `{
-var pz_: f32 = 0.0;
 var x: f32;
 var y: f32;
 var z: f32;
@@ -10923,8 +10660,6 @@ v.y = (y * ${w});
     params: [{ name: "a", def: 10 }, { name: "b", def: 28 }, { name: "c", def: 1.66 }, { name: "h", def: 0.00001 }, { name: "centerx", def: 0 }, { name: "centery", def: 0 }, { name: "scale", def: 1000 }],
     verified: true, priority: 0, flags: ["3d","dc","z"], types: ["3D","DC"],
     code: (w, p) => `{
-var z_: f32 = 0.0;
-var pz_: f32 = 0.0;
 var bdcs: f32 = (1.0 / select(${p[6]}, 0.00001, (${p[6]} == 0.0)));
 var x: f32 = (t.x + ((${p[3]} * ${p[0]}) * (t.y - t.x)));
 var y: f32 = (t.y + (${p[3]} * ((t.x * (${p[1]} - z_)) - t.y)));
@@ -11028,7 +10763,6 @@ v.y += (y * ${w});
     funcNames: ["roundc"],
     funcs: `fn roundc(x: f32) -> f32 { return sign(x) * floor(abs(x) + 0.5); }`,
     code: (w, p) => `{
-var pz_: f32 = 0.0;
 var nSpirals: i32 = i32(roundc(${p[3]}));
 var s: f32;
 var t_: f32;
@@ -11165,8 +10899,6 @@ v.y += (${w} * t.y);
     params: [{ name: "translateX", def: 0 }, { name: "translateY", def: 0 }, { name: "translateZ", def: 0 }, { name: "scaleX", def: 1 }, { name: "scaleY", def: 1 }, { name: "scaleZ", def: 1 }, { name: "rotateX", def: 0 }, { name: "rotateY", def: 0 }, { name: "rotateZ", def: 0 }, { name: "shearXY", def: 0 }, { name: "shearXZ", def: 0 }, { name: "shearYX", def: 0 }, { name: "shearYZ", def: 0 }, { name: "shearZX", def: 0 }, { name: "shearZY", def: 0 }],
     verified: true, priority: 0, flags: ["3d","z"], types: ["3D"],
     code: (w, p) => `{
-var z_: f32 = 0.0;
-var pz_: f32 = 0.0;
 var xa: f32 = ((${p[6]} * PI) / 180.0);
 var _sinX: f32 = sin(xa);
 var _cosX: f32 = cos(xa);
@@ -11234,8 +10966,6 @@ v.y += ((v_ / u) * r_);
     params: [],
     verified: true, priority: 0, flags: ["z"], types: ["2D"],
     code: (w, _p) => `{
-var z_: f32 = 0.0;
-var pz_: f32 = 0.0;
 var x: f32 = t.x;
 x = ((x * x) * x);
 var y: f32 = t.y;
@@ -11403,8 +11133,6 @@ if ((${w} != 0.0)) {
     params: [{ name: "n", def: 4 }, { name: "rad", def: 1 }, { name: "zero", def: 0 }],
     verified: true, priority: 0, flags: ["3d","z"], types: ["3D","CROP"],
     code: (w, p) => `{
-var z_: f32 = 0.0;
-var pz_: f32 = 0.0;
 var coef: f32 = ((${p[0]} * 0.5) / PI);
 var FX: f32 = t.x;
 var FY: f32 = t.y;
@@ -12607,7 +12335,6 @@ fn pointgrid3d_random() -> f32 {
   return select(res, -res, (res < 0));
 }`,
     code: (w, p) => `{
-var pz_: f32 = 0.0;
 var _dx: f32 = ((${p[1]} - ${p[0]}) / ${p[2]});
 var _dy: f32 = ((${p[4]} - ${p[3]}) / ${p[5]});
 var _dz: f32 = ((${p[7]} - ${p[6]}) / ${p[8]});
@@ -13819,7 +13546,6 @@ if (((((${w} * d) + x) < l) || (((${w} * e) + y) < m))) {
     params: [{ name: "radius1", def: 0.5 }, { name: "radius2", def: 1 }, { name: "size1", def: 0.5 }, { name: "size2", def: 2 }, { name: "ywave", def: 1 }, { name: "xwave", def: 1 }, { name: "height", def: 1 }, { name: "warp", def: 1 }, { name: "weight", def: 2 }],
     verified: true, priority: 0, flags: ["3d","z"], types: ["3D","BASE_SHAPE"],
     code: (w, p) => `{
-var pz_: f32 = 0.0;
 var r_: f32 = ((${w} / sqrt(((((t.x * t.x) * ${p[7]}) + (t.y * t.y)) + ${p[2]}))) * ${p[3]});
 var xx: f32 = ((th * ${p[0]}) + ((PI * f32(i32((${p[8]} * rnd(rs))))) * ${p[1]}));
 var sina: f32 = sin((xx * ${p[4]}));
@@ -13833,8 +13559,6 @@ pz_ += (r_ * ${p[6]});
     params: [{ name: "xx", def: 1 }, { name: "yy", def: 1 }, { name: "xa", def: 1 }, { name: "xb", def: 0 }, { name: "xc", def: 1 }, { name: "xd", def: 0 }, { name: "xe", def: 1 }, { name: "xf", def: 0 }, { name: "xg", def: 1 }, { name: "xh", def: 0 }, { name: "ya", def: 0 }, { name: "yb", def: 1 }, { name: "yc", def: 0 }, { name: "yd", def: 1 }, { name: "ye", def: 0 }, { name: "yf", def: 1 }, { name: "yg", def: 0 }, { name: "yh", def: 1 }, { name: "za", def: 0 }, { name: "zb", def: 0 }, { name: "zc", def: 0 }, { name: "zd", def: 0 }, { name: "ze", def: 1 }, { name: "zf", def: 1 }, { name: "zg", def: 1 }, { name: "zh", def: 1 }],
     verified: true, priority: 0, flags: ["3d","z"], types: ["3D"],
     code: (w, p) => `{
-var pz_: f32 = 0.0;
-var z_: f32 = 0.0;
 var x: f32 = (round(t.x) * ${p[0]});
 var y: f32 = (round(t.y) * ${p[1]});
 if ((y <= 0.0)) {
@@ -14227,8 +13951,6 @@ fn powc(x: f32, y: f32) -> f32 {
   return select(m, -m, (i32(yi) & 1) != 0);
 }`,
     code: (w, p) => `{
-var z_: f32 = 0.0;
-var pz_: f32 = 0.0;
 var absPower: i32 = i32(roundc(abs(${p[0]})));
 var cPower: f32 = ((${p[1]} / ${p[0]}) * 0.5);
 var z: f32 = ((z_ / f32(absPower)) + ${p[3]});
@@ -15442,8 +15164,6 @@ v.y = (${w} * y);
     params: [{ name: "x1", def: 1 }, { name: "x2", def: 3 }, { name: "x3", def: 1 }, { name: "x_blur_amount", def: 0.1 }, { name: "y1", def: 1 }, { name: "y2", def: 3 }, { name: "y3", def: 1 }, { name: "y_blur_amount", def: 0.1 }, { name: "z1", def: 1 }, { name: "z2", def: 3 }, { name: "z3", def: 1 }, { name: "z_blur_amount", def: 0.1 }, { name: "type", def: 0 }, { name: "blur", def: 0 }],
     verified: true, priority: 0, flags: ["3d","z"], types: ["3D"],
     code: (w, p) => `{
-var pz_: f32 = 0.0;
-var z_: f32 = 0.0;
 if ((${p[13]} != 0)) {
   if ((${p[12]} == 2)) {
     v.x += (((${w} * ${p[2]}) * sin((${p[0]} * floor((${p[1]} * t.x))))) + ((${p[3]} * sin(((2.0 * PI) * rnd(rs)))) * t.x));
@@ -17012,8 +16732,6 @@ v.y += (${w} * c.im);
     params: [{ name: "ampx", def: 0.5 }, { name: "ampy", def: 0.6 }, { name: "freqx", def: 1.2 }, { name: "freqy", def: 1 }],
     verified: true, priority: 0, flags: ["3d","z"], types: ["3D"],
     code: (w, p) => `{
-var pz_: f32 = 0.0;
-var z_: f32 = 0.0;
 var ax: f32 = ${p[0]};
 var ay: f32 = ${p[1]};
 var fx: f32 = ((${p[2]} * 2.0) * PI);
@@ -17054,8 +16772,6 @@ fn Complex_Scale(c: ptr<function, Complex>, mul: f32) {
   (*c).im = ((*c).im * mul);
 }`,
     code: (w, p) => `{
-var z_: f32 = 0.0;
-var pz_: f32 = 0.0;
 var z: Complex;
 Complex_Init(&(z), t.x, t.y);
 var z2: Complex;
@@ -17088,7 +16804,6 @@ if ((rnd(rs) < (${p[4]} / 2))) {
     params: [{ name: "x1", def: -0.2 }, { name: "y1", def: -0.1 }, { name: "z1", def: 0 }, { name: "x2", def: 0.2 }, { name: "y2", def: -0.1 }, { name: "z2", def: 0 }, { name: "x3", def: 0.2 }, { name: "y3", def: 0.1 }, { name: "z3", def: 0 }],
     verified: true, priority: 0, flags: ["3d","z"], types: ["3D","BASE_SHAPE"],
     code: (w, p) => `{
-var pz_: f32 = 0.0;
 var sqrt_r1: f32 = sqrt(rnd(rs));
 var r2_: f32 = rnd(rs);
 var a: f32 = (1.0 - sqrt_r1);
@@ -17522,8 +17237,6 @@ fn glitchy1_hash(a_in: i32) -> f32 {
   return (f32(a) / 2147483647);
 }`,
     code: (w, p) => `{
-var z_: f32 = 0.0;
-var pz_: f32 = 0.0;
 var h: f32 = sin(((${p[11]} / 180.0) * PI));
 var k: f32 = cos(((${p[11]} / 180.0) * PI));
 var x: f32 = t.x;
@@ -17626,7 +17339,6 @@ v.y += (${w} * p_.y);
   return 1.0;
 }`,
     code: (w, p) => `{
-var pz_: f32 = 0.0;
 var x: f32 = (rnd(rs) - 0.5);
 var y: f32 = (rnd(rs) - 0.5);
 var z: f32 = (rnd(rs) - 0.5);
@@ -17651,7 +17363,6 @@ if ((distance_ < 0.0)) {
   return ((length(max(q, vec3f(0.0))) + min(max(q.x, max(q.y, q.z)), 0.0)) - r_);
 }`,
     code: (w, p) => `{
-var pz_: f32 = 0.0;
 var x: f32 = (rnd(rs) - 0.5);
 var y: f32 = (rnd(rs) - 0.5);
 var z: f32 = (rnd(rs) - 0.5);
@@ -17675,7 +17386,6 @@ if ((distance_ < 0.0)) {
   return (length(vec2f((length(vec2f(p_.x, p_.z)) - t_.x), p_.y)) - t_.y);
 }`,
     code: (w, p) => `{
-var pz_: f32 = 0.0;
 var x: f32 = (rnd(rs) - 0.5);
 var y: f32 = (rnd(rs) - 0.5);
 var z: f32 = (rnd(rs) - 0.5);
@@ -18125,7 +17835,6 @@ if (((((((((((((${p[5]} + ${p[6]}) + ${p[7]}) + ${p[11]}) + ${p[12]}) + ${p[13]}
     funcNames: ["roundc"],
     funcs: `fn roundc(x: f32) -> f32 { return sign(x) * floor(abs(x) + 0.5); }`,
     code: (w, p) => `{
-var pz_: f32 = 0.0;
 var spreadx: f32 = -(${p[0]});
 if ((rnd(rs) < 0.5)) {
   spreadx = ${p[0]};
@@ -18149,8 +17858,6 @@ pz_ = (${w} * (pz_ + (spreadz * roundc(log(rnd(rs))))));
     funcNames: ["roundc"],
     funcs: `fn roundc(x: f32) -> f32 { return sign(x) * floor(abs(x) + 0.5); }`,
     code: (w, p) => `{
-var z_: f32 = 0.0;
-var pz_: f32 = 0.0;
 var c2x: f32;
 var c2y: f32;
 var c2: f32;
@@ -18191,8 +17898,6 @@ pz_ += (d * (z_ * s2z));
     funcNames: ["roundc"],
     funcs: `fn roundc(x: f32) -> f32 { return sign(x) * floor(abs(x) + 0.5); }`,
     code: (w, p) => `{
-var z_: f32 = 0.0;
-var pz_: f32 = 0.0;
 var pa: f32;
 var qa: f32;
 var cx: f32;
@@ -18232,8 +17937,6 @@ pz_ += (vr * (z_ * s2z));
     params: [{ name: "a", def: 1 }, { name: "b", def: 2 }, { name: "c", def: 3 }, { name: "d", def: 4 }, { name: "e", def: 2 }, { name: "f", def: 0 }, { name: "g", def: 2 }, { name: "h", def: 0 }],
     verified: true, priority: 0, flags: ["3d","z"], types: ["3D"],
     code: (w, p) => `{
-var pz_: f32 = 0.0;
-var z_: f32 = 0.0;
 v.x += (${w} * (sin((${p[0]} * t.y)) - cos((${p[1]} * t.x))));
 v.y += (${w} * (sin((${p[2]} * t.x)) - cos((${p[3]} * t.y))));
 pz_ += (((${w} * (sin((${p[4]} * t.y)) - cos((${p[5]} * z_)))) * cos((${p[6]} * t.x))) + sin((${p[7]} * z_)));
@@ -18245,8 +17948,6 @@ pz_ += (((${w} * (sin((${p[4]} * t.y)) - cos((${p[5]} * z_)))) * cos((${p[6]} * 
     funcNames: ["roundc"],
     funcs: `fn roundc(x: f32) -> f32 { return sign(x) * floor(abs(x) + 0.5); }`,
     code: (w, p) => `{
-var z_: f32 = 0.0;
-var pz_: f32 = 0.0;
 var ax: f32 = cos((t.x * ${p[19]}));
 var bx: f32 = (((cos((t.x + ${p[1]})) * cos((t.y + ${p[2]}))) * (cos((t.x + ${p[3]})) * cos((t.y + ${p[4]})))) * (cos((t.x + ${p[5]})) * cos((t.y + ${p[6]}))));
 var by: f32 = (((sin((t.x + ${p[7]})) * cos((t.y + ${p[8]}))) * (sin((t.x + ${p[9]})) * cos((t.y + ${p[10]})))) * (sin((t.x + ${p[11]})) * cos((t.y + ${p[12]}))));
@@ -19520,7 +19221,6 @@ v.y += (r_ * s);
     params: [],
     verified: true, priority: -1, flags: ["z"], types: ["ZTRANSFORM","POST"],
     code: (w, _p) => `{
-var z_: f32 = 0.0;
 var pre_flatten: f32 = min(abs(${w}), 1.0);
 z_ = (z_ * (1.0 - pre_flatten));
 }`,
@@ -19529,7 +19229,6 @@ z_ = (z_ * (1.0 - pre_flatten));
     params: [],
     verified: true, priority: 1, flags: ["z"], types: ["ZTRANSFORM","POST"],
     code: (w, _p) => `{
-var pz_: f32 = 0.0;
 var post_flatten: f32 = min(abs(${w}), 1.0);
 pz_ = (pz_ * (1.0 - post_flatten));
 }`,
@@ -19697,8 +19396,6 @@ fn Complex_Scale(c: ptr<function, Complex>, mul: f32) {
   (*c).im = ((*c).im * mul);
 }`,
     code: (w, p) => `{
-var z_: f32 = 0.0;
-var pz_: f32 = 0.0;
 var zc: f32 = (*cp);
 var random: f32 = rnd(rs);
 var x1: f32 = t.x;

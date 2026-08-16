@@ -12,7 +12,7 @@
 // ports take precedence so behaviour matches JWildfire; hand-written entries
 // remain as fallbacks for anything the port pipeline does not cover.
 
-import { JWF_VARIATIONS, type JwfVariationDef } from './variations.jwf';
+import { JWF_VARIATIONS, type JwfVariationDef } from './variations.jwf.ts';
 
 export interface VariationDef {
   params?: { name: string; def: number }[];

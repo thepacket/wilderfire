@@ -4,9 +4,23 @@
 // divergent ones and these overrides bring the WGSL back to CPU semantics.
 // Snippets stay in the CUDA dialect so they go through the same transpiler.
 
-export interface Override { gpuCode?: string; gpuFunctions?: string; note: string }
+export interface Override { gpuCode?: string; gpuFunctions?: string; note: string; /** text appended to the original snippet */ append?: string }
 
 export const OVERRIDES: Record<string, Override> = {
+  ovoid3d: {
+    note: 'CPU uses x²+y²+z²; GPU used the 2D r².',
+    gpuCode: `float T = __x*__x + __y*__y + __z*__z + epsilon;
+float r = __ovoid3d / T;
+__px += __x * r * __ovoid3d_x;
+__py += __y * r * __ovoid3d_y;
+__pz += __z * r * __ovoid3d_z;`,
+  },
+  linearT3D: {
+    note: 'GPU used powY for the z component; CPU uses powZ.',
+    gpuCode: `__px += (__x < 0.f ? -1.f : 1.f) * powf(fabsf(__x), __linearT3D_powX) * __linearT3D;
+__py += (__y < 0.f ? -1.f : 1.f) * powf(fabsf(__y), __linearT3D_powY) * __linearT3D;
+__pz += (__z < 0.f ? -1.f : 1.f) * powf(fabsf(__z), __linearT3D_powZ) * __linearT3D;`,
+  },
   brick: {
     note: 'CPU uses a floored modulo for the row parity; GPU used fmod (wrong sign for negative rows).',
     gpuCode: `float br_sx = fmaxf(fabsf(__brick_scale_x), 1e-4f);
@@ -81,5 +95,9 @@ if (_d != 0.f) {
   __px += __perspective * __perspective_dist * __x * _t;
   __py += __perspective * _vfcos * __y * _t;
 }`,
+  },
+  onion: {
+    note: 'GPU snippet dropped the z output (CPU: pVarTP.z += z1 + pAffineTP.z).',
+    append: '\n__pz += z1 + __z;',
   },
 };

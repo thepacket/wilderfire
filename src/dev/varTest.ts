@@ -25,12 +25,12 @@ export interface VarTestResult {
   maxErr: number;
   /** pass fraction per parameter set */
   perSet?: number[];
-  worst?: { pt: [number, number]; ours: number[]; theirs: number[]; set?: number };
+  worst?: { pt: number[]; ours: number[]; theirs: number[]; set?: number };
   msg?: string;
   flags?: string[];
 }
 
-interface Spec { points: [number, number][]; affine: number[]; entries: { name: string; priority: number; source: string; sets: { weight: number; params: Record<string, number> }[] }[] }
+interface Spec { points: number[][]; affine: number[]; entries: { name: string; priority: number; source: string; sets: { weight: number; params: Record<string, number> }[] }[] }
 interface OracleRow { name: string; set: number; random: boolean; samples: number; out: (number[] | null)[]; error?: string; paramError?: string }
 
 const PRELUDE = `const PI: f32 = 3.14159265358979;
@@ -54,7 +54,7 @@ function buildShader(def: VariationDef, funcs: string, priority: number): string
   const snippet = def.code(w, p, A);
   return `${PRELUDE}
 ${funcs}
-@group(0) @binding(0) var<storage, read> inp: array<vec2f>;
+@group(0) @binding(0) var<storage, read> inp: array<vec4f>;
 @group(0) @binding(1) var<storage, read_write> outp: array<vec4f>;
 @group(0) @binding(2) var<storage, read> xd: array<f32>;
 
@@ -72,15 +72,18 @@ fn main(@builtin(global_invocation_id) gid: vec3u) {
   var hide: bool = false;
   let cp = &c;
   let hd = &hide;
-  var t0 = inp[pi];
+  var t0 = inp[pi].xy;
   var t = t0;
+  var z_ = inp[pi].z;
+  var pz_ = ${priority === 1 ? 'z_' : '0.0'};
   var r2 = max(dot(t, t), 1e-12);
   var r = sqrt(r2);
   var th = atan2(t.x, t.y);
   var ph = atan2(t.y, t.x);
   var v = ${priority === 1 ? 't' : 'vec2f(0.0, 0.0)'};
   ${snippet}
-  outp[i] = vec4f(${priority === -1 ? 't' : 'v'}, c, select(0.0, 1.0, hide));
+  // color + hide packed: c in [0,1], +10 when hidden
+  outp[i] = vec4f(${priority === -1 ? 't' : 'v'}, ${priority === -1 ? 'z_' : 'pz_'}, c + select(0.0, 10.0, hide));
 }
 `;
 }
@@ -109,10 +112,10 @@ function contextLines(code: string, line: number): string {
   return ls.slice(Math.max(0, line - 2), line + 1).map((l, i) => `${Math.max(0, line - 2) + i + 1}: ${l}`).join('\n');
 }
 
-async function run(device: GPUDevice, pipeline: GPUComputePipeline, points: [number, number][], xd: Float32Array<ArrayBuffer>, samples: number): Promise<Float32Array> {
+async function run(device: GPUDevice, pipeline: GPUComputePipeline, points: number[][], xd: Float32Array<ArrayBuffer>, samples: number): Promise<Float32Array> {
   const n = points.length * samples;
-  const inp = device.createBuffer({ size: points.length * 8, usage: GPUBufferUsage.STORAGE | GPUBufferUsage.COPY_DST });
-  device.queue.writeBuffer(inp, 0, new Float32Array(points.flat()));
+  const inp = device.createBuffer({ size: points.length * 16, usage: GPUBufferUsage.STORAGE | GPUBufferUsage.COPY_DST });
+  device.queue.writeBuffer(inp, 0, new Float32Array(points.flatMap((p) => [p[0], p[1], p[2] ?? 0, 0])));
   const outp = device.createBuffer({ size: n * 16, usage: GPUBufferUsage.STORAGE | GPUBufferUsage.COPY_SRC });
   const xdb = device.createBuffer({ size: xd.byteLength, usage: GPUBufferUsage.STORAGE | GPUBufferUsage.COPY_DST });
   device.queue.writeBuffer(xdb, 0, xd);
@@ -198,22 +201,24 @@ export async function runVarTest(device: GPUDevice, opts: { only?: string[]; ver
           const theirs = row.out[pi];
           if (!theirs) continue;
           // ours: stats over samples
-          let sx = 0, sy = 0, sxx = 0, syy = 0, sc = 0, hides = 0, valid = 0;
+          let sx = 0, sy = 0, sz = 0, sxx = 0, syy = 0, szz = 0, sc = 0, hides = 0, valid = 0;
           for (let s = 0; s < samples; s++) {
             const o = (pi * samples + s) * 4;
-            const x = out[o], y = out[o + 1];
-            if (!isFinite(x) || !isFinite(y)) continue;
-            valid++; sx += x; sy += y; sxx += x * x; syy += y * y; sc += out[o + 2]; hides += out[o + 3];
+            const x = out[o], y = out[o + 1], z = out[o + 2];
+            if (!isFinite(x) || !isFinite(y) || !isFinite(z)) continue;
+            const ch = out[o + 3]; const hid = ch >= 5 ? 1 : 0; const col = ch - 10 * hid;
+            valid++; sx += x; sy += y; sz += z; sxx += x * x; syy += y * y; szz += z * z; sc += col; hides += hid;
           }
           const tMag = Math.hypot(theirs[0], theirs[1]);
           if (tMag > 1e5) continue; // both blow up; skip
           total++; sTotal++;
           if (valid === 0) { updWorst(res, spec.points[pi], [NaN, NaN], theirs, Infinity, row.set); maxErr = Infinity; continue; }
-          const mx = sx / valid, my = sy / valid, mc = sc / valid, mh = hides / valid;
+          const mx = sx / valid, my = sy / valid, mz = sz / valid, mc = sc / valid, mh = hides / valid;
+          const tz = theirs[4] ?? 0; // deterministic rows: [x,y,c,hide,z]; random: [mx,my,c,hide,stdx,stdy,mz,stdz]
           let err: number;
           if (!row.random) {
-            const scale = Math.max(1, tMag);
-            err = Math.max(Math.abs(mx - theirs[0]), Math.abs(my - theirs[1])) / scale;
+            const scale = Math.max(1, tMag, Math.abs(tz));
+            err = Math.max(Math.abs(mx - theirs[0]), Math.abs(my - theirs[1]), Math.abs(mz - tz)) / scale;
             err = Math.max(err, Math.abs(mc - theirs[2]) * 0.5, Math.abs(mh - theirs[3]));
             if (err <= tol) { ok++; sOk++; }
           } else {
@@ -228,10 +233,13 @@ export async function runVarTest(device: GPUDevice, opts: { only?: string[]; ver
             const okStd = stdErr <= 0.35;
             const okC = Math.abs(mc - theirs[2]) <= 0.1 || tstdx === 0 && tstdy === 0 && Math.abs(mc - theirs[2]) <= 0.02;
             const okH = Math.abs(mh - theirs[3]) <= 0.15;
+            const tmz = theirs[6] ?? 0, tstdz = theirs[7] ?? 0;
+            const stdz = Math.sqrt(Math.max(0, szz / valid - mz * mz));
+            const okZ = Math.abs(mz - tmz) <= 4.5 * Math.max(tstdz, stdz) / Math.sqrt(samples) + 0.02 * scale;
             err = Math.max(meanErr / (4.5 * sem + 0.02 * scale), stdErr / 0.35) * tol; // normalized so tol is the pass line
-            if (okMean && okStd && okC && okH) { ok++; sOk++; }
+            if (okMean && okStd && okC && okH && okZ) { ok++; sOk++; }
           }
-          if (err > maxErr) { maxErr = err; updWorst(res, spec.points[pi], [mx, my, mc, mh], theirs, err, row.set); }
+          if (err > maxErr) { maxErr = err; updWorst(res, spec.points[pi], [mx, my, mc, mh, mz], theirs, err, row.set); }
         }
         perSet[row.set] = sTotal ? sOk / sTotal : 1;
       }
@@ -272,7 +280,7 @@ export async function saveVerified(results: VarTestResult[]): Promise<void> {
     console.warn('could not save verified.json (dev server sink missing?)', err);
   }
 }
-function updWorst(res: VarTestResult, pt: [number, number], ours: number[], theirs: number[], err: number, set: number) {
+function updWorst(res: VarTestResult, pt: number[], ours: number[], theirs: number[], err: number, set: number) {
   if (!res.worst || err >= res.maxErr) res.worst = { pt, ours: ours.map(r4), theirs: theirs.map(r4), set };
 }
 const r4 = (x: number) => Math.round(x * 1e4) / 1e4;

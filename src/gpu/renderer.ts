@@ -96,7 +96,7 @@ export class FlameRenderer {
     this.rngBuf = d.createBuffer({ size: this.nPoints * 8, usage: GPUBufferUsage.STORAGE | GPUBufferUsage.COPY_DST });
     this.xdBuf = d.createBuffer({ size: XD_FLOATS * 4, usage: GPUBufferUsage.STORAGE | GPUBufferUsage.COPY_DST });
     this.palBuf = d.createBuffer({ size: MAX_LAYERS * 256 * 16, usage: GPUBufferUsage.STORAGE | GPUBufferUsage.COPY_DST });
-    this.paramsBuf = d.createBuffer({ size: 48, usage: GPUBufferUsage.UNIFORM | GPUBufferUsage.COPY_DST });
+    this.paramsBuf = d.createBuffer({ size: 128, usage: GPUBufferUsage.UNIFORM | GPUBufferUsage.COPY_DST });
     this.tmBuf = d.createBuffer({ size: 64, usage: GPUBufferUsage.UNIFORM | GPUBufferUsage.COPY_DST });
 
     const tmModule = d.createShaderModule({ code: TONEMAP_WGSL });
@@ -216,12 +216,12 @@ export class FlameRenderer {
     const pts = new Float32Array(this.nPoints * 4);
     const rng = new Uint32Array(this.nPoints * 2); // [state, prev xform]
     for (let i = 0; i < this.nPoints; i++) {
-      pts[i * 4] = Math.random() * 2 - 1;
-      pts[i * 4 + 1] = Math.random() * 2 - 1;
-      pts[i * 4 + 2] = Math.random();
-      pts[i * 4 + 3] = 20; // fuse
+      pts[i * 4] = Math.random() * 2 - 1;      // x
+      pts[i * 4 + 1] = Math.random() * 2 - 1;  // y
+      pts[i * 4 + 2] = 0;                      // z
+      pts[i * 4 + 3] = Math.random();          // color
       rng[i * 2] = (Math.random() * 0xffffffff) >>> 0 || 1;
-      rng[i * 2 + 1] = 0;
+      rng[i * 2 + 1] = 20 << 8; // prev xform (low 8 bits) | fuse (high bits)
     }
     this.device.queue.writeBuffer(this.ptsBuf, 0, pts);
     this.device.queue.writeBuffer(this.rngBuf, 0, rng);
@@ -251,12 +251,34 @@ export class FlameRenderer {
     const fullW = tile ? tile.fullW : w;
     const fullH = tile ? tile.fullH : h;
     const ppu = 0.25 * Math.min(fullW, fullH) * f.zoom;
-    const pu32 = new Uint32Array(12);
+    const pu32 = new Uint32Array(32);
     const pf32 = new Float32Array(pu32.buffer);
-    pu32[0] = w; pu32[1] = h; pu32[2] = this.itersPerPass; pu32[3] = 0;
+    const cam3d = Math.abs(f.camPitch) > 1e-9 || Math.abs(f.camYaw) > 1e-9 || Math.abs(f.camBank) > 1e-9 || Math.abs(f.camPersp) > 1e-9
+      || Math.abs(f.camPosX) > 1e-9 || Math.abs(f.camPosY) > 1e-9 || Math.abs(f.camPosZ) > 1e-9;
+    pu32[0] = w; pu32[1] = h; pu32[2] = this.itersPerPass; pu32[3] = (f.preserveZ ? 1 : 0) | (cam3d ? 2 : 0);
     pf32[4] = f.centerX; pf32[5] = f.centerY; pf32[6] = ppu; pf32[7] = f.rotation;
     pf32[8] = tile ? tile.tileX : 0; pf32[9] = tile ? tile.tileY : 0;
     pf32[10] = fullW; pf32[11] = fullH;
+    // JWildfire camera matrix (FlameRendererView.createProjectionMatrix; bank = 0,
+    // roll = our rotation, yaw negated as JWildfire does). Rows m0..m2 map to
+    // camPoint = (m0·p, m1·p, m2·p).
+    const yaw = (-f.camYaw * Math.PI) / 180, pitch = (f.camPitch * Math.PI) / 180, roll = f.rotation, bank = (f.camBank * Math.PI) / 180;
+    const cy = Math.cos(yaw), sy = Math.sin(yaw), cp = Math.cos(pitch), sp = Math.sin(pitch);
+    const cr = Math.cos(roll), sr = Math.sin(roll), cb = Math.cos(bank), sb = Math.sin(bank);
+    const m00 = -cp * sr * sy - (sp * sb * sr - cb * cr) * cy;
+    const m10 = -cp * cy * sr + (sp * sb * sr - cb * cr) * sy;
+    const m20 = cb * sp * sr + cr * sb;
+    const m01 = cp * cr * sy + (cr * sp * sb + cb * sr) * cy;
+    const m11 = cp * cr * cy - (cr * sp * sb + cb * sr) * sy;
+    const m21 = -cb * cr * sp + sb * sr;
+    const m02 = -cp * cy * sb + sp * sy;
+    const m12 = cp * sb * sy + cy * sp;
+    const m22 = cp * cb;
+    pf32.set([m00, m10, m20, 0], 12);
+    pf32.set([m01, m11, m21, 0], 16);
+    pf32.set([m02, m12, m22, 0], 20);
+    pf32.set([f.camPosX, f.camPosY, f.camPosZ, f.camPersp], 24);
+    pf32[28] = f.camPersp;
     this.device.queue.writeBuffer(this.paramsBuf, 0, pu32);
 
     const tu32 = new Uint32Array(16);

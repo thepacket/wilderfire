@@ -45,7 +45,18 @@ export interface Flame {
   centerX: number;
   centerY: number;
   zoom: number;      // 1 = world range ~[-2,2] fits the short canvas axis
-  rotation: number;  // radians
+  rotation: number;  // radians (camera roll)
+  /** 3D camera (JWildfire semantics): pitch/yaw in degrees, perspective factor,
+   *  camera position offset; all zero = flat 2D projection. */
+  camPitch: number;
+  camYaw: number;
+  camBank: number;
+  camPersp: number;
+  camPosX: number;
+  camPosY: number;
+  camPosZ: number;
+  /** JWildfire preserve_z: 2D variations pass the point's z through (scaled by weight). */
+  preserveZ: boolean;
   brightness: number;
   gamma: number;
   /** flam3 gamma_threshold: linear ramp below this alpha, pow(1/gamma) above —
@@ -89,6 +100,8 @@ export function defaultFlame(palette: RGB[]): Flame {
     centerY: 0,
     zoom: 1,
     rotation: 0,
+    camPitch: 0, camYaw: 0, camBank: 0, camPersp: 0, camPosX: 0, camPosY: 0, camPosZ: 0,
+    preserveZ: false,
     brightness: 3,
     gamma: 3.2,
     gammaThreshold: 0.04,
@@ -259,6 +272,9 @@ export function normalizeFlame(obj: any, fallbackPalette: RGB[]): Flame {
     centerY: num(obj?.centerY, 0),
     zoom: Math.max(0.01, num(obj?.zoom, 1)),
     rotation: num(obj?.rotation, 0),
+    camPitch: num(obj?.camPitch, 0), camYaw: num(obj?.camYaw, 0), camBank: num(obj?.camBank, 0), camPersp: num(obj?.camPersp, 0),
+    camPosX: num(obj?.camPosX, 0), camPosY: num(obj?.camPosY, 0), camPosZ: num(obj?.camPosZ, 0),
+    preserveZ: !!obj?.preserveZ,
     brightness: Math.max(0.05, num(obj?.brightness, 3)),
     gamma: Math.max(0.5, num(obj?.gamma, 3.2)),
     gammaThreshold: Math.min(0.5, Math.max(0, num(obj?.gammaThreshold, 0.04))),

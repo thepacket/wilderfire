@@ -39,10 +39,10 @@ public class Oracle {
     PrintStream out = new PrintStream(new FileOutputStream(args[1]), true, "UTF-8");
     String line = in.readLine();
     int np = Integer.parseInt(line.split(" ")[1]);
-    double[] px = new double[np], py = new double[np];
+    double[] px = new double[np], py = new double[np], pz = new double[np];
     for (int i = 0; i < np; i++) {
       String[] t = in.readLine().trim().split(" ");
-      px[i] = Double.parseDouble(t[0]); py[i] = Double.parseDouble(t[1]);
+      px[i] = Double.parseDouble(t[0]); py[i] = Double.parseDouble(t[1]); pz[i] = t.length > 2 ? Double.parseDouble(t[2]) : 0;
     }
     String[] af = in.readLine().split(" ");
     double[] affine = new double[6];
@@ -89,9 +89,9 @@ public class Oracle {
         boolean differs = false;
         for (int i = 0; i < np; i++) {
           double x1 = Double.NaN, y1 = Double.NaN, x2 = Double.NaN, y2 = Double.NaN;
-          setup(a, v, px[i], py[i], curPrio);
+          setup(a, v, px[i], py[i], pz[i], curPrio);
           try { f.transform(ctx, xf, a, v, weight); XYZPoint o = curPrio == -1 ? a : v; x1 = o.x; y1 = o.y; } catch (Throwable ex) { }
-          setup(a, v, px[i], py[i], curPrio);
+          setup(a, v, px[i], py[i], pz[i], curPrio);
           try { f.transform(ctx, xf, a, v, weight); XYZPoint o = curPrio == -1 ? a : v; x2 = o.x; y2 = o.y; } catch (Throwable ex) { }
           if ((x1 != x2 && !(Double.isNaN(x1) && Double.isNaN(x2))) || (y1 != y2 && !(Double.isNaN(y1) && Double.isNaN(y2)))) differs = true;
         }
@@ -107,29 +107,30 @@ public class Oracle {
         String err = null;
         for (int i = 0; i < np; i++) {
           // accumulate stats over samples (samples==1 → plain values)
-          double sx = 0, sy = 0, sxx = 0, syy = 0, sc = 0; int hides = 0, valid = 0;
+          double sx = 0, sy = 0, sz = 0, sxx = 0, syy = 0, szz = 0, sc = 0; int hides = 0, valid = 0;
           for (int s = 0; s < samples; s++) {
-            setup(a, v, px[i], py[i], curPrio);
-            double ox, oy, oc; boolean hide;
+            setup(a, v, px[i], py[i], pz[i], curPrio);
+            double ox, oy, oz, oc; boolean hide;
             try {
               f.transform(ctx, xf, a, v, weight);
               XYZPoint o = curPrio == -1 ? a : v;
-              ox = o.x; oy = o.y; oc = v.color; hide = v.doHide || a.doHide;
+              ox = o.x; oy = o.y; oz = o.z; oc = v.color; hide = v.doHide || a.doHide;
             } catch (Throwable ex) {
-              ox = Double.NaN; oy = Double.NaN; oc = Double.NaN; hide = false;
+              ox = Double.NaN; oy = Double.NaN; oz = Double.NaN; oc = Double.NaN; hide = false;
               if (err == null) err = ex.getClass().getSimpleName() + ": " + ex.getMessage();
             }
-            if (Double.isNaN(ox) || Double.isNaN(oy) || Double.isInfinite(ox) || Double.isInfinite(oy)) continue;
+            if (Double.isNaN(ox) || Double.isNaN(oy) || Double.isNaN(oz) || Double.isInfinite(ox) || Double.isInfinite(oy) || Double.isInfinite(oz)) continue;
             valid++;
-            sx += ox; sy += oy; sxx += ox * ox; syy += oy * oy; sc += oc; if (hide) hides++;
+            sx += ox; sy += oy; sz += oz; sxx += ox * ox; syy += oy * oy; szz += oz * oz; sc += oc; if (hide) hides++;
           }
           if (!first) sb.append(',');
           first = false;
           if (valid == 0) { sb.append("null"); continue; }
-          double mx = sx / valid, my = sy / valid;
-          double vx = Math.max(0, sxx / valid - mx * mx), vy = Math.max(0, syy / valid - my * my);
+          double mx = sx / valid, my = sy / valid, mz = sz / valid;
+          double vx = Math.max(0, sxx / valid - mx * mx), vy = Math.max(0, syy / valid - my * my), vz = Math.max(0, szz / valid - mz * mz);
           sb.append('[').append(num(mx)).append(',').append(num(my)).append(',').append(num(sc / valid)).append(',').append(num((double) hides / valid));
-          if (samples > 1) sb.append(',').append(num(Math.sqrt(vx))).append(',').append(num(Math.sqrt(vy)));
+          if (samples > 1) sb.append(',').append(num(Math.sqrt(vx))).append(',').append(num(Math.sqrt(vy))).append(',').append(num(mz)).append(',').append(num(Math.sqrt(vz)));
+          else sb.append(',').append(num(mz));
           sb.append(']');
         }
         sb.append("]");
@@ -144,12 +145,12 @@ public class Oracle {
     System.err.println("oracle: " + nVars + " variations");
   }
 
-  static void setup(XYZPoint a, XYZPoint v, double x, double y, int prio) {
+  static void setup(XYZPoint a, XYZPoint v, double x, double y, double z, int prio) {
     a.clear(); v.clear();
-    a.x = x; a.y = y; a.z = 0; a.color = 0.5;
+    a.x = x; a.y = y; a.z = z; a.color = 0.5;
     a.invalidate();
     v.color = 0.5;
-    if (prio == 1) { v.x = x; v.y = y; v.z = 0; }
+    if (prio == 1) { v.x = x; v.y = y; v.z = z; }
     else { v.x = 0; v.y = 0; v.z = 0; }
     v.invalidate();
   }

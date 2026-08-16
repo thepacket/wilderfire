@@ -267,6 +267,18 @@ export function parseFlameXML(text: string, fallbackPalette: RGB[]): Flame[] {
     if (isFinite(scale) && scale > 0) f.zoom = (scale * zoomMul) / (0.25 * sizeMin);
     const rot = parseFloat(fe.getAttribute('rotate') ?? '');
     if (isFinite(rot)) f.rotation = (rot * Math.PI) / 180;
+    // JWildfire 3D camera
+    const numAttr = (n: string) => { const v = parseFloat(fe.getAttribute(n) ?? ''); return isFinite(v) ? v : 0; };
+    // cam_pitch / cam_yaw / cam_roll are stored in radians; cam_roll is the bank axis
+    // (the flam3 `rotate` attribute is JWildfire's camRoll, our `rotation`).
+    f.camPitch = (numAttr('cam_pitch') * 180) / Math.PI;
+    f.camYaw = (numAttr('cam_yaw') * 180) / Math.PI;
+    f.camBank = (numAttr('cam_roll') * 180) / Math.PI;
+    f.camPersp = numAttr('cam_persp');
+    f.camPosX = numAttr('cam_pos_x');
+    f.camPosY = numAttr('cam_pos_y');
+    f.camPosZ = numAttr('cam_pos_z');
+    f.preserveZ = numAttr('preserve_z') !== 0;
     const br = parseFloat(fe.getAttribute('brightness') ?? '');
     if (isFinite(br) && br > 0) f.brightness = Math.min(br, 6);
     const ga = parseFloat(fe.getAttribute('gamma') ?? '');
@@ -358,6 +370,8 @@ export function flameToXML(f: Flame): string {
   lines.push(
     `<flame version="WilderFire 0.1" name="${esc(f.name)}" size="${size} ${size}" ` +
     `center="${fmt(f.centerX)} ${fmt(f.centerY)}" scale="${fmt(scale)}" rotate="${fmt((f.rotation * 180) / Math.PI)}" ` +
+    `cam_pitch="${fmt((f.camPitch * Math.PI) / 180)}" cam_yaw="${fmt((f.camYaw * Math.PI) / 180)}" cam_roll="${fmt((f.camBank * Math.PI) / 180)}" cam_persp="${fmt(f.camPersp)}" ` +
+    `cam_pos_x="${fmt(f.camPosX)}" cam_pos_y="${fmt(f.camPosY)}" cam_pos_z="${fmt(f.camPosZ)}" preserve_z="${f.preserveZ ? 1 : 0}" ` +
     `filter="0.5" quality="200" brightness="${fmt(f.brightness)}" gamma="${fmt(f.gamma)}" gamma_threshold="${fmt(f.gammaThreshold)}" ` +
     `vibrancy="${fmt(f.vibrancy)}" background="${fmt(f.background[0])} ${fmt(f.background[1])} ${fmt(f.background[2])}">`,
   );
