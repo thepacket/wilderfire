@@ -94,7 +94,7 @@ export function buildRenderPanel(app: App, root: HTMLElement) {
   const tone = el('div', 'section');
   tone.append(el('h3', '', 'Tone'));
   const brS = slider({
-    label: 'Brightness', min: 0.1, max: 6, step: 0.05, value: app.flame.brightness,
+    label: 'Brightness', min: 0.1, max: 8, step: 0.05, value: app.flame.brightness,
     onInput: (v) => { app.flame.brightness = v; app.commitTone(SRC); },
   });
   const gaS = slider({

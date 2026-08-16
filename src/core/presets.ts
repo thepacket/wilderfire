@@ -9,7 +9,7 @@ const P: PresetSpec[] = [
     name: 'Ember Swirl',
     palette: 'Ember',
     data: {
-      brightness: 1.6, gamma: 2.6, zoom: 0.9,
+      brightness: 4, gamma: 4, zoom: 0.9,
       xforms: [
         {
           affine: [0.62, -0.4, 0.25, 0.4, 0.62, 0.1],
@@ -33,7 +33,7 @@ const P: PresetSpec[] = [
     name: 'Deep Julia',
     palette: 'Ocean',
     data: {
-      brightness: 1.5, gamma: 2.4, zoom: 0.8,
+      brightness: 3.75, gamma: 3.75, zoom: 0.8,
       xforms: [
         {
           affine: [0.9, 0.05, 0.3, -0.05, 0.9, 0.0],
@@ -52,7 +52,7 @@ const P: PresetSpec[] = [
     name: 'Night Bloom',
     palette: 'Violet',
     data: {
-      brightness: 1.7, gamma: 2.8, zoom: 0.85,
+      brightness: 4.25, gamma: 4.25, zoom: 0.85,
       xforms: [
         {
           affine: [0.75, -0.35, 0.0, 0.35, 0.75, 0.0],
@@ -76,7 +76,7 @@ const P: PresetSpec[] = [
     name: 'Aurora Fan',
     palette: 'Aurora',
     data: {
-      brightness: 1.6, gamma: 2.5, zoom: 0.75,
+      brightness: 4, gamma: 4, zoom: 0.75,
       xforms: [
         {
           affine: [0.8, 0.15, 0.1, -0.15, 0.8, 0.15],
@@ -100,7 +100,7 @@ const P: PresetSpec[] = [
     name: 'Solar Disc',
     palette: 'Solar',
     data: {
-      brightness: 1.5, gamma: 2.3, zoom: 0.95,
+      brightness: 3.75, gamma: 3.75, zoom: 0.95,
       xforms: [
         {
           affine: [0.7, -0.5, 0.0, 0.5, 0.7, 0.0],
@@ -123,7 +123,7 @@ const P2: PresetSpec[] = [
     name: 'Neon Orbit',
     palette: 'Ember',
     data: {
-      brightness: 1.7, gamma: 2.6, zoom: 0.8,
+      brightness: 4.25, gamma: 4, zoom: 0.8,
       paletteStops: [[0, .02, 0, .12], [.3, 0, .35, 1], [.6, 0, 1, .8], [.85, 1, .9, .25], [1, 1, 1, 1]],
       xforms: [
         { affine: [-0.38, -0.65, 0.6, 0.65, -0.38, 0], weight: 1, color: 0, colorSpeed: .55, xaos: [0, 1, 1],
@@ -139,7 +139,7 @@ const P2: PresetSpec[] = [
     name: 'Golden Nautilus',
     palette: 'Ember',
     data: {
-      brightness: 1.6, gamma: 2.5, zoom: .75,
+      brightness: 4, gamma: 4, zoom: .75,
       paletteStops: [[0, .02, .01, 0], [.4, .45, .28, .05], [.7, 1, .75, .2], [1, 1, .98, .9]],
       xforms: [
         { affine: [0.68, -0.32, 0.15, 0.32, 0.68, 0.05], weight: 1, color: 0, colorSpeed: 0,
@@ -155,7 +155,7 @@ const P2: PresetSpec[] = [
     name: 'Silk Veil',
     palette: 'Violet',
     data: {
-      brightness: 1.7, gamma: 2.7, zoom: .8,
+      brightness: 4.25, gamma: 4, zoom: .8,
       paletteStops: [[0, .03, 0, .08], [.35, .4, .1, .5], [.65, .9, .4, .6], [1, 1, .95, .9]],
       xforms: [
         { affine: [0.6, -0.6, 0.2, 0.6, 0.6, 0], weight: 1, color: .05, colorSpeed: .55,
@@ -170,7 +170,7 @@ const P2: PresetSpec[] = [
     name: 'Aurora Veils',
     palette: 'Aurora',
     data: {
-      brightness: 1.8, gamma: 2.8, zoom: .75,
+      brightness: 4.5, gamma: 4.25, zoom: .75,
       layers: [
         { weight: 1, visible: true,
           paletteStops: [[0, 0, .05, .03], [.4, .05, .5, .25], [.7, .3, .95, .5], [1, .9, 1, .9]],
@@ -193,7 +193,7 @@ const P2: PresetSpec[] = [
     name: 'Clockwork',
     palette: 'Solar',
     data: {
-      brightness: 1.5, gamma: 2.4, zoom: .8,
+      brightness: 3.75, gamma: 3.75, zoom: .8,
       paletteStops: [[0, .05, .03, 0], [.35, .6, .25, .05], [.65, .95, .65, .15], [1, 1, .95, .75]],
       xforms: [
         { affine: [0.62, 0, 0.45, 0, 0.62, 0], weight: 1, color: 0, colorSpeed: .5,

@@ -85,8 +85,9 @@ export function randomFlame(): Flame {
       }],
     };
   }
-  f.brightness = rr(2.8, 4);
-  f.gamma = rr(3.2, 4);
+  f.brightness = rr(3.5, 5);
+  f.gamma = rr(3.6, 4.4);
+  f.gammaThreshold = 0.01;
   f.gammaThreshold = 0.04;
   f.zoom = rr(0.7, 1.1);
   return f;
