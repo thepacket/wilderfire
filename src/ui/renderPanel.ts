@@ -187,7 +187,7 @@ export function buildRenderPanel(app: App, root: HTMLElement) {
     deLiveSel.append(o);
   }
   deLiveSel.title = 'Cap on the DE radius while previewing (exports always use the full radius)';
-  deLiveSel.onchange = () => { app.renderer.deLiveCap = parseInt(deLiveSel.value); };
+  deLiveSel.onchange = () => { app.renderer.deLiveCap = parseInt(deLiveSel.value); app.renderer.invalidate(); };
   deLiveRow.append(deLiveSel);
 
   const osRow = el('div', 'row');
@@ -217,7 +217,7 @@ export function buildRenderPanel(app: App, root: HTMLElement) {
     if (q === 4000) o.selected = true;
     qSel.append(o);
   }
-  qSel.onchange = () => { app.renderer.targetQuality = parseInt(qSel.value); };
+  qSel.onchange = () => { app.renderer.targetQuality = parseInt(qSel.value); app.renderer.invalidate(); };
   qRow.append(qSel);
 
   const pauseBtn = el('button', '', '⏸ Pause');

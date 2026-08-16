@@ -166,6 +166,7 @@ export class App {
 
   /** Tonemap-only change — no accumulation reset. */
   commitTone(source = '') {
+    this.renderer.invalidate();
     this.emit('tone', source);
     this.snapshot(source);
   }

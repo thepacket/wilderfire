@@ -188,6 +188,7 @@ export class FlameRenderer {
     this.allocHistogram();
     this.resetAccumulation();
     this.hasPresented = false; // canvas was cleared by the resize: present right away
+    this.needsPresent = true;
   }
 
   /** Push the current flame to the GPU. Recompiles the kernel on structural change. */
@@ -251,16 +252,22 @@ export class FlameRenderer {
     this.device.queue.writeBuffer(this.rngBuf, 0, rng);
   }
 
+  /** Something tone-related changed (or the view): redraw even when the
+   *  accumulation is finished. Without this the renderer idles once converged. */
+  invalidate() { this.needsPresent = true; }
+  private needsPresent = true;
+
   resetAccumulation() {
     this.samples = 0;
     this.emaSps = 0;
+    this.needsPresent = true;
     this.reseedPoints();
     const enc = this.device.createCommandEncoder();
     enc.clearBuffer(this.histBuf);
     this.device.queue.submit([enc.finish()]);
   }
 
-  setPaused(p: boolean) { this.paused = p; }
+  setPaused(p: boolean) { this.paused = p; this.needsPresent = true; }
   isPaused() { return this.paused; }
 
   private writeUniforms(
@@ -593,6 +600,13 @@ export class FlameRenderer {
     const dt = this.lastT ? (t - this.lastT) / 1000 : 0;
     this.lastT = t;
 
+    // Idle: converged (or paused) and nothing to redraw → do no GPU work at all.
+    // The canvas keeps its last presented frame. invalidate() wakes us up.
+    if (!accumulate && !this.needsPresent) {
+      this.onFrame?.({ spp, samplesPerSec: 0, paused: this.paused, converged });
+      return;
+    }
+
     // The tonemap must see the sample count *including* this frame's passes:
     // the compute pass runs before the tonemap in the same submission, and
     // using the pre-dispatch count (0 right after a reset, i.e. on every frame
@@ -630,6 +644,7 @@ export class FlameRenderer {
       const view = this.context.getCurrentTexture().createView();
       this.encodeTonemap(enc, this.renderBG, this.renderPipeline, view, w, h, false, { r: 0, g: 0, b: 0, a: 1 });
       this.hasPresented = true;
+      this.needsPresent = false;
     }
     this.device.queue.submit([enc.finish()]);
 
