@@ -96,7 +96,7 @@ export class FlameRenderer {
     this.rngBuf = d.createBuffer({ size: this.nPoints * 8, usage: GPUBufferUsage.STORAGE | GPUBufferUsage.COPY_DST });
     this.xdBuf = d.createBuffer({ size: XD_FLOATS * 4, usage: GPUBufferUsage.STORAGE | GPUBufferUsage.COPY_DST });
     this.palBuf = d.createBuffer({ size: MAX_LAYERS * 256 * 16, usage: GPUBufferUsage.STORAGE | GPUBufferUsage.COPY_DST });
-    this.paramsBuf = d.createBuffer({ size: 128, usage: GPUBufferUsage.UNIFORM | GPUBufferUsage.COPY_DST });
+    this.paramsBuf = d.createBuffer({ size: 192, usage: GPUBufferUsage.UNIFORM | GPUBufferUsage.COPY_DST });
     this.tmBuf = d.createBuffer({ size: 64, usage: GPUBufferUsage.UNIFORM | GPUBufferUsage.COPY_DST });
 
     const tmModule = d.createShaderModule({ code: TONEMAP_WGSL });
@@ -251,10 +251,12 @@ export class FlameRenderer {
     const fullW = tile ? tile.fullW : w;
     const fullH = tile ? tile.fullH : h;
     const ppu = 0.25 * Math.min(fullW, fullH) * f.zoom;
-    const pu32 = new Uint32Array(32);
+    const pu32 = new Uint32Array(48);
     const pf32 = new Float32Array(pu32.buffer);
+    const dofOn = Math.abs(f.camDOF ?? 0) > 1e-9;
+    const dimOn = (f.dimishZ ?? 0) > 1e-9;
     const cam3d = Math.abs(f.camPitch) > 1e-9 || Math.abs(f.camYaw) > 1e-9 || Math.abs(f.camBank) > 1e-9 || Math.abs(f.camPersp) > 1e-9
-      || Math.abs(f.camPosX) > 1e-9 || Math.abs(f.camPosY) > 1e-9 || Math.abs(f.camPosZ) > 1e-9;
+      || Math.abs(f.camPosX) > 1e-9 || Math.abs(f.camPosY) > 1e-9 || Math.abs(f.camPosZ) > 1e-9 || dofOn || dimOn;
     pu32[0] = w; pu32[1] = h; pu32[2] = this.itersPerPass; pu32[3] = (f.preserveZ ? 1 : 0) | (cam3d ? 2 : 0);
     pf32[4] = f.centerX; pf32[5] = f.centerY; pf32[6] = ppu; pf32[7] = f.rotation;
     pf32[8] = tile ? tile.tileX : 0; pf32[9] = tile ? tile.tileY : 0;
@@ -279,6 +281,12 @@ export class FlameRenderer {
     pf32.set([m02, m12, m22, 0], 20);
     pf32.set([f.camPosX, f.camPosY, f.camPosZ, f.camPersp], 24);
     pf32[28] = f.camPersp;
+    pf32[29] = f.camZ ?? 0;
+    pf32.set([f.focusX ?? 0, f.focusY ?? 0, f.focusZ ?? 0, f.camDOFArea ?? 0.5], 32);
+    pf32.set([dofOn ? 0.1 * f.camDOF * (f.camDOFScale ?? 1) : 0, f.camDOFExponent ?? 2, f.camDOFFade ?? 1, f.newDOF ? 1 : 0], 36);
+    pf32.set([f.dimishZ ?? 0, f.dimZDist ?? 0, 0, 0], 40);
+    const dc = f.dimZColor ?? [0, 0, 0];
+    pf32.set([dc[0], dc[1], dc[2], 0], 44);
     this.device.queue.writeBuffer(this.paramsBuf, 0, pu32);
 
     const tu32 = new Uint32Array(16);

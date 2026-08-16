@@ -69,10 +69,22 @@ function lerpVariations(a: VarInstance[], b: VarInstance[], t: number): VarInsta
   });
 }
 
+/** yz/zx (+post) planes: linear lerp, identity when absent; omitted from the result when both absent. */
+function lerp3DAffines(a: XForm, b: XForm, t: number): Partial<Pick<XForm, 'yz' | 'zx' | 'yzPost' | 'zxPost'>> {
+  const out: Partial<Pick<XForm, 'yz' | 'zx' | 'yzPost' | 'zxPost'>> = {};
+  for (const k of ['yz', 'zx', 'yzPost', 'zxPost'] as const) {
+    if (!a[k] && !b[k]) continue;
+    const A = a[k] ?? IDENTITY, B = b[k] ?? IDENTITY;
+    out[k] = A.map((v, i) => lerp(v, B[i], t)) as Affine;
+  }
+  return out;
+}
+
 function lerpXForm(a: XForm, b: XForm, t: number, n: number): XForm {
   const out: XForm = {
     affine: lerpAffine(a.affine, b.affine, t),
     post: lerpAffine(a.post, b.post, t),
+    ...lerp3DAffines(a, b, t),
     weight: lerp(a.weight, b.weight, t),
     color: lerp(a.color, b.color, t),
     colorSpeed: lerp(a.colorSpeed, b.colorSpeed, t),
@@ -147,6 +159,13 @@ export function interpFlame(a: Flame, b: Flame, t: number): Flame {
     camBank: lerp(a.camBank ?? 0, b.camBank ?? 0, t), camPersp: lerp(a.camPersp ?? 0, b.camPersp ?? 0, t), camPosX: lerp(a.camPosX ?? 0, b.camPosX ?? 0, t),
     camPosY: lerp(a.camPosY ?? 0, b.camPosY ?? 0, t), camPosZ: lerp(a.camPosZ ?? 0, b.camPosZ ?? 0, t),
     preserveZ: t < 0.5 ? a.preserveZ : b.preserveZ,
+    camDOF: lerp(a.camDOF ?? 0, b.camDOF ?? 0, t), camDOFArea: lerp(a.camDOFArea ?? 0.5, b.camDOFArea ?? 0.5, t),
+    camDOFExponent: lerp(a.camDOFExponent ?? 2, b.camDOFExponent ?? 2, t), camDOFScale: lerp(a.camDOFScale ?? 1, b.camDOFScale ?? 1, t),
+    camDOFFade: lerp(a.camDOFFade ?? 1, b.camDOFFade ?? 1, t), newDOF: t < 0.5 ? !!a.newDOF : !!b.newDOF,
+    focusX: lerp(a.focusX ?? 0, b.focusX ?? 0, t), focusY: lerp(a.focusY ?? 0, b.focusY ?? 0, t), focusZ: lerp(a.focusZ ?? 0, b.focusZ ?? 0, t),
+    camZ: lerp(a.camZ ?? 0, b.camZ ?? 0, t),
+    dimishZ: lerp(a.dimishZ ?? 0, b.dimishZ ?? 0, t), dimZDist: lerp(a.dimZDist ?? 0, b.dimZDist ?? 0, t),
+    dimZColor: [0, 1, 2].map((i) => lerp(a.dimZColor?.[i] ?? 0, b.dimZColor?.[i] ?? 0, t)) as RGB,
     brightness: lerp(a.brightness, b.brightness, t),
     gamma: lerp(a.gamma, b.gamma, t),
     gammaThreshold: lerp(a.gammaThreshold ?? 0.04, b.gammaThreshold ?? 0.04, t),

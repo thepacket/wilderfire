@@ -116,6 +116,10 @@ const XFORM_CURVE_MAP: Record<string, { key: string; map?: (v: number) => number
 for (const [ij, idx] of Object.entries(COEFF_IDX)) {
   XFORM_CURVE_MAP[`xyCoeff${ij}Curve`] = { key: `affine.${idx}` };
   XFORM_CURVE_MAP[`xyPostCoeff${ij}Curve`] = { key: `post.${idx}` };
+  XFORM_CURVE_MAP[`yzCoeff${ij}Curve`] = { key: `yz.${idx}` };
+  XFORM_CURVE_MAP[`yzPostCoeff${ij}Curve`] = { key: `yzPost.${idx}` };
+  XFORM_CURVE_MAP[`zxCoeff${ij}Curve`] = { key: `zx.${idx}` };
+  XFORM_CURVE_MAP[`zxPostCoeff${ij}Curve`] = { key: `zxPost.${idx}` };
 }
 
 /** Curve-import context: where this element lives in the Flame + timebase. */
@@ -126,6 +130,12 @@ function parseXFormEl(elm: Element, ctx?: CurveCtx): XForm {
   x.variations = [];
   x.affine = parseCoefs(elm.getAttribute('coefs'), x.affine);
   x.post = parseCoefs(elm.getAttribute('post'), x.post);
+  // JWildfire 3D affines (same "00 01 10 11 20 21" order); identity → omitted
+  const ID: Affine = [1, 0, 0, 0, 1, 0];
+  for (const [attr, key] of [['yzCoefs', 'yz'], ['zxCoefs', 'zx'], ['yzPost', 'yzPost'], ['zxPost', 'zxPost']] as const) {
+    const a = parseCoefs(elm.getAttribute(attr), ID);
+    if (a.some((v, i) => Math.abs(v - ID[i]) > 1e-12)) x[key] = a;
+  }
   const wa = parseFloat(elm.getAttribute('weight') ?? '');
   if (isFinite(wa)) x.weight = Math.max(wa, 0);
   const ca = parseFloat(elm.getAttribute('color') ?? '');
@@ -364,6 +374,20 @@ export function parseFlameXML(text: string, fallbackPalette: RGB[]): Flame[] {
     f.camPosY = numAttr('cam_pos_y');
     f.camPosZ = numAttr('cam_pos_z');
     f.preserveZ = numAttr('preserve_z') !== 0;
+    // Depth of field + dimish-z (JWildfire); defaults follow Flame's constructor
+    const numOr = (n: string, d: number) => { const v = parseFloat(fe.getAttribute(n) ?? ''); return isFinite(v) ? v : d; };
+    f.camDOF = Math.max(0, numAttr('cam_dof'));
+    f.camDOFArea = Math.max(0, numOr('cam_dof_area', 0.5));
+    f.camDOFExponent = Math.max(0.1, numOr('cam_dof_exponent', 2));
+    f.camDOFScale = numOr('cam_dof_scale', 1);
+    f.camDOFFade = Math.min(1, Math.max(0, numOr('cam_dof_fade', 1)));
+    f.newDOF = numAttr('new_dof') !== 0;
+    f.focusX = numAttr('cam_xfocus'); f.focusY = numAttr('cam_yfocus'); f.focusZ = numAttr('cam_zfocus');
+    f.camZ = numAttr('cam_zpos');
+    f.dimishZ = Math.max(0, numAttr('cam_zdimish'));
+    f.dimZDist = numAttr('cam_zdimdist');
+    const dzc = nums(fe.getAttribute('cam_zdimcolor'));
+    if (dzc.length === 3) f.dimZColor = dzc.map((v) => Math.min(1, Math.max(0, v))) as RGB;
     const br = parseFloat(fe.getAttribute('brightness') ?? '');
     if (isFinite(br) && br > 0) f.brightness = Math.min(br, 6);
     const ga = parseFloat(fe.getAttribute('gamma') ?? '');
@@ -393,6 +417,10 @@ export function parseFlameXML(text: string, fallbackPalette: RGB[]): Flame[] {
         vibrancyCurve: { key: 'vibrancy' },
         camZoomCurve: { key: 'zoom', map: (v) => v * (isFinite(scale) && scale > 0 ? scale : 1) * zoomPerUnit },
         pixelsPerUnitCurve: { key: 'zoom', map: (v) => v * zoomMul * zoomPerUnit },
+        camDOFCurve: { key: 'camDOF' }, camDOFAreaCurve: { key: 'camDOFArea' }, camDOFExponentCurve: { key: 'camDOFExponent' },
+        camDOFScaleCurve: { key: 'camDOFScale' }, camDOFFadeCurve: { key: 'camDOFFade' },
+        focusXCurve: { key: 'focusX' }, focusYCurve: { key: 'focusY' }, focusZCurve: { key: 'focusZ' }, camZCurve: { key: 'camZ' },
+        dimishZCurve: { key: 'dimishZ' }, dimZDistanceCurve: { key: 'dimZDist' },
       };
       for (const rc of readCurves(fe, fps)) {
         const m = FLAME_MAP[rc.prefix];
@@ -481,6 +509,10 @@ const FLAME_CURVE_PREFIX: Record<string, { prefix: string; map?: (v: number) => 
   camPosX: { prefix: 'camPosXCurve' }, camPosY: { prefix: 'camPosYCurve' }, camPosZ: { prefix: 'camPosZCurve' },
   brightness: { prefix: 'brightnessCurve' }, gamma: { prefix: 'gammaCurve' }, gammaThreshold: { prefix: 'gammaThresholdCurve' },
   vibrancy: { prefix: 'vibrancyCurve' },
+  camDOF: { prefix: 'camDOFCurve' }, camDOFArea: { prefix: 'camDOFAreaCurve' }, camDOFExponent: { prefix: 'camDOFExponentCurve' },
+  camDOFScale: { prefix: 'camDOFScaleCurve' }, camDOFFade: { prefix: 'camDOFFadeCurve' },
+  focusX: { prefix: 'focusXCurve' }, focusY: { prefix: 'focusYCurve' }, focusZ: { prefix: 'focusZCurve' }, camZ: { prefix: 'camZCurve' },
+  dimishZ: { prefix: 'dimishZCurve' }, dimZDist: { prefix: 'dimZDistanceCurve' },
 };
 function mapped(c: MotionCurve, map?: (v: number) => number): MotionCurve {
   return map ? { ...c, points: c.points.map((p) => ({ t: p.t, v: map(p.v) })) } : c;
@@ -494,8 +526,9 @@ function xformCurveAttrs(x: XForm, items: { rest: string; curve: MotionCurve }[]
     else if (rest === 'color') out.push(...curveAttrs('colorCurve', curve, fps));
     else if (rest === 'opacity') out.push(...curveAttrs('opacityCurve', curve, fps));
     else if (rest === 'colorSpeed') out.push(...curveAttrs('colorSymmetryCurve', mapped(curve, (v) => 1 - 2 * v), fps));
-    else if ((m = /^(affine|post)\.([0-5])$/.exec(rest))) {
-      out.push(...curveAttrs(`${m[1] === 'affine' ? 'xyCoeff' : 'xyPostCoeff'}${AFFINE_TO_COEFF[+m[2]]}Curve`, curve, fps));
+    else if ((m = /^(affine|post|yz|zx|yzPost|zxPost)\.([0-5])$/.exec(rest))) {
+      const pfx: Record<string, string> = { affine: 'xyCoeff', post: 'xyPostCoeff', yz: 'yzCoeff', zx: 'zxCoeff', yzPost: 'yzPostCoeff', zxPost: 'zxPostCoeff' };
+      out.push(...curveAttrs(`${pfx[m[1]]}${AFFINE_TO_COEFF[+m[2]]}Curve`, curve, fps));
     } else if ((m = /^(variations|preVariations|postVariations)\.(\d+)\.(weight|params\.(.+))$/.exec(rest))) {
       const vi = (x as any)[m[1]]?.[+m[2]];
       if (!vi || !VARIATIONS[vi.name]) continue;
@@ -528,6 +561,10 @@ function xformToXML(x: XForm, tag: string, nXForms: number, extraAttrs: string[]
   attrs.push(`coefs="${coefsToXML(x.affine)}"`);
   const isIdentityPost = x.post.every((v, i) => Math.abs(v - [1, 0, 0, 0, 1, 0][i]) < 1e-9);
   if (!isIdentityPost) attrs.push(`post="${coefsToXML(x.post)}"`);
+  if (x.yz) attrs.push(`yzCoefs="${coefsToXML(x.yz)}"`);
+  if (x.zx) attrs.push(`zxCoefs="${coefsToXML(x.zx)}"`);
+  if (x.yzPost) attrs.push(`yzPost="${coefsToXML(x.yzPost)}"`);
+  if (x.zxPost) attrs.push(`zxPost="${coefsToXML(x.zxPost)}"`);
   if (tag === 'xform' && x.xaos && x.xaos.some((v) => v !== 1)) {
     const row = Array.from({ length: nXForms }, (_, j) => fmt(x.xaos![j] ?? 1));
     attrs.push(`chaos="${row.join(' ')}"`);
@@ -571,6 +608,10 @@ export function flameToXML(f: Flame, opts: XMLExportOpts = {}): string {
     `center="${fmt(f.centerX)} ${fmt(f.centerY)}" scale="${fmt(scale)}" rotate="${fmt((f.rotation * 180) / Math.PI)}" ` +
     `cam_pitch="${fmt((f.camPitch * Math.PI) / 180)}" cam_yaw="${fmt((f.camYaw * Math.PI) / 180)}" cam_roll="${fmt((f.camBank * Math.PI) / 180)}" cam_persp="${fmt(f.camPersp)}" ` +
     `cam_pos_x="${fmt(f.camPosX)}" cam_pos_y="${fmt(f.camPosY)}" cam_pos_z="${fmt(f.camPosZ)}" preserve_z="${f.preserveZ ? 1 : 0}" ` +
+    `cam_zpos="${fmt(f.camZ ?? 0)}" cam_xfocus="${fmt(f.focusX ?? 0)}" cam_yfocus="${fmt(f.focusY ?? 0)}" cam_zfocus="${fmt(f.focusZ ?? 0)}" ` +
+    `cam_dof="${fmt(f.camDOF ?? 0)}" cam_dof_area="${fmt(f.camDOFArea ?? 0.5)}" cam_dof_exponent="${fmt(f.camDOFExponent ?? 2)}" new_dof="${f.newDOF ? 1 : 0}" ` +
+    `cam_dof_shape="BUBBLE" cam_dof_scale="${fmt(f.camDOFScale ?? 1)}" cam_dof_rotate="0" cam_dof_fade="${fmt(f.camDOFFade ?? 1)}" ` +
+    `cam_zdimish="${fmt(f.dimishZ ?? 0)}" cam_zdimdist="${fmt(f.dimZDist ?? 0)}" cam_zdimcolor="${(f.dimZColor ?? [0, 0, 0]).map(fmt).join(' ')}" ` +
     `filter="0.5" quality="200" brightness="${fmt(f.brightness)}" gamma="${fmt(f.gamma)}" gamma_threshold="${fmt(f.gammaThreshold)}" ` +
     `vibrancy="${fmt(f.vibrancy)}" background="${fmt(f.background[0])} ${fmt(f.background[1])} ${fmt(f.background[2])}"` +
     timeAttrs + (flameCurveAttrs.length ? ' ' + flameCurveAttrs.join(' ') : '') + '>',

@@ -105,9 +105,12 @@ const FLAME_PARAMS: [string, string][] = [
   ['zoom', 'Zoom'], ['rotation', 'Rotation (rad)'], ['centerX', 'Center X'], ['centerY', 'Center Y'],
   ['camPitch', 'Pitch'], ['camYaw', 'Yaw'], ['camBank', 'Bank'], ['camPersp', 'Perspective'],
   ['camPosX', 'Cam X'], ['camPosY', 'Cam Y'], ['camPosZ', 'Cam Z'],
+  ['camDOF', 'DOF amount'], ['camDOFArea', 'DOF area'], ['focusZ', 'Focus Z'], ['camZ', 'Focus plane (legacy)'],
+  ['dimishZ', 'Dimish Z'], ['dimZDist', 'Dimish distance'],
   ['brightness', 'Brightness'], ['gamma', 'Gamma'], ['vibrancy', 'Vibrancy'],
 ];
 const AFF = ['a', 'b', 'c', 'd', 'e', 'f'];
+const AFF3 = ['yz', 'zx', 'yzPost', 'zxPost'] as const;
 
 /** Every animatable numeric parameter of the flame, grouped for a picker. */
 export function paramPaths(flame: Flame): ParamEntry[] {
@@ -126,6 +129,7 @@ export function paramPaths(flame: Flame): ParamEntry[] {
       out.push({ path: `${base}.opacity`, label: `${name} opacity`, group: g });
       AFF.forEach((k, i) => out.push({ path: `${base}.affine.${i}`, label: `${name} affine ${k}`, group: g }));
       AFF.forEach((k, i) => out.push({ path: `${base}.post.${i}`, label: `${name} post ${k}`, group: g }));
+      for (const pl of AFF3) if (x[pl]) AFF.forEach((k, i) => out.push({ path: `${base}.${pl}.${i}`, label: `${name} ${pl} ${k}`, group: g }));
       const lists: [string, typeof x.variations][] = [['variations', x.variations]];
       if (x.preVariations?.length) lists.push(['preVariations', x.preVariations]);
       if (x.postVariations?.length) lists.push(['postVariations', x.postVariations]);

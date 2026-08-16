@@ -15,6 +15,14 @@ export interface VarInstance {
 export interface XForm {
   affine: Affine;
   post: Affine;
+  /** JWildfire 3D affines (optional; identity when absent). Same [a,b,c,d,e,f]
+   *  layout as `affine`, applied in the yz plane (y' = a·y + b·z + c, z' = d·y + e·z + f)
+   *  and the zx plane (x' = a·x + b·z + c, z' = d·x + e·z + f) after the xy affine;
+   *  post variants after the post affine. */
+  yz?: Affine;
+  zx?: Affine;
+  yzPost?: Affine;
+  zxPost?: Affine;
   weight: number;      // relative selection probability
   color: number;       // palette index 0..1
   colorSpeed: number;  // blend speed toward this xform's color
@@ -57,6 +65,24 @@ export interface Flame {
   camPosZ: number;
   /** JWildfire preserve_z: 2D variations pass the point's z through (scaled by weight). */
   preserveZ: boolean;
+  /** Depth of field (JWildfire): amount (0 = off), blur-shape scale, fade (0..1),
+   *  and either the "new" focus-point model (focusX/Y/Z, area, exponent) or the
+   *  legacy focus plane camZ. Blur shape is always the bubble (disc). */
+  camDOF: number;
+  camDOFArea: number;
+  camDOFExponent: number;
+  camDOFScale: number;
+  camDOFFade: number;
+  newDOF: boolean;
+  focusX: number;
+  focusY: number;
+  focusZ: number;
+  camZ: number;
+  /** Depth fade (JWildfire dimish-z): points farther than dimZDist along the camera
+   *  z axis fade toward dimZColor with exp(-d²·dimishZ). */
+  dimishZ: number;
+  dimZDist: number;
+  dimZColor: RGB;
   brightness: number;
   gamma: number;
   /** flam3 gamma_threshold: linear ramp below this alpha, pow(1/gamma) above —
@@ -102,6 +128,9 @@ export function defaultFlame(palette: RGB[]): Flame {
     rotation: 0,
     camPitch: 0, camYaw: 0, camBank: 0, camPersp: 0, camPosX: 0, camPosY: 0, camPosZ: 0,
     preserveZ: false,
+    camDOF: 0, camDOFArea: 0.5, camDOFExponent: 2, camDOFScale: 1, camDOFFade: 1, newDOF: false,
+    focusX: 0, focusY: 0, focusZ: 0, camZ: 0,
+    dimishZ: 0, dimZDist: 0, dimZColor: [0, 0, 0],
     brightness: 3,
     gamma: 3.2,
     gammaThreshold: 0.04,
@@ -183,6 +212,12 @@ function normXForm(x: any): XForm {
     opacity: clamp01(num(x?.opacity, 1)),
     variations: vars.length ? vars : d.variations,
   };
+  for (const k of ['yz', 'zx', 'yzPost', 'zxPost'] as const) {
+    if (Array.isArray(x?.[k]) && x[k].length === 6) {
+      const a = normAffine(x[k], IDENTITY);
+      if (a.some((v, i) => v !== IDENTITY[i])) out[k] = a;
+    }
+  }
   const pre = normVarList(x?.preVariations);
   const post = normVarList(x?.postVariations);
   if (pre?.length) out.preVariations = pre;
@@ -275,6 +310,12 @@ export function normalizeFlame(obj: any, fallbackPalette: RGB[]): Flame {
     camPitch: num(obj?.camPitch, 0), camYaw: num(obj?.camYaw, 0), camBank: num(obj?.camBank, 0), camPersp: num(obj?.camPersp, 0),
     camPosX: num(obj?.camPosX, 0), camPosY: num(obj?.camPosY, 0), camPosZ: num(obj?.camPosZ, 0),
     preserveZ: !!obj?.preserveZ,
+    camDOF: Math.max(0, num(obj?.camDOF, 0)), camDOFArea: Math.max(0, num(obj?.camDOFArea, 0.5)),
+    camDOFExponent: Math.max(0.1, num(obj?.camDOFExponent, 2)), camDOFScale: num(obj?.camDOFScale, 1),
+    camDOFFade: clamp01(num(obj?.camDOFFade, 1)), newDOF: !!obj?.newDOF,
+    focusX: num(obj?.focusX, 0), focusY: num(obj?.focusY, 0), focusZ: num(obj?.focusZ, 0), camZ: num(obj?.camZ, 0),
+    dimishZ: Math.max(0, num(obj?.dimishZ, 0)), dimZDist: num(obj?.dimZDist, 0),
+    dimZColor: (Array.isArray(obj?.dimZColor) && obj.dimZColor.length === 3 ? obj.dimZColor.map((v: unknown) => clamp01(num(v, 0))) : [0, 0, 0]) as RGB,
     brightness: Math.max(0.05, num(obj?.brightness, 3)),
     gamma: Math.max(0.5, num(obj?.gamma, 3.2)),
     gammaThreshold: Math.min(0.5, Math.max(0, num(obj?.gammaThreshold, 0.04))),

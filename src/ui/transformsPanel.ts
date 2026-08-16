@@ -403,6 +403,33 @@ export function buildTransformsPanel(app: App, root: HTMLElement) {
     });
     editorSec.append(postGrid);
 
+    // 3D affines: yz / zx planes (+ post), collapsed unless any is set
+    const planes = [['yz', 'YZ (y′ = a·y + b·z + c, z′ = d·y + e·z + f)'], ['zx', 'ZX (x′ = a·x + b·z + c, z′ = d·x + e·z + f)'], ['yzPost', 'YZ post'], ['zxPost', 'ZX post']] as const;
+    const any3d = planes.some(([k]) => x[k]);
+    const h3d = el('h3', '', `3D affines ${any3d ? '' : '(identity)'}`);
+    h3d.style.cursor = 'pointer';
+    h3d.title = 'Extra affine planes applied after the 2D affine (yz, then zx); post variants after the post affine.';
+    editorSec.append(h3d);
+    const box3d = el('div', '');
+    box3d.style.display = any3d ? 'block' : 'none';
+    h3d.onclick = () => { box3d.style.display = box3d.style.display === 'none' ? 'block' : 'none'; };
+    for (const [key, label] of planes) {
+      const cap = el('div', 'hint', label);
+      cap.style.margin = '4px 0 0';
+      const g = el('div', 'affine-grid');
+      const cur = x[key] ?? IDENTITY;
+      cur.forEach((v, i) => {
+        g.append(numberInput(v, 0.01, (nv) => {
+          const a = [...(x[key] ?? IDENTITY)] as typeof IDENTITY;
+          a[i] = nv;
+          if (a.every((q, k) => Math.abs(q - IDENTITY[k]) < 1e-12)) delete x[key]; else x[key] = a;
+          app.commit(SRC);
+        }));
+      });
+      box3d.append(cap, g);
+    }
+    editorSec.append(box3d);
+
     // Variations (pre stage / main / post stage)
     const renderVarGroup = (title: string, arr: () => XForm['variations'], removable: boolean) => {
       const list = arr();

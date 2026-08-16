@@ -49,6 +49,48 @@ export function buildRenderPanel(app: App, root: HTMLElement) {
   cam.append(zoomS.root, rotS.root, pitchS.root, yawS.root, perspS.root, camZS.root, pzRow);
   cam.append(el('div', 'hint', 'Drag the canvas to pan · scroll to zoom · drag triangle handles to edit transforms. Pitch/yaw/perspective view the flame in 3D.'));
 
+  // Depth of field + depth fade
+  const dof = el('div', 'section');
+  dof.append(el('h3', '', 'Depth of field'));
+  const dofS = slider({
+    label: 'Amount', min: 0, max: 2, step: 0.01, value: app.flame.camDOF ?? 0,
+    onInput: (v) => { app.flame.camDOF = v; app.commit(SRC); },
+  });
+  const dofAreaS = slider({
+    label: 'Focus area', min: 0, max: 2, step: 0.01, value: app.flame.camDOFArea ?? 0.5,
+    onInput: (v) => { app.flame.camDOFArea = v; app.commit(SRC); },
+  });
+  const focusZS = slider({
+    label: 'Focus Z', min: -2, max: 2, step: 0.01, value: app.flame.focusZ ?? 0,
+    onInput: (v) => { app.flame.focusZ = v; app.flame.newDOF = true; app.commit(SRC); },
+  });
+  const fadeS = slider({
+    label: 'Fade', min: 0, max: 1, step: 0.01, value: app.flame.camDOFFade ?? 1,
+    onInput: (v) => { app.flame.camDOFFade = v; app.commit(SRC); },
+  });
+  const dimS = slider({
+    label: 'Dimish Z', min: 0, max: 5, step: 0.05, value: app.flame.dimishZ ?? 0,
+    onInput: (v) => { app.flame.dimishZ = v; app.commit(SRC); },
+  });
+  const dimDistS = slider({
+    label: 'Dim distance', min: -2, max: 2, step: 0.01, value: app.flame.dimZDist ?? 0,
+    onInput: (v) => { app.flame.dimZDist = v; app.commit(SRC); },
+  });
+  const dimColRow = el('div', 'row');
+  dimColRow.append(el('label', '', 'Dim colour'));
+  const dimColInp = el('input') as HTMLInputElement;
+  dimColInp.type = 'color';
+  const toHex3 = (c: number[]) => '#' + c.map((v) => Math.round(v * 255).toString(16).padStart(2, '0')).join('');
+  dimColInp.value = toHex3(app.flame.dimZColor ?? [0, 0, 0]);
+  dimColInp.addEventListener('input', () => {
+    const h = dimColInp.value;
+    app.flame.dimZColor = [parseInt(h.slice(1, 3), 16) / 255, parseInt(h.slice(3, 5), 16) / 255, parseInt(h.slice(5, 7), 16) / 255];
+    app.commit(SRC);
+  });
+  dimColRow.append(dimColInp);
+  dof.append(dofS.root, dofAreaS.root, focusZS.root, fadeS.root, dimS.root, dimDistS.root, dimColRow);
+  dof.append(el('div', 'hint', 'Points away from the focus blur into discs (amount × distance); Dimish Z fades points beyond the dim distance toward the dim colour. Both need depth: use 3D variations, pitch/yaw, or a 3D affine.'));
+
   const tone = el('div', 'section');
   tone.append(el('h3', '', 'Tone'));
   const brS = slider({
@@ -300,7 +342,7 @@ export function buildRenderPanel(app: App, root: HTMLElement) {
     }
   };
 
-  root.append(cam, tone, perf, io);
+  root.append(cam, dof, tone, perf, io);
 
   app.on('flame', (src) => {
     if (src === SRC) return;
@@ -308,6 +350,8 @@ export function buildRenderPanel(app: App, root: HTMLElement) {
     rotS.set((app.flame.rotation * 180) / Math.PI);
     pitchS.set(app.flame.camPitch); yawS.set(app.flame.camYaw); perspS.set(app.flame.camPersp); camZS.set(app.flame.camPosZ);
     pzChk.checked = app.flame.preserveZ;
+    dofS.set(app.flame.camDOF ?? 0); dofAreaS.set(app.flame.camDOFArea ?? 0.5); focusZS.set(app.flame.focusZ ?? 0); fadeS.set(app.flame.camDOFFade ?? 1);
+    dimS.set(app.flame.dimishZ ?? 0); dimDistS.set(app.flame.dimZDist ?? 0); dimColInp.value = toHex3(app.flame.dimZColor ?? [0, 0, 0]);
     brS.set(app.flame.brightness);
     gaS.set(app.flame.gamma);
     gtS.set(app.flame.gammaThreshold ?? 0.04);

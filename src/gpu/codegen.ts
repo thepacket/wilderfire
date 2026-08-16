@@ -14,6 +14,7 @@
 //   [8..15]             reserved
 //   per visible layer:  CDF table ((n+1) rows × 16) then xform blocks
 //   per-xform block:    6 affine, 6 post, color, colorSpeed, opacity, pad,
+//                       6 yz, 6 zx, 6 yzPost, 6 zxPost (JWildfire 3D affines),
 //                       then per variation: weight + params
 
 import type { Flame, XForm, VarInstance } from '../core/flame';
@@ -21,7 +22,7 @@ import { visibleLayers } from '../core/flame';
 import { VARIATIONS } from '../core/variations';
 
 const CDF_ROW = 16;
-const HEADER = 16;    // floats per xform block header
+const HEADER = 40;    // floats per xform block header
 const XD_HEADER = 16; // floats reserved at the front of xd
 
 export interface CompiledFlame {
@@ -133,15 +134,31 @@ ${snips}    ${output} = v;${zOut ? `\n    ${zOut} = pz_;` : ''}
 `;
   };
 
-  let body = `  var t0 = vec2f(${A(0)}*pin.x + ${A(1)}*pin.y + ${A(2)}, ${A(3)}*pin.x + ${A(4)}*pin.y + ${A(5)});\n`;
-  body += '  var zout = pin.z;\n';
-  if (pre.length) body += genStage(pre, 't0', 't0', 'vec2f(0.0, 0.0)', 'pin.z', null);
+  // JWildfire TransformationAffineFullStep: xy linear part, then the yz plane,
+  // then the zx plane, and all translations added at the end.
+  let body = `  let ax = ${A(0)}*pin.x + ${A(1)}*pin.y;
+  let ay = ${A(3)}*pin.x + ${A(4)}*pin.y;
+  let ay2 = ${A(16)}*ay + ${A(17)}*pin.z;
+  let az2 = ${A(19)}*ay + ${A(20)}*pin.z;
+  let ax3 = ${A(22)}*ax + ${A(23)}*az2;
+  let az3 = ${A(25)}*ax + ${A(26)}*az2;
+  var t0 = vec2f(ax3 + ${A(2)} + ${A(24)}, ay2 + ${A(5)} + ${A(18)});
+  let zin = az3 + ${A(21)} + ${A(27)};
+`;
+  body += '  var zout = zin;\n';
+  if (pre.length) body += genStage(pre, 't0', 't0', 'vec2f(0.0, 0.0)', 'zin', null);
   body += '  var vout = vec2f(0.0, 0.0);\n';
-  body += genStage(main, 't0', 'vout', 'vec2f(0.0, 0.0)', 'pin.z', 'zout');
+  body += genStage(main, 't0', 'vout', 'vec2f(0.0, 0.0)', 'zin', 'zout');
   if (post.length) body += genStage(post, 'vout', 'vout', 'vec2f(0.0, 0.0)', 'zout', null);
 
   return `fn ${name}(pin: vec3f, cp: ptr<function, f32>, rs: ptr<function, u32>, hd: ptr<function, bool>) -> vec3f {
-${body}  return vec3f(${A(6)}*vout.x + ${A(7)}*vout.y + ${A(8)}, ${A(9)}*vout.x + ${A(10)}*vout.y + ${A(11)}, zout);
+${body}  let px1 = ${A(6)}*vout.x + ${A(7)}*vout.y;
+  let py1 = ${A(9)}*vout.x + ${A(10)}*vout.y;
+  let py2 = ${A(28)}*py1 + ${A(29)}*zout;
+  let pz2 = ${A(31)}*py1 + ${A(32)}*zout;
+  let px3 = ${A(34)}*px1 + ${A(35)}*pz2;
+  let pz3 = ${A(37)}*px1 + ${A(38)}*pz2;
+  return vec3f(px3 + ${A(8)} + ${A(36)}, py2 + ${A(11)} + ${A(30)}, pz3 + ${A(33)} + ${A(39)});
 }`;
 }
 
@@ -238,6 +255,7 @@ ${cases}
     var rx: f32;
     var ry: f32;
     var visible = true;
+    var dz = 1.0; // dimish-z intensity
     if (cam3d) {
       // JWildfire 3D camera: rotate by the camera matrix (yaw/pitch/roll), offset,
       // then perspective-divide; the centre offset applies after projection.
@@ -246,8 +264,38 @@ ${cases}
       let cz = P.m2.x * dp.x + P.m2.y * dp.y + P.m2.z * dp.z + P.camPos.z;
       let zr = 1.0 - P.camPersp * cz + P.camPos.z;
       visible = zr >= 1e-9;
-      rx = cx / zr - P.centerX;
-      ry = cy / zr - P.centerY;
+      // dimish-z: fade points beyond dimZDist toward the dim colour
+      if (P.dimZ.x > 1e-9) {
+        let zd = P.dimZ.y - cz;
+        if (zd > 0.0) { dz = exp(-zd * zd * P.dimZ.x); }
+      }
+      var px = cx;
+      var py = cy;
+      // depth of field (bubble shape): random disc offset ∝ distance from focus
+      if (P.dof.x != 0.0) {
+        var dist = 0.0;
+        if (P.dof.w > 0.5) {
+          let fx_ = cx - P.focus.x; let fy_ = cy - P.focus.y; let fz_ = cz - P.focus.z;
+          let d = pow(fx_ * fx_ + fy_ * fy_ + fz_ * fz_, 1.0 / P.dof.y);
+          let area = P.focus.w; let fade = area / 2.25; let amf = area - fade;
+          if (d > area) { dist = d; }
+          else if (d > amf) { let u = clamp((d - amf) / fade, 0.0, 1.0); dist = u * u * u * (u * (u * 6.0 - 15.0) + 10.0) * d; }
+        } else {
+          let zd_ = P.camZ - cz;
+          if (zd_ > 0.0) { dist = zd_; }
+        }
+        if (dist > 0.0) {
+          var ff = 1.0;
+          if (P.dof.z >= 0.999999) { ff = rnd(&rs); }
+          else if (P.dof.z > 1e-6) { if (rnd(&rs) <= P.dof.z) { ff = rnd(&rs); } }
+          let dr = ff * P.dof.x * dist;
+          let ang = 6.28318530718 * rnd(&rs);
+          px = cx + dr * cos(ang);
+          py = cy + dr * sin(ang);
+        }
+      }
+      rx = px / zr - P.centerX;
+      ry = py / zr - P.centerY;
     } else {
       let ox = dp.x - P.centerX;
       let oy = dp.y - P.centerY;
@@ -259,7 +307,8 @@ ${cases}
     let fy = ry * P.ppu + offY;
     if (visible && fx >= 0.0 && fy >= 0.0 && fx < f32(P.width) && fy < f32(P.height)) {
       let hi = (u32(fy) * P.width + u32(fx)) * 4u;
-      let col = pal[${li * 256}u + min(u32(clamp(dc, 0.0, 1.0) * 255.99), 255u)];
+      var col = pal[${li * 256}u + min(u32(clamp(dc, 0.0, 1.0) * 255.99), 255u)];
+      if (dz < 1.0) { col = vec4f(mix(P.dimColor.xyz, col.xyz, dz), col.w); }
       atomicAdd(&hist[hi + 0u], u32(col.x * op * 255.0));
       atomicAdd(&hist[hi + 1u], u32(col.y * op * 255.0));
       atomicAdd(&hist[hi + 2u], u32(col.z * op * 255.0));
@@ -301,9 +350,13 @@ struct Params {
   m2: vec4f,
   camPos: vec4f, // xyz: camera position offset, w: camPersp
   camPersp: f32,
-  _p1: f32,
+  camZ: f32,     // legacy DOF focus plane
   _p2: f32,
   _p3: f32,
+  focus: vec4f,  // xyz: DOF focus point, w: DOF area
+  dof: vec4f,    // x: 0.1·camDOF·scale, y: exponent, z: fade, w: newDOF flag
+  dimZ: vec4f,   // x: dimishZ, y: dimZDist
+  dimColor: vec4f,
 };
 
 @group(0) @binding(0) var<uniform> P: Params;
@@ -386,6 +439,11 @@ ${lcases}
         out[B + 12] = x.color;
         out[B + 13] = x.colorSpeed;
         out[B + 14] = x.opacity;
+        const I = [1, 0, 0, 0, 1, 0];
+        for (let i = 0; i < 6; i++) out[B + 16 + i] = x.yz?.[i] ?? I[i];
+        for (let i = 0; i < 6; i++) out[B + 22 + i] = x.zx?.[i] ?? I[i];
+        for (let i = 0; i < 6; i++) out[B + 28 + i] = x.yzPost?.[i] ?? I[i];
+        for (let i = 0; i < 6; i++) out[B + 34 + i] = x.zxPost?.[i] ?? I[i];
         let o = B + HEADER;
         for (const list of varLists(x)) {
           for (const vi of list) {
