@@ -4,8 +4,9 @@
 // never recompile — only structural edits (adding/removing layers, xforms or
 // variations, toggling layer visibility) do.
 //
-// Layers: walker threads are partitioned across visible layers proportionally
-// to layer weight (cutoffs in the xd header, so weight tweaks stay numeric).
+// Layers: walker threads are partitioned equally across visible layers (JWildfire iterates every
+// layer equally often); the layer weight multiplies the plotted colour (xd header slots 8+li, so
+// weight tweaks stay numeric).
 // Each layer gets its own iteration function, CDF rows (xaos), xform blocks,
 // and a 256-entry slice of the palette buffer.
 //
@@ -22,13 +23,15 @@ import { visibleLayers } from '../core/flame';
 import { VARIATIONS } from '../core/variations';
 
 const CDF_ROW = 16;
-const HEADER = 40;    // floats per xform block header
+const HEADER = 48;    // floats per xform block header (6 affine, 6 post, color, colorSpeed, opacity, pad, 24 3D affines, 8 colour modifiers)
 const XD_HEADER = 16; // floats reserved at the front of xd
 
 export interface CompiledFlame {
   wgsl: string;
   dataSize: number; // float count for the xd buffer
   writeData(flame: Flame, out: Float32Array): void;
+  /** The kernel carries per-point colour modifiers (JWildfire mod_gamma/…): binding 6 `mods` must be bound. */
+  usesMods: boolean;
 }
 
 /** All variation lists of an xform in serialized order: pre, main, post. */
@@ -52,7 +55,7 @@ function collectFuncs(flame: Flame): string {
   const seen = new Set<string>();
   const parts: string[] = [];
   for (const ly of visibleLayers(flame)) {
-    const xs = ly.final ? [...ly.xforms, ly.final] : ly.xforms;
+    const xs = [...ly.xforms, ...(ly.final ? [ly.final] : []), ...ly.moreFinals];
     for (const x of xs) {
       for (const list of varLists(x)) {
         for (const vi of list) {
@@ -107,15 +110,30 @@ function genXformFn(name: string, x: XForm, B: number, palBase: number): string 
       const w = `xd[${off}u]`;
       const p = (def.params ?? []).map((_, k) => `xd[${off + 1 + k}u]`);
       off += 1 + (def.params?.length ?? 0);
-      return { def, w, p, prio: def.priority ?? 0 };
+      const dprio = def.priority ?? 0;
+      // JWildfire per-instance override: only a normal variation forced to pre/post has a distinct meaning
+      // (EnforcedPre/PostVariationTransformationStep: the point becomes p + w·f(p)); other combinations keep the definition
+      const forced = vi.priority !== undefined && vi.priority !== dprio && dprio === 0 && (vi.priority === -1 || vi.priority === 1) ? vi.priority : 0;
+      return { def, w, p, prio: forced !== 0 ? forced : dprio, forced };
     }).filter((b): b is NonNullable<typeof b> => b !== null);
     // …then emit in priority order.
     let snips = '';
+    const precalc = '    r2 = max(dot(t, t), 1e-12); r = sqrt(r2); th = atan2(t.x, t.y); ph = atan2(t.y, t.x);\n';
     for (const prio of [-2, -1, 0, 1, 2]) {
       for (const b of bound) {
         // prepost variations: their inverse snippet rewrites the input first (prio -2), the forward one runs last (prio 2)
         if (prio === -2 && b.def.preCode) { snips += '    ' + b.def.preCode(b.w, b.p, A) + '\n'; continue; }
         if (b.prio !== prio) continue;
+        if (b.forced === -1) {
+          // enforced pre: input ← input + w·f(input) (the snippet adds into v; v is borrowed and restored)
+          snips += `    {\n      let v_keep = v; let pz_keep = pz_; v = t; pz_ = z_;\n    ${b.def.code(b.w, b.p, A)}\n      t = v; z_ = pz_; v = v_keep; pz_ = pz_keep;\n    }\n` + precalc;
+          continue;
+        }
+        if (b.forced === 1) {
+          // enforced post: output ← output + w·f(output) (the snippet reads t; t is borrowed and restored)
+          snips += `    {\n      let t_keep = t; let z_keep = z_; t = v; z_ = pz_;\n` + precalc + `    ${b.def.code(b.w, b.p, A)}\n      t = t_keep; z_ = z_keep;\n    }\n` + precalc;
+          continue;
+        }
         snips += '    ' + b.def.code(b.w, b.p, A) + '\n';
         if (prio === 0 && zOut && !(b.def.flags ?? []).includes('z')) {
           snips += `    if (P.flags & 1u) != 0u { pz_ += ${b.w} * z_; }\n`;
@@ -165,8 +183,82 @@ ${body}  let px1 = ${A(6)}*vout.x + ${A(7)}*vout.y;
 }`;
 }
 
+// JWildfire per-transform colour modifiers (DefaultRenderIterationState.transformPlotColor + its
+// HSLRGBConverter, ported literally incl. quirks): the four modifier values travel with the point and
+// are blended per transform like the colour; at plot time they reshape the palette RGB, which
+// JWildfire holds on a 0..199.2 scale (palette·200/256) — the gamma and contrast formulas depend on that scale.
+const MODS_WGSL = `@group(0) @binding(6) var<storage, read_write> mods: array<vec4f>; // per-point [gamma, contrast, saturation, hue]
+
+fn modBlend(m: vec4f, b: u32) -> vec4f {
+  // m' = m·(1+speed)/2 + value·(1−speed)/2 (block slots 40..47: value/speed pairs)
+  let v = vec4f(xd[b + 40u], xd[b + 42u], xd[b + 44u], xd[b + 46u]);
+  let s = vec4f(xd[b + 41u], xd[b + 43u], xd[b + 45u], xd[b + 47u]);
+  return m * (1.0 + s) * 0.5 + v * (1.0 - s) * 0.5;
+}
+
+fn hslFromRgb(rgb: vec3f) -> vec3f {
+  let r = clamp(rgb.x, 0.0, 1.0); let g = clamp(rgb.y, 0.0, 1.0); let bl = clamp(rgb.z, 0.0, 1.0);
+  let mx = max(r, max(g, bl)); let mn = min(r, min(g, bl));
+  let l = (mn + mx) * 0.5;
+  var h = 1.0; var s = 0.0;
+  if (abs(l) > 1e-10) {
+    s = mx - mn;
+    if (abs(s) > 1e-10) {
+      s = s / select(2.0 - mx - mn, mn + mx, l <= 0.5);
+      if (abs(r - mx) < 1e-10) { h = select(1.0 - (mx - g) / (mx - mn), 5.0 + (mx - bl) / (mx - mn), g == mn); }
+      else if (abs(g - mx) < 1e-10) { h = select(3.0 - (mx - bl) / (mx - mn), 1.0 + (mx - r) / (mx - mn), bl == mn); }
+      else { h = select(5.0 - (mx - r) / (mx - mn), 3.0 + (mx - g) / (mx - mn), r == mn); }
+      h = h / 6.0;
+    }
+  }
+  return vec3f(h, s, l);
+}
+
+fn rgbFromHsl(hsl: vec3f) -> vec3f {
+  var h = clamp(hsl.x, 0.0, 1.0); let s = clamp(hsl.y, 0.0, 1.0); let l = clamp(hsl.z, 0.0, 1.0);
+  let v = select(l + s - l * s, l * (1.0 + s), l <= 0.5);
+  if (v <= 0.0) { return vec3f(0.0); }
+  h = clamp(h * 6.0, 0.0, 6.0);
+  let hi = floor(h);
+  let y = l + l - v;
+  let x = y + (v - y) * (h - hi);
+  let z = v - (v - y) * (h - hi);
+  let i = i32(hi);
+  if (i == 1) { return vec3f(z, v, y); }
+  if (i == 2) { return vec3f(y, v, x); }
+  if (i == 3) { return vec3f(y, z, v); }
+  if (i == 4) { return vec3f(x, y, v); }
+  if (i == 5) { return vec3f(v, y, z); }
+  return vec3f(v, x, y);
+}
+
+fn applyColorMods(col: vec3f, m: vec4f) -> vec3f {
+  const S: f32 = 255.0 * 200.0 / 256.0; // JWildfire RenderColor scale
+  var c = col * S;
+  if (abs(m.x) > 1e-10) {
+    let gamma = 4.2 / (4.2 - m.x);
+    let alpha = c.x * 0.299 + c.y * 0.588 + c.z * 0.113;
+    if (alpha > 1e-10) { c = c * (pow(alpha, gamma) / alpha); }
+  }
+  if (abs(m.y) > 1e-10) {
+    let gamma = 1.2 / (1.2 - m.y * 0.5);
+    c = (c - 127.5) * gamma + 127.5;
+  }
+  if (abs(m.z) > 1e-10) {
+    let avg = c.x * 0.299 + c.y * 0.588 + c.z * 0.113;
+    c = c + (c - avg) * m.z;
+  }
+  if (abs(m.w) > 1e-10) {
+    let hsl = hslFromRgb(c / 255.0);
+    c = clamp(round(rgbFromHsl(vec3f(hsl.x + m.w, hsl.y, hsl.z)) * 255.0), vec3f(0.0), vec3f(255.0));
+  }
+  return max(c, vec3f(0.0)) / S;
+}
+`;
+
 export function compileFlame(flame: Flame, nPoints: number): CompiledFlame {
   const layers = visibleLayers(flame);
+  const usesMods = layers.some((ly) => [...ly.xforms, ...(ly.final ? [ly.final] : []), ...ly.moreFinals].some((x) => x.colorMods?.some((v) => v !== 0)));
   const L = layers.length;
 
   // ---- Layout ----
@@ -178,7 +270,8 @@ export function compileFlame(flame: Flame, nPoints: number): CompiledFlame {
     const bases = ly.xforms.map((x) => { const b = off; off += blockSize(x); return b; });
     let finalBase = -1;
     if (ly.final) { finalBase = off; off += blockSize(ly.final); }
-    return { n, cdfBase, bases, finalBase };
+    const moreBases = ly.moreFinals.map((x) => { const b = off; off += blockSize(x); return b; });
+    return { n, cdfBase, bases, finalBase, moreBases };
   });
   const dataSize = Math.max(off, 64);
 
@@ -191,6 +284,7 @@ export function compileFlame(flame: Flame, nPoints: number): CompiledFlame {
       funcs += genXformFn(`applyX${li}_${i}`, x, info.bases[i], li * 256) + '\n\n';
     });
     if (ly.final) funcs += genXformFn(`applyF${li}`, ly.final, info.finalBase, li * 256) + '\n\n';
+    ly.moreFinals.forEach((x, k) => { funcs += genXformFn(`applyF${li}_${k}`, x, info.moreBases[k], li * 256) + '\n\n'; });
 
     let sel = `    let cb = ${info.cdfBase}u + (prev + 1u) * ${CDF_ROW}u;\n    var xi = 0u;\n`;
     for (let i = 0; i < info.n - 1; i++) {
@@ -202,16 +296,19 @@ export function compileFlame(flame: Flame, nPoints: number): CompiledFlame {
       return `      case ${i}u: {
         let cs = xd[${b + 13}u];
         c = c * (1.0 - cs) + xd[${b + 12}u] * cs;
-        op = xd[${b + 14}u];
+        op = xd[${b + 14}u];${usesMods ? `\n        m = modBlend(m, ${b}u);` : ''}
         np = applyX${li}_${i}(p, &c, &rs, &hide, &rgbo);
       }`;
     }).join('\n');
-    const finalBlock = ly.final ? `
+    // final transforms run in sequence (JWildfire: each further final takes the previous output)
+    const finalStep = (fn: string, base: number, input: string) => `
       {
-        let fcs = xd[${info.finalBase + 13}u];
-        dc = dc * (1.0 - fcs) + xd[${info.finalBase + 12}u] * fcs;
+        let fcs = xd[${base + 13}u];
+        dc = dc * (1.0 - fcs) + xd[${base + 12}u] * fcs;${usesMods ? `\n        dm = modBlend(dm, ${base}u);` : ''}
       }
-      dp = applyF${li}(p, &dc, &rs, &hide, &rgbo);` : '';
+      dp = ${fn}(${input}, &dc, &rs, &hide, &rgbo);`;
+    let finalBlock = ly.final ? finalStep(`applyF${li}`, info.finalBase, 'p') : '';
+    ly.moreFinals.forEach((_, k) => { finalBlock += finalStep(`applyF${li}_${k}`, info.moreBases[k], 'dp'); }); // dp starts as p
 
     iterFns += `
 fn iterLayer${li}(idx: u32) {
@@ -220,7 +317,7 @@ fn iterLayer${li}(idx: u32) {
   var prev = min(rngs[idx].y & 255u, ${info.n - 1}u);
   var fuse = f32(rngs[idx].y >> 8u);
   var p = pt.xyz;
-  var c = pt.w;
+  var c = pt.w;${usesMods ? '\n  var m = mods[idx];' : ''}
   let ca = cos(P.rotation);
   let sa = sin(P.rotation);
   let offX = P.fullW * 0.5 - P.tileX;
@@ -241,19 +338,27 @@ ${cases}
     prev = xi;
     p = np;
 
-    if (p.x != p.x || p.y != p.y || p.z != p.z || abs(p.x) > 1e10 || abs(p.y) > 1e10 || abs(p.z) > 1e10) {
+    // JWildfire re-fuses a point only when a coordinate is NaN/infinite (it never limits the magnitude,
+    // and its doubles give z ~1e300 of headroom under preserve_z growth). In f32 z would overflow where
+    // JWildfire's is merely huge, and an infinite z poisons x/y through the 0·z terms of the identity
+    // 3D affines — so z is kept finite (|z| ≤ 1e18, NaN → 0) and only x/y decide whether the point restarts.
+    // JWildfire notices the bad point only at its next validateState() (every 1000 iterations, so ~500
+    // wasted-but-counted iterations on average) and then fuses 20 more; the same expected loss here.
+    if (p.x != p.x || p.y != p.y || abs(p.x) > 3.0e38 || abs(p.y) > 3.0e38) {
       p = vec3f(rnd(&rs) * 2.0 - 1.0, rnd(&rs) * 2.0 - 1.0, 0.0);
-      c = rnd(&rs);
-      fuse = 100.0;
+      c = rnd(&rs);${usesMods ? '\n      m = vec4f(0.0);' : ''}
+      fuse = 21.0 + floor(rnd(&rs) * 1000.0);
       continue;
     }
+    if (p.z != p.z) { p.z = 0.0; }
+    p.z = clamp(p.z, -1.0e18, 1.0e18);
     if (fuse > 0.0) {
       fuse = fuse - 1.0;
       continue;
     }
 
     var dp = p;
-    var dc = c;${finalBlock}
+    var dc = c;${usesMods ? '\n    var dm = m;' : ''}${finalBlock}
     if (hide) { op = 0.0; }
 
     var rx: f32;
@@ -319,16 +424,19 @@ ${cases}
     if (visible && fx >= 0.0 && fy >= 0.0 && fx < f32(P.width) && fy < f32(P.height)) {
       let hi = (u32(fy) * P.width + u32(fx)) * 4u;
       var col = pal[${li * 256}u + min(u32(clamp(dc, 0.0, 1.0) * 255.99), 255u)];
-      if (rgbo.w > 0.5) { col = vec4f(clamp(rgbo.xyz, vec3f(0.0), vec3f(1.0)), 1.0); }
+      if (rgbo.w > 0.5) { col = vec4f(clamp(rgbo.xyz, vec3f(0.0), vec3f(1.0)), 1.0); }${usesMods ? '\n      col = vec4f(applyColorMods(col.xyz, dm), col.w);' : ''}
       if (dz < 1.0) { col = vec4f(mix(P.dimColor.xyz, col.xyz, dz), col.w); }
-      atomicAdd(&hist[hi + 0u], u32(col.x * op * 255.0));
-      atomicAdd(&hist[hi + 1u], u32(col.y * op * 255.0));
-      atomicAdd(&hist[hi + 2u], u32(col.z * op * 255.0));
+      let lw = op * xd[${8 + li}u]; // JWildfire layer weight: colour intensity multiplier (the density count is unaffected)
+      // fixed-point colour accumulation is dithered so dim contributions (small weights/opacities) stay unbiased
+      let dth = rnd(&rs);
+      atomicAdd(&hist[hi + 0u], u32(col.x * lw * 255.0 + dth));
+      atomicAdd(&hist[hi + 1u], u32(col.y * lw * 255.0 + dth));
+      atomicAdd(&hist[hi + 2u], u32(col.z * lw * 255.0 + dth));
       atomicAdd(&hist[hi + 3u], u32(op * 256.0));
     }
   }
 
-  pts[idx] = vec4f(p, c);
+  pts[idx] = vec4f(p, c);${usesMods ? '\n  mods[idx] = m;' : ''}
   rngs[idx] = vec2u(rs, prev | (u32(fuse) << 8u));
 }
 `;
@@ -378,6 +486,7 @@ struct Params {
 @group(0) @binding(3) var<storage, read_write> rngs: array<vec2u>; // x: rng state, y: prev xform
 @group(0) @binding(4) var<storage, read_write> hist: array<atomic<u32>>;
 @group(0) @binding(5) var<storage, read> pal: array<vec4f>;
+${usesMods ? MODS_WGSL : ''}
 
 fn rnd(state: ptr<function, u32>) -> f32 {
   var x = *state;
@@ -415,16 +524,15 @@ ${lcases}
     out.fill(0);
     const ls = visibleLayers(fl);
 
-    // Layer thread cutoffs
-    let lw = ls.map((l) => Math.max(l.weight, 0));
-    let tot = lw.reduce((a, b) => a + b, 0);
-    if (tot <= 1e-12) { lw = lw.map(() => 1); tot = lw.length; }
+    // Layer thread cutoffs: like JWildfire every layer iterates equally often (one iteration state per
+    // layer, round-robin); the layer weight scales the plotted colour, not the sample share (slots 8+li).
     let acc = 0;
     ls.forEach((_, i) => {
-      acc += lw[i] / tot;
+      acc += 1 / ls.length;
       out[i] = Math.round(acc * nPoints);
     });
     if (ls.length) out[ls.length - 1] = nPoints + 1;
+    ls.forEach((l, i) => { out[8 + i] = Math.max(l.weight, 0); });
 
     ls.forEach((ly, li) => {
       if (li >= infos.length) return;
@@ -462,6 +570,7 @@ ${lcases}
         for (let i = 0; i < 6; i++) out[B + 22 + i] = x.zx?.[i] ?? I[i];
         for (let i = 0; i < 6; i++) out[B + 28 + i] = x.yzPost?.[i] ?? I[i];
         for (let i = 0; i < 6; i++) out[B + 34 + i] = x.zxPost?.[i] ?? I[i];
+        for (let i = 0; i < 8; i++) out[B + 40 + i] = x.colorMods?.[i] ?? 0;
         let o = B + HEADER;
         for (const list of varLists(x)) {
           for (const vi of list) {
@@ -476,10 +585,11 @@ ${lcases}
       };
       ly.xforms.forEach((x, i) => { if (i < info.bases.length) writeBlock(x, info.bases[i]); });
       if (ly.final && info.finalBase >= 0) writeBlock(ly.final, info.finalBase);
+      ly.moreFinals.forEach((x, k) => { if (k < info.moreBases.length) writeBlock(x, info.moreBases[k]); });
     });
   };
 
-  return { wgsl, dataSize, writeData };
+  return { wgsl, dataSize, writeData, usesMods };
 }
 
 export const TONEMAP_WGSL = `// WilderFire tonemap: density-estimation filter + log-density + gamma/vibrancy

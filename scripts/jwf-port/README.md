@@ -196,11 +196,29 @@ hits (coverage 0.94 vs 0.44 on Phoenix_0) — now rounded the same way; (2)
 **fuse** — 65k GPU walkers × a few hundred steps each per export made the
 20-step transient visible on slowly contracting flames; re-seeds now fuse
 200 (100 live) and those iterations are excluded from the sample count.
-Of the 44 random-generator fixtures, 6 reference variations we do not have
-(`barycentroid`, `colordomain`, `glsl_apollonian`, `glynns3subfl`,
-`post_brush_stroke_wf`, `cut_triskel`) and 7 still differ (`Bokeh_1`,
-`Cross_1`, `EDisc_1`, `Galaxies_0`, `Julians_0` — hopalong's single long
-trajectory vs our 65k short ones — `Orchids_0/1`, `Rays_0`); the rest match.
+Of the 44 random-generator fixtures, 3 reference variations we do not have
+(`colordomain` in `Rays_0`, `post_brush_stroke_wf` in `Duckies_1`/`Painterly_0`)
+and 3 differ for an inherent reason (`Julians_0` — hopalong's single long
+trajectory vs our 65k short ones — `Cross_0`, `Splits_1`: non-contracting
+walks whose JWildfire points drift out of view over millions of steps while
+our short trajectories stay near the origin); **the other 38 match**
+(`Bokeh_1` closest at 0.80 / corr 0.84 — a three-layer flame).
+
+### Engine semantics found by the isolate-and-diff loop (2026-08-17)
+
+Each of these was found by making XML variants of a differing fixture
+(`flameCompare({sets: [], files: […]})` + `MANIFEST=manifest.part.json … Compare`)
+until one attribute explained the difference, then ported from the JWildfire source:
+
+| JWildfire behaviour | fixture | fix |
+|---|---|---|
+| A **final xform does not recolour** unless `color_type="DIFFUSION"` (finals default to `ColorType.NONE`; normal xforms to DIFFUSION) | Cross_1, Orchids | importer sets colorSpeed 0 for finals without an explicit DIFFUSION/TARGETG; exporter writes `color_type="DIFFUSION"` when a final has speed; new finals get speed 0 |
+| **Several final xforms** per layer, applied in sequence | Orchids_0/1, Bokeh_1 | `Layer.moreFinals` (imported, rendered as chained `applyF` steps, exported, shown read-only as "Final 2…" with swap/remove) |
+| Per-xform **colour modifiers** `mod_gamma/contrast/saturation/hue` (+ speeds), carried per point and applied to the plotted RGB (`transformPlotColor`, incl. its clamping HSL converter and the 0..199.2 RenderColor scale) | Galaxies_0/1 | `XForm.colorMods`, per-point `mods` buffer (bound only when a flame uses them), `applyColorMods` in the kernel |
+| A point restarts only on **NaN/∞** (never on magnitude), and only at the next `validateState()` (every 1000 iterations, so ~500 counted iterations are lost) + 20 fuse | EDisc_1 (z grew 15× per step under preserve_z, overflowed f32 and poisoned x/y through the identity 3D affines' 0·z) | no magnitude limit on x/y; z kept finite (±1e18); restart waits 21+U(0,1000) |
+| **Layer weight** multiplies the plotted colour; every layer iterates equally often | Bokeh_1 | equal thread split, colour × weight (`xd[8+li]`), colour accumulation dithered so small weights/opacities stay unbiased |
+| **Per-instance priority** `<var>_fx_priority`: a normal variation forced to pre runs as input ← input + w·f(input), forced to post as output ← output + w·f(output) (`EnforcedPre/PostVariationTransformationStep`) | Ghosts_1, Brokat_0 (+ Bubbles, Layers, Spirals, Painterly, Bokeh) | `VarInstance.priority`, imported/exported, emitted by codegen with borrowed t/v |
+| `crackle` jitters its cells with `NoiseTools.simplexNoise3D` on the CPU but FastNoise `singleSimplex` in its own GPU code | Bokeh_1 | the table simplex from `dc_perlin` (hoisted once, shared) replaces `singleSimplex` |
 
 ## Semantics worth knowing
 

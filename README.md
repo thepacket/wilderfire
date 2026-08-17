@@ -42,7 +42,8 @@ in the stack.
   at run time, external content such as sub-flames/images/meshes/SVG/text,
   CPU-built point sets, …); the importer names the reason when a flame uses one.
   Parametric controls for every one, JWildfire-style **pre / normal / post
-  priority** (and the *prepost* inverse pairs), and **direct-colour `dc_*` variations** — both the flam3 kind
+  priority** (per-instance overrides and the *prepost* inverse pairs), several
+  chained final transforms per layer, per-transform colour modifiers, and **direct-colour `dc_*` variations** — both the flam3 kind
   that steer the palette coordinate and JWildfire's shader-art kind
   (`dc_hexagons`, `dc_menger`, `dc_voronoise`, …) that paint RGB directly
 - **Variation picker** — searchable popover with type chips (2D, 3D, blur,

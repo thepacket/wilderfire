@@ -88,6 +88,30 @@ const report: { name: string; status: 'ok' | 'skip' | 'error'; reason?: string; 
 // Registry of module-scope WGSL items across all variations (name → text) to detect conflicts.
 const fnRegistry = new Map<string, string>();
 
+// JWildfire's table simplex noise (NoiseTools.simplexNoise3D) as embedded in dc_perlin's GPU code: the 2050-int
+// permutation and 1024×3 gradient tables are function locals there (20 KB per thread) → module-scope constants
+// `dc_perlin_p` / `dc_perlin_grad3`, and `float *U = grad3[g]` alias inlined. Shared by every variation whose CPU uses it.
+function hoistPerlin(f: string): string {
+  const pm = /int p\[2050\] = \{[\s\S]*?\};/.exec(f)!, gm = /float grad3\[1024\]\[3\] = \{[\s\S]*?\}\s*\};/.exec(f)!;
+  f = f.replace(pm[0], '').replace(gm[0], '');
+  const s0 = f.indexOf('dc_perlin_simplexNoise3D('), s1 = f.indexOf('__device__', s0 + 1);
+  f = f.slice(0, s0) + f.slice(s0, s1).replace(/float \*U;/, '').replace(/U = grad3\[gi\[corner\]\];/, '')
+    .replace(/U\[_x_\]/g, 'grad3[gi[corner]][_x_]').replace(/U\[_y_\]/g, 'grad3[gi[corner]][_y_]').replace(/U\[_z_\]/g, 'grad3[gi[corner]][_z_]') + f.slice(s1);
+  return pm[0].replace(/^int p/, 'int dc_perlin_p') + '\n' + gm[0].replace(/^float grad3/, 'float dc_perlin_grad3') + '\n' + f.replace(/\bp\[/g, 'dc_perlin_p[').replace(/\bgrad3\[/g, 'dc_perlin_grad3[');
+}
+let perlinLibCache: string | null = null;
+/** tables + `dc_perlin_simplexNoise3D(float V[])` only (from the dc_perlin dump entry). */
+function perlinNoiseLib(): string {
+  if (perlinLibCache !== null) return perlinLibCache;
+  const dp = dump.find((d) => d.name === 'dc_perlin');
+  if (!dp?.gpuFunctions) throw new Error('perlinNoiseLib: dc_perlin dump entry missing');
+  const h = hoistPerlin(dp.gpuFunctions.replace(/__state%d_/g, 'dc_perlin_'));
+  const s0 = h.indexOf('__device__ float dc_perlin_simplexNoise3D('), s1 = h.indexOf('__device__', s0 + 1);
+  const tables = h.slice(0, h.indexOf('__device__'));
+  perlinLibCache = tables + h.slice(s0, s1 < 0 ? undefined : s1);
+  return perlinLibCache;
+}
+
 function bindingsFor(v: DumpVar): Env {
   const b = new Map<string, Binding>();
   const F = { k: 'f32' } as const, B = { k: 'bool' } as const, I = { k: 'i32' } as const, U = { k: 'u32' } as const;
@@ -184,14 +208,14 @@ for (let v0 of dump) {
         .replace(/x1=y1=50000\.0-RANDFLOAT\(\)\*100000;/, 'y1 = 50000.0 - RANDFLOAT() * 100000; x1 = y1;'), f],
       // `t++` inside the do-while condition; the 2050-int permutation and 1024×3 gradient tables are
       // function locals in JWildfire's CUDA (20 KB per thread) → module-scope constants; `float *U = grad3[g]` alias inlined
-      dc_perlin: (c, f) => {
-        const pm = /int p\[2050\] = \{[\s\S]*?\};/.exec(f)!, gm = /float grad3\[1024\]\[3\] = \{[\s\S]*?\}\s*\};/.exec(f)!;
-        f = f.replace(pm[0], '').replace(gm[0], '');
-        const s0 = f.indexOf('dc_perlin_simplexNoise3D('), s1 = f.indexOf('__device__', s0 + 1);
-        f = f.slice(0, s0) + f.slice(s0, s1).replace(/float \*U;/, '').replace(/U = grad3\[gi\[corner\]\];/, '')
-          .replace(/U\[_x_\]/g, 'grad3[gi[corner]][_x_]').replace(/U\[_y_\]/g, 'grad3[gi[corner]][_y_]').replace(/U\[_z_\]/g, 'grad3[gi[corner]][_z_]') + f.slice(s1);
-        f = pm[0].replace(/^int p/, 'int dc_perlin_p') + '\n' + gm[0].replace(/^float grad3/, 'float dc_perlin_grad3') + '\n' + f.replace(/\bp\[/g, 'dc_perlin_p[').replace(/\bgrad3\[/g, 'dc_perlin_grad3[');
-        return [c.replace(/&& t\+\+ < __dc_perlin_select_bailout\)/, '&& jpostinc(&t) < __dc_perlin_select_bailout)'), f];
+      dc_perlin: (c, f) => [c.replace(/&& t\+\+ < __dc_perlin_select_bailout\)/, '&& jpostinc(&t) < __dc_perlin_select_bailout)'), hoistPerlin(f)],
+      // JWildfire's GPU crackle jitters its cell centres with FastNoise's singleSimplex, its CPU with
+      // NoiseTools.simplexNoise3D (the table simplex dc_perlin carries) — use the CPU noise
+      crackle: (c, f) => {
+        const lib = perlinNoiseLib();
+        f = f.replace(/singleSimplex\(1337, E\.x, E\.y, E\.z\)/, 'crackle_snoise_(E)').replace(/singleSimplex\(1337, F\.x, F\.y, F\.z\)/, 'crackle_snoise_(F)');
+        if (!f.includes('crackle_snoise_(E)')) throw new Error('crackle fix: pattern not found');
+        return [c, lib + '\n__device__ float crackle_snoise_(float3 v) { float a[3]; a[0] = v.x; a[1] = v.y; a[2] = v.z; return dc_perlin_simplexNoise3D(a); }\n' + f];
       },
       // JWildfire's snippet never assigns ldcs (the Java sets it in init) — and its oldx/oldy state is restored by EXTRA_STATE above
       recurrenceplot: (c, f) => [c.replace(/float ldcs;/, 'float ldcs = 1.0 / (__recurrenceplot_scale == 0.0 ? 10E-6 : __recurrenceplot_scale);'), f],

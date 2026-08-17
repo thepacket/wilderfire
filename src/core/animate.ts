@@ -65,7 +65,8 @@ function lerpVariations(a: VarInstance[], b: VarInstance[], t: number): VarInsta
       const pb = vb?.params[k] ?? va?.params[k] ?? defs[k];
       params[k] = lerp(pa, pb, t);
     }
-    return { name, weight: lerp(va?.weight ?? 0, vb?.weight ?? 0, t), params };
+    const priority = (va ?? vb)?.priority; // JWildfire per-instance priority: not interpolable, taken from the side that has it
+    return { name, weight: lerp(va?.weight ?? 0, vb?.weight ?? 0, t), params, ...(priority !== undefined ? { priority } : {}) };
   });
 }
 
@@ -130,9 +131,17 @@ function lerpLayer(a: Layer, b: Layer, t: number): Layer {
     const d = b.palette[i] ?? c;
     return [lerp(c[0], d[0], t), lerp(c[1], d[1], t), lerp(c[2], d[2], t)] as RGB;
   });
+  // further final transforms (JWildfire imports): morphed pairwise where both sides have them
+  const nm = Math.max(a.moreFinals.length, b.moreFinals.length);
+  const moreFinals: XForm[] = [];
+  for (let i = 0; i < nm; i++) {
+    const xa = a.moreFinals[i], xb = b.moreFinals[i];
+    moreFinals.push(xa && xb ? lerpXForm(xa, xb, t, n) : lerpXForm(xa ?? identityFinal(xb!), xb ?? identityFinal(xa!), t, n));
+  }
   return {
     xforms,
     final,
+    moreFinals,
     palette,
     weight: lerp(a.weight, b.weight, t),
     visible: a.visible || b.visible,

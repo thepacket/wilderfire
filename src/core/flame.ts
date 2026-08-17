@@ -10,6 +10,9 @@ export interface VarInstance {
   name: string;
   weight: number;
   params: Record<string, number>;
+  /** JWildfire per-instance priority override (`<var>_fx_priority`): a normal variation forced to run as a
+   *  pre step (-1: input ← input + w·f(input)) or a post step (1: output ← output + w·f(output)). Absent = the definition's priority. */
+  priority?: number;
 }
 
 export interface XForm {
@@ -26,6 +29,11 @@ export interface XForm {
   weight: number;      // relative selection probability
   color: number;       // palette index 0..1
   colorSpeed: number;  // blend speed toward this xform's color
+  /** JWildfire per-transform colour modifiers [gamma, gammaSpeed, contrast, contrastSpeed,
+   *  saturation, saturationSpeed, hue, hueSpeed]: each point carries four modifier values,
+   *  blended per transform like the colour (m' = m·(1+speed)/2 + value·(1−speed)/2), and applied
+   *  to the plotted RGB. Absent/zeros = no effect (the default). */
+  colorMods?: number[];
   opacity: number;     // 0..1 plot opacity
   variations: VarInstance[];
   /** Optional variation stages evaluated BEFORE the main sum (transforming the
@@ -42,8 +50,10 @@ export interface XForm {
 export interface Layer {
   xforms: XForm[];
   final: XForm | null;
+  /** JWildfire allows several final transforms, applied in sequence after `final` (each takes the previous output). */
+  moreFinals: XForm[];
   palette: RGB[]; // 256 entries
-  weight: number;   // density share relative to other layers
+  weight: number;   // JWildfire layer weight: multiplies the plotted colour intensity (all layers iterate equally)
   visible: boolean;
 }
 
@@ -127,6 +137,7 @@ export function defaultLayer(palette: RGB[]): Layer {
   return {
     xforms: [defaultXForm(), defaultXForm()],
     final: null,
+    moreFinals: [],
     palette,
     weight: 1,
     visible: true,
@@ -178,11 +189,11 @@ export function visibleLayers(f: Flame): Layer[] {
 
 /** Structural signature — when this changes, the WGSL shader must be regenerated. */
 export function flameSignature(f: Flame): string {
-  const names = (l?: VarInstance[]) => (l ?? []).map((v) => v.name).join(',');
+  const names = (l?: VarInstance[]) => (l ?? []).map((v) => v.name + (v.priority !== undefined ? '@' + v.priority : '')).join(',');
   const sig = (x: XForm) => `${names(x.preVariations)}<${names(x.variations)}>${names(x.postVariations)}`;
   return visibleLayers(f)
-    .map((l) => l.xforms.map(sig).join('|') + '#' + (l.final ? sig(l.final) : '-'))
-    .join('@@');
+    .map((l) => l.xforms.map(sig).join('|') + '#' + [l.final, ...l.moreFinals].map((x) => (x ? sig(x) : '-')).join('#'))
+    .join('@@') + (visibleLayers(f).some((l) => [...l.xforms, l.final, ...l.moreFinals].some((x) => x?.colorMods?.some((v) => v !== 0))) ? '~mods' : '');
 }
 
 /** Rotate the linear part of an affine (rotates the triangle in world space). */
@@ -216,6 +227,7 @@ function normVarList(list: any): VarInstance[] | null {
       params: typeof v.params === 'object' && v.params ? Object.fromEntries(
         Object.entries(v.params).map(([k, val]) => [k, num(val, 0)])
       ) : {},
+      ...(v.priority === -1 || v.priority === 1 ? { priority: v.priority } : {}),
     }));
 }
 
@@ -228,6 +240,7 @@ function normXForm(x: any): XForm {
     weight: Math.max(0, num(x?.weight, 1)),
     color: clamp01(num(x?.color, 0)),
     colorSpeed: clamp01(num(x?.colorSpeed, 0.5)),
+    ...(Array.isArray(x?.colorMods) && x.colorMods.some((v: unknown) => Number(v)) ? { colorMods: Array.from({ length: 8 }, (_, i) => num(x.colorMods[i], 0)) } : {}),
     opacity: clamp01(num(x?.opacity, 1)),
     variations: vars.length ? vars : d.variations,
   };
@@ -301,6 +314,7 @@ function normLayer(obj: any, fallbackPalette: RGB[]): Layer {
   return {
     xforms,
     final: obj?.final ? normXForm(obj.final) : null,
+    moreFinals: Array.isArray(obj?.moreFinals) ? obj.moreFinals.map(normXForm) : [],
     palette: normPalette(obj, fallbackPalette),
     weight: Math.max(0, num(obj?.weight, 1)),
     visible: obj?.visible !== false,

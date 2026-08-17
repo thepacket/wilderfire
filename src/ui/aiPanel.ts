@@ -29,7 +29,7 @@ function systemPrompt(flame: Flame, o: ContextOpts): string {
 FLAME JSON SHAPE:
 {
   "name": string,
-  "layers": [ { "xforms": [...], "final": null | xform, "paletteStops": [...], "weight": 0-2, "visible": true } ],  // 1-8 layers; each layer has its own transforms + gradient; weight = density share
+  "layers": [ { "xforms": [...], "final": null | xform, "paletteStops": [...], "weight": 0-2, "visible": true } ],  // 1-8 layers; each layer has its own transforms + gradient; weight = colour intensity multiplier (JWildfire semantics)
   "centerX": 0, "centerY": 0, "zoom": ~0.6-1.5, "rotation": radians,
   "brightness": ~3.5-5 (4 typical), "gamma": ~3.5-4.5 (4 typical), "gammaThreshold": ~0.01, "vibrancy": 0..1, "background": [r,g,b]  // JWildfire-style tone mapping
 }

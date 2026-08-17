@@ -20,7 +20,7 @@ const NON_VARIATION_ATTRS = new Set([
   'weight', 'color', 'symmetry', 'color_speed', 'opacity', 'coefs', 'post',
   'chaos', 'animate', 'motion_frequency', 'motion_function', 'var_color',
   'name', 'mirror_pre_post_translations',
-  // JWildfire per-xform extras we do not model
+  // JWildfire per-xform extras we do not model (mod_* colour modifiers ARE modelled: colorMods)
   'material', 'material_speed', 'mod_gamma', 'mod_gamma_speed', 'mod_contrast', 'mod_contrast_speed',
   'mod_saturation', 'mod_saturation_speed', 'mod_hue', 'mod_hue_speed', 'color_type', 'target_color',
   'draw_mode', 'weighting_field_type', 'weighting_field_input', 'yzCoefs', 'zxCoefs', 'yzPost', 'zxPost',
@@ -146,8 +146,17 @@ function parseXFormEl(elm: Element, ctx?: CurveCtx): XForm {
   const symA = parseFloat(elm.getAttribute('symmetry') ?? '');
   if (isFinite(csA)) x.colorSpeed = Math.min(1, Math.max(0, csA));
   else if (isFinite(symA)) x.colorSpeed = Math.min(1, Math.max(0, (1 - symA) / 2));
+  // JWildfire colour types: an xform recolours (color/symmetry) only as DIFFUSION (the default for
+  // normal xforms) — a *final* xform defaults to NONE and leaves the colour alone; explicit NONE
+  // (and the target/distance/cyclic modes we do not model) never blend towards `color`
+  const ctype = (elm.getAttribute('color_type') ?? '').toUpperCase();
+  if (ctype === 'NONE' || ctype === 'TARGET' || ctype === 'DISTANCE' || ctype === 'CYCLIC' || (elm.tagName.toLowerCase() === 'finalxform' && ctype !== 'DIFFUSION' && ctype !== 'TARGETG')) x.colorSpeed = 0;
   const chaos = nums(elm.getAttribute('chaos'));
   if (chaos.length) x.xaos = chaos.map((v) => Math.max(0, v));
+  // JWildfire colour modifiers (transform "Color" tab): gamma/contrast/saturation/hue with blend speeds
+  const mods = ['mod_gamma', 'mod_gamma_speed', 'mod_contrast', 'mod_contrast_speed', 'mod_saturation', 'mod_saturation_speed', 'mod_hue', 'mod_hue_speed']
+    .map((a) => { const v = parseFloat(elm.getAttribute(a) ?? ''); return isFinite(v) ? v : 0; });
+  if (mods.some((v) => v !== 0)) x.colorMods = mods;
 
   // Variation weights + params from remaining attributes. Names prefixed
   // pre_/post_ (flam3/JWildfire pre_blur, post_curl, …) route to the stages.
@@ -175,7 +184,7 @@ function parseXFormEl(elm: Element, ctx?: CurveCtx): XForm {
     // Duplicate variation instances on one xform were renamed name__dup<k> by
     // the lenient pre-parser; strip the marker to resolve them.
     const name = attr.name.replace(/__dup\d+/, '');
-    if (NON_VARIATION_ATTRS.has(name) || isFxPriorityAttr(name) || name.startsWith('wfield_')) continue;
+    if (NON_VARIATION_ATTRS.has(name) || isFxPriorityAttr(name) || name.startsWith('wfield_')) continue; // _fx_priority is read below
     if (isCurveAttr(attr.name, cprefixes)) continue;
     const val = parseFloat(attr.value);
     if (!isFinite(val)) continue;
@@ -211,7 +220,10 @@ function parseXFormEl(elm: Element, ctx?: CurveCtx): XForm {
     for (const pd of VARIATIONS[vname].params ?? []) {
       p[pd.name] = params[raw]?.[pd.name] ?? pd.def;
     }
-    const inst = { name: vname, weight, params: p };
+    const inst: XForm['variations'][number] = { name: vname, weight, params: p };
+    // JWildfire per-instance priority override (`<var>_fx_priority`), kept only when it differs from the definition
+    const fxp = parseFloat(elm.getAttribute(`${raw}_fx_priority`) ?? '');
+    if (isFinite(fxp) && Math.round(fxp) !== (VARIATIONS[vname].priority ?? 0)) inst.priority = Math.round(fxp);
     if (stage === 'pre') { (x.preVariations ??= []).push(inst); instByRaw.set(raw, { inst, list: 'preVariations' }); }
     else if (stage === 'post') { (x.postVariations ??= []).push(inst); instByRaw.set(raw, { inst, list: 'postVariations' }); }
     else { x.variations.push(inst); instByRaw.set(raw, { inst, list: 'variations' }); }
@@ -441,10 +453,11 @@ export function parseFlameXML(text: string, fallbackPalette: RGB[]): Flame[] {
       const ctx = (base: string): CurveCtx | undefined => (isFirst ? { pathBase: base, fps } : undefined);
       const xf = Array.from(elm.querySelectorAll(':scope > xform')).slice(0, MAX_XFORMS)
         .map((xe, xi) => parseXFormEl(xe, ctx(`layers.${li}.xforms.${xi}`)));
-      const fin = elm.querySelector(':scope > finalxform');
+      const fins = Array.from(elm.querySelectorAll(':scope > finalxform'));
       return {
         xforms: xf.length ? xf : [defaultXForm()],
-        final: fin ? parseXFormEl(fin, ctx(`layers.${li}.final`)) : null,
+        final: fins.length ? parseXFormEl(fins[0], ctx(`layers.${li}.final`)) : null,
+        moreFinals: fins.slice(1).map((fe) => parseXFormEl(fe)), // JWildfire: further finals, applied in sequence
         palette: parsePaletteEl(elm) ?? fallbackPalette,
       };
     };
@@ -555,11 +568,17 @@ function xformToXML(x: XForm, tag: string, nXForms: number, extraAttrs: string[]
   attrs.push(`color="${fmt(x.color)}"`);
   attrs.push(`color_speed="${fmt(x.colorSpeed)}"`);
   attrs.push(`symmetry="${fmt(1 - 2 * x.colorSpeed)}"`);
+  if (tag === 'finalxform' && x.colorSpeed > 0) attrs.push('color_type="DIFFUSION"'); // JWildfire finals default to NONE (no recolouring)
+  if (x.colorMods?.some((v) => v !== 0)) {
+    ['mod_gamma', 'mod_gamma_speed', 'mod_contrast', 'mod_contrast_speed', 'mod_saturation', 'mod_saturation_speed', 'mod_hue', 'mod_hue_speed']
+      .forEach((a, i) => attrs.push(`${a}="${fmt(x.colorMods![i] ?? 0)}"`));
+  }
   attrs.push(`opacity="${fmt(x.opacity)}"`);
   const pushVars = (list: typeof x.variations | undefined, prefix: string) => {
     for (const vi of list ?? []) {
       if (!VARIATIONS[vi.name]) continue;
       attrs.push(`${prefix}${vi.name}="${fmt(vi.weight)}"`);
+      if (vi.priority !== undefined) attrs.push(`${prefix}${vi.name}_fx_priority="${vi.priority}"`); // JWildfire per-instance priority
       for (const pd of VARIATIONS[vi.name].params ?? []) {
         attrs.push(`${prefix}${vi.name}_${pd.name}="${fmt(vi.params[pd.name] ?? pd.def)}"`);
       }
@@ -638,6 +657,7 @@ export function flameToXML(f: Flame, opts: XMLExportOpts = {}): string {
     if (ly.final) {
       const extra = xformCurveAttrs(ly.final, buckets.get(`layers.${li}.final`) ?? [], fps);
       lines.push(indent + xformToXML(ly.final, 'finalxform', ly.xforms.length, extra).trim());
+      for (const mf of ly.moreFinals) lines.push(indent + xformToXML(mf, 'finalxform', ly.xforms.length).trim());
     }
     lines.push(paletteToXML(ly.palette, indent));
   };

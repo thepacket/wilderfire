@@ -191,8 +191,9 @@ export function buildTransformsPanel(app: App, root: HTMLElement) {
   };
   delBtn.onclick = () => {
     if (app.selected === -1) {
-      layer().final = null;
-      app.selected = 0;
+      // deleting the Final promotes the next chained one (JWildfire imports), else none
+      layer().final = layer().moreFinals.length ? layer().moreFinals.shift()! : null;
+      if (!layer().final) app.selected = 0;
     } else {
       if (layer().xforms.length <= 1) return;
       layer().xforms.splice(app.selected, 1);
@@ -207,7 +208,7 @@ export function buildTransformsPanel(app: App, root: HTMLElement) {
       app.selected = -1;
     } else {
       const fx = defaultXForm();
-      fx.colorSpeed = 0.2;
+      fx.colorSpeed = 0; // like JWildfire: a final transform does not recolour unless asked to
       layer().final = fx;
       app.selected = -1;
       app.commit();
@@ -307,6 +308,21 @@ export function buildTransformsPanel(app: App, root: HTMLElement) {
       item.onclick = () => { app.select(-1); rebuild(); };
       list.append(item);
     }
+    // further final transforms (JWildfire files can chain several): rendered and exported, shown read-only here
+    layer().moreFinals.forEach((mf, k) => {
+      const item = el('div', 'xform-item');
+      const sw = el('span', 'xform-swatch');
+      sw.style.background = '#cccccc';
+      item.title = 'Additional final transform from a JWildfire file — applied after the Final transform. Remove it, or make it the Final transform to edit it.';
+      const rm = el('button', 'icon', '✕');
+      rm.title = 'Remove this final transform';
+      rm.onclick = (e) => { e.stopPropagation(); layer().moreFinals.splice(k, 1); app.commit(); rebuild(); };
+      const up = el('button', 'icon', '↑');
+      up.title = 'Swap with the Final transform';
+      up.onclick = (e) => { e.stopPropagation(); const f = layer().final!; layer().final = mf; layer().moreFinals[k] = f; app.commit(); rebuild(); };
+      item.append(sw, el('span', 'xname', `Final ${k + 2}`), el('span', 'xinfo', mf.variations.map((v) => v.name).join(', ')), up, rm);
+      list.append(item);
+    });
     finalBtn.textContent = layer().final ? 'Final ✓' : '+ Final';
   }
 

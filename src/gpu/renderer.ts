@@ -25,6 +25,7 @@ export class FlameRenderer {
   private histBuf!: GPUBuffer;
   private ptsBuf!: GPUBuffer;
   private rngBuf!: GPUBuffer;
+  private modsBuf!: GPUBuffer; // per-point JWildfire colour modifiers (bound only when the compiled flame uses them)
   private xdBuf!: GPUBuffer;
   private palBuf!: GPUBuffer;
   private paramsBuf!: GPUBuffer;
@@ -108,6 +109,7 @@ export class FlameRenderer {
     const d = this.device;
     this.ptsBuf = d.createBuffer({ size: this.nPoints * 16, usage: GPUBufferUsage.STORAGE | GPUBufferUsage.COPY_DST });
     this.rngBuf = d.createBuffer({ size: this.nPoints * 8, usage: GPUBufferUsage.STORAGE | GPUBufferUsage.COPY_DST });
+    this.modsBuf = d.createBuffer({ size: this.nPoints * 16, usage: GPUBufferUsage.STORAGE | GPUBufferUsage.COPY_DST });
     this.xdBuf = d.createBuffer({ size: XD_FLOATS * 4, usage: GPUBufferUsage.STORAGE | GPUBufferUsage.COPY_DST });
     this.palBuf = d.createBuffer({ size: MAX_LAYERS * 256 * 16, usage: GPUBufferUsage.STORAGE | GPUBufferUsage.COPY_DST });
     this.paramsBuf = d.createBuffer({ size: 256, usage: GPUBufferUsage.UNIFORM | GPUBufferUsage.COPY_DST });
@@ -177,6 +179,7 @@ export class FlameRenderer {
         { binding: 3, resource: { buffer: this.rngBuf } },
         { binding: 4, resource: { buffer: this.histBuf } },
         { binding: 5, resource: { buffer: this.palBuf } },
+        ...(this.compiled?.usesMods ? [{ binding: 6, resource: { buffer: this.modsBuf } }] : []),
       ],
     });
   }
@@ -265,6 +268,7 @@ export class FlameRenderer {
     }
     this.device.queue.writeBuffer(this.ptsBuf, 0, pts);
     this.device.queue.writeBuffer(this.rngBuf, 0, rng);
+    if (this.compiled?.usesMods) this.device.queue.writeBuffer(this.modsBuf, 0, new Float32Array(this.nPoints * 4)); // JWildfire starts every point with zero modifiers
   }
 
   /** Something tone-related changed (or the view): redraw even when the
@@ -478,6 +482,7 @@ export class FlameRenderer {
         { binding: 3, resource: { buffer: this.rngBuf } },
         { binding: 4, resource: { buffer: this.offHist } },
         { binding: 5, resource: { buffer: this.palBuf } },
+        ...(this.compiled?.usesMods ? [{ binding: 6, resource: { buffer: this.modsBuf } }] : []),
       ],
     });
     if (!this.exportPipeline) {
