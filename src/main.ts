@@ -319,7 +319,7 @@ async function boot() {
       return results;
     },
     // Render fixtures/samples/presets offscreen into compare-out/ for scripts/jwf-port/compare.py
-    flameCompare: async (opts?: { only?: string[]; width?: number; quality?: number; sets?: ("fixtures" | "samples" | "presets")[]; files?: string[] }) => {
+    flameCompare: async (opts?: { only?: string[]; width?: number; quality?: number; sets?: ("fixtures" | "samples" | "presets")[]; files?: string[]; prefix?: string }) => {
       const { runFlameCompare } = await import('./dev/flameCompare');
       return runFlameCompare(app, opts);
     },

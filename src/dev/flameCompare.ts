@@ -13,7 +13,7 @@ import { JWF_SAMPLES } from '../core/samples';
 import { FIXTURES } from './flameTest';
 import type { App } from '../ui/common';
 
-export interface CompareOpts { only?: string[]; width?: number; quality?: number; sets?: ('fixtures' | 'samples' | 'presets')[]; files?: string[] }
+export interface CompareOpts { only?: string[]; width?: number; quality?: number; sets?: ('fixtures' | 'samples' | 'presets')[]; files?: string[]; prefix?: string }
 export interface CompareItem { id: string; set: string; xml: string }
 
 async function collect(app: App, sets: string[], files: string[] = []): Promise<CompareItem[]> {
@@ -66,16 +66,17 @@ export async function runFlameCompare(app: App, opts: CompareOpts = {}): Promise
       cv.getContext('2d')!.putImageData(new ImageData(px, W, H), 0, 0);
       const blob = await new Promise<Blob | null>((res) => cv.toBlob(res, 'image/png'));
       if (!blob) throw new Error('toBlob failed');
-      await save(`${it.id}.wf.png`, blob);
-      await save(`${it.id}.flame`, it.xml);
-      manifest.push({ id: it.id, set: it.set, w: W, h: H, quality });
+      const id = (opts.prefix ?? '') + it.id; // e.g. prefix 'full_' keeps a full-size run apart from the 512 px one
+      await save(`${id}.wf.png`, blob);
+      await save(`${id}.flame`, it.xml);
+      manifest.push({ id, set: it.set, w: W, h: H, quality });
       out.push({ id: it.id, ok: true, ms: performance.now() - t0 });
     } catch (err) {
       out.push({ id: it.id, ok: false, msg: String((err as Error).message ?? err), ms: performance.now() - t0 });
     }
   }
   // partial runs (only/files) keep the full manifest intact
-  await save(opts.only || opts.files ? 'manifest.part.json' : 'manifest.json', JSON.stringify(manifest, null, 1));
+  await save(opts.prefix ? `manifest.${opts.prefix}json` : opts.only || opts.files ? 'manifest.part.json' : 'manifest.json', JSON.stringify(manifest, null, 1));
   app.setFlame(saved);
   app.renderer.setFlame(app.flame);
   console.log('flameCompare:', out.filter((o) => o.ok).length, 'ok,', out.filter((o) => !o.ok).map((o) => `${o.id}: ${o.msg}`).join('; '));
