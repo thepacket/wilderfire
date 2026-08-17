@@ -2,7 +2,7 @@
 // Variations ported from JWildfire (https://github.com/thargor6/JWildfire, LGPL-2.1,
 // (c) Andreas Maschke and contributors) by transpiling each variation's CUDA GPU
 // snippet to WGSL and verifying it against JWildfire's Java implementation.
-// 744 verified of 786 transpiled (1026 in JWildfire).
+// 746 verified of 786 transpiled (1026 in JWildfire).
 //
 // Snippet scope: t (input point, var), z_ (input z), r2, r, th = atan2(x,y), ph = atan2(y,x),
 // v (output accumulator), pz_ (output z), rs (rng), cp (palette coord ptr), hd (hide-flag ptr).
@@ -139,8 +139,8 @@ pz_ += (${w} * z_);
     code: (w, p) => `{
 var rn: f32;
 rn = rnd(rs);
-var t_: f32 = ((ph + ((2.0 * PI) * trunc((rn * abs(${p[0]}))))) / ${p[0]});
-var rnew: f32 = powc(r, (${p[1]} / ${p[0]}));
+var t_: f32 = ((ph + ((2.0 * PI) * trunc((rn * abs(f32(i32(${p[0]}))))))) / f32(i32(${p[0]})));
+var rnew: f32 = powc(r, (${p[1]} / f32(i32(${p[0]}))));
 v.x += ((${w} * rnew) * cos(t_));
 v.y += ((${w} * rnew) * sin(t_));
 }`,
@@ -604,7 +604,7 @@ fn powc(x: f32, y: f32) -> f32 {
   return select(m, -m, (i32(yi) & 1) != 0);
 }`,
     code: (w, p) => `{
-var power: i32 = i32(roundc(${p[0]}));
+var power: i32 = i32(roundc(f32(i32(${p[0]}))));
 var absPower: f32;
 var cPower: f32;
 absPower = abs(f32(power));
@@ -856,8 +856,8 @@ v.y += (((${w} * y0) * 2.0) / PI);
     verified: true, priority: 0, flags: [], types: ["2D"],
     code: (w, p) => `{
 var a: f32 = (ph + (${p[3]} * r));
-var c: f32 = floor(((((${p[2]} * a) + PI) * 0.5) / PI));
-var comp_fac: f32 = (1.0 - (((${p[0]} * ${p[2]}) * 0.5) / PI));
+var c: f32 = floor(((((f32(i32(${p[2]})) * a) + PI) * 0.5) / PI));
+var comp_fac: f32 = (1.0 - (((${p[0]} * f32(i32(${p[2]}))) * 0.5) / PI));
 a = ((a * comp_fac) + (c * ${p[0]}));
 v.x += ((${w} * (r + ${p[1]})) * cos(a));
 v.y += ((${w} * (r + ${p[1]})) * sin(a));
@@ -954,7 +954,7 @@ if ((d != 0.0)) {
     funcs: `fn roundc(x: f32) -> f32 { return sign(x) * floor(abs(x) + 0.5); }`,
     code: (w, p) => `{
 var a: f32 = th;
-var r_: f32 = (${p[0]} * cos((f32(i32(roundc(${p[1]}))) * a)));
+var r_: f32 = (${p[0]} * cos((f32(i32(roundc(f32(i32(${p[1]}))))) * a)));
 if (((${p[2]} > 0) && (${p[2]} > rnd(rs)))) {
   r_ *= rnd(rs);
 }
@@ -1591,16 +1591,14 @@ if ((abs(${p[0]}) < 1.0e-8)) {
   "colorscale_wf": {
     params: [{ name: "scale_x", def: 0 }, { name: "scale_y", def: 0 }, { name: "scale_z", def: 0.5 }, { name: "offset_z", def: 0 }, { name: "reset_z", def: 0 }, { name: "sides", def: 0 }],
     verified: true, priority: 0, flags: ["3d","dc","z"], types: ["3D","DC"],
-    funcNames: ["roundc"],
-    funcs: `fn roundc(x: f32) -> f32 { return sign(x) * floor(abs(x) + 0.5); }`,
     code: (w, p) => `{
 v.x += ((${w} * ${p[0]}) * t.x);
 v.y += ((${w} * ${p[1]}) * t.y);
 var dz: f32 = ((((*cp) * ${p[2]}) * ${w}) + ${p[3]});
-if ((i32(roundc(${p[4]})) > 0)) {
+if ((${p[4]} > 0)) {
   pz_ = dz;
 } else {
-  if ((i32(roundc(${p[5]})) > 0)) {
+  if ((${p[5]} > 0)) {
     pz_ += (dz * rnd(rs));
   } else {
     pz_ += dz;
@@ -1699,8 +1697,8 @@ if ((mode == 2)) {
     params: [{ name: "scalex", def: 0.25 }, { name: "scaley", def: 0.5 }, { name: "freqx", def: 1.5707963267948966 }, { name: "freqy", def: 0.7853981633974483 }, { name: "use_cos_x", def: 1 }, { name: "use_cos_y", def: 0 }, { name: "dampx", def: 0 }, { name: "dampy", def: 0 }],
     verified: true, priority: 0, flags: [], types: ["2D"],
     code: (w, p) => `{
-var use_cos_x: bool = (${p[4]} != 0.0);
-var use_cos_y: bool = (${p[5]} != 0.0);
+var use_cos_x: bool = (f32(i32(${p[4]})) != 0.0);
+var use_cos_y: bool = (f32(i32(${p[5]})) != 0.0);
 var _dampingX: f32 = select(exp(${p[6]}), 1.0, (abs(${p[6]}) < 1.0e-8));
 var _dampingY: f32 = select(exp(${p[7]}), 1.0, (abs(${p[7]}) < 1.0e-8));
 if (use_cos_x) {
@@ -1807,7 +1805,7 @@ var rad: f32 = sqrt(((t.x * t.x) + (t.y * t.y)));
 var ang: f32 = atan2(t.y, t.x);
 var rdc: f32 = (cr + ((rnd(rs) * 0.5) * ca));
 var esc: i32 = select(0, 1, (rad > cr));
-var cr0: i32 = select(0, 1, (i32(roundc(${p[4]})) == 1));
+var cr0: i32 = select(0, 1, (i32(roundc(f32(i32(${p[4]})))) == 1));
 var s: f32 = sin(ang);
 var c: f32 = cos(ang);
 (*hd) = false;
@@ -1845,7 +1843,7 @@ var rad: f32 = sqrt(((t.x * t.x) + (t.y * t.y)));
 var ang: f32 = atan2(t.y, t.x);
 var rdc: f32 = (cr + ((rnd(rs) * 0.5) * ca));
 var esc: i32 = select(0, 1, (rad > cr));
-var cr0: i32 = select(0, 1, (i32(roundc(${p[4]})) == 1));
+var cr0: i32 = select(0, 1, (i32(roundc(f32(i32(${p[4]})))) == 1));
 var s: f32 = sin(ang);
 var c: f32 = cos(ang);
 (*hd) = false;
@@ -2440,6 +2438,24 @@ if ((r_ < 1.0)) {
 }
 }`,
   },
+  "post_colorscale_wf": {
+    params: [{ name: "scale_x", def: 0 }, { name: "scale_y", def: 0 }, { name: "scale_z", def: 0.5 }, { name: "offset_z", def: 0 }, { name: "reset_z", def: 0 }, { name: "sides", def: 0 }],
+    verified: true, priority: 1, flags: ["3d","dc","z"], types: ["3D","POST"],
+    code: (w, p) => `{
+v.x += ((${w} * ${p[0]}) * v.x);
+v.y += ((${w} * ${p[1]}) * v.y);
+var dz: f32 = ((((*cp) * ${p[2]}) * ${w}) + ${p[3]});
+if ((${p[4]} > 0)) {
+  pz_ = dz;
+} else {
+  if ((${p[5]} > 0)) {
+    pz_ += (dz * rnd(rs));
+  } else {
+    pz_ += dz;
+  }
+}
+}`,
+  },
   "cloverleaf_wf": {
     params: [{ name: "filled", def: 0.85 }],
     verified: true, priority: 0, flags: [], types: ["BASE_SHAPE"],
@@ -2492,8 +2508,8 @@ if ((t.y > 0)) {
     params: [{ name: "scalex", def: 0.25 }, { name: "scaley", def: 0.5 }, { name: "freqx", def: 1.5707963267948966 }, { name: "freqy", def: 0.7853981633974483 }, { name: "use_cos_x", def: 1 }, { name: "use_cos_y", def: 0 }, { name: "dampx", def: 0 }, { name: "dampy", def: 0 }],
     verified: true, priority: 0, flags: [], types: ["2D"],
     code: (w, p) => `{
-var use_cos_x: bool = (${p[4]} != 0.0);
-var use_cos_y: bool = (${p[5]} != 0.0);
+var use_cos_x: bool = (f32(i32(${p[4]})) != 0.0);
+var use_cos_y: bool = (f32(i32(${p[5]})) != 0.0);
 var _dampingX: f32 = select(exp(${p[6]}), 1.0, (abs(${p[6]}) < 1.0e-8));
 var _dampingY: f32 = select(exp(${p[7]}), 1.0, (abs(${p[7]}) < 1.0e-8));
 if (use_cos_x) {
@@ -2512,8 +2528,8 @@ if (use_cos_y) {
     params: [{ name: "scalex", def: 0.25 }, { name: "scaley", def: 0.5 }, { name: "freqx", def: 1.5707963267948966 }, { name: "freqy", def: 0.7853981633974483 }, { name: "use_cos_x", def: 1 }, { name: "use_cos_y", def: 0 }, { name: "dampx", def: 0 }, { name: "dampy", def: 0 }],
     verified: true, priority: 0, flags: [], types: ["2D"],
     code: (w, p) => `{
-var use_cos_x: bool = (${p[4]} != 0.0);
-var use_cos_y: bool = (${p[5]} != 0.0);
+var use_cos_x: bool = (f32(i32(${p[4]})) != 0.0);
+var use_cos_y: bool = (f32(i32(${p[5]})) != 0.0);
 var _dampingX: f32 = select(exp(${p[6]}), 1.0, (abs(${p[6]}) < 1.0e-8));
 var _dampingY: f32 = select(exp(${p[7]}), 1.0, (abs(${p[7]}) < 1.0e-8));
 if (use_cos_x) {
@@ -2732,7 +2748,7 @@ if ((abs(t.y) <= ${w})) {
 }`,
     code: (w, p) => `{
 var _regularForm: f32 = select(0.0, 1.0, (abs((${p[1]} - 2.0)) < 1.0e-10));
-var _dontInvert: bool = (abs(${p[0]}) < 1.0e-8);
+var _dontInvert: bool = (abs(f32(i32(${p[0]}))) < 1.0e-8);
 var r_: f32;
 if ((_regularForm != 0.0)) {
   r_ = (${w} / ((((t.x * t.x) + (t.y * t.y)) + (z_ * z_)) + 1.0e-20));
@@ -2811,8 +2827,8 @@ fn powc(x: f32, y: f32) -> f32 {
   return select(m, -m, (i32(yi) & 1) != 0);
 }`,
     code: (w, p) => `{
-var n: i32 = i32(roundc(${p[1]}));
-var parity: i32 = i32(roundc(${p[0]}));
+var n: i32 = i32(roundc(f32(i32(${p[1]}))));
+var parity: i32 = i32(roundc(f32(i32(${p[0]}))));
 var _nnz: i32 = select(n, 1, (n == 0));
 var _vvar: f32 = (${w} / PI);
 var _vvar_2: f32 = (_vvar * 0.5);
@@ -2855,23 +2871,23 @@ var a: f32 = 0.0;
 var r_: f32 = 0.0;
 switch i32((rnd(rs) * 5)) {
   case 0: {
-    a = ((f32(i32((rnd(rs) * ${p[0]}))) + (rnd(rs) * ${p[1]})) / ${p[0]});
-    r_ = ((f32(i32((rnd(rs) * ${p[0]}))) + (rnd(rs) * ${p[2]})) / ${p[0]});
+    a = ((f32(i32((rnd(rs) * f32(i32(${p[0]}))))) + (rnd(rs) * ${p[1]})) / f32(i32(${p[0]})));
+    r_ = ((f32(i32((rnd(rs) * f32(i32(${p[0]}))))) + (rnd(rs) * ${p[2]})) / f32(i32(${p[0]})));
   }
   case 1: {
-    a = ((f32(i32((rnd(rs) * ${p[0]}))) + rnd(rs)) / ${p[0]});
-    r_ = ((f32(i32((rnd(rs) * ${p[0]}))) + ${p[2]}) / ${p[0]});
+    a = ((f32(i32((rnd(rs) * f32(i32(${p[0]}))))) + rnd(rs)) / f32(i32(${p[0]})));
+    r_ = ((f32(i32((rnd(rs) * f32(i32(${p[0]}))))) + ${p[2]}) / f32(i32(${p[0]})));
   }
   case 2: {
-    a = ((f32(i32((rnd(rs) * ${p[0]}))) + ${p[1]}) / ${p[0]});
-    r_ = ((f32(i32((rnd(rs) * ${p[0]}))) + rnd(rs)) / ${p[0]});
+    a = ((f32(i32((rnd(rs) * f32(i32(${p[0]}))))) + ${p[1]}) / f32(i32(${p[0]})));
+    r_ = ((f32(i32((rnd(rs) * f32(i32(${p[0]}))))) + rnd(rs)) / f32(i32(${p[0]})));
   }
   case 3: {
     a = rnd(rs);
-    r_ = (((f32(i32((rnd(rs) * ${p[0]}))) + ${p[2]}) + (rnd(rs) * (1.0 - ${p[2]}))) / ${p[0]});
+    r_ = (((f32(i32((rnd(rs) * f32(i32(${p[0]}))))) + ${p[2]}) + (rnd(rs) * (1.0 - ${p[2]}))) / f32(i32(${p[0]})));
   }
   case 4: {
-    a = (((f32(i32((rnd(rs) * ${p[0]}))) + ${p[1]}) + (rnd(rs) * (1.0 - ${p[1]}))) / ${p[0]});
+    a = (((f32(i32((rnd(rs) * f32(i32(${p[0]}))))) + ${p[1]}) + (rnd(rs) * (1.0 - ${p[1]}))) / f32(i32(${p[0]})));
     r_ = rnd(rs);
   }
   case default: {
@@ -3786,7 +3802,7 @@ v.y += (((${w} * sqrt((xmax - 1.0))) * sqrt((xmax + 1.0))) * sinnu);
 }`,
     code: (w, p) => `{
 var _sign: i32 = 1;
-if ((${p[0]} < 0)) {
+if ((f32(i32(${p[0]})) < 0)) {
   _sign = -1;
 }
 var r2_: f32 = ((t.y * t.y) + (t.x * t.x));
@@ -3819,8 +3835,8 @@ var nu: f32 = acos(t_);
 if ((t.y < 0)) {
   nu *= -1.0;
 }
-nu = ((nu / ${p[0]}) + (((2.0 * PI) / ${p[0]}) * floor((rnd(rs) * ${p[0]}))));
-mu /= ${p[0]};
+nu = ((nu / f32(i32(${p[0]}))) + (((2.0 * PI) / f32(i32(${p[0]}))) * floor((rnd(rs) * f32(i32(${p[0]}))))));
+mu /= f32(i32(${p[0]}));
 sinhmu = sinh(mu);
 coshmu = cosh(mu);
 sinnu = sin(nu);
@@ -4008,7 +4024,7 @@ _is = (1.0 / _s);
 _vxp = (${p[1]} * _p);
 _pxa = (_p * a);
 _pixa = ((PI - _p) * a);
-_fixed_dist_calc = i32(roundc(select(0.0, 1.0, (${p[7]} != 0))));
+_fixed_dist_calc = i32(roundc(select(0.0, 1.0, (f32(i32(${p[7]})) != 0))));
 var x: f32 = ((t.x * _s) - ${p[3]});
 var y: f32 = ((t.y * _s) + ${p[4]});
 var d: f32 = select(sqrt((((x * x) * y) * y)), sqrt(((x * x) + (y * y))), (_fixed_dist_calc != 0));
@@ -4042,7 +4058,7 @@ fn powc(x: f32, y: f32) -> f32 {
   return select(m, -m, (i32(yi) & 1) != 0);
 }`,
     code: (w, p) => `{
-var power: i32 = i32(roundc(${p[0]}));
+var power: i32 = i32(roundc(f32(i32(${p[0]}))));
 var _absN: i32 = select(power, -power, (power < 0));
 var _cN: f32 = ((${p[1]} / f32(power)) * 0.5);
 if ((power != 0)) {
@@ -5873,8 +5889,8 @@ var gdoax: f32 = (select(abs(${p[2]}), 0.1, (abs(${p[2]}) < 1.0)) * 2.0);
 var gdoay: f32 = (select(abs(${p[3]}), 0.1, (abs(${p[3]}) < 1.0)) * 2.0);
 var gdocx: f32 = ${p[4]};
 var gdocy: f32 = ${p[5]};
-var gdos: i32 = i32(${p[7]});
-var gdob: f32 = ((${p[6]} * 2.0) / max(gdoax, gdoay));
+var gdos: i32 = i32(f32(i32(${p[7]})));
+var gdob: f32 = ((f32(i32(${p[6]})) * 2.0) / max(gdoax, gdoay));
 var osc_x: f32 = gdoffs_fosc(gdodx, 1.0);
 var osc_y: f32 = gdoffs_fosc(gdody, 1.0);
 var in_x: f32 = (t.x + gdocx);
@@ -6294,8 +6310,8 @@ fn powc(x: f32, y: f32) -> f32 {
   return select(m, -m, (i32(yi) & 1) != 0);
 }`,
     code: (w, p) => `{
-var power: i32 = i32(roundc(${p[0]}));
-var divisor: i32 = i32(roundc(${p[1]}));
+var power: i32 = i32(roundc(f32(i32(${p[0]}))));
+var divisor: i32 = i32(roundc(f32(i32(${p[1]}))));
 var half_inv_power: f32 = ((0.5 * f32(divisor)) / f32(power));
 var inv_power: f32 = (f32(divisor) / f32(power));
 var inv_power_2pi: f32 = ((2.0 * PI) / f32(power));
@@ -6321,8 +6337,8 @@ fn powc(x: f32, y: f32) -> f32 {
   return select(m, -m, (i32(yi) & 1) != 0);
 }`,
     code: (w, p) => `{
-var power: i32 = i32(roundc(${p[0]}));
-var divisor: i32 = i32(roundc(${p[1]}));
+var power: i32 = i32(roundc(f32(i32(${p[0]}))));
+var divisor: i32 = i32(roundc(f32(i32(${p[1]}))));
 var inv_power: f32;
 var abs_inv_power: f32;
 var half_inv_power: f32;
@@ -6378,7 +6394,7 @@ v.y += (r_ * s);
     funcNames: ["roundc"],
     funcs: `fn roundc(x: f32) -> f32 { return sign(x) * floor(abs(x) + 0.5); }`,
     code: (w, p) => `{
-var power: f32 = f32(i32(roundc(${p[0]})));
+var power: f32 = f32(i32(roundc(f32(i32(${p[0]})))));
 var starblur_alpha: f32 = (PI / power);
 var starblur_length: f32 = sqrt(((1.0 + (${p[1]} * ${p[1]})) - ((2.0 * ${p[1]}) * cos(starblur_alpha))));
 starblur_alpha = asin(((sin(starblur_alpha) * ${p[1]}) / starblur_length));
@@ -6479,7 +6495,7 @@ var front: bool;
 var side: i32;
 var a: f32 = ${p[1]};
 var b: f32 = ${p[2]};
-switch i32(${p[0]}) {
+switch i32(f32(i32(${p[0]}))) {
   case 0: {
     radius = select(select((${w} * rnd(rs)), ${w}, (rnd(rs) < 0.05)), ${w}, (min(max(${p[3]}, 0.0), 1.0) == 0.0));
     ang = ((rnd(rs) * 2) * PI);
@@ -6687,16 +6703,16 @@ for (i = -1; (i < 2); i++) {
   M1 = (M + i);
   for (j = -1; (j < 2); j++) {
     N1 = (N + j);
-    dX = i32((f32(((19 * M1) + (257 * N1))) + ${p[3]}));
+    dX = i32((f32(((19 * M1) + (257 * N1))) + f32(i32(${p[3]}))));
     n = ((dX << 13) ^ dX);
     DiscretNoise = (f32((((n * (((n * n) * 15731) + 789221)) + 1376312589) & 2147483647)) * AM);
     K = (1 + i32(floor((min(max(${p[2]}, 1.0), 25.0) * DiscretNoise))));
     for (l = 0; (l < K); l++) {
-      dX = i32((f32(((l + (64 * M1)) + (15 * N1))) + ${p[3]}));
+      dX = i32((f32(((l + (64 * M1)) + (15 * N1))) + f32(i32(${p[3]}))));
       n = ((dX << 13) ^ dX);
       DiscretNoise = (f32((((n * (((n * n) * 15731) + 789221)) + 1376312589) & 2147483647)) * AM);
       X = ((DiscretNoise + f32(M1)) * ${p[1]});
-      dX = i32((f32(((l + (21 * M1)) + (33 * N1))) + ${p[4]}));
+      dX = i32((f32(((l + (21 * M1)) + (33 * N1))) + f32(i32(${p[4]}))));
       n = ((dX << 13) ^ dX);
       DiscretNoise = (f32((((n * (((n * n) * 15731) + 789221)) + 1376312589) & 2147483647)) * AM);
       Y = ((DiscretNoise + f32(N1)) * ${p[1]});
@@ -6861,14 +6877,14 @@ var invStripes: i32;
 var invHole: i32;
 var s: f32;
 var c: f32;
-if ((p0_ < 0)) {
-  p0_ = abs(p0_);
+if ((f32(i32(p0_)) < 0)) {
+  p0_ = abs(f32(i32(p0_)));
   invStripes = 1;
 } else {
   invStripes = 0;
 }
-if ((p0_ != 0)) {
-  angStrip = (PI / p0_);
+if ((f32(i32(p0_)) != 0)) {
+  angStrip = (PI / f32(i32(p0_)));
   angStrip2 = (2 * angStrip);
   s = sin(angStrip);
   c = cos(angStrip);
@@ -6880,7 +6896,7 @@ if ((p0_ != 0)) {
   }
   angStrip1 = (min(max(p1_, 0.0), 2.0) * angStrip);
 }
-if ((${p[4]} == 1)) {
+if ((f32(i32(${p[4]})) == 1)) {
   if ((p2_ < 0.0)) {
     p2_ = abs(p2_);
   }
@@ -6912,13 +6928,13 @@ angXY = atan2(x, y);
 if ((angXY < 0)) {
   angXY += (2.0 * PI);
 }
-if ((p0_ != 0)) {
+if ((f32(i32(p0_)) != 0)) {
   while ((angXY > angStrip2)) {
     angXY -= angStrip2;
   }
   if ((invStripes == 0)) {
     if ((angXY > angStrip1)) {
-      if ((${p[5]} == 0)) {
+      if ((f32(i32(${p[5]})) == 0)) {
         x = 0.0;
         y = 0.0;
       } else {
@@ -6941,7 +6957,7 @@ if ((p0_ != 0)) {
     }
   } else {
     if ((angXY < angStrip1)) {
-      if ((${p[5]} == 0)) {
+      if ((f32(i32(${p[5]})) == 0)) {
         x = 0.0;
         y = 0.0;
       } else {
@@ -6977,10 +6993,10 @@ if (((x != 0) || (y != 0))) {
   z = 0.0;
   angZ = 0.0;
 }
-if ((${p[4]} == 0)) {
+if ((f32(i32(${p[4]})) == 0)) {
   if ((invHole == 0)) {
     if ((angZ > p2_)) {
-      if (((${p[5]} == 0) || (${p[3]} != 1.0))) {
+      if (((f32(i32(${p[5]})) == 0) || (${p[3]} != 1.0))) {
         x = 0.0;
         y = 0.0;
         z = 0.0;
@@ -6995,7 +7011,7 @@ if ((${p[4]} == 0)) {
     }
   } else {
     if ((angZ < p2_)) {
-      if (((${p[5]} == 0) || (${p[3]} != 1.0))) {
+      if (((f32(i32(${p[5]})) == 0) || (${p[3]} != 1.0))) {
         x = 0.0;
         y = 0.0;
         z = 0.0;
@@ -7011,7 +7027,7 @@ if ((${p[4]} == 0)) {
   }
 } else {
   if (((angZ > p2_) || (angZ < (PI - p2_)))) {
-    if (((${p[5]} == 0) || (${p[3]} != 1.0))) {
+    if (((f32(i32(${p[5]})) == 0) || (${p[3]} != 1.0))) {
       x = 0.0;
       y = 0.0;
       z = 0.0;
@@ -7519,7 +7535,7 @@ if ((0.0 != s)) {
   return select(m, -m, (i32(yi) & 1) != 0);
 }`,
     code: (w, p) => `{
-var murl_power: f32 = round(${p[1]});
+var murl_power: f32 = round(f32(i32(${p[1]})));
 var c: f32 = ${p[0]};
 if ((murl_power != 1.0)) {
   c = (${p[0]} / (murl_power - 1.0));
@@ -7559,19 +7575,19 @@ var _r: f32;
 var _re: f32;
 var _im: f32;
 var _rl: f32;
-var _p2: f32 = (${p[1]} / 2.0);
-if ((${p[1]} != 0.0)) {
-  _invp = (1.0 / ${p[1]});
+var _p2: f32 = (f32(i32(${p[1]})) / 2.0);
+if ((f32(i32(${p[1]})) != 0.0)) {
+  _invp = (1.0 / f32(i32(${p[1]})));
   if ((${p[0]} == -1.0)) {
     _vp = 0.0;
   } else {
-    _vp = (${w} * powc((${p[0]} + 1.0), (2.0 / ${p[1]})));
+    _vp = (${w} * powc((${p[0]} + 1.0), (2.0 / f32(i32(${p[1]})))));
   }
 } else {
   _invp = 100000000000.0;
   _vp = (${w} * powc((${p[0]} + 1.0), 4.0));
 }
-_a = (atan2(t.y, t.x) * ${p[1]});
+_a = (atan2(t.y, t.x) * f32(i32(${p[1]})));
 _sina = sin(_a);
 _cosa = cos(_a);
 _r = (${p[0]} * powc(((t.x * t.x) + (t.y * t.y)), _p2));
@@ -7612,8 +7628,8 @@ t.y = (((y * re) - (x * im)) * r_);
   return select(m, -m, (i32(yi) & 1) != 0);
 }`,
     code: (w, p) => `{
-var absN: f32 = abs(${p[0]});
-var cN: f32 = (((${p[1]} / ${p[0]}) - 1.0) / 2.0);
+var absN: f32 = abs(f32(i32(${p[0]})));
+var cN: f32 = (((${p[1]} / f32(i32(${p[0]}))) - 1.0) / 2.0);
 var z: f32 = (t.x / absN);
 var radius_square: f32 = ((t.x * t.x) + (t.y * t.y));
 var radius_out: f32 = (${w} * powc((radius_square + (z * z)), cN));
@@ -7627,7 +7643,7 @@ var c21: f32 = ${p[7]};
 var x: f32 = (((c00 * t.x) + (c01 * t.y)) + c20);
 var y: f32 = (((c10 * t.x) + (c11 * t.y)) + c21);
 var rand: f32 = f32(i32((rnd(rs) * absN)));
-var alpha: f32 = ((atan2(y, x) + ((2.0 * PI) * rand)) / ${p[0]});
+var alpha: f32 = ((atan2(y, x) + ((2.0 * PI) * rand)) / f32(i32(${p[0]})));
 var gamma: f32 = (radius_out * sqrt(radius_square));
 var sina: f32 = sin(alpha);
 var cosa: f32 = cos(alpha);
@@ -8032,8 +8048,8 @@ v.y = ((0.5 * ${w}) * (cos((r2 + 1.0e-20)) * (2.0 * t.y)));
     params: [{ name: "effect", def: 8 }],
     verified: true, priority: 0, flags: [], types: ["2D"],
     code: (w, p) => `{
-v.x += ((${w} * tanh(t.x)) * ((1.0 / cos(t.x)) + (${p[0]} * PI)));
-v.y += ((${w} * tanh(t.y)) * ((1.0 / cos(t.y)) + (${p[0]} * PI)));
+v.x += ((${w} * tanh(t.x)) * ((1.0 / cos(t.x)) + (f32(i32(${p[0]})) * PI)));
+v.y += ((${w} * tanh(t.y)) * ((1.0 / cos(t.y)) + (f32(i32(${p[0]})) * PI)));
 }`,
   },
   "roundspher": {
@@ -8764,7 +8780,7 @@ fn polylogarithm_factorial(n: i32) -> f32 {
   return prod;
 }`,
     code: (w, p) => `{
-var N: f32 = ${p[0]};
+var N: f32 = f32(i32(${p[0]}));
 var HSTerm: f32 = polylogarithm_HarmonicS((i32(N) - 1));
 var vv: f32 = ${w};
 var z: Complex;
@@ -8908,7 +8924,7 @@ var _rota: f32 = (PI * ${p[0]});
 var _rotb: f32 = (-PI + _rota);
 var a: f32 = atan2(t.y, t.x);
 var r_: f32 = sqrt(((t.x * t.x) + (t.y * t.y)));
-var t_: f32 = ((${p[3]} * log(r_)) + ((${p[1]} * (a + PI)) / PI));
+var t_: f32 = ((${p[3]} * log(r_)) + ((f32(i32(${p[1]})) * (a + PI)) / PI));
 if ((t_ < 0.0)) {
   t_ -= t_size_2;
 }
@@ -9085,13 +9101,13 @@ v.y += (${w} * (((${A(3)} * x) + (${A(4)} * y)) + ${A(5)}));
 var ang: f32 = ((rnd(rs) * 2.0) * PI);
 var rnd_: f32 = (1.0 - (2.0 * rnd(rs)));
 var r_: f32;
-var count: i32 = i32(roundc(${p[0]}));
+var count: i32 = i32(roundc(f32(i32(${p[0]}))));
 if ((rnd(rs) < 0.5)) {
   r_ = ((acos(rnd_) - (f32((i32(roundc((f32(count) * rnd(rs)))) + 1)) * PI)) + ${p[1]});
 } else {
   r_ = ((acos(-rnd_) - (f32((i32(roundc((f32(count) * rnd(rs)))) + 1)) * PI)) + ${p[1]});
 }
-r_ *= (${w} / (${p[0]} * PI));
+r_ *= (${w} / (f32(i32(${p[0]})) * PI));
 var s: f32 = sin(ang);
 var c: f32 = cos(ang);
 v.x += (r_ * c);
@@ -9504,7 +9520,7 @@ X = (t.x - (f32(((M * 2) + 1)) * ${p[0]}));
 Y = (t.y - (f32(((N * 2) + 1)) * ${p[0]}));
 U = sqrt(((X * X) + (Y * Y)));
 V = ((0.3 + (0.7 * circleLinear_DiscretNoise2((M + 10), (N + 3)))) * ${p[0]});
-Z1 = circleLinear_DiscretNoise2(i32((f32(M) + ${p[5]})), N);
+Z1 = circleLinear_DiscretNoise2(i32((f32(M) + f32(i32(${p[5]})))), N);
 if (((Z1 < ${p[2]}) && (U < V))) {
   if ((${p[4]} > 0)) {
     if ((Z1 < (${p[2]} * ${p[3]}))) {
@@ -9544,7 +9560,7 @@ fn circleRand_DiscretNoise2(X: i32, Y: i32) -> f32 {
   return (f32((((n * (((n * n) * 15731) + 789221)) + 1376312589) & 2147483647)) * circleRand_AM);
 }`,
     code: (w, p) => `{
-var Seed: i32 = i32(roundc(${p[4]}));
+var Seed: i32 = i32(roundc(f32(i32(${p[4]}))));
 var X: f32;
 var Y: f32;
 var U: f32;
@@ -9634,13 +9650,13 @@ N = i32(floor(((0.5 * Uxy.y) / ${p[0]})));
 X = (Uxy.x - (f32(((M * 2) + 1)) * ${p[0]}));
 Y = (Uxy.y - (f32(((N * 2) + 1)) * ${p[0]}));
 U = sqrt(((X * X) + (Y * Y)));
-var b1: bool = (circleTrans1_DiscretNoise2(i32((f32(M) + ${p[4]})), N) > ${p[1]});
+var b1: bool = (circleTrans1_DiscretNoise2(i32((f32(M) + f32(i32(${p[4]})))), N) > ${p[1]});
 var b2: bool = (U > ((0.3 + (0.7 * circleTrans1_DiscretNoise2((M + 10), (N + 3)))) * ${p[0]}));
 if (!(b1 || b2)) {
   var f1: f32 = rnd(rs);
   var f2: f32 = rnd(rs);
   var f3: f32 = rnd(rs);
-  Uxy = circleTrans1_CircleR(${p[2]}, ${p[3]}, ${p[0]}, ${p[4]}, ${p[1]}, f1, f2, f3);
+  Uxy = circleTrans1_CircleR(${p[2]}, ${p[3]}, ${p[0]}, f32(i32(${p[4]})), ${p[1]}, f1, f2, f3);
 }
 v.x += (${w} * Uxy.x);
 v.y += (${w} * Uxy.y);
@@ -10758,7 +10774,7 @@ var directblur: f32 = ${p[6]};
 if ((directblur < 0.0)) {
   directblur = 0.0;
 }
-var blur: i32 = select(0, 1, (${p[4]} != 0));
+var blur: i32 = select(0, 1, (f32(i32(${p[4]})) != 0));
 xInterval = abs((crob_right - crob_left));
 yInterval = abs((crob_bottom - crob_top));
 xInt_2 = (xInterval / 2.0);
@@ -11904,7 +11920,7 @@ var ang: f32 = atan2(t.y, t.x);
 var az: f32 = acos((z_ / rad));
 var rdc: f32 = (cr + ((rnd(rs) * 0.5) * ca));
 var esc: bool = (rad > cr);
-var cr0: bool = (${p[5]} == 1);
+var cr0: bool = (f32(i32(${p[5]})) == 1);
 var s: f32 = sin(ang);
 var c: f32 = cos(ang);
 var saz: f32 = sin(az);
@@ -11936,13 +11952,13 @@ if ((cr0 && esc)) {
     code: (w, p) => `{
 var a: array<f32, 13>;
 var b: array<f32, 13>;
-for (var i: i32 = 1; (f32(i) <= ${p[0]}); i++) {
-  a[i] = cos((((2.0 * PI) * f32(i)) / ${p[0]}));
-  b[i] = sin((((2.0 * PI) * f32(i)) / ${p[0]}));
+for (var i: i32 = 1; (f32(i) <= f32(i32(${p[0]}))); i++) {
+  a[i] = cos((((2.0 * PI) * f32(i)) / f32(i32(${p[0]}))));
+  b[i] = sin((((2.0 * PI) * f32(i)) / f32(i32(${p[0]}))));
 }
 var x: f32;
 var y: f32;
-var l: i32 = (i32((rnd(rs) * ${p[0]})) + 1);
+var l: i32 = (i32((rnd(rs) * f32(i32(${p[0]})))) + 1);
 if ((rnd(rs) < 0.5)) {
   x = ((t.x / 2.0) + a[l]);
   y = ((t.y / 2.0) + b[l]);
@@ -12105,15 +12121,15 @@ var x: f32 = 1.0;
 var y: f32 = 1.0;
 var a: array<f32, 25>;
 var b: array<f32, 25>;
-for (var i: i32 = 1; (f32(i) <= ${p[0]}); i++) {
-  a[((2 * i) - 1)] = cos((((2.0 * PI) * f32(i)) / ${p[0]}));
-  b[((2 * i) - 1)] = sin((((2.0 * PI) * f32(i)) / ${p[0]}));
+for (var i: i32 = 1; (f32(i) <= f32(i32(${p[0]}))); i++) {
+  a[((2 * i) - 1)] = cos((((2.0 * PI) * f32(i)) / f32(i32(${p[0]}))));
+  b[((2 * i) - 1)] = sin((((2.0 * PI) * f32(i)) / f32(i32(${p[0]}))));
 }
-for (var i: i32 = 1; (f32(i) <= ${p[0]}); i++) {
-  a[(2 * i)] = ((cos((((2.0 * PI) * f32(i)) / ${p[0]})) + cos((((2.0 * PI) * f32((i - 1))) / ${p[0]}))) / 2.0);
-  b[(2 * i)] = ((sin((((2.0 * PI) * f32(i)) / ${p[0]})) + sin((((2.0 * PI) * f32((i - 1))) / ${p[0]}))) / 2.0);
+for (var i: i32 = 1; (f32(i) <= f32(i32(${p[0]}))); i++) {
+  a[(2 * i)] = ((cos((((2.0 * PI) * f32(i)) / f32(i32(${p[0]})))) + cos((((2.0 * PI) * f32((i - 1))) / f32(i32(${p[0]}))))) / 2.0);
+  b[(2 * i)] = ((sin((((2.0 * PI) * f32(i)) / f32(i32(${p[0]})))) + sin((((2.0 * PI) * f32((i - 1))) / f32(i32(${p[0]}))))) / 2.0);
 }
-var l: i32 = (1 + i32(((2.0 * ${p[0]}) * rnd(rs))));
+var l: i32 = (1 + i32(((2.0 * f32(i32(${p[0]}))) * rnd(rs))));
 x = ((t.x / 3.0) + ((a[l] - b[l]) / sqrt(2.0)));
 y = ((t.y / 3.0) + ((a[l] + b[l]) / sqrt(2.0)));
 v.x += (x * ${w});
@@ -12128,11 +12144,11 @@ var x: f32;
 var y: f32;
 var a: array<f32, 25>;
 var b: array<f32, 25>;
-var r_: f32 = (sqrt(1.25) * sqrt(${p[0]}));
-var c: i32 = i32((${p[0]} * rnd(rs)));
-for (var i: i32 = 0; (i < i32(${p[0]})); i++) {
-  a[i] = cos((((2.0 * PI) * f32(i)) / ${p[0]}));
-  b[i] = sin((((2.0 * PI) * f32(i)) / ${p[0]}));
+var r_: f32 = (sqrt(1.25) * sqrt(f32(i32(${p[0]}))));
+var c: i32 = i32((f32(i32(${p[0]})) * rnd(rs)));
+for (var i: i32 = 0; (i < i32(f32(i32(${p[0]})))); i++) {
+  a[i] = cos((((2.0 * PI) * f32(i)) / f32(i32(${p[0]}))));
+  b[i] = sin((((2.0 * PI) * f32(i)) / f32(i32(${p[0]}))));
 }
 var ra: f32 = (1.0 / (sqrt(3.0) * sqrt(((t.x * t.x) + (t.y * t.y)))));
 if (((c % 2) == 0)) {
@@ -12304,7 +12320,7 @@ v.y += (y * ${w});
     funcNames: ["roundc"],
     funcs: `fn roundc(x: f32) -> f32 { return sign(x) * floor(abs(x) + 0.5); }`,
     code: (w, p) => `{
-var nSpirals: i32 = i32(roundc(${p[3]}));
+var nSpirals: i32 = i32(roundc(f32(i32(${p[3]}))));
 var s: f32;
 var t_: f32;
 t_ = ((2.0 * PI) * rnd(rs));
@@ -12469,6 +12485,18 @@ v.x += ((${p[0]} + ((${w} * ${p[1]}) * t.x)) + ((${p[2]} * t.x) * t.x));
 v.x += ((((${p[3]} * t.x) * t.y) + (${p[4]} * t.y)) + ((${p[5]} * t.y) * t.y));
 v.y += ((${p[6]} + (${p[7]} * t.x)) + ((${p[8]} * t.x) * t.x));
 v.y += ((((${p[9]} * t.x) * t.y) + ((${w} * ${p[10]}) * t.y)) + ((${p[11]} * t.y) * t.y));
+}`,
+  },
+  "swirl3D_wf": {
+    params: [{ name: "n", def: 0 }],
+    verified: true, priority: 0, flags: ["3d","dc","z"], types: ["3D","DC"],
+    code: (w, p) => `{
+var rad: f32 = r;
+var ang: f32 = ph;
+v.x += (${w} * (rad * cos(ang)));
+v.y += (${w} * (rad * sin(ang)));
+pz_ += (${w} * sin(((6.0 * cos(rad)) - (f32(i32(${p[0]})) * ang))));
+(*cp) = abs(sin(((6.0 * cos(rad)) - (f32(i32(${p[0]})) * ang))));
 }`,
   },
   "jac_asn": {
@@ -12882,15 +12910,15 @@ if ((${w} != 0.0)) {
     params: [{ name: "n", def: 4 }, { name: "rad", def: 1 }, { name: "zero", def: 0 }],
     verified: true, priority: 0, flags: ["3d","z"], types: ["3D","CROP"],
     code: (w, p) => `{
-var coef: f32 = ((${p[0]} * 0.5) / PI);
+var coef: f32 = ((f32(i32(${p[0]})) * 0.5) / PI);
 var FX: f32 = t.x;
 var FY: f32 = t.y;
 var FZ: f32 = z_;
-var a0: f32 = (PI / ${p[0]});
+var a0: f32 = (PI / f32(i32(${p[0]})));
 var len: f32 = (1.0 / cos(a0));
 var d: f32 = ((${p[1]} * sin(a0)) * len);
 var angle: f32 = atan2(t.y, t.x);
-angle = ((floor((angle * coef)) / coef) + (PI / ${p[0]}));
+angle = ((floor((angle * coef)) / coef) + (PI / f32(i32(${p[0]}))));
 var x0: f32 = (cos(angle) * len);
 var y0: f32 = (sin(angle) * len);
 if ((sqrt((((t.x - x0) * (t.x - x0)) + ((t.y - y0) * (t.y - y0)))) < d)) {
@@ -14043,17 +14071,17 @@ fn pointgrid_random() -> f32 {
   return select(res, -res, (res < 0));
 }`,
     code: (w, p) => `{
-var _dx: f32 = ((${p[1]} - ${p[0]}) / ${p[2]});
-var _dy: f32 = ((${p[4]} - ${p[3]}) / ${p[5]});
-var xIdx: i32 = i32((rnd(rs) * ${p[2]}));
-var yIdx: i32 = i32((rnd(rs) * ${p[5]}));
+var _dx: f32 = ((${p[1]} - ${p[0]}) / f32(i32(${p[2]})));
+var _dy: f32 = ((${p[4]} - ${p[3]}) / f32(i32(${p[5]})));
+var xIdx: i32 = i32((rnd(rs) * f32(i32(${p[2]}))));
+var yIdx: i32 = i32((rnd(rs) * f32(i32(${p[5]}))));
 var x: f32 = (${p[0]} + (_dx * f32(xIdx)));
 var y: f32 = (${p[3]} + (_dy * f32(yIdx)));
 if ((${p[6]} > 0)) {
-  var xseed: i32 = i32((((${p[7]} + 1563) * f32(xIdx)) + f32(yIdx)));
+  var xseed: i32 = i32((((f32(i32(${p[7]})) + 1563) * f32(xIdx)) + f32(yIdx)));
   pointgrid_randomize(xseed);
   var distx: f32 = ((0.5 - pointgrid_random()) * ${p[6]});
-  var yseed: i32 = i32((((${p[7]} + 6715) * f32(yIdx)) + f32(xIdx)));
+  var yseed: i32 = i32((((f32(i32(${p[7]})) + 6715) * f32(yIdx)) + f32(xIdx)));
   pointgrid_randomize(yseed);
   var disty: f32 = ((0.5 - pointgrid_random()) * ${p[6]});
   x += distx;
@@ -14084,23 +14112,23 @@ fn pointgrid3d_random() -> f32 {
   return select(res, -res, (res < 0));
 }`,
     code: (w, p) => `{
-var _dx: f32 = ((${p[1]} - ${p[0]}) / ${p[2]});
-var _dy: f32 = ((${p[4]} - ${p[3]}) / ${p[5]});
-var _dz: f32 = ((${p[7]} - ${p[6]}) / ${p[8]});
-var xIdx: i32 = i32((rnd(rs) * ${p[2]}));
-var yIdx: i32 = i32((rnd(rs) * ${p[5]}));
-var zIdx: i32 = i32((rnd(rs) * ${p[8]}));
+var _dx: f32 = ((${p[1]} - ${p[0]}) / f32(i32(${p[2]})));
+var _dy: f32 = ((${p[4]} - ${p[3]}) / f32(i32(${p[5]})));
+var _dz: f32 = ((${p[7]} - ${p[6]}) / f32(i32(${p[8]})));
+var xIdx: i32 = i32((rnd(rs) * f32(i32(${p[2]}))));
+var yIdx: i32 = i32((rnd(rs) * f32(i32(${p[5]}))));
+var zIdx: i32 = i32((rnd(rs) * f32(i32(${p[8]}))));
 var x: f32 = (${p[0]} + (_dx * f32(xIdx)));
 var y: f32 = (${p[3]} + (_dy * f32(yIdx)));
 var z: f32 = (${p[6]} + (_dz * f32(zIdx)));
 if ((${p[9]} > 0)) {
-  var xseed: i32 = i32((((${p[10]} + 1563) * f32(xIdx)) + f32(zIdx)));
+  var xseed: i32 = i32((((f32(i32(${p[10]})) + 1563) * f32(xIdx)) + f32(zIdx)));
   pointgrid3d_randomize(xseed);
   var distx: f32 = ((0.5 - pointgrid3d_random()) * ${p[9]});
-  var yseed: i32 = i32((((${p[10]} + 6715) * f32(yIdx)) + f32(xIdx)));
+  var yseed: i32 = i32((((f32(i32(${p[10]})) + 6715) * f32(yIdx)) + f32(xIdx)));
   pointgrid3d_randomize(yseed);
   var disty: f32 = ((0.5 - pointgrid3d_random()) * ${p[9]});
-  var zseed: i32 = i32((((${p[10]} + 4761) * f32(zIdx)) + f32(yIdx)));
+  var zseed: i32 = i32((((f32(i32(${p[10]})) + 4761) * f32(zIdx)) + f32(yIdx)));
   pointgrid3d_randomize(zseed);
   var distz: f32 = ((0.5 - pointgrid3d_random()) * ${p[9]});
   x += distx;
@@ -14123,16 +14151,16 @@ if ((${p[1]} == 1)) {
 } else {
   rev = 1;
 }
-if (((n < 0.5) && (${p[2]} != 1))) {
+if (((n < 0.5) && (f32(i32(${p[2]})) != 1))) {
   v.x = ((${w} * (rev * t.x)) + ${p[0]});
   v.y = (${w} * t.y);
-} else if (((n > 0.5) && (${p[2]} != 1))) {
+} else if (((n > 0.5) && (f32(i32(${p[2]})) != 1))) {
   v.x = ((${w} * (rev * t.x)) - ${p[0]});
   v.y = (${w} * t.y);
-} else if (((n < 0.5) && (${p[2]} == 1))) {
+} else if (((n < 0.5) && (f32(i32(${p[2]})) == 1))) {
   v.y = ((${w} * (rev * t.y)) + ${p[0]});
   v.x = (${w} * t.x);
-} else if (((n > 0.5) && (${p[2]} == 1))) {
+} else if (((n > 0.5) && (f32(i32(${p[2]})) == 1))) {
   v.y = ((${w} * (rev * t.y)) - ${p[0]});
   v.x = (${w} * t.x);
 }
@@ -15577,7 +15605,7 @@ if ((${p[9]} == 1)) {
   y = ((2.0 * rnd(rs)) - 1.0);
 }
 var uv: vec2f = vec2f(x, y);
-color = dc_mandala_getRGBColor(uv, ${p[0]}, ${p[1]}, ${p[2]}, ${p[3]}, ${p[4]}, ${p[5]}, min(max(${p[6]}, 0.0), 1.0), min(max(${p[7]}, 0.0), 1.0), min(max(${p[8]}, 0.0), 1.0));
+color = dc_mandala_getRGBColor(uv, ${p[0]}, ${p[1]}, ${p[2]}, f32(i32(${p[3]})), f32(i32(${p[4]})), f32(i32(${p[5]})), min(max(${p[6]}, 0.0), 1.0), min(max(${p[7]}, 0.0), 1.0), min(max(${p[8]}, 0.0), 1.0));
 {
   var zc_: vec3i = dbl2int(color);
   z = greyscale(i32(f32(zc_.x)), i32(f32(zc_.y)), i32(f32(zc_.z)));
@@ -19872,7 +19900,7 @@ if ((${p[7]} == 1)) {
   y = (rnd(rs) - 0.5);
 }
 var uv: vec2f = (vec2f(x, y) * vec2f(min(max(${p[0]}, 0.1), 50.0)));
-color = dc_sunflower_getRGBColor(uv, ${p[2]}, min(max(${p[1]}, -1.0), 1.0), min(max(${p[5]}, 0.0), 1.0), min(max(${p[6]}, 0.0), 1.0), min(max(${p[3]}, 0.0), 1.0), min(max(${p[4]}, 0.0), 1.0));
+color = dc_sunflower_getRGBColor(uv, f32(i32(${p[2]})), min(max(${p[1]}, -1.0), 1.0), min(max(${p[5]}, 0.0), 1.0), min(max(${p[6]}, 0.0), 1.0), min(max(${p[3]}, 0.0), 1.0), min(max(${p[4]}, 0.0), 1.0));
 {
   var zc_: vec3i = dbl2int(color);
   z = greyscale(i32(f32(zc_.x)), i32(f32(zc_.y)), i32(f32(zc_.z)));
@@ -20590,13 +20618,13 @@ var FY_h: f32 = (1.5 * rz);
 var FX: f32 = (t.x - FX_h);
 var FY: f32 = (t.y - FY_h);
 var add: f32 = 0.0;
-if ((${p[3]} == 1)) {
+if ((f32(i32(${p[3]})) == 1)) {
   if ((((i32(rx) % 2) == 0) && ((i32(rz) % 2) == 0))) {
     add = 1.0471975511965979;
   }
 }
-if ((${p[3]} >= 2)) {
-  var hash_f: f32 = (sin((((FX_h * 12.9898) + (FY_h * 78.233)) + ${p[3]})) * 43758.5453);
+if ((f32(i32(${p[3]})) >= 2)) {
+  var hash_f: f32 = (sin((((FX_h * 12.9898) + (FY_h * 78.233)) + f32(i32(${p[3]})))) * 43758.5453);
   hash_f = (hash_f - floor(hash_f));
   if ((hash_f < 0.5)) {
     add = 1.0471975511965979;
@@ -20670,19 +20698,19 @@ var rz: f32 = floor((log(rnd(rs)) * select(-(${p[4]}), ${p[4]}, (rnd(rs) < 0.5))
 var FX_h: f32 = ((M_SQRT3 * rx) + (M_SQRT3_2 * select(-rz, rz, (rnd(rs) < 0.5))));
 var FY_h: f32 = (1.5 * rz);
 var add: bool = true;
-if ((${p[5]} == 1.0)) {
+if ((f32(i32(${p[5]})) == 1.0)) {
   if (((f32((i32(rx) % 2)) == 0.0) && (f32((i32(rz) % 2)) == 0.0))) {
     add = false;
   }
 }
-if ((${p[5]} >= 2)) {
-  var hash_f: f32 = (sin((((FX_h * 12.9898) + (FY_h * 78.233)) + ${p[5]})) * 43758.5453);
+if ((f32(i32(${p[5]})) >= 2)) {
+  var hash_f: f32 = (sin((((FX_h * 12.9898) + (FY_h * 78.233)) + f32(i32(${p[5]})))) * 43758.5453);
   hash_f = (hash_f - floor(hash_f));
   if ((hash_f < 0.5)) {
     add = false;
   }
 }
-var nnn: f32 = (3.0 * ${p[0]});
+var nnn: f32 = (3.0 * f32(i32(${p[0]})));
 var nnnn: f32 = (1.0 / nnn);
 var s1: f32 = exp((PI * nnnn));
 var k_factor: f32 = (2.0 / (s1 + (1.0 / s1)));
@@ -20792,7 +20820,7 @@ if ((min(max(${p[0]}, 0.0), 1.0) == 0)) {
   y = (rnd(rs) - 0.5);
 }
 var st: vec2f = vec2f((x * ${p[3]}), (y * ${p[3]}));
-var h: vec2f = vec2f(floor((7.0 * ${p[2]})), floor((7.0 * ${p[2]})));
+var h: vec2f = vec2f(floor((7.0 * f32(i32(${p[2]})))), floor((7.0 * f32(i32(${p[2]})))));
 var ipos: vec2f = floor((st + (h * cut_truchet_random2(h))));
 var fpos: vec2f = fract((st + (h * cut_truchet_random2(h))));
 var tile: vec2f = cut_truchet_truchetPattern(fpos, cut_truchet_random(ipos));
@@ -22268,7 +22296,7 @@ if ((min(max(${p[1]}, 0.0), 1.0) == 0)) {
   x = (rnd(rs) - 0.5);
   y = (rnd(rs) - 0.5);
 }
-var shiftxy: f32 = (${p[0]} * sin(((${p[0]} * 180.0) / PI)));
+var shiftxy: f32 = (f32(i32(${p[0]})) * sin(((f32(i32(${p[0]})) * 180.0) / PI)));
 var uv: vec2f = ((vec2f(x, y) * vec2f(min(max(${p[3]}, 0.1), 50.0))) - vec2f(shiftxy, shiftxy));
 var color: vec3f = vec3f(0.0, 0.0, 0.0);
 color = (color + cut_hextruchetflow_ShowScene((uv + vec2f(step(1.5, 1.0))), i32(min(max(${p[2]}, 0.0), 1.0))));
@@ -22800,7 +22828,7 @@ if ((${p[6]} == 1)) {
   y = (rnd(rs) - 0.5);
 }
 var uv: vec2f = (vec2f(x, y) * vec2f(${p[5]}));
-color = dc_fractcolor_getRGBColor(uv, min(max(${p[2]}, 0.0), 1.0), min(max(${p[3]}, 0.0), 1.0), ${p[1]}, ${p[4]});
+color = dc_fractcolor_getRGBColor(uv, min(max(${p[2]}, 0.0), 1.0), min(max(${p[3]}, 0.0), 1.0), ${p[1]}, f32(i32(${p[4]})));
 {
   var zc_: vec3i = dbl2int(color);
   z = greyscale(i32(f32(zc_.x)), i32(f32(zc_.y)), i32(f32(zc_.z)));
@@ -24297,7 +24325,7 @@ var z: f32 = z_;
 var nx: i32 = i32(roundc(min(max(${p[2]}, 1.0), 100.0)));
 var ny: i32 = i32(roundc(min(max(${p[5]}, 1.0), 100.0)));
 var nz: i32 = i32(roundc(min(max(${p[8]}, 1.0), 100.0)));
-var seed: i32 = i32(roundc(${p[10]}));
+var seed: i32 = i32(roundc(f32(i32(${p[10]}))));
 if ((${p[0]} != 0.0)) {
   var nr: i32 = i32(floor(((x - ${p[1]}) * ${p[0]})));
   if ((nr >= 0)) {
@@ -27859,7 +27887,7 @@ v.y += ((${w} * (cm_ly * cm_s)) / ${p[0]});
     code: (w, p) => `{
 var dt_r: f32 = sqrt((((t.x * t.x) + (t.y * t.y)) + 1.0e-10));
 var dt_theta: f32 = atan2(t.y, t.x);
-var dt_radial: f32 = (1.0 + (${p[1]} * cos((${p[0]} * dt_theta))));
+var dt_radial: f32 = (1.0 + (${p[1]} * cos((f32(i32(${p[0]})) * dt_theta))));
 var dt_nr: f32 = (dt_r * dt_radial);
 v.x += ((${w} * dt_nr) * cos(dt_theta));
 v.y += ((${w} * dt_nr) * sin(dt_theta));
@@ -27888,7 +27916,7 @@ v.y += (${w} * (t.y + lg_py));
     code: (w, p) => `{
 var sh_theta: f32 = atan2(t.y, t.x);
 var sh_r: f32 = sqrt(((t.x * t.x) + (t.y * t.y)));
-var sh_harm: f32 = (cos((${p[0]} * sh_theta)) * cos((${p[1]} * sh_theta)));
+var sh_harm: f32 = (cos((f32(i32(${p[0]})) * sh_theta)) * cos((f32(i32(${p[1]})) * sh_theta)));
 var sh_nr: f32 = (sh_r * (1.0 + (${p[2]} * sh_harm)));
 v.x += ((${w} * sh_nr) * cos(sh_theta));
 v.y += ((${w} * sh_nr) * sin(sh_theta));
@@ -28727,7 +28755,7 @@ v.y += (${w} * ((dp_r * dp_sa) + (dp_perp * dp_ca)));
     params: [{ name: "freq", def: 4 }, { name: "modes", def: 4 }, { name: "amp", def: 0.2 }],
     verified: true, priority: 0, flags: [], types: ["2D"],
     code: (w, p) => `{
-var fa_modes: f32 = max(abs(${p[1]}), 1.0);
+var fa_modes: f32 = max(abs(f32(i32(${p[1]}))), 1.0);
 var fa_r: f32 = sqrt(((t.x * t.x) + (t.y * t.y)));
 var fa_theta: f32 = atan2(t.y, t.x);
 var fa_wave: f32 = ((${p[2]} * cos((${p[0]} * fa_r))) * cos((fa_modes * fa_theta)));
@@ -29013,7 +29041,7 @@ var fz_x: f32 = t.x;
 var fz_y: f32 = t.y;
 var fz_cs: f32 = cos(${p[1]});
 var fz_sn: f32 = sin(${p[1]});
-for (var i: i32 = 0; (f32(i) < ${p[2]}); i++) {
+for (var i: i32 = 0; (f32(i) < f32(i32(${p[2]}))); i++) {
   var fz_nx: f32 = ((fz_x * fz_cs) - (fz_y * fz_sn));
   var fz_ny: f32 = ((fz_x * fz_sn) + (fz_y * fz_cs));
   fz_x = (fz_nx * ${p[0]});

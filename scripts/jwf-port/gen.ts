@@ -14,6 +14,8 @@ import { OVERRIDES } from './overrides.ts';
 import clampsJson from './data/param-clamps.json' with { type: 'json' };
 const PARAM_CLAMPS = clampsJson as Record<string, Record<string, [number, number]>>;
 import dcBaseJson from './data/dc-base.json' with { type: 'json' };
+import intsJson from './data/param-ints.json' with { type: 'json' };
+const PARAM_INTS = intsJson as Record<string, Record<string, 'trunc' | 'round'>>;
 const DC_BASE = dcBaseJson as { inherit: string[]; own2: string[]; ownOther: string[] };
 
 const here = dirname(fileURLToPath(import.meta.url));
@@ -233,6 +235,28 @@ for (let v0 of dump) {
       const re = new RegExp(`(?<![A-Za-z0-9_])__${v0.name}_${pn}(?![A-Za-z0-9_])(?!\\s*(?:[-+*/]?=)(?!=))`, 'g');
       ovCode = ovCode.replace(re, `(fminf(fmaxf(__${v0.name}_${pn}, ${lo.toFixed(4)}f), ${hi.toFixed(4)}f))`);
     }
+  }
+  // Java setParameter() int casts (data/param-ints.json): the CPU truncates/rounds the
+  // value at set time; the GPU snippet reads the raw float — wrap reads the same way.
+  const ints = PARAM_INTS[v0.name] ?? {};
+  if (Object.keys(ints).length && (ovCode ?? v0.gpuCode)) {
+    ovCode = (ovCode ?? v0.gpuCode ?? '').replace(/varpar->/g, '__');
+    for (const [pn, how] of Object.entries(ints)) {
+      const re = new RegExp(`(?<![A-Za-z0-9_])__${v0.name}_${pn}(?![A-Za-z0-9_])(?!\\s*(?:[-+*/]?=)(?!=))`, 'g');
+      ovCode = ovCode.replace(re, how === 'round' ? `((float)lroundf(__${v0.name}_${pn}))` : `((float)(int)(__${v0.name}_${pn}))`);
+    }
+  }
+  // GPU snippets often test a *double* flag param with lroundf(p) > 0 / == 1 where the
+  // Java tests the raw double (p > 0). Only for params the dump types as float.
+  {
+    let code = ovCode ?? v0.gpuCode ?? '';
+    const floatParams = v0.params.filter((q) => !q.int).map((q) => q.name);
+    let changed = false;
+    for (const pn of floatParams) {
+      const re = new RegExp(`lroundf\\(\\s*(\\(?\\(?\\(?)__${v0.name}_${pn}(?![A-Za-z0-9_])`, 'g');
+      if (re.test(code)) { code = code.replace(new RegExp(`lroundf\\(\\s*__${v0.name}_${pn}\\s*\\)`, 'g'), `(__${v0.name}_${pn})`); changed = true; }
+    }
+    if (changed) ovCode = code;
   }
   const v: DumpVar = ov || ovCode !== undefined ? { ...v0, gpuCode: ovCode ?? v0.gpuCode, gpuFunctions: ov?.gpuFunctions ?? v0.gpuFunctions } : v0;
   if (v.error) { report.push({ name: v.name, status: 'error', reason: 'instantiation: ' + v.error }); continue; }

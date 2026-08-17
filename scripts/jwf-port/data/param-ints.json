@@ -1,0 +1,673 @@
+{
+"attractor_flow": {
+"attractorMode": "trunc",
+"waveMode": "trunc",
+"zMode": "trunc"
+},
+"brownian_js": {
+"seed": "trunc"
+},
+"bubbleT3D": {
+"modus_blur": "trunc",
+"number_of_stripes": "trunc",
+"symmetry_z": "trunc"
+},
+"busybrad": {
+"corner": "trunc",
+"mode": "trunc",
+"n": "trunc",
+"sensen_post_effect": "trunc"
+},
+"bwrands": {
+"seed": "trunc"
+},
+"cactusGlobe": {
+"pups_count": "trunc"
+},
+"cell2": {
+"mirror_x": "trunc",
+"mirror_y": "trunc"
+},
+"circleLinear": {
+"Seed": "trunc"
+},
+"circleRand": {
+"Seed": "trunc"
+},
+"circleTrans1": {
+"Seed": "trunc"
+},
+"circlecrop": {
+"zero": "trunc"
+},
+"crob": {
+"blur": "trunc"
+},
+"curliecue": {
+"seed": "trunc"
+},
+"curliecue2": {
+"seed": "trunc"
+},
+"cut_2ewangtile": {
+"seed": "trunc"
+},
+"cut_alientext": {
+"seed": "trunc"
+},
+"cut_booleans": {
+"seed": "trunc"
+},
+"cut_bricks": {
+"seed": "trunc"
+},
+"cut_btree": {
+"randomize": "trunc"
+},
+"cut_btruchet": {
+"seed": "trunc"
+},
+"cut_circdes": {
+"seed": "trunc"
+},
+"cut_fingerprint": {
+"seed": "trunc"
+},
+"cut_fractal": {
+"seed": "trunc"
+},
+"cut_fun": {
+"seed": "trunc"
+},
+"cut_hextruchetflow": {
+"randomize": "trunc"
+},
+"cut_jigsaw": {
+"seed": "trunc"
+},
+"cut_kaleido": {
+"seed": "trunc"
+},
+"cut_magfield": {
+"randomize": "trunc"
+},
+"cut_mandala": {
+"seed": "trunc"
+},
+"cut_pattern": {
+"seed": "trunc"
+},
+"cut_randomtile": {
+"seed": "trunc"
+},
+"cut_sincos": {
+"seed": "trunc"
+},
+"cut_snowflake": {
+"seed": "trunc"
+},
+"cut_spots": {
+"seed": "trunc"
+},
+"cut_sqsplits": {
+"seed": "trunc"
+},
+"cut_swarp": {
+"seed": "trunc"
+},
+"cut_truchet": {
+"seed": "trunc"
+},
+"cut_truchetweaving": {
+"randomize": "trunc"
+},
+"cut_tstruchet": {
+"seed": "trunc"
+},
+"cut_web": {
+"seed": "trunc"
+},
+"dc_acrilic": {
+"seed": "trunc"
+},
+"dc_apollonian": {
+"seed": "trunc"
+},
+"dc_booleans": {
+"randomize": "trunc"
+},
+"dc_butterflies": {
+"seed": "trunc"
+},
+"dc_circlesblue": {
+"seed": "trunc"
+},
+"dc_circuits": {
+"Seed": "trunc"
+},
+"dc_cracklep_wf": {
+"preset": "trunc"
+},
+"dc_ducks": {
+"seed": "trunc"
+},
+"dc_fractcolor": {
+"iters": "trunc",
+"randomize": "trunc"
+},
+"dc_grid3D": {
+"Seed": "trunc"
+},
+"dc_hexagons": {
+"seed": "trunc"
+},
+"dc_hoshi": {
+"seed": "trunc"
+},
+"dc_inversion": {
+"seed": "trunc"
+},
+"dc_kaleidocomplex": {
+"seed": "trunc"
+},
+"dc_kaleidoscopic": {
+"seed": "trunc"
+},
+"dc_kaliset": {
+"Seed": "trunc"
+},
+"dc_kaliset2": {
+"seed": "trunc"
+},
+"dc_layers": {
+"seed": "trunc"
+},
+"dc_mandala": {
+"loops": "trunc",
+"multiply": "trunc",
+"sides": "trunc"
+},
+"dc_mandbrot": {
+"seed": "trunc"
+},
+"dc_portal": {
+"seed": "trunc"
+},
+"dc_randomoctree": {
+"seed": "trunc"
+},
+"dc_rotations": {
+"seed": "trunc"
+},
+"dc_squares": {
+"seed": "trunc"
+},
+"dc_starsfield": {
+"seed": "trunc"
+},
+"dc_sunflower": {
+"N": "trunc"
+},
+"dc_tesla": {
+"seed": "trunc"
+},
+"dc_tree": {
+"seed": "trunc"
+},
+"dc_triTile": {
+"depth": "trunc",
+"depth1": "trunc",
+"depth2": "trunc",
+"itt": "trunc",
+"itt1": "trunc",
+"itt2": "trunc",
+"t": "trunc"
+},
+"dc_turbulence": {
+"seed": "trunc"
+},
+"dc_vortex": {
+"randomize": "trunc"
+},
+"dc_warping": {
+"randomize": "trunc"
+},
+"de_stijl": {
+"seed": "trunc"
+},
+"diatom": {
+"spokes": "trunc"
+},
+"dla3d_wf": {
+"dc_color": "trunc",
+"display_junctions": "trunc",
+"display_nodes": "trunc",
+"max_iter": "trunc",
+"seed": "trunc",
+"single_thread": "trunc"
+},
+"dla_wf": {
+"buffer_size": "trunc",
+"max_iter": "trunc",
+"seed": "trunc"
+},
+"drunken_tiles": {
+"seed": "trunc"
+},
+"eJulia": {
+"power": "trunc"
+},
+"faraday": {
+"modes": "trunc"
+},
+"fractal_zoom": {
+"iters": "trunc"
+},
+"funnel": {
+"effect": "trunc"
+},
+"gdoffs": {
+"gamma": "trunc",
+"square": "trunc"
+},
+"glitchy1": {
+"seed": "trunc"
+},
+"glsl_acrilic": {
+"Seed": "trunc"
+},
+"glsl_apollonian": {
+"seed": "trunc"
+},
+"glsl_circlesblue": {
+"Seed": "trunc"
+},
+"glsl_grid3D": {
+"Seed": "trunc"
+},
+"glsl_kaleidoscopic": {
+"Seed": "trunc"
+},
+"glsl_kaliset": {
+"Seed": "trunc"
+},
+"glsl_kaliset2": {
+"Seed": "trunc"
+},
+"glsl_randomoctree": {
+"Seed": "trunc"
+},
+"glsl_squares": {
+"Seed": "trunc"
+},
+"glsl_starsfield": {
+"Seed": "trunc"
+},
+"glynnSim2B": {
+"colorMode": "trunc"
+},
+"glynns3subfl": {
+"type": "trunc"
+},
+"gpattern": {
+"seed": "trunc"
+},
+"greebles": {
+"base_shape": "trunc",
+"greeble_shape": "trunc",
+"mode": "trunc",
+"seed": "trunc",
+"subdivisions": "trunc"
+},
+"hamid_js": {
+"filled circles": "trunc",
+"number_lines/circles": "trunc"
+},
+"harmonograph_js": {
+"a1": "trunc",
+"a2": "trunc",
+"a3": "trunc",
+"a4": "trunc",
+"p1": "trunc",
+"p2": "trunc",
+"p3": "trunc",
+"p4": "trunc",
+"seed": "trunc",
+"time": "trunc"
+},
+"hilbert_js": {
+"show_lines": "trunc",
+"show_points": "trunc"
+},
+"htree_js": {
+"show_lines": "trunc",
+"show_points": "trunc"
+},
+"hypercrop": {
+"n": "trunc"
+},
+"hypershift2": {
+"p": "trunc",
+"q": "trunc"
+},
+"inversion": {
+"color_gradient": "trunc",
+"color_measure": "trunc",
+"imode": "trunc",
+"ring_mode": "trunc",
+"shape": "trunc"
+},
+"jubiQ": {
+"power": "trunc"
+},
+"julia3D": {
+"power": "trunc"
+},
+"julia3Dq": {
+"divisor": "trunc",
+"power": "trunc"
+},
+"julia3Dz": {
+"power": "trunc"
+},
+"julian": {
+"power": "trunc"
+},
+"julian2": {
+"power": "trunc"
+},
+"julian3Dx": {
+"power": "trunc"
+},
+"juliaq": {
+"divisor": "trunc",
+"power": "trunc"
+},
+"kaplan": {
+"seed": "trunc"
+},
+"kifs3d": {
+"max_iter": "trunc"
+},
+"knots3D": {
+"facets": "trunc",
+"presetId": "trunc",
+"steps": "trunc"
+},
+"koch_js": {
+"show_lines": "trunc",
+"show_points": "trunc"
+},
+"lazyjess": {
+"corner": "trunc",
+"n": "trunc"
+},
+"lsystem_js": {
+"iters": "trunc",
+"presetId": "trunc",
+"show_lines_param": "trunc",
+"show_points_param": "trunc"
+},
+"mandelbrot": {
+"invert": "trunc",
+"iter": "trunc",
+"max_points": "trunc",
+"seed": "trunc"
+},
+"maurer_lines": {
+"cosets_mode": "trunc",
+"curve_mode": "trunc",
+"direct_color_gradient": "trunc",
+"direct_color_measure": "trunc",
+"direct_color_thresholding": "trunc",
+"measure": "trunc",
+"meta_mode": "trunc",
+"mode": "trunc",
+"number_of_filters": "trunc",
+"operator": "trunc",
+"render_mode": "trunc",
+"render_submode": "trunc",
+"tangent_submode": "trunc"
+},
+"mobiqN": {
+"colorMode": "trunc",
+"iterations": "trunc",
+"spaceType": "trunc"
+},
+"mobius_strip": {
+"radial mode": "trunc",
+"twists": "trunc",
+"width mode": "trunc"
+},
+"msTruchet": {
+"seed": "trunc"
+},
+"murl": {
+"power": "trunc"
+},
+"murl2": {
+"power": "trunc"
+},
+"nBlur": {
+"numEdges": "trunc",
+"numStripes": "trunc"
+},
+"natural_foam": {
+"blur_quality": "trunc",
+"density": "trunc",
+"iterations": "trunc",
+"seed": "trunc"
+},
+"neuron3D": {
+"seed": "trunc"
+},
+"npolar": {
+"n": "trunc",
+"parity": "trunc"
+},
+"pixel_flow": {
+"seed": "trunc"
+},
+"pointgrid3d_wf": {
+"seed": "trunc",
+"xcount": "trunc",
+"ycount": "trunc",
+"zcount": "trunc"
+},
+"pointgrid_wf": {
+"seed": "trunc",
+"xcount": "trunc",
+"ycount": "trunc"
+},
+"polylogarithm": {
+"n": "trunc"
+},
+"post_bumpmap_wf": {
+"reset_z": "trunc"
+},
+"post_circlecrop": {
+"zero": "trunc"
+},
+"post_julia3Dq": {
+"divisor": "trunc",
+"power": "trunc"
+},
+"post_juliaq": {
+"divisor": "trunc",
+"power": "trunc"
+},
+"post_mirror_wf": {
+"xaxis": "trunc",
+"yaxis": "trunc",
+"zaxis": "trunc"
+},
+"pre_circlecrop": {
+"zero": "trunc"
+},
+"pre_stabilize": {
+"n": "trunc",
+"seed": "trunc"
+},
+"primitives_wf": {
+"shape": "trunc"
+},
+"quad": {
+"ll_seed": "trunc",
+"lr_seed": "trunc",
+"ul_seed": "trunc",
+"ur_seed": "trunc"
+},
+"recurrenceplot": {
+"Density": "trunc",
+"dc": "trunc",
+"func_id": "trunc",
+"k": "trunc"
+},
+"ripple": {
+"fixed_dist_calc": "trunc"
+},
+"romanesco": {
+"floret_count": "trunc",
+"num_arms": "trunc",
+"recursion_depth": "trunc"
+},
+"rose_wf": {
+"waves": "trunc"
+},
+"rosoni": {
+"altshapes": "trunc"
+},
+"rsquares_js": {
+"show_lines": "trunc",
+"show_points": "trunc"
+},
+"sattractor_js": {
+"m": "trunc"
+},
+"scrambly": {
+"byrows": "trunc",
+"l": "trunc",
+"seed": "trunc"
+},
+"seashell3D": {
+"nSpirals": "trunc"
+},
+"siercarpet_js": {
+"m": "trunc"
+},
+"snowflake_wf": {
+"buffer_size": "trunc",
+"dc_color": "trunc",
+"max_iter": "trunc",
+"seed": "trunc"
+},
+"sph_harmonic": {
+"l": "trunc",
+"m": "trunc"
+},
+"spherecrop": {
+"zero": "trunc"
+},
+"spherical3D_wf": {
+"invert": "trunc"
+},
+"starblur": {
+"power": "trunc"
+},
+"subflame_wf": {
+"flame_sequence_digits": "trunc",
+"flame_sequence_end": "trunc",
+"flame_sequence_repeat": "trunc",
+"flame_sequence_start": "trunc"
+},
+"svg_wf": {
+"pre_antialias": "trunc",
+"true_color": "trunc"
+},
+"swirl3D_wf": {
+"n": "trunc"
+},
+"synth": {
+"b_layer": "trunc",
+"b_type": "trunc",
+"c_layer": "trunc",
+"c_type": "trunc",
+"d_layer": "trunc",
+"d_type": "trunc",
+"e_layer": "trunc",
+"e_type": "trunc",
+"f_layer": "trunc",
+"f_type": "trunc",
+"mode": "trunc",
+"smooth": "trunc"
+},
+"target_sp": {
+"n_of_sp": "trunc"
+},
+"text_wf": {
+"baseline": "trunc"
+},
+"tile_reverse": {
+"vertical": "trunc"
+},
+"tqmirror": {
+"preset": "trunc"
+},
+"tree_js": {
+"show_lines": "trunc",
+"show_points": "trunc"
+},
+"triantruchet": {
+"seed": "trunc"
+},
+"truchet_ae": {
+"seed": "trunc"
+},
+"truchet_hex_crop": {
+"seed": "trunc"
+},
+"truchet_hex_fill": {
+"n": "trunc",
+"seed": "trunc"
+},
+"truchetflow": {
+"randomize": "trunc"
+},
+"voron": {
+"xseed": "trunc",
+"yseed": "trunc"
+},
+"vortex": {
+"randomize": "trunc"
+},
+"waffle": {
+"slices": "trunc"
+},
+"wangtiles": {
+"reset_z": "trunc",
+"seed": "trunc",
+"tile_x": "trunc",
+"tile_y": "trunc"
+},
+"waveblur_wf": {
+"count": "trunc"
+},
+"waves2_wf": {
+"use_cos_x": "trunc",
+"use_cos_y": "trunc"
+},
+"waves3_wf": {
+"use_cos_x": "trunc",
+"use_cos_y": "trunc"
+},
+"waves4_wf": {
+"use_cos_x": "trunc",
+"use_cos_y": "trunc"
+},
+"wedge": {
+"count": "trunc"
+},
+"woggle_js": {
+"m": "trunc"
+}
+}

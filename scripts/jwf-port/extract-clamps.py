@@ -14,6 +14,7 @@ for f in glob.glob(J + '/*.java'):
     s = open(f, encoding='latin-1').read()
     for m in re.finditer(r'return\s+"([A-Za-z0-9_]+)"\s*;', s): files.setdefault(m.group(1), f)
 found = {}
+found_ints = {}
 for n in sorted(names):
     f = files.get(n)
     if not f: continue
@@ -29,6 +30,16 @@ for n in sorted(names):
         if pm and lm and consts.get(pm.group(1)):
             clamps[consts[pm.group(1)]] = [float(lm.group(1)), float(lm.group(2))]
     if clamps: found[n] = clamps
+    # integer truncation / rounding of a double param in setParameter
+    ints = {}
+    for stmt in body.split(';'):
+        pm = re.search(r'(PARAM_[A-Za-z0-9_]+)', stmt)
+        if not pm or not consts.get(pm.group(1)): continue
+        if re.search(r'=\s*\(int\)\s*pValue', stmt) or re.search(r'=\s*Tools\.FTOI\(\s*pValue\s*\)', stmt): ints[consts[pm.group(1)]] = 'trunc'
+        elif re.search(r'=\s*\(int\)\s*Math\.round\(\s*pValue', stmt) or re.search(r'=\s*Math\.round\(\s*pValue', stmt): ints[consts[pm.group(1)]] = 'round'
+    if ints: found_ints[n] = ints
 out = os.path.join(os.path.dirname(__file__), 'data/param-clamps.json')
 json.dump(found, open(out, 'w'), indent=0, sort_keys=True)
-print(f'{len(found)} variations with clamps → {out}')
+out2 = os.path.join(os.path.dirname(__file__), 'data/param-ints.json')
+json.dump(found_ints, open(out2, 'w'), indent=0, sort_keys=True)
+print(f'{len(found)} variations with clamps → {out}; {len(found_ints)} with int-cast params → {out2}')

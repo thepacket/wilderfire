@@ -19,7 +19,7 @@ fn powc(x: f32, y: f32) -> f32 {
   return select(m, -m, (i32(yi) & 1) != 0);
 }`,
     code: (w, p) => `{
-var n: f32 = f32(i32(roundc(${p[0]})));
+var n: f32 = f32(i32(roundc(f32(i32(${p[0]})))));
 n = select(n, 1.0, (n == 0.0));
 var absn: f32 = abs(n);
 var cn: f32 = (((1.0 / n) - 1.0) / 2.0);
@@ -63,15 +63,15 @@ v.y += ((v_ * front) * sin(t.y));
     params: [{ name: "xaxis", def: 1 }, { name: "yaxis", def: 0 }, { name: "zaxis", def: 0 }, { name: "xshift", def: 0 }, { name: "yshift", def: 0 }, { name: "zshift", def: 0 }, { name: "xscale", def: 1 }, { name: "yscale", def: 1 }, { name: "xcolorshift", def: 0 }, { name: "ycolorshift", def: 0 }, { name: "zcolorshift", def: 0 }],
     verified: false, priority: 1, flags: ["dc","z"], types: ["2D","DC","POST"],
     code: (_w, p) => `{
-if (((${p[0]} > 0.0) && (rnd(rs) < 0.5))) {
+if (((f32(i32(${p[0]})) > 0.0) && (rnd(rs) < 0.5))) {
   v.x = (-v.x - ${p[3]});
   (*cp) = (((*cp) + ${p[8]}) % 1.0);
 }
-if (((${p[1]} > 0.0) && (rnd(rs) < 0.5))) {
+if (((f32(i32(${p[1]})) > 0.0) && (rnd(rs) < 0.5))) {
   v.y = (-v.y - ${p[4]});
   (*cp) = (((*cp) + ${p[9]}) % 1.0);
 }
-if (((${p[2]} > 0.0) && (rnd(rs) < 0.5))) {
+if (((f32(i32(${p[2]})) > 0.0) && (rnd(rs) < 0.5))) {
   pz_ = (-pz_ - ${p[5]});
   (*cp) = (((*cp) + ${p[10]}) % 1.0);
 }
@@ -93,7 +93,7 @@ var rad: f32 = sqrt(((v.x * v.x) + (v.y * v.y)));
 var ang: f32 = atan2(v.y, v.x);
 var rdc: f32 = (cr + ((rnd(rs) * 0.5) * ca));
 var esc: bool = (rad > cr);
-var cr0: bool = (${p[4]} != 0.0);
+var cr0: bool = (f32(i32(${p[4]})) != 0.0);
 var c: f32;
 var s: f32;
 s = sin(ang);
@@ -131,14 +131,14 @@ var x: f32 = _x0;
 var y1: f32 = _y0;
 var y: f32 = _y0;
 var currIter: i32;
-var inverted: i32 = select(0, 1, (rnd(rs) < ${p[5]}));
+var inverted: i32 = select(0, 1, (rnd(rs) < f32(i32(${p[5]}))));
 if ((inverted != 0)) {
   currIter = 0;
 } else {
-  currIter = i32(${p[0]});
+  currIter = i32(f32(i32(${p[0]})));
 }
 var k: i32 = 0;
-while (((k < 10) && (((inverted != 0) && (f32(currIter) < ${p[0]})) || (!(inverted != 0) && ((f32(currIter) >= ${p[0]}) || ((${p[6]} < 1) && (f32(currIter) < ((0.1 * ${p[0]}) * (1 - ${p[6]}))))))))) {
+while (((k < 10) && (((inverted != 0) && (f32(currIter) < f32(i32(${p[0]})))) || (!(inverted != 0) && ((f32(currIter) >= f32(i32(${p[0]}))) || ((${p[6]} < 1) && (f32(currIter) < ((0.1 * f32(i32(${p[0]}))) * (1 - ${p[6]}))))))))) {
   if (((_x0 == 0) && (_y0 == 0))) {
     _x0 = (((${p[2]} - ${p[1]}) * rnd(rs)) + ${p[1]});
     _y0 = (((${p[4]} - ${p[3]}) * rnd(rs)) + ${p[3]});
@@ -152,13 +152,13 @@ while (((k < 10) && (((inverted != 0) && (f32(currIter) < ${p[0]})) || (!(invert
   x = _x0;
   y = _y0;
   currIter = 0;
-  while (((((x * x) + (y * y)) < f32((2 * 2))) && (f32(currIter) < ${p[0]}))) {
+  while (((((x * x) + (y * y)) < f32((2 * 2))) && (f32(currIter) < f32(i32(${p[0]}))))) {
     var xtemp: f32 = (((x * x) - (y * y)) + _x0);
     y = (((2.0 * x) * y) + _y0);
     x = xtemp;
     currIter++;
   }
-  if ((((f32(currIter) >= ${p[0]}) || (${p[6]} == 1)) || (f32(currIter) < (0.1 * (${p[0]} * (1 - ${p[6]})))))) {
+  if ((((f32(currIter) >= f32(i32(${p[0]}))) || (${p[6]} == 1)) || (f32(currIter) < (0.1 * (f32(i32(${p[0]})) * (1 - ${p[6]})))))) {
     _x0 = 0;
     _y0 = 0;
   }
@@ -173,26 +173,6 @@ pz_ += _z0;
 (*&(jwx_mandelbrot_x0)) = _x0;
 (*&(jwx_mandelbrot_y0)) = _y0;
 (*&(jwx_mandelbrot_z0)) = _z0;
-}`,
-  },
-  "post_colorscale_wf": {
-    params: [{ name: "scale_x", def: 0 }, { name: "scale_y", def: 0 }, { name: "scale_z", def: 0.5 }, { name: "offset_z", def: 0 }, { name: "reset_z", def: 0 }, { name: "sides", def: 0 }],
-    verified: false, priority: 1, flags: ["3d","dc","z"], types: ["3D","POST"],
-    funcNames: ["roundc"],
-    funcs: `fn roundc(x: f32) -> f32 { return sign(x) * floor(abs(x) + 0.5); }`,
-    code: (w, p) => `{
-v.x += ((${w} * ${p[0]}) * v.x);
-v.y += ((${w} * ${p[1]}) * v.y);
-var dz: f32 = ((((*cp) * ${p[2]}) * ${w}) + ${p[3]});
-if ((i32(roundc(${p[4]})) > 0)) {
-  pz_ = dz;
-} else {
-  if ((i32(roundc(${p[5]})) > 0)) {
-    pz_ += (dz * rnd(rs));
-  } else {
-    pz_ += dz;
-  }
-}
 }`,
   },
   "post_falloff2": {
@@ -624,7 +604,7 @@ if ((abs(${p[0]}) < 0.000001)) {
   Cy = ((f32(Iy) + 0.5) * ${p[0]});
   var xx: i32 = (Ix ^ 46657);
   var yy: i32 = (Iy ^ 40321);
-  var xy: i32 = i32((f32((xx * yy)) + ${p[5]}));
+  var xy: i32 = i32((f32((xx * yy)) + f32(i32(${p[5]}))));
   xx &= 65535;
   yy &= 65535;
   xy &= 65535;
@@ -960,9 +940,9 @@ v.y += (ri * sin(ang2));
     code: (w, p) => `{
 var x: f32;
 var y: f32;
-var t_: f32 = (rnd(rs) * ${p[1]});
-x = (harmonograph_js_mo(t_, ${p[2]}, ${p[3]}, ${p[4]}, ${p[5]}, ${p[6]}, ${p[7]}, ${p[8]}, ${p[9]}) / 180);
-y = (harmonograph_js_mo(t_, ${p[10]}, ${p[11]}, (${p[12]} + 90.0), ${p[13]}, ${p[14]}, ${p[15]}, (${p[16]} + 90.0), ${p[17]}) / 180);
+var t_: f32 = (rnd(rs) * f32(i32(${p[1]})));
+x = (harmonograph_js_mo(t_, f32(i32(${p[2]})), ${p[3]}, f32(i32(${p[4]})), ${p[5]}, f32(i32(${p[6]})), ${p[7]}, f32(i32(${p[8]})), ${p[9]}) / 180);
+y = (harmonograph_js_mo(t_, f32(i32(${p[10]})), ${p[11]}, (f32(i32(${p[12]})) + 90.0), ${p[13]}, f32(i32(${p[14]})), ${p[15]}, (f32(i32(${p[16]})) + 90.0), ${p[17]}) / 180);
 v.x += (x * ${w});
 v.y += (y * ${w});
 }`,
@@ -1084,18 +1064,6 @@ for (var k: i32 = 0; (k < 500); k++) {
 }
 v.x = (x * ${w});
 v.y = (y * ${w});
-}`,
-  },
-  "swirl3D_wf": {
-    params: [{ name: "n", def: 0 }],
-    verified: false, priority: 0, flags: ["3d","dc","z"], types: ["3D","DC"],
-    code: (w, p) => `{
-var rad: f32 = r;
-var ang: f32 = ph;
-v.x += (${w} * (rad * cos(ang)));
-v.y += (${w} * (rad * sin(ang)));
-pz_ += (${w} * sin(((6.0 * cos(rad)) - (${p[0]} * ang))));
-(*cp) = abs(sin(((6.0 * cos(rad)) - (${p[0]} * ang))));
 }`,
   },
   "dc_circuits": {
@@ -1890,7 +1858,7 @@ if ((min(max(${p[1]}, 0.0), 1.0) == 0.0)) {
   py_center = 0.0;
 }
 var uv: vec2f = (vec2f(x, y) * vec2f(min(max(${p[2]}, 1.0), 100.0)));
-color = cut_fingerprint_getRGBColor(uv, ${p[0]}, min(max(${p[3]}, 0.02), 1.0));
+color = cut_fingerprint_getRGBColor(uv, f32(i32(${p[0]})), min(max(${p[3]}, 0.02), 1.0));
 (*hd) = false;
 if ((min(max(${p[4]}, 0.0), 1.0) == 0)) {
   if ((color.x == 0.0)) {
@@ -2248,7 +2216,7 @@ if ((min(max(${p[1]}, 0.0), 1.0) == 0)) {
   x = (rnd(rs) - 0.5);
   y = (rnd(rs) - 0.5);
 }
-var uvx: f32 = (${p[0]} * sin(((${p[0]} * 180.0) / PI)));
+var uvx: f32 = (f32(i32(${p[0]})) * sin(((f32(i32(${p[0]})) * 180.0) / PI)));
 var u: vec2f = vec2f(((x * min(max(${p[4]}, 0.1), 50.0)) - uvx), ((y * min(max(${p[4]}, 0.1), 50.0)) - uvx));
 var R3: f32 = 1.732050807;
 var s: vec2f = vec2f(1.0, R3);
@@ -2557,10 +2525,10 @@ var a_rad: f32 = (${p[0]} * 0.0174532925);
 var sina: f32 = sin(a_rad);
 var cosa: f32 = cos(a_rad);
 var blockx: i32 = i32(floor((t.x * ${p[2]})));
-blockx = i32((f32(blockx) + (2.0 - (4.0 * pixel_flow_hash(i32(((f32(blockx) * ${p[3]}) + 1)))))));
+blockx = i32((f32(blockx) + (2.0 - (4.0 * pixel_flow_hash(i32(((f32(blockx) * f32(i32(${p[3]}))) + 1)))))));
 var blocky: i32 = i32(floor((t.y * ${p[2]})));
-blocky = i32((f32(blocky) + (2.0 - (4.0 * pixel_flow_hash(i32(((f32(blocky) * ${p[3]}) + 1)))))));
-var fLen: f32 = ((pixel_flow_hash(i32((f32(blocky) + (f32(blockx) * -(${p[3]}))))) + pixel_flow_hash(i32((f32(blockx) + ((f32(blocky) * ${p[3]}) / 2))))) * 0.5);
+blocky = i32((f32(blocky) + (2.0 - (4.0 * pixel_flow_hash(i32(((f32(blocky) * f32(i32(${p[3]}))) + 1)))))));
+var fLen: f32 = ((pixel_flow_hash(i32((f32(blocky) + (f32(blockx) * -(f32(i32(${p[3]}))))))) + pixel_flow_hash(i32((f32(blockx) + ((f32(blocky) * f32(i32(${p[3]}))) / 2))))) * 0.5);
 var r01: f32 = rnd(rs);
 var fade: f32 = ((((1.0 * r01) * r01) * r01) * r01);
 v.x += (((${w} * ${p[1]}) * cosa) * fade);

@@ -71,15 +71,16 @@ node scripts/jwf-port/gen.ts            # re-emit with the new verdicts
 ## Status
 
 Of JWildfire's 1026 variations, all 786 that carry a GPU snippet transpile;
-**742 verify against the Java oracle in 3D** (+2 force-verified: `pre_flatten`,
-`cut_bricks` — see `gen.ts`) and ship in `variations.jwf.ts`; 44 transpile but
+**744 verify against the Java oracle in 3D** (+2 force-verified: `pre_flatten`,
+`cut_bricks` — see `gen.ts`) and ship in `variations.jwf.ts`; 42 transpile but
 diverge (f32 hash noise, a few GPU≠CPU snippets, param-only mismatches) and stay
 in `variations.jwf.unverified.ts`; the remaining 240 have no GPU snippet in
 JWildfire or need resources/custom Java code. Together with the 70 hand-written
-flam3 entries the app registry has 748 variations. Systematic GPU≠CPU families fixed at generator level: the 17 `*3D`
+flam3 entries the app registry has 750 variations. Systematic GPU≠CPU families fixed at generator level: the 17 `*3D`
 solid samplers (CPU rejection-samples up to 50 times before hiding — `retry`
-override), Java `setParameter()` clamps (`data/param-clamps.json` from
-`extract-clamps.py`, applied to every param read), the `DC_BaseFunc` shader-art
+override), Java `setParameter()` clamps and int casts (`data/param-clamps.json`,
+`data/param-ints.json` from `extract-clamps.py`, applied to every param read;
+`lroundf(flag) > 0` tests on double params become plain comparisons like the Java), the `DC_BaseFunc` shader-art
 family (CPU samples `rnd−0.5` and sets z = greyscale(colour); the GPU sampled
 `2·rnd−1` and left z = 0.5 — `data/dc-base.json` says which classes inherit the
 base transform), mistyped param names, a few C-isms (`++i` in conditions, chained
