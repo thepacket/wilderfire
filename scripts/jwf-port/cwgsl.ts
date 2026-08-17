@@ -852,6 +852,19 @@ BUILTINS.RANDFLOAT = () => ({ c: 'rnd(rs)', ty: F32 });
 // layer's palette base index, `numColors` to 256; helper defined in HELPER_FUNCS.
 BUILTINS.read_imageStepMode = (a, em) => ({ c: `read_imageStepMode(${em.toU32(a[0])}, ${em.toI32(a[1])}, ${em.toF32(a[2])})`, ty: vec(4, 'f32') });
 BUILTINS.RANDINT = () => ({ c: 'rndi(rs)', ty: U32 });
+// HSIN2(a1, c1, a2, c2, add_a, add_b, K): the classic shader hash `sin(a1*c1 + a2*c2 + add) * K`
+// (then fract / x-trunc(x) by the caller) evaluated in double-float (two f32) arithmetic so the
+// fractional part matches JWildfire's f64 Java for integer-valued a1/a2 (cell ids). c1, c2, K
+// must be literals; the value returned is (sin(X)·K) − trunc(sin(X)·K), which fract() and
+// `x − (int)x` both leave unchanged. See HELPER_FUNCS.hsin_.
+BUILTINS.HSIN2 = (a, em) => {
+  const lit = (r: EmitRes, what: string) => { const v = Number(r.c); if (!Number.isFinite(v)) fail(`HSIN2: ${what} must be a numeric literal, got ${r.c}`); return v; };
+  const df = (v: number) => { const hi = Math.fround(v); const lo = Math.fround(v - hi); return `vec2f(${fmtF(hi)}, ${fmtF(lo)})`; };
+  const c1 = lit(a[1], 'c1'), c2 = lit(a[3], 'c2'), k = lit(a[6], 'K');
+  const x = `df_add(df_add(df_add(df_mulf(${df(c1)}, ${em.toF32(a[0])}), df_mulf(${df(c2)}, ${em.toF32(a[2])})), vec2f(${em.toF32(a[4])}, 0.0)), vec2f(${em.toF32(a[5])}, 0.0))`;
+  return { c: `hsin_(${x}, ${df(k)})`, ty: F32 };
+};
+function fmtF(v: number): string { let s = String(v); if (!/[.e]/.test(s)) s += '.0'; if (/^-?\d+e/.test(s)) s = s.replace(/^(-?\d+)e/, '$1.0e'); return s; }
 BUILTINS.erff = (a, em) => ({ c: `erf(${em.toF32(a[0])})`, ty: F32 });
 BUILTINS.erf = BUILTINS.erff;
 BUILTINS.j1f = (a, em) => ({ c: `besselJ1(${em.toF32(a[0])})`, ty: F32 });
@@ -918,8 +931,63 @@ export const HELPER_FUNCS: Record<string, string> = {
   for (var j = 0; j < 6; j++) { y += 1.0; ser += cof[j] / y; }
   return -tmp + log(2.5066282746310005 * ser / x); }`,
   tgamma: `fn tgamma(x: f32) -> f32 { return exp(lgamma(x)); }`,
+  // --- double-float (two-f32) arithmetic for the hash helper below (Dekker/Knuth; needs a fused fma) ---
+  //     the shader compiler reassociates floating point (Metal fast-math): it folds the error terms
+  //     of TwoSum to zero and regroups sums even across buffer loads. `op_` passes a value through
+  //     an integer add of the runtime zero `df_zero` (set opaquely by the kernel entry point), which
+  //     the optimiser cannot see through; every intermediate whose rounding matters goes through it.
+  //     fma() is fused (tested) and used as is.
+  op_: `fn op_(v: f32) -> f32 { return bitcast<f32>(bitcast<u32>(v) + df_zero); }`,
+  df_qts: `fn df_qts(a0: f32, b0: f32) -> vec2f { let a = op_(a0); let b = op_(b0); let s = op_(a + b); return vec2f(s, b - op_(s - a)); }`,
+  df_ts: `fn df_ts(a0: f32, b0: f32) -> vec2f { let a = op_(a0); let b = op_(b0); let s = op_(a + b); let bb = op_(s - a); return vec2f(s, op_(a - op_(s - bb)) + op_(b - bb)); }`,
+  df_add: `fn df_add(x: vec2f, y: vec2f) -> vec2f { var s = df_ts(x.x, y.x); let t = df_ts(x.y, y.y); s.y = op_(s.y + t.x); s = df_qts(s.x, s.y); s.y = op_(s.y + t.y); return df_qts(s.x, s.y); }`,
+  df_mulf: `fn df_mulf(x: vec2f, b: f32) -> vec2f { let p = op_(x.x * b); var e = fma(x.x, b, -p); e = op_(e + x.y * b); return df_qts(p, e); }`,
+  df_mul: `fn df_mul(x: vec2f, y: vec2f) -> vec2f { let p = op_(x.x * y.x); var e = fma(x.x, y.x, -p); e = op_(e + op_(x.x * y.y + x.y * y.x)); return df_qts(p, e); }`,
+  // Taylor series, valid for |x| <= pi/4 (+ slack); ~1e-14 absolute
+  df_sin: `fn df_sin(x: vec2f) -> vec2f {
+  let x2 = df_mul(x, x);
+  var s = vec2f(-7.647163609812713e-13, -1.2200710471178288e-20);
+  s = df_add(df_mul(s, x2), vec2f(1.6059044372074283e-10, -5.352526511562726e-18));
+  s = df_add(df_mul(s, x2), vec2f(-2.5052107943679403e-08, -4.4176230446483665e-16));
+  s = df_add(df_mul(s, x2), vec2f(2.7557318844628753e-06, 3.793571224297229e-14));
+  s = df_add(df_mul(s, x2), vec2f(-0.00019841270113829523, 2.725596874933456e-12));
+  s = df_add(df_mul(s, x2), vec2f(0.008333333767950535, -4.34617203337595e-10));
+  s = df_add(df_mul(s, x2), vec2f(-0.1666666716337204, 4.967053879312289e-09));
+  s = df_add(df_mul(s, x2), vec2f(1.0, 0.0));
+  return df_mul(s, x);
+}`,
+  df_cos: `fn df_cos(x: vec2f) -> vec2f {
+  let x2 = df_mul(x, x);
+  var s = vec2f(4.7794772561329454e-14, 7.62544404448643e-22);
+  s = df_add(df_mul(s, x2), vec2f(-1.147074536050896e-11, -2.372207689231238e-19));
+  s = df_add(df_mul(s, x2), vec2f(2.0876755879584152e-09, 1.1082839809204342e-16));
+  s = df_add(df_mul(s, x2), vec2f(-2.755731998149713e-07, 7.575112209051195e-15));
+  s = df_add(df_mul(s, x2), vec2f(2.4801587642286904e-05, -3.40699609366682e-13));
+  s = df_add(df_mul(s, x2), vec2f(-0.0013888889225199819, 3.3631094437103215e-11));
+  s = df_add(df_mul(s, x2), vec2f(0.0416666679084301, -1.2417634698280722e-09));
+  s = df_add(df_mul(s, x2), vec2f(-0.5, 0.0));
+  s = df_add(df_mul(s, x2), vec2f(1.0, 0.0));
+  return s;
+}`,
+  // (sin(X)*K) - trunc(sin(X)*K) in double-float: reduce X mod 2pi, then by quadrant, then series
+  hsin_: `fn hsin_(x: vec2f, k: vec2f) -> f32 {
+  let n = round(x.x * 0.15915494309189535);
+  var r = df_add(x, df_mulf(vec2f(-6.2831854820251465, 1.7484555314695172e-07), n));
+  let q = round(r.x * 0.6366197723675814);
+  r = df_add(r, df_mulf(vec2f(-1.5707963705062866, 4.371138828673793e-08), q));
+  let qi = i32(q) & 3;
+  var s: vec2f;
+  if (qi == 0) { s = df_sin(r); } else if (qi == 1) { s = df_cos(r); } else if (qi == 2) { s = -df_sin(r); } else { s = -df_cos(r); }
+  let v = df_mul(s, k);
+  // sign-preserving fraction of v.x + v.y; the low part can carry across the integer v.x rounded to
+  var f = op_(v.x - trunc(v.x)) + v.y;
+  let pos = v.x > 0.0 || (v.x == 0.0 && v.y > 0.0);
+  if (pos && f < 0.0) { f += 1.0; } else if (!pos && f > 0.0) { f -= 1.0; }
+  if (f >= 1.0) { f -= 1.0; } else if (f <= -1.0) { f += 1.0; }
+  return f;
+}`,
 };
-const HELPER_DEPS: Record<string, string[]> = { tgamma: ['lgamma'] };
+const HELPER_DEPS: Record<string, string[]> = { tgamma: ['lgamma'], hsin_: ['op_', 'df_qts', 'df_ts', 'df_add', 'df_mulf', 'df_mul', 'df_sin', 'df_cos'], df_qts: ['op_'], df_ts: ['op_'], df_add: ['op_', 'df_qts', 'df_ts'], df_mulf: ['op_', 'df_qts'], df_mul: ['op_', 'df_qts'], df_sin: ['op_', 'df_qts', 'df_ts', 'df_add', 'df_mul'], df_cos: ['op_', 'df_qts', 'df_ts', 'df_add', 'df_mul'] };
 
 function isLvalueExpr(e: Expr): boolean {
   return e.t === 'id' || e.t === 'index' || e.t === 'member' || (e.t === 'unary' && e.op === '*');

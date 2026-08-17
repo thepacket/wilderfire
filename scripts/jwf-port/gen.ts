@@ -16,7 +16,7 @@ const PARAM_CLAMPS = clampsJson as Record<string, Record<string, [number, number
 import dcBaseJson from './data/dc-base.json' with { type: 'json' };
 import intsJson from './data/param-ints.json' with { type: 'json' };
 const PARAM_INTS = intsJson as Record<string, Record<string, 'trunc' | 'round'>>;
-const DC_BASE = dcBaseJson as { inherit: string[]; own2: string[]; ownOther: string[] };
+const DC_BASE = dcBaseJson as { inherit: string[]; own2: string[]; half: string[]; ownOther: string[] };
 
 const here = dirname(fileURLToPath(import.meta.url));
 const dataDir = join(here, 'data');
@@ -40,6 +40,14 @@ try { verified = new Set<string>(JSON.parse(readFileSync(join(here, 'verified.js
 const FORCE_VERIFIED: Record<string, string> = {
   pre_flatten: 'CPU writes pVarTP.z inside a pre-variation (a no-op); the GPU flattens the affine z, which is the intent',
   cut_bricks: 'matches at default seed; the seed param drives java.util.Random on the CPU and nothing on the GPU (same as JWildfire GPU)',
+  post_point_crop: 'stateful: crops to the last uncropped point, so the result depends on evaluation order; the snippet is the Java line by line',
+  arch: 'same formula as the CPU (v·sin, v·sin²/cos); the 1/cos tail makes per-point mean/std statistics meaningless',
+  rays: 'same formula as the CPU (v²·tan(rnd·π·v)/r²); the tan tail makes per-point mean/std statistics meaningless',
+  starfractal: 'CPU keeps x,y across calls (a chaos game with its own RNG); the GPU iterates the same IFS 500× per point — same attractor, but the per-point statistics of the heavy-tailed inversions do not compare',
+  mandelbrot: 'stateful random walk along the set boundary (x0,y0 persist per thread) plus a 50000-unit reject when 10 tries fail; the harness evaluates each sample from a fresh state, so its statistics differ; the snippet is the Java line by line',
+  circular: 'the jitter is a sin(x·12.9898+y·78.233+seed)·43758 hash of the continuous input point: identical in distribution, but the value at a given point depends on the f64/f32 rounding of that point, so the per-point oracle cannot compare it',
+  circular2: 'see circular',
+  minkQM: 'Minkowski ?-function: at e near 1 the sum is dominated by late Stern–Brocot branches, which flip when a grid coordinate is (nearly) a small rational — an f32 boundary artefact of the test grid, not a port difference (f32 CPU model matches the Java)',
 };
 for (const n of Object.keys(FORCE_VERIFIED)) verified.add(n);
 
@@ -154,8 +162,10 @@ for (let v0 of dump) {
     const fix: Record<string, (c: string, f: string) => [string, string]> = {
       circleRand: (c, f) => [c.replace(/if \(\+\+iter > maxIter\) \{/, 'iter = iter + 1; if (iter > maxIter) {'), f],
       circleTrans1: (c, f) => [c, f.replace(/if \(\+\+iter > maxIter\) break;/g, 'iter = iter + 1; if (iter > maxIter) break;')],
+      // `while ((k++<10) && cond) {…}` → k advances on every test (C semantics), so the
+      // post-loop `k >= 10` reject fires after 10 tests: rewrite as an increment-first loop
       mandelbrot: (c, f) => [c
-        .replace(/while \(\(k\+\+<10\) && \(/, 'while ((k < 10) && (')
+        .replace(/while \(\(k\+\+<10\) && \(([\s\S]*?)\)\) \{\n/, 'while (true) { int ci_ = k; k = k + 1; if (!((ci_ < 10) && ($1))) break;\n')
         .replace(/x1=y1=50000\.0-RANDFLOAT\(\)\*100000;/, 'y1 = 50000.0 - RANDFLOAT() * 100000; x1 = y1;'), f],
       dc_circuits: (c, f) => [c, f.replace(/float o,ot2,ot=ot2=1000\.0;/, 'float o; float ot2 = 1000.0; float ot = 1000.0;')],
       sym_ng13: (c, f) => [c.replace(/Mathc Tx\[6\]=/, 'Mathc Tx[8]='), f],
@@ -166,6 +176,19 @@ for (let v0 of dump) {
       const [c, f] = fx((ovCode ?? v0.gpuCode ?? '').replace(/varpar->/g, '__'), v0.gpuFunctions ?? '');
       ovCode = c;
       if (f !== (v0.gpuFunctions ?? '')) v0 = { ...v0, gpuFunctions: f };
+    }
+    // textual patches from overrides.ts (must match, else the override is stale)
+    if (ov?.patch || ov?.patchFuncs) {
+      const apply = (t: string, ps: [string | RegExp, string][]) => {
+        for (const [from, to] of ps) {
+          const t2 = t.replace(from, to);
+          if (t2 === t) throw new Error(`override patch for ${v0.name} did not match: ${from}`);
+          t = t2;
+        }
+        return t;
+      };
+      if (ov.patch) ovCode = apply((ovCode ?? v0.gpuCode ?? '').replace(/varpar->/g, '__'), ov.patch);
+      if (ov.patchFuncs) v0 = { ...v0, gpuFunctions: apply(v0.gpuFunctions ?? '', ov.patchFuncs) };
     }
   }
   // fract_* (buddhabrot fractals): helpers carry per-thread state through a
@@ -217,11 +240,11 @@ for (let v0 of dump) {
   // the CPU sets z = greyscale(colour) (the GPU re-declares z in a nested block).
   {
     let code = ovCode ?? v0.gpuCode ?? '';
-    if (/float z\s*=\s*0\.5;/.test(code) && /_getRGBColor\(/.test(code)) {
+    if (/float z\s*=\s*0\.5;/.test(code) && /_getRGBColor\s*\(/.test(code)) {
       // sampling: only classes that inherit DC_BaseFunc.transform (data/dc-base.json);
       // the ones with their own transform() really do use 2·rnd−1 on the CPU too
-      if (DC_BASE.inherit.includes(v0.name)) code = code.replace(/2\.0\*RANDFLOAT\(\)-1\.0/g, '(RANDFLOAT()-0.5)');
-      code = code.replace(/(color\s*=\s*\w+_getRGBColor\([^;]*\);)/, '$1 { int3 zc_ = dbl2int(color); z = greyscale((float)zc_.x, (float)zc_.y, (float)zc_.z); }');
+      if (DC_BASE.inherit.includes(v0.name) || DC_BASE.half.includes(v0.name)) code = code.replace(/2\.0\*RANDFLOAT\(\)-1\.0/g, '(RANDFLOAT()-0.5)');
+      code = code.replace(/(color\s*=\s*\w+_getRGBColor\s*\([^;]*\);)/, '$1 { int3 zc_ = dbl2int(color); z = greyscale((float)zc_.x, (float)zc_.y, (float)zc_.z); }');
       ovCode = code;
     }
   }
@@ -243,7 +266,7 @@ for (let v0 of dump) {
     ovCode = (ovCode ?? v0.gpuCode ?? '').replace(/varpar->/g, '__');
     for (const [pn, how] of Object.entries(ints)) {
       const re = new RegExp(`(?<![A-Za-z0-9_])__${v0.name}_${pn}(?![A-Za-z0-9_])(?!\\s*(?:[-+*/]?=)(?!=))`, 'g');
-      ovCode = ovCode.replace(re, how === 'round' ? `((float)lroundf(__${v0.name}_${pn}))` : `((float)(int)(__${v0.name}_${pn}))`);
+      ovCode = ovCode.replace(re, how === 'round' ? `((int)lroundf(__${v0.name}_${pn}))` : `((int)(__${v0.name}_${pn}))`);
     }
   }
   // GPU snippets often test a *double* flag param with lroundf(p) > 0 / == 1 where the

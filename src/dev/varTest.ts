@@ -26,6 +26,10 @@ export interface VarTestResult {
   /** pass fraction per parameter set */
   perSet?: number[];
   worst?: { pt: number[]; ours: number[]; theirs: number[]; set?: number };
+  /** which criteria failed how often per set (diagnostics): e.g. {1: {mean: 12, z: 40}} */
+  why?: Record<number, Record<string, number>>;
+  /** a few failing points per set with the criterion, ours and theirs (diagnostics) */
+  samples?: { set: number; pt: number[]; ours: number[]; theirs: number[]; why: string[] }[];
   msg?: string;
   flags?: string[];
 }
@@ -54,6 +58,7 @@ function buildShader(def: VariationDef, funcs: string, priority: number): string
   const snippet = def.code(w, p, A);
   return `${PRELUDE}
 var<private> pal: array<vec4f, 256>; // palette stand-in for direct-colour variations
+var<private> df_zero: u32 = 0u; // runtime 0 (opaque) for the double-float helpers
 ${funcs}
 @group(0) @binding(0) var<storage, read> inp: array<vec4f>;
 @group(0) @binding(1) var<storage, read_write> outp: array<vec4f>;
@@ -62,6 +67,7 @@ ${funcs}
 @compute @workgroup_size(64)
 fn main(@builtin(global_invocation_id) gid: vec3u) {
   let i = gid.x;
+  df_zero = bitcast<u32>(xd[${base + 6}]) >> 31u;
   let S = u32(xd[${base + 6}]);
   if (i >= arrayLength(&inp) * S) { return; }
   let pi = i / S;
@@ -189,7 +195,11 @@ export async function runVarTest(device: GPUDevice, opts: { only?: string[]; ver
         const set = e.sets[row.set];
         if (!set || !row.out) continue;
         res.random = res.random || row.random;
-        const samples = row.random ? 256 : 1;
+        // random variations: REPS replicas of the oracle's 256 samples — the pooled stats are tighter and the
+        // spread of the per-replica stds estimates the sampling noise of a 256-sample std (rare-event
+        // Bernoulli tails make that noise far larger than the Gaussian 1/sqrt(2n))
+        const REPS = 4, ORACLE_N = 256;
+        const samples = row.random ? ORACLE_N * REPS : 1;
         const nP = def.params?.length ?? 0;
         const base = 1 + nP;
         const xd = new Float32Array(Math.max(16, base + 8));
@@ -206,13 +216,19 @@ export async function runVarTest(device: GPUDevice, opts: { only?: string[]; ver
           if (!theirs) continue;
           // ours: stats over samples
           let sx = 0, sy = 0, sz = 0, sxx = 0, syy = 0, szz = 0, sc = 0, hides = 0, valid = 0;
+          const rep = Array.from({ length: REPS }, () => ({ n: 0, sx: 0, sy: 0, sxx: 0, syy: 0 }));
           for (let s = 0; s < samples; s++) {
             const o = (pi * samples + s) * 4;
             const x = out[o], y = out[o + 1], z = out[o + 2];
             if (!isFinite(x) || !isFinite(y) || !isFinite(z)) continue;
             const ch = out[o + 3]; const hid = ch >= 5 ? 1 : 0; const col = ch - 10 * hid;
             valid++; sx += x; sy += y; sz += z; sxx += x * x; syy += y * y; szz += z * z; sc += col; hides += hid;
+            const rp = rep[Math.floor(s / ORACLE_N)]; rp.n++; rp.sx += x; rp.sy += y; rp.sxx += x * x; rp.syy += y * y;
           }
+          // spread of the per-replica std (of a 256-sample replica) — the sampling noise of theirs' std
+          const repStd = rep.filter((r) => r.n > 1).map((r) => Math.hypot(Math.sqrt(Math.max(0, r.sxx / r.n - (r.sx / r.n) ** 2)), Math.sqrt(Math.max(0, r.syy / r.n - (r.sy / r.n) ** 2))));
+          const repMean = repStd.reduce((a, b) => a + b, 0) / Math.max(1, repStd.length);
+          const sdRep = repStd.length > 1 ? Math.sqrt(repStd.reduce((a, b) => a + (b - repMean) ** 2, 0) / (repStd.length - 1)) : 0;
           const tMag = Math.hypot(theirs[0], theirs[1]);
           if (tMag > 1e5) continue; // both blow up; skip
           total++; sTotal++;
@@ -224,24 +240,26 @@ export async function runVarTest(device: GPUDevice, opts: { only?: string[]; ver
             const scale = Math.max(1, tMag, Math.abs(tz));
             err = Math.max(Math.abs(mx - theirs[0]), Math.abs(my - theirs[1]), Math.abs(mz - tz)) / scale;
             err = Math.max(err, Math.abs(mc - theirs[2]) * 0.5, Math.abs(mh - theirs[3]));
-            if (err <= tol) { ok++; sOk++; }
+            if (err <= tol) { ok++; sOk++; } else noteFail(res, row.set, spec.points[pi], [mx, my, mc, mh, mz], theirs, ['det']);
           } else {
             const stdx = Math.sqrt(Math.max(0, sxx / valid - mx * mx)), stdy = Math.sqrt(Math.max(0, syy / valid - my * my));
             const tstdx = theirs[4] ?? 0, tstdy = theirs[5] ?? 0;
             // means within a few standard errors; stds within a factor
-            const sem = Math.max(Math.hypot(tstdx, tstdy), Math.hypot(stdx, stdy)) / Math.sqrt(samples);
+            const sem = Math.max(Math.hypot(tstdx, tstdy), Math.hypot(stdx, stdy)) * Math.sqrt(1 / ORACLE_N + 1 / samples);
             const scale = Math.max(1, tMag);
             const meanErr = Math.hypot(mx - theirs[0], my - theirs[1]);
             const stdErr = Math.abs(Math.hypot(stdx, stdy) - Math.hypot(tstdx, tstdy)) / Math.max(0.05, Math.hypot(tstdx, tstdy));
             const okMean = meanErr <= 4.5 * sem + 0.02 * scale;
-            const okStd = stdErr <= 0.35;
+            // within 35 %, or within the measured sampling noise of a 256-sample std (theirs) + ours (pooled)
+            const okStd = stdErr <= 0.35 || Math.abs(Math.hypot(stdx, stdy) - Math.hypot(tstdx, tstdy)) <= 4.5 * sdRep * Math.sqrt(1 + 1 / REPS) + 0.005 * scale;
             const okC = Math.abs(mc - theirs[2]) <= 0.1 || tstdx === 0 && tstdy === 0 && Math.abs(mc - theirs[2]) <= 0.02;
             const okH = Math.abs(mh - theirs[3]) <= 0.15;
             const tmz = theirs[6] ?? 0, tstdz = theirs[7] ?? 0;
             const stdz = Math.sqrt(Math.max(0, szz / valid - mz * mz));
-            const okZ = Math.abs(mz - tmz) <= 4.5 * Math.max(tstdz, stdz) / Math.sqrt(samples) + 0.02 * scale;
+            const okZ = Math.abs(mz - tmz) <= 4.5 * Math.max(tstdz, stdz) * Math.sqrt(1 / ORACLE_N + 1 / samples) + 0.02 * scale;
             err = Math.max(meanErr / (4.5 * sem + 0.02 * scale), stdErr / 0.35) * tol; // normalized so tol is the pass line
             if (okMean && okStd && okC && okH && okZ) { ok++; sOk++; }
+            else noteFail(res, row.set, spec.points[pi], [mx, my, mc, mh, stdx, stdy, mz, stdz], theirs, [!okMean && 'mean', !okStd && 'std', !okC && 'color', !okH && 'hide', !okZ && 'z'].filter(Boolean) as string[]);
           }
           if (err > maxErr) { maxErr = err; updWorst(res, spec.points[pi], [mx, my, mc, mh, mz], theirs, err, row.set); }
         }
@@ -283,6 +301,12 @@ export async function saveVerified(results: VarTestResult[]): Promise<void> {
   } catch (err) {
     console.warn('could not save verified.json (dev server sink missing?)', err);
   }
+}
+function noteFail(res: VarTestResult, set: number, pt: number[], ours: number[], theirs: number[], why: string[]) {
+  res.why ??= {}; res.why[set] ??= {};
+  for (const w of why) res.why[set][w] = (res.why[set][w] ?? 0) + 1;
+  res.samples ??= [];
+  if (res.samples.filter((s) => s.set === set).length < 3) res.samples.push({ set, pt, ours: ours.map(r4), theirs: theirs.map(r4), why });
 }
 function updWorst(res: VarTestResult, pt: number[], ours: number[], theirs: number[], err: number, set: number) {
   if (!res.worst || err >= res.maxErr) res.worst = { pt, ours: ours.map(r4), theirs: theirs.map(r4), set };

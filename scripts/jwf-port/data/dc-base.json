@@ -26,7 +26,8 @@
 "dc_spacefold",
 "dc_fractcolor",
 "dc_warping",
-"dc_vortex"
+"dc_vortex",
+"dc_mandbrot"
 ],
 "own2": [
 "dc_mandala",
@@ -51,5 +52,9 @@
 "dc_acrilic",
 "dc_triantess",
 "dc_portal"
-]
+],
+"half": [
+"dc_butterflies"
+],
+"_note": "inherit: classes that inherit DC_BaseFunc.transform (samples rnd-0.5); own2: own transform sampling 2*rnd-1; half: own transform sampling rnd-0.5; ownOther: other sampling"
 }

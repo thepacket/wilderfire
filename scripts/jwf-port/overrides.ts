@@ -14,6 +14,9 @@ export interface Override {
   /** Java setParameter() clamps these params (Tools.limitValue); the GPU snippet reads
    *  them raw. Reads of `__<var>_<param>` are wrapped in the same clamp. */
   clampParams?: Record<string, [number, number]>;
+  /** textual patches (from → to) applied to the snippet / the helper functions before transpiling */
+  patch?: [string | RegExp, string][];
+  patchFuncs?: [string | RegExp, string][];
 }
 
 export const OVERRIDES: Record<string, Override> = {
@@ -125,6 +128,131 @@ __py += r * __y;`,
   sym_ng13: {
     note: 'GPU snippet declares Mathc Tx[6] but writes Tx[6] and Tx[7] (out of bounds).',
     // (patched textually in gen.ts: Tx[6] → Tx[8])
+  },
+  julia3D: {
+    note: 'CPU raises r2d + (z/|power|)² to the power; the GPU used the unscaled z.',
+    patch: [['powf(__r2 + __z*__z, cn)', 'powf(__r2 + _z*_z, cn)']],
+  },
+  post_circlecrop: {
+    note: 'GPU snippet added to __px/__py where the CPU assigns, never hid the cropped points, and tested zero as a bool instead of == 1.',
+    gpuCode: `float x0 = __post_circlecrop_x;
+float y0 = __post_circlecrop_y;
+float cr = __post_circlecrop_radius;
+float ca = fmaxf(-1.0f, fminf(__post_circlecrop_scatter_area, 1.f));
+float vv = __post_circlecrop;
+__px -= x0;
+__py -= y0;
+float rad = sqrtf(__px * __px + __py * __py);
+float ang = atan2f(__py, __px);
+float rdc = cr + (RANDFLOAT() * 0.5f * ca);
+bool esc = rad > cr;
+bool cr0 = lroundf(__post_circlecrop_zero) == 1;
+float s = sinf(ang);
+float c = cosf(ang);
+__doHide = false;
+if (cr0 && esc) {
+  __px = 0.f; __py = 0.f;
+  __doHide = true;
+} else if (cr0 && !esc) {
+  __px = vv * __px + x0; __py = vv * __py + y0;
+} else if (!cr0 && esc) {
+  __px = vv * rdc * c + x0; __py = vv * rdc * s + y0;
+} else {
+  __px = vv * __px + x0; __py = vv * __py + y0;
+}`,
+  },
+  post_mirror_wf: {
+    note: 'GPU snippet ignored xscale/yscale (CPU scales both axes on every mirror) and the |amount| > EPSILON guard.',
+    gpuCode: `if (fabsf(__post_mirror_wf) > 1e-8f) {
+  if (__post_mirror_wf_xaxis > 0.f && RANDFLOAT() < 0.5f) {
+    __px = __post_mirror_wf_xscale * (-__px - __post_mirror_wf_xshift);
+    __py = __post_mirror_wf_yscale * __py;
+    __pal = fmodf(__pal + __post_mirror_wf_xcolorshift, 1.0f);
+  }
+  if (__post_mirror_wf_yaxis > 0.f && RANDFLOAT() < 0.5f) {
+    __px = __post_mirror_wf_xscale * __px;
+    __py = __post_mirror_wf_yscale * (-__py - __post_mirror_wf_yshift);
+    __pal = fmodf(__pal + __post_mirror_wf_ycolorshift, 1.0f);
+  }
+  if (__post_mirror_wf_zaxis > 0.f && RANDFLOAT() < 0.5f) {
+    __pz = -__pz - __post_mirror_wf_zshift;
+    __pal = fmodf(__pal + __post_mirror_wf_zcolorshift, 1.0f);
+  }
+}`,
+  },
+  post_point_symmetry_wf: {
+    note: 'CPU picks the symmetry index uniformly (random(order)); the GPU rounded rnd·(order−1), halving the weight of the first and last copies.',
+    patch: [['int idx = lroundf(RANDFLOAT() * (order-1));', 'int idx = (int)(RANDFLOAT() * (float)order); if (idx >= order) idx = order - 1;']],
+  },
+  ...Object.fromEntries(['cut_glypho', 'cut_fingerprint'].map((n) => [n, {
+    note: 'CPU returns right after hiding (point stays at 0,0); the GPU snippet fell through and wrote the position anyway.',
+    patch: [[new RegExp(`__px = __${n} \\* \\(x-px_center\\);(\\s*)__py = __${n} \\* \\(y-py_center\\);`), `if (!__doHide) { __px = __${n} * (x-px_center);$1__py = __${n} * (y-py_center); }`]],
+  } satisfies Override])),
+  xtrb: {
+    note: 'GPU init computed S2ac = S2/c/6 where the CPU uses S2/(a+c)/6.',
+    patch: [['S2ac = S2 / (c) / 6.0;', 'S2ac = S2 / (a + c) / 6.0;']],
+  },
+  // --- sin(x)*43758 shader hashes on integer cell ids: evaluated in double-float (HSIN2, see cwgsl.ts)
+  //     so the cell pattern matches the f64 Java instead of f32 noise ---
+  worley: {
+    note: 'cell hash sin(cx·127.1+cy·311.7)·43758.5453 in double-float so the sites match the Java.',
+    patch: [['sinf(cell_x * 127.1f + cell_y * 311.7f) * 43758.5453f', 'HSIN2(cell_x, 127.1, cell_y, 311.7, 0.0, 0.0, 43758.5453)'],
+      ['sinf(cell_x * 269.5f + cell_y * 183.3f) * 43758.5453f', 'HSIN2(cell_x, 269.5, cell_y, 183.3, 0.0, 0.0, 43758.5453)']],
+  },
+  voronoi_fold: {
+    note: 'cell hash in double-float (see worley).',
+    patch: [['sinf(cell_x * 127.1f + cell_y * 311.7f) * 43758.5453f', 'HSIN2(cell_x, 127.1, cell_y, 311.7, 0.0, 0.0, 43758.5453)'],
+      ['sinf(cell_x * 269.5f + cell_y * 183.3f) * 43758.5453f', 'HSIN2(cell_x, 269.5, cell_y, 183.3, 0.0, 0.0, 43758.5453)']],
+  },
+  r_circleblur: {
+    note: 'circle hashes on the rounded cell (bx, by) in double-float (see worley).',
+    patch: [['sinf(bx * 127.1 + by * 311.7 +  __r_circleblur_seed ) * 43758.5453', 'HSIN2(bx, 127.1, by, 311.7, __r_circleblur_seed, 0.0, 43758.5453)'],
+      ['sinf(bx * 269.5 + by * 183.3 +  __r_circleblur_seed ) * 43758.5453', 'HSIN2(bx, 269.5, by, 183.3, __r_circleblur_seed, 0.0, 43758.5453)'],
+      ['sinf(by * 12.9898 + bx * 78.233 +  __r_circleblur_seed ) * 43758.5453', 'HSIN2(by, 12.9898, bx, 78.233, __r_circleblur_seed, 0.0, 43758.5453)']],
+  },
+  waves4: {
+    note: 'row hash in double-float (see worley).',
+    patch: [['sinf(ax * 12.9898 + ax * 78.233 + 1.0 + y0 * 0.001 * __waves4_yfact) * 43758.5453', 'HSIN2(ax, 12.9898, ax, 78.233, 1.0, y0 * 0.001 * __waves4_yfact, 43758.5453)']],
+  },
+  waves42: {
+    note: 'row hash in double-float (see worley).',
+    patch: [['sinf(ax * 12.9898f + ax * 78.233f + 1.0f + y0 * 0.001f * __waves42_yfact) * 43758.5453f', 'HSIN2(ax, 12.9898, ax, 78.233, 1.0, y0 * 0.001 * __waves42_yfact, 43758.5453)']],
+  },
+  cut_truchetweaving: {
+    note: 'tile hash in double-float (see worley).',
+    patchFuncs: [['fract(sinf(id.x*324.23+id.y*5604.342)*87654.53)', 'fract(HSIN2(id.x, 324.23, id.y, 5604.342, 0.0, 0.0, 87654.53))']],
+  },
+  cut_wood: {
+    note: 'noise-cell hash in double-float (see worley).',
+    patchFuncs: [['fract(sinf(dot(make_float2(st.x,st.y),make_float2(12.9898,78.233)))*43758.5453123)', 'fract(HSIN2(st.x, 12.9898, st.y, 78.233, 0.0, 0.0, 43758.5453123))'],
+      ['fract(sinf(seed + dot(make_float2(st.x,st.y), make_float2(12.9898,78.233)))* 43758.5453123)', 'fract(HSIN2(st.x, 12.9898, st.y, 78.233, seed, 0.0, 43758.5453123))']],
+  },
+  chrysanthemum: {
+    note: 'CPU scales the radius by 0.1; the GPU snippet dropped it.',
+    patch: [['r *= __chrysanthemum;', 'r *= __chrysanthemum * 0.1;']],
+  },
+  pixel_flow: {
+    note: 'CPU fade = fLen·r⁴ (GPU dropped fLen), hash() divides by Integer.MAX_VALUE (GPU: 2³²), and the block/seed products are int arithmetic.',
+    patch: [['float fade = 1.0 * r01', 'float fade = fLen * r01'], [/__pixel_flow_seed/g, '((int)__pixel_flow_seed)']],
+    patchFuncs: [['return (float) a/ exp2f(32.0);', 'return (float) a / 2147483647.0f;']],
+  },
+  // --- dc_* shader-art family: GPU helper ≠ Java helper ---
+  dc_hoshi: {
+    note: 'Java hsv() computes (t1+h)/3 (GPU: t1+h/3) and rotate() by +3.14159/(…) (GPU: −PI/(…)).',
+    patchFuncs: [[/t1\s*=\s*t1\s*\+\s*h\/3\.0;/, 't1 = (t1 + h) / 3.0;'], ['-PI/(0.10', '3.14159/(0.10']],
+  },
+  dc_gmandelbroot: {
+    note: 'Java hsv() computes (t1+h)/3 (GPU: t1+h/3); Java hides black (0,0,0) colours.',
+    patchFuncs: [[/t1\s*=\s*t1\s*\+\s*h\/3\.0;/, 't1 = (t1 + h) / 3.0;']],
+    append: '\nif (color.x == 0.0f && color.y == 0.0f && color.z == 0.0f) __doHide = true;',
+  },
+  dc_turbulence: {
+    note: 'GPU passed zoom where the Java uses level (loop count) — the argument was mislabelled.',
+    patch: [['dc_turbulence_getRGBColor(uv,__dc_turbulence_time,__dc_turbulence_zoom)', 'dc_turbulence_getRGBColor(uv,__dc_turbulence_time,__dc_turbulence_level)']],
+  },
+  dc_mandbrot: {
+    note: 'Java rotates with p.times(rot) (row vector · matrix); the GPU used times(&rot,p) (matrix · column) — opposite rotation.',
+    patchFuncs: [['p = times(&rot,p);', 'p = make_float2(cs*p.x + sn*p.y, -sn*p.x + cs*p.y);']],
   },
   // 3D solid samplers: CPU tries up to 50 random points inside the SDF before
   // hiding; the GPU snippet tries once (mostly hidden, wrong density).

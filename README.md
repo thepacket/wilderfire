@@ -26,10 +26,13 @@ in the stack.
 
 ## Features
 
-- **750 variations** — 70 hand-written flam3 classics plus **746 JWildfire
+- **787 variations** — 70 hand-written flam3 classics plus **784 JWildfire
   variations ported mechanically** from JWildfire's own GPU snippets by a
   CUDA→WGSL transpiler and **numerically verified in 3D against headless
-  JWildfire** (see [`scripts/jwf-port/README.md`](scripts/jwf-port/README.md)).
+  JWildfire** (775 by the per-point oracle, 9 by inspection where statistics
+  cannot compare; JWildfire's own GPU≠CPU snippet bugs are patched back to the
+  Java, and shader hashes on cell ids run in double-float so cut/worley
+  patterns match — see [`scripts/jwf-port/README.md`](scripts/jwf-port/README.md)).
   Parametric controls for every one, JWildfire-style **pre / normal / post
   priority**, and **direct-colour `dc_*` variations** — both the flam3 kind
   that steer the palette coordinate and JWildfire's shader-art kind

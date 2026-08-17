@@ -388,6 +388,10 @@ fn rnd(state: ptr<function, u32>) -> f32 {
 
 fn mmod(a: f32, b: f32) -> f32 { return a - b * floor(a / b); }
 
+// runtime 0u (set opaquely in main): the double-float helpers (hsin_) route intermediates through an
+// integer add of it so the shader compiler's fast-math reassociation cannot fold their error terms
+var<private> df_zero: u32 = 0u;
+
 ${collectFuncs(flame)}
 
 ${funcs}${iterFns}
@@ -395,6 +399,7 @@ ${funcs}${iterFns}
 fn main(@builtin(global_invocation_id) gid: vec3u) {
   let idx = gid.x;
   if (idx >= arrayLength(&rngs)) { return; }
+  df_zero = bitcast<u32>(P.ppu) >> 31u;
 ${ldis}
   switch layer {
 ${lcases}
