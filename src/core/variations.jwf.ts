@@ -2,7 +2,7 @@
 // Variations ported from JWildfire (https://github.com/thargor6/JWildfire, LGPL-2.1,
 // (c) Andreas Maschke and contributors) by transpiling each variation's CUDA GPU
 // snippet to WGSL and verifying it against JWildfire's Java implementation.
-// 846 verified of 848 transpiled (1026 in JWildfire).
+// 869 verified of 871 transpiled (1026 in JWildfire).
 //
 // Snippet scope: t (input point, var), z_ (input z), r2, r, th = atan2(x,y), ph = atan2(y,x),
 // v (output accumulator), pz_ (output z), rs (rng), cp (palette coord ptr), hd (hide-flag ptr).
@@ -2136,6 +2136,53 @@ if ((((((x < xmin) || (x > xmax)) || (y < ymin)) || (y > ymax)) && (min(max(${p[
   }
   v.x = (${w} * x);
   v.y = (${w} * y);
+}
+}`,
+  },
+  "pre_crop": {
+    params: [{ name: "left", def: -1 }, { name: "right", def: 1 }, { name: "top", def: -1 }, { name: "bottom", def: 1 }, { name: "scatter_area", def: 0 }, { name: "zero", def: 0 }],
+    verified: true, priority: -1, flags: ["hide"], types: ["CROP","PRE"],
+    funcNames: ["atan2j"],
+    funcs: `fn atan2j(y: f32, x: f32) -> f32 { if (x == 0.0 && y == 0.0) { return select(0.0, PI, (bitcast<u32>(x) >> 31u) == 1u) * select(1.0, -1.0, (bitcast<u32>(y) >> 31u) == 1u); } return atan2(y, x); }`,
+    code: (w, p) => `{
+loop {
+var xmin: f32 = 0;
+var xmax: f32 = 0;
+var ymin: f32 = 0;
+var ymax: f32 = 0;
+var w_: f32 = 0;
+var h: f32 = 0;
+{
+  xmin = min(${p[0]}, ${p[1]});
+  ymin = min(${p[2]}, ${p[3]});
+  xmax = max(${p[0]}, ${p[1]});
+  ymax = max(${p[2]}, ${p[3]});
+  w_ = (((xmax - xmin) * 0.5) * min(max(${p[4]}, -1.0), 1.0));
+  h = (((ymax - ymin) * 0.5) * min(max(${p[4]}, -1.0), 1.0));
+}
+var x: f32 = t.x;
+var y: f32 = t.y;
+if ((((((x < xmin) || (x > xmax)) || (y < ymin)) || (y > ymax)) && (min(max(${p[5]}, 0.0), 1.0) != 0))) {
+  t.y = 0;
+  t.x = t.y;
+  (*hd) = true;
+  break;
+} else {
+  (*hd) = false;
+  if ((x < xmin)) {
+    x = (xmin + (rnd(rs) * w_));
+  } else if ((x > xmax)) {
+    x = (xmax - (rnd(rs) * w_));
+  }
+  if ((y < ymin)) {
+    y = (ymin + (rnd(rs) * h));
+  } else if ((y > ymax)) {
+    y = (ymax - (rnd(rs) * h));
+  }
+}
+t.x = (${w} * x);
+t.y = (${w} * y);
+break;
 }
 }`,
   },
@@ -14951,7 +14998,7 @@ v.y += (ri * sin(ang2));
 
 var<private> jwx_dc_cylinder2_inited_: f32 = 0.0;
 
-var<private> jwx_dc_cylinder2_n: f32 = 0.0;
+var<private> jwx_dc_cylinder2_n: i32 = 0;
 
 var<private> jwx_dc_cylinder2_ldcs: f32 = 0.0;
 
@@ -15484,8 +15531,8 @@ var y: f32 = t.y;
 var z: f32 = z_;
 if ((((((((x < xmin) || (x > xmax)) || (y < ymin)) || (y > ymax)) || (z < zmin)) || (z > zmax)) && (min(max(${p[7]}, 0.0), 1.0) != 0))) {
   pz_ = 0;
+  v.x = pz_;
   v.y = pz_;
-  v.x = v.y;
   (*hd) = true;
   break;
 } else {
@@ -18229,6 +18276,977 @@ if ((${p[9]} > 0)) {
 v.x += (x * ${w});
 v.y += (y * ${w});
 pz_ += (z * ${w});
+}`,
+  },
+  "glsl_fractaldots": {
+    params: [{ name: "Density Pixels", def: 1000000 }, { name: "iterations", def: 9 }, { name: "DotSize", def: 400 }, { name: "MaxIterations", def: 10 }, { name: "complexity", def: 0.001245675 }, { name: "pattern", def: 2.5 }, { name: "spacing", def: 12 }, { name: "rotate1", def: 1.5 }, { name: "rotate2", def: 64 }, { name: "zoom", def: 64 }, { name: "Gradient", def: 0 }],
+    verified: true, priority: 0, flags: ["dc","rgb","state"], types: ["SIMULATION","DC","BASE_SHAPE"],
+    funcNames: ["jwx_glsl_fractaldots_Density_Pixels_c","jwx_glsl_fractaldots_rotate1_c","jwx_glsl_fractaldots_zoom_c","jwx_glsl_fractaldots_spacing_c","jwx_glsl_fractaldots_MaxIterations_c","jwx_glsl_fractaldots_complexity_c","jwx_glsl_fractaldots_rotate2_c","jwx_glsl_fractaldots_pattern_c","jwx_glsl_fractaldots_iterations_c","jwx_glsl_fractaldots_inited_","jwx_glsl_fractaldots_resolutionY","jwx_glsl_fractaldots_circleSize","powc","atan2j","glsl_fractaldots_rot","glsl_fractaldots_getRGBColor","dbl2int"],
+    funcs: `fn powc(x: f32, y: f32) -> f32 {
+  if (x >= 0.0) { return pow(x, y); }
+  let yi = round(y);
+  if (abs(y - yi) > 1e-6) { return pow(x, y); }
+  let m = pow(-x, y);
+  return select(m, -m, (i32(yi) & 1) != 0);
+}
+
+fn atan2j(y: f32, x: f32) -> f32 { if (x == 0.0 && y == 0.0) { return select(0.0, PI, (bitcast<u32>(x) >> 31u) == 1u) * select(1.0, -1.0, (bitcast<u32>(y) >> 31u) == 1u); } return atan2(y, x); }
+
+fn glsl_fractaldots_rot(uv: vec2f, a: f32) -> vec2f {
+  return vec2f(((uv.x * cos(a)) - (uv.y * sin(a))), ((uv.y * cos(a)) + (uv.x * sin(a))));
+}
+
+fn glsl_fractaldots_getRGBColor(xp: i32, yp: i32) -> vec3f {
+  var x: f32 = (f32(xp) + 0.5);
+  var y: f32 = (f32(yp) + 0.5);
+  var uv: vec2f = vec2f(((x / jwx_glsl_fractaldots_Density_Pixels_c) - 0.5), ((y / f32(jwx_glsl_fractaldots_resolutionY)) - 0.5));
+  var col: vec3f = vec3f(0.0, 0.0, 0.0);
+  uv = glsl_fractaldots_rot(uv, jwx_glsl_fractaldots_rotate1_c);
+  uv = (uv * vec2f(jwx_glsl_fractaldots_zoom_c));
+  var s: f32 = jwx_glsl_fractaldots_spacing_c;
+  for (var i: i32 = 0; (f32(i) < jwx_glsl_fractaldots_MaxIterations_c); i++) {
+    uv = (abs(uv) - vec2f(s));
+    uv = (uv - vec2f(jwx_glsl_fractaldots_complexity_c));
+    uv = glsl_fractaldots_rot(uv, jwx_glsl_fractaldots_rotate2_c);
+    s = (s / jwx_glsl_fractaldots_pattern_c);
+    if ((jwx_glsl_fractaldots_iterations_c < f32(i))) {
+      break;
+    }
+  }
+  var c: f32 = select(1.0, 0.0, (length(uv) > jwx_glsl_fractaldots_circleSize));
+  return vec3f(c, c, c);
+}
+
+fn dbl2int(theColor: vec3f) -> vec3i {
+  var red: i32 = max(0, min(255, i32(floor((theColor.x * 256.0)))));
+  var green: i32 = max(0, min(255, i32(floor((theColor.y * 256.0)))));
+  var blue: i32 = max(0, min(255, i32(floor((theColor.z * 256.0)))));
+  return vec3i(red, green, blue);
+}
+
+var<private> jwx_glsl_fractaldots_Density_Pixels_c: f32 = 0.0;
+
+var<private> jwx_glsl_fractaldots_rotate1_c: f32 = 0.0;
+
+var<private> jwx_glsl_fractaldots_zoom_c: f32 = 0.0;
+
+var<private> jwx_glsl_fractaldots_spacing_c: f32 = 0.0;
+
+var<private> jwx_glsl_fractaldots_MaxIterations_c: f32 = 0.0;
+
+var<private> jwx_glsl_fractaldots_complexity_c: f32 = 0.0;
+
+var<private> jwx_glsl_fractaldots_rotate2_c: f32 = 0.0;
+
+var<private> jwx_glsl_fractaldots_pattern_c: f32 = 0.0;
+
+var<private> jwx_glsl_fractaldots_iterations_c: f32 = 0.0;
+
+var<private> jwx_glsl_fractaldots_inited_: f32 = 0.0;
+
+var<private> jwx_glsl_fractaldots_resolutionY: i32 = 0;
+
+var<private> jwx_glsl_fractaldots_circleSize: f32 = 0.0;`,
+    code: (w, p) => `{
+jwx_glsl_fractaldots_Density_Pixels_c = ${p[0]};
+jwx_glsl_fractaldots_rotate1_c = ${p[7]};
+jwx_glsl_fractaldots_zoom_c = ${p[9]};
+jwx_glsl_fractaldots_spacing_c = ${p[6]};
+jwx_glsl_fractaldots_MaxIterations_c = ${p[3]};
+jwx_glsl_fractaldots_complexity_c = ${p[4]};
+jwx_glsl_fractaldots_rotate2_c = ${p[8]};
+jwx_glsl_fractaldots_pattern_c = ${p[5]};
+jwx_glsl_fractaldots_iterations_c = min(max(${p[1]}, 1.0), 100.0);
+if ((jwx_glsl_fractaldots_inited_ == 0.0)) {
+  jwx_glsl_fractaldots_inited_ = 1.0;
+  jwx_glsl_fractaldots_resolutionY = i32(${p[0]});
+  jwx_glsl_fractaldots_circleSize = (${p[2]} / (3.0 * powc(2.0, ${p[3]})));
+}
+jwx_glsl_fractaldots_resolutionY = i32(${p[0]});
+jwx_glsl_fractaldots_circleSize = (${p[2]} / (3.0 * powc(2.0, ${p[3]})));
+var i: i32 = i32((rnd(rs) * ${p[0]}));
+var j: i32 = i32((rnd(rs) * f32(jwx_glsl_fractaldots_resolutionY)));
+var color: vec3f = vec3f(0.0, 0.0, 0.0);
+color = glsl_fractaldots_getRGBColor(i, j);
+if ((min(max(${p[10]}, 0.0), 1.0) == 0)) {
+  var tcolor: vec3i = dbl2int(color);
+  (*rgb).w = select(0.0, 1.0, true);
+  (*rgb).x = (f32(tcolor.x) / 255.0);
+  (*rgb).y = (f32(tcolor.y) / 255.0);
+  (*rgb).z = (f32(tcolor.z) / 255.0);
+} else {
+  (*cp) = (color.x * color.y);
+}
+v.x += (${w} * ((f32(i) / ${p[0]}) - 0.5));
+v.y += (${w} * ((f32(j) / f32(jwx_glsl_fractaldots_resolutionY)) - 0.5));
+}`,
+  },
+  "glsl_hoshi": {
+    params: [{ name: "Density Pixels", def: 1000000 }, { name: "Seed", def: 100000 }, { name: "time", def: 10 }, { name: "Steps", def: 28 }, { name: "Scale", def: 1.25 }, { name: "Translate", def: 1.5 }, { name: "Gradient", def: 0 }],
+    verified: true, priority: 0, flags: ["dc","rgb","state"], types: ["SIMULATION","DC","BASE_SHAPE"],
+    funcNames: ["jwx_glsl_hoshi_Density_Pixels_c","jwx_glsl_hoshi_Steps_c","jwx_glsl_hoshi_time_c","jwx_glsl_hoshi_inited_","jwx_glsl_hoshi_resolutionY","jwx_glsl_hoshi_fold","jwx_glsl_hoshi_translate","jwx_glsl_hoshi_scale","atan2j","mmod2","smoothstepc","glsl_hoshi_rotate","glsl_hoshi_hsv","glsl_hoshi_getRGBColor","dbl2int"],
+    funcs: `fn atan2j(y: f32, x: f32) -> f32 { if (x == 0.0 && y == 0.0) { return select(0.0, PI, (bitcast<u32>(x) >> 31u) == 1u) * select(1.0, -1.0, (bitcast<u32>(y) >> 31u) == 1u); } return atan2(y, x); }
+
+fn mmod2(a: vec2f, b: vec2f) -> vec2f { return a - b * floor(a / b); }
+
+fn smoothstepc(a: f32, b: f32, x: f32) -> f32 { if (a == b) { return step(a, x); } let t = clamp((x - a) / (b - a), 0.0, 1.0); return t * t * (3.0 - 2.0 * t); }
+
+fn glsl_hoshi_rotate(p_: vec2f, a: f32) -> vec2f {
+  return vec2f(((p_.x * cos(a)) - (p_.y * sin(a))), ((p_.x * sin(a)) + (p_.y * cos(a))));
+}
+
+fn glsl_hoshi_hsv(h: f32, s: f32, v_: f32) -> vec3f {
+  var t1: vec3f = vec3f(3.0, 2.0, 1.0);
+  t1 = ((t1 + vec3f(h)) / vec3f(3.0));
+  var t2: vec3f = ((fract(t1) * vec3f(6.0)) - vec3f(3.0));
+  t2 = (abs(t2) - vec3f(1.0));
+  t2 = clamp(t2, vec3f(0.0), vec3f(1.0));
+  return (mix(vec3f(3.1, 3.1, 3.1), t2, s) * vec3f(v_));
+}
+
+fn glsl_hoshi_getRGBColor(xp: i32, yp: i32) -> vec3f {
+  var p_: vec2f = vec2f((((2.0 * f32(xp)) / jwx_glsl_hoshi_Density_Pixels_c) - 1.0), (((2.0 * f32(yp)) / f32(jwx_glsl_hoshi_resolutionY)) - 1.0));
+  p_ = (p_ * vec2f(0.182));
+  var x: f32 = p_.y;
+  p_ = abs((mmod2(p_, vec2f(4.0)) - vec2f(2.0)));
+  for (var i: i32 = i32(jwx_glsl_hoshi_Steps_c); (i > 0); i--) {
+    p_ = (abs((p_ - jwx_glsl_hoshi_fold)) + jwx_glsl_hoshi_fold);
+    p_ = ((p_ * vec2f(jwx_glsl_hoshi_scale)) - jwx_glsl_hoshi_translate);
+    p_ = glsl_hoshi_rotate(p_, (3.14159 / ((((0.1 + (sin(((jwx_glsl_hoshi_time_c * 0.0005) + (f32(i) * 0.5000001))) * 0.4999)) + 0.5) + (10.0 / jwx_glsl_hoshi_time_c)) + (sin(jwx_glsl_hoshi_time_c) / 100.0))));
+  }
+  var i: f32 = (((x * x) + atan2j(p_.y, p_.x)) + (jwx_glsl_hoshi_time_c * 0.02));
+  var h: f32 = ((floor((i * 4.0)) / 8.0) + 1.107);
+  h += ((smoothstepc(-0.1, 0.8, (mmod(((i * 2.0) / 5.0), (1.0 / 4.0)) * 900.0)) / 0.01) - 0.5);
+  var color: vec3f = glsl_hoshi_hsv(h, 1.0, smoothstepc(-3.0, 3.0, (length(p_) * 1.0)));
+  return color;
+}
+
+fn dbl2int(theColor: vec3f) -> vec3i {
+  var red: i32 = max(0, min(255, i32(floor((theColor.x * 256.0)))));
+  var green: i32 = max(0, min(255, i32(floor((theColor.y * 256.0)))));
+  var blue: i32 = max(0, min(255, i32(floor((theColor.z * 256.0)))));
+  return vec3i(red, green, blue);
+}
+
+var<private> jwx_glsl_hoshi_Density_Pixels_c: f32 = 0.0;
+
+var<private> jwx_glsl_hoshi_Steps_c: f32 = 0.0;
+
+var<private> jwx_glsl_hoshi_time_c: f32 = 0.0;
+
+var<private> jwx_glsl_hoshi_inited_: f32 = 0.0;
+
+var<private> jwx_glsl_hoshi_resolutionY: i32 = 0;
+
+var<private> jwx_glsl_hoshi_fold: vec2f = vec2f(0.0);
+
+var<private> jwx_glsl_hoshi_translate: vec2f = vec2f(0.0);
+
+var<private> jwx_glsl_hoshi_scale: f32 = 0.0;`,
+    code: (w, p) => `{
+jwx_glsl_hoshi_Density_Pixels_c = ${p[0]};
+jwx_glsl_hoshi_Steps_c = min(max(${p[3]}, 1.0), 60.0);
+jwx_glsl_hoshi_time_c = ${p[2]};
+if ((jwx_glsl_hoshi_inited_ == 0.0)) {
+  jwx_glsl_hoshi_inited_ = 1.0;
+  jwx_glsl_hoshi_resolutionY = i32(${p[0]});
+  jwx_glsl_hoshi_fold = vec2f(-0.5, -0.5);
+  jwx_glsl_hoshi_translate = vec2f(min(max(${p[5]}, 0.0), 5.0), min(max(${p[5]}, 0.0), 5.0));
+  jwx_glsl_hoshi_scale = min(max(${p[4]}, 1.0), 5.0);
+  {
+    jwx_glsl_hoshi_translate = vec2f(min(max(${p[5]}, 0.0), 5.0), min(max(${p[5]}, 0.0), 5.0));
+    jwx_glsl_hoshi_scale = min(max(${p[4]}, 1.0), 5.0);
+  }
+}
+jwx_glsl_hoshi_resolutionY = i32(${p[0]});
+jwx_glsl_hoshi_fold = vec2f(-0.5, -0.5);
+var i: i32 = i32((rnd(rs) * ${p[0]}));
+var j: i32 = i32((rnd(rs) * f32(jwx_glsl_hoshi_resolutionY)));
+var color: vec3f = vec3f(0.0, 0.0, 0.0);
+color = glsl_hoshi_getRGBColor(i, j);
+if ((min(max(${p[6]}, 0.0), 1.0) == 0)) {
+  var tcolor: vec3i = dbl2int(color);
+  (*rgb).w = select(0.0, 1.0, true);
+  (*rgb).x = (f32(tcolor.x) / 255.0);
+  (*rgb).y = (f32(tcolor.y) / 255.0);
+  (*rgb).z = (f32(tcolor.z) / 255.0);
+} else {
+  (*cp) = (color.x * color.y);
+}
+v.x += (${w} * ((f32(i) / ${p[0]}) - 0.5));
+v.y += (${w} * ((f32(j) / f32(jwx_glsl_hoshi_resolutionY)) - 0.5));
+}`,
+  },
+  "glsl_kaleidocomplex": {
+    params: [{ name: "Density Pixels", def: 1000000 }, { name: "Seed", def: 10000 }, { name: "time", def: 0 }, { name: "iMax", def: 12 }, { name: "Color", def: 2 }, { name: "Red Fac.", def: 1 }, { name: "Green Fac.", def: 1 }, { name: "Blue Fac.", def: 1 }, { name: "Gradient", def: 0 }],
+    verified: true, priority: 0, flags: ["dc","rgb","state"], types: ["SIMULATION","DC","BASE_SHAPE"],
+    funcNames: ["jwx_glsl_kaleidocomplex_Density_Pixels_c","jwx_glsl_kaleidocomplex_iMax_c","jwx_glsl_kaleidocomplex_time_c","jwx_glsl_kaleidocomplex_Color_c","jwx_glsl_kaleidocomplex_Red_Fac__c","jwx_glsl_kaleidocomplex_Green_Fac__c","jwx_glsl_kaleidocomplex_Blue_Fac__c","jwx_glsl_kaleidocomplex_inited_","jwx_glsl_kaleidocomplex_resolutionY","atan2j","glsl_kaleidocomplex_cmult","glsl_kaleidocomplex_getRGBColor","dbl2int"],
+    funcs: `fn atan2j(y: f32, x: f32) -> f32 { if (x == 0.0 && y == 0.0) { return select(0.0, PI, (bitcast<u32>(x) >> 31u) == 1u) * select(1.0, -1.0, (bitcast<u32>(y) >> 31u) == 1u); } return atan2(y, x); }
+
+fn glsl_kaleidocomplex_cmult(a: vec2f, b: vec2f) -> vec2f {
+  return vec2f(((a.x * b.x) - (a.y * b.y)), ((a.x * b.y) + (a.y * b.x)));
+}
+
+fn glsl_kaleidocomplex_getRGBColor(xp: i32, yp: i32) -> vec3f {
+  var x: f32 = (f32(xp) + 0.5);
+  var y: f32 = (f32(yp) + 0.5);
+  var uv: vec2f = vec2f(((x / jwx_glsl_kaleidocomplex_Density_Pixels_c) - 0.5), ((y / f32(jwx_glsl_kaleidocomplex_resolutionY)) - 0.5));
+  var z: vec4f = vec4f(0.0, 0.0, 0.0, 0.0);
+  var of_: vec2f = (vec2f((abs(uv.x) / 0.125), (abs(uv.y) / 0.125)) * vec2f(1.0));
+  var col: vec3f = vec3f(0.0, 0.0, 0.0);
+  var dist: vec2f = vec2f(0.0, 0.0);
+  z.x = of_.x;
+  z.y = of_.y;
+  var ii: i32 = -1;
+  var r_: f32 = 1.0;
+  for (var i: i32 = -1; (f32(i) < jwx_glsl_kaleidocomplex_iMax_c); i++) {
+    r_ *= -1.0;
+    ii++;
+    var t1: vec2f = glsl_kaleidocomplex_cmult(vec2f(z.x, z.y), vec2f(1.0, 1.0));
+    z.x = t1.x;
+    z.y = t1.y;
+    t1 = (abs(vec2f(z.x, z.y)) + vec2f((r_ - 10.5)));
+    z.x = t1.x;
+    z.y = t1.y;
+    t1 = glsl_kaleidocomplex_cmult(vec2f(z.x, z.y), vec2f(sin(jwx_glsl_kaleidocomplex_time_c), cos(jwx_glsl_kaleidocomplex_time_c)));
+    z.x = t1.x;
+    z.y = t1.y;
+    z.z = (jwx_glsl_kaleidocomplex_Color_c * ((z.x * z.z) - (z.y * z.w)));
+    z.w = (jwx_glsl_kaleidocomplex_Color_c * ((z.y * z.z) - (z.x * z.w)));
+    dist.x = dot(vec2f(z.x, z.y), vec2f(z.x, z.y));
+    dist.y = dot(vec2f(z.z, z.w), vec2f(z.z, z.w));
+    if (((f32(ii) > 0.0) && ((sqrt((z.x * z.x)) < 0.51) || (sqrt((z.y * z.y)) < 0.51)))) {
+      col.x = exp(-(abs(((z.x * z.x) * z.y))));
+      col.y = exp(-(abs(((z.y * z.x) * z.y))));
+      col.z = exp(-(abs(min(z.x, z.y))));
+      break;
+    }
+    col.x += (jwx_glsl_kaleidocomplex_Color_c * exp(-(abs(((-z.x / f32(ii)) + (f32(ii) / z.x))))));
+    col.y += (jwx_glsl_kaleidocomplex_Color_c * exp(-(abs(((-z.y / f32(ii)) + (f32(ii) / z.y))))));
+    col.z += (jwx_glsl_kaleidocomplex_Color_c * exp(-(abs((((-z.x - z.y) / f32(ii)) + (f32(ii) / (z.x + z.y)))))));
+    if (((dist.x > 10000000.0) || (dist.y > 100000000000.0))) {
+      break;
+    }
+  }
+  col = vec3f(cos((col.x * jwx_glsl_kaleidocomplex_Red_Fac__c)), cos((col.y * jwx_glsl_kaleidocomplex_Green_Fac__c)), cos((col.z * jwx_glsl_kaleidocomplex_Blue_Fac__c)));
+  return col;
+}
+
+fn dbl2int(theColor: vec3f) -> vec3i {
+  var red: i32 = max(0, min(255, i32(floor((theColor.x * 256.0)))));
+  var green: i32 = max(0, min(255, i32(floor((theColor.y * 256.0)))));
+  var blue: i32 = max(0, min(255, i32(floor((theColor.z * 256.0)))));
+  return vec3i(red, green, blue);
+}
+
+var<private> jwx_glsl_kaleidocomplex_Density_Pixels_c: f32 = 0.0;
+
+var<private> jwx_glsl_kaleidocomplex_iMax_c: f32 = 0.0;
+
+var<private> jwx_glsl_kaleidocomplex_time_c: f32 = 0.0;
+
+var<private> jwx_glsl_kaleidocomplex_Color_c: f32 = 0.0;
+
+var<private> jwx_glsl_kaleidocomplex_Red_Fac__c: f32 = 0.0;
+
+var<private> jwx_glsl_kaleidocomplex_Green_Fac__c: f32 = 0.0;
+
+var<private> jwx_glsl_kaleidocomplex_Blue_Fac__c: f32 = 0.0;
+
+var<private> jwx_glsl_kaleidocomplex_inited_: f32 = 0.0;
+
+var<private> jwx_glsl_kaleidocomplex_resolutionY: i32 = 0;`,
+    code: (w, p) => `{
+jwx_glsl_kaleidocomplex_Density_Pixels_c = ${p[0]};
+jwx_glsl_kaleidocomplex_iMax_c = min(max(${p[3]}, 1.0), 50.0);
+jwx_glsl_kaleidocomplex_time_c = ${p[2]};
+jwx_glsl_kaleidocomplex_Color_c = ${p[4]};
+jwx_glsl_kaleidocomplex_Red_Fac__c = ${p[5]};
+jwx_glsl_kaleidocomplex_Green_Fac__c = ${p[6]};
+jwx_glsl_kaleidocomplex_Blue_Fac__c = ${p[7]};
+if ((jwx_glsl_kaleidocomplex_inited_ == 0.0)) {
+  jwx_glsl_kaleidocomplex_inited_ = 1.0;
+  jwx_glsl_kaleidocomplex_resolutionY = i32(${p[0]});
+}
+jwx_glsl_kaleidocomplex_resolutionY = i32(${p[0]});
+var i: i32 = i32((rnd(rs) * ${p[0]}));
+var j: i32 = i32((rnd(rs) * f32(jwx_glsl_kaleidocomplex_resolutionY)));
+var color: vec3f = vec3f(0.0, 0.0, 0.0);
+color = glsl_kaleidocomplex_getRGBColor(i, j);
+if ((min(max(${p[8]}, 0.0), 1.0) == 0)) {
+  var tcolor: vec3i = dbl2int(color);
+  (*rgb).w = select(0.0, 1.0, true);
+  (*rgb).x = (f32(tcolor.x) / 255.0);
+  (*rgb).y = (f32(tcolor.y) / 255.0);
+  (*rgb).z = (f32(tcolor.z) / 255.0);
+} else {
+  var s: f32 = ((color.x + color.y) + color.z);
+  var red: f32 = (color.x / s);
+  (*cp) = sin(red);
+}
+v.x += (${w} * ((f32(i) / ${p[0]}) - 0.5));
+v.y += (${w} * ((f32(j) / f32(jwx_glsl_kaleidocomplex_resolutionY)) - 0.5));
+}`,
+  },
+  "glsl_kaleidoscopic": {
+    params: [{ name: "Density Pixels", def: 1000000 }, { name: "Seed", def: 10000 }, { name: "time", def: 0 }, { name: "Sides", def: 8 }, { name: "zoom", def: 0 }, { name: "P1", def: 0 }, { name: "Radial", def: 0 }, { name: "Gradient", def: 0 }],
+    verified: true, priority: 0, flags: ["dc","rgb","state"], types: ["SIMULATION","DC","BASE_SHAPE"],
+    funcNames: ["jwx_glsl_kaleidoscopic_time_c","jwx_glsl_kaleidoscopic_Density_Pixels_c","jwx_glsl_kaleidoscopic_zoom_c","jwx_glsl_kaleidoscopic_Radial_c","jwx_glsl_kaleidoscopic_P1_c","jwx_glsl_kaleidoscopic_inited_","jwx_glsl_kaleidoscopic_KA","jwx_glsl_kaleidoscopic_resolutionY","atan2j","glsl_kaleidoscopic_smallKoleidoscope","glsl_kaleidoscopic_getRGBColor","dbl2int"],
+    funcs: `fn atan2j(y: f32, x: f32) -> f32 { if (x == 0.0 && y == 0.0) { return select(0.0, PI, (bitcast<u32>(x) >> 31u) == 1u) * select(1.0, -1.0, (bitcast<u32>(y) >> 31u) == 1u); } return atan2(y, x); }
+
+fn glsl_kaleidoscopic_smallKoleidoscope(uv: vec2f) -> vec2f {
+  var angle: f32 = (abs((mmod(atan2j(uv.y, uv.x), (2.0 * jwx_glsl_kaleidoscopic_KA)) - jwx_glsl_kaleidoscopic_KA)) + (0.1 * jwx_glsl_kaleidoscopic_time_c));
+  var uvr: vec2f = (vec2f(cos(angle), sin(angle)) * vec2f(length(uv)));
+  return uvr;
+}
+
+fn glsl_kaleidoscopic_getRGBColor(xp: i32, yp: i32) -> vec3f {
+  var x: f32 = (f32(xp) + 0.5);
+  var y: f32 = (f32(yp) + 0.5);
+  var uv: vec2f = (vec2f((((2.0 * x) / jwx_glsl_kaleidoscopic_Density_Pixels_c) - 1.0), (((2.0 * y) / f32(jwx_glsl_kaleidoscopic_resolutionY)) - 1.0)) * vec2f(12.0));
+  uv = (uv * vec2f((0.1 + jwx_glsl_kaleidoscopic_zoom_c)));
+  if ((jwx_glsl_kaleidoscopic_Radial_c == 1)) {
+    uv = glsl_kaleidoscopic_smallKoleidoscope(uv);
+  }
+  var p_: vec3f = vec3f(uv.x, uv.y, jwx_glsl_kaleidoscopic_zoom_c);
+  for (var i: i32 = 0; (i < 44); i++) {
+    var t1: vec3f = (abs(p_) / vec3f(dot(p_, p_)));
+    var t0: vec3f = (t1 - vec3f(1.0, 1.02, (jwx_glsl_kaleidoscopic_P1_c * 0.4)));
+    var t2: vec3f = (vec3f(1.3, 0.999, 0.678) * abs(t0));
+    p_ = vec3f(t2.x, t2.z, t2.y);
+  }
+  return p_;
+}
+
+fn dbl2int(theColor: vec3f) -> vec3i {
+  var red: i32 = max(0, min(255, i32(floor((theColor.x * 256.0)))));
+  var green: i32 = max(0, min(255, i32(floor((theColor.y * 256.0)))));
+  var blue: i32 = max(0, min(255, i32(floor((theColor.z * 256.0)))));
+  return vec3i(red, green, blue);
+}
+
+var<private> jwx_glsl_kaleidoscopic_time_c: f32 = 0.0;
+
+var<private> jwx_glsl_kaleidoscopic_Density_Pixels_c: f32 = 0.0;
+
+var<private> jwx_glsl_kaleidoscopic_zoom_c: f32 = 0.0;
+
+var<private> jwx_glsl_kaleidoscopic_Radial_c: f32 = 0.0;
+
+var<private> jwx_glsl_kaleidoscopic_P1_c: f32 = 0.0;
+
+var<private> jwx_glsl_kaleidoscopic_inited_: f32 = 0.0;
+
+var<private> jwx_glsl_kaleidoscopic_KA: f32 = 0.0;
+
+var<private> jwx_glsl_kaleidoscopic_resolutionY: i32 = 0;`,
+    code: (w, p) => `{
+jwx_glsl_kaleidoscopic_time_c = ${p[2]};
+jwx_glsl_kaleidoscopic_Density_Pixels_c = ${p[0]};
+jwx_glsl_kaleidoscopic_zoom_c = min(max(${p[4]}, 0.0), 1.0);
+jwx_glsl_kaleidoscopic_Radial_c = min(max(${p[6]}, 0.0), 1.0);
+jwx_glsl_kaleidoscopic_P1_c = min(max(${p[5]}, 0.0), 1.0);
+if ((jwx_glsl_kaleidoscopic_inited_ == 0.0)) {
+  jwx_glsl_kaleidoscopic_inited_ = 1.0;
+  jwx_glsl_kaleidoscopic_resolutionY = i32(${p[0]});
+  jwx_glsl_kaleidoscopic_KA = (PI / min(max(${p[3]}, 2.0), 20.0));
+}
+jwx_glsl_kaleidoscopic_resolutionY = i32(${p[0]});
+jwx_glsl_kaleidoscopic_KA = (PI / min(max(${p[3]}, 2.0), 20.0));
+var i: i32 = i32((rnd(rs) * ${p[0]}));
+var j: i32 = i32((rnd(rs) * f32(jwx_glsl_kaleidoscopic_resolutionY)));
+var color: vec3f = vec3f(0.0, 0.0, 0.0);
+color = glsl_kaleidoscopic_getRGBColor(i, j);
+if ((min(max(${p[7]}, 0.0), 1.0) == 0)) {
+  var tcolor: vec3i = dbl2int(color);
+  (*rgb).w = select(0.0, 1.0, true);
+  (*rgb).x = (f32(tcolor.x) / 255.0);
+  (*rgb).y = (f32(tcolor.y) / 255.0);
+  (*rgb).z = (f32(tcolor.z) / 255.0);
+} else {
+  var s: f32 = ((color.x + color.y) + color.z);
+  var red: f32 = (color.x / s);
+  (*cp) = sin(red);
+}
+v.x += (${w} * ((f32(i) / ${p[0]}) - 0.5));
+v.y += (${w} * ((f32(j) / f32(jwx_glsl_kaleidoscopic_resolutionY)) - 0.5));
+}`,
+  },
+  "glsl_acrilic": {
+    params: [{ name: "Density Pixels", def: 1000000 }, { name: "Seed", def: 10000 }, { name: "time", def: 0 }, { name: "Steps", def: 10 }, { name: "p1", def: 12 }, { name: "p2", def: 12 }, { name: "p3", def: 12 }, { name: "p4", def: 12 }, { name: "p5", def: 75 }, { name: "p6", def: 75 }, { name: "Red Fac.", def: 1 }, { name: "Green Fac.", def: 1 }, { name: "Blue Fac.", def: 1 }, { name: "Gradient", def: 0 }],
+    verified: true, priority: 0, flags: ["dc","rgb","state"], types: ["SIMULATION","DC","BASE_SHAPE"],
+    funcNames: ["jwx_glsl_acrilic_Density_Pixels_c","jwx_glsl_acrilic_Steps_c","jwx_glsl_acrilic_p1_c","jwx_glsl_acrilic_time_c","jwx_glsl_acrilic_p2_c","jwx_glsl_acrilic_p3_c","jwx_glsl_acrilic_p4_c","jwx_glsl_acrilic_p5_c","jwx_glsl_acrilic_p6_c","jwx_glsl_acrilic_Red_Fac__c","jwx_glsl_acrilic_Green_Fac__c","jwx_glsl_acrilic_Blue_Fac__c","jwx_glsl_acrilic_inited_","jwx_glsl_acrilic_resolutionY","atan2j","glsl_acrilic_sq","glsl_acrilic_getRGBColor","dbl2int"],
+    funcs: `fn atan2j(y: f32, x: f32) -> f32 { if (x == 0.0 && y == 0.0) { return select(0.0, PI, (bitcast<u32>(x) >> 31u) == 1u) * select(1.0, -1.0, (bitcast<u32>(y) >> 31u) == 1u); } return atan2(y, x); }
+
+fn glsl_acrilic_sq(x: f32) -> f32 {
+  return (x * x);
+}
+
+fn glsl_acrilic_getRGBColor(xp: i32, yp: i32) -> vec3f {
+  var x: f32 = (f32(xp) + 0.5);
+  var y: f32 = (f32(yp) + 0.5);
+  var p_: vec2f = vec2f(((0.7 * x) / jwx_glsl_acrilic_Density_Pixels_c), ((0.7 * y) / f32(jwx_glsl_acrilic_resolutionY)));
+  var col: vec3f = vec3f(0.0, 0.0, 0.0);
+  for (var j: i32 = 0; (j < 3); j++) {
+    for (var i: i32 = 1; (f32(i) < jwx_glsl_acrilic_Steps_c); i++) {
+      p_.x += ((0.1 / f32((i + j))) * sin(((((f32(i) * jwx_glsl_acrilic_p1_c) * p_.y) + jwx_glsl_acrilic_time_c) + cos((((jwx_glsl_acrilic_time_c / (jwx_glsl_acrilic_p2_c * f32(i))) * f32(i)) + f32(j))))));
+      p_.y += ((0.1 / f32((i + j))) * cos(((((f32(i) * jwx_glsl_acrilic_p3_c) * p_.x) + jwx_glsl_acrilic_time_c) + sin((((jwx_glsl_acrilic_time_c / (jwx_glsl_acrilic_p4_c * f32(i))) * f32(i)) + f32(j))))));
+    }
+    if ((j == 0)) {
+      col.x = (sin((jwx_glsl_acrilic_p5_c * glsl_acrilic_sq(p_.x))) + sin((jwx_glsl_acrilic_p6_c * glsl_acrilic_sq(p_.y))));
+    }
+    if ((j == 1)) {
+      col.y = (sin((jwx_glsl_acrilic_p5_c * glsl_acrilic_sq(p_.x))) + sin((jwx_glsl_acrilic_p6_c * glsl_acrilic_sq(p_.y))));
+    }
+    if ((j == 2)) {
+      col.z = (sin((jwx_glsl_acrilic_p5_c * glsl_acrilic_sq(p_.x))) + sin((jwx_glsl_acrilic_p6_c * glsl_acrilic_sq(p_.y))));
+    }
+  }
+  col = vec3f(cos((col.x * jwx_glsl_acrilic_Red_Fac__c)), cos((col.y * jwx_glsl_acrilic_Green_Fac__c)), cos((col.z * jwx_glsl_acrilic_Blue_Fac__c)));
+  return col;
+}
+
+fn dbl2int(theColor: vec3f) -> vec3i {
+  var red: i32 = max(0, min(255, i32(floor((theColor.x * 256.0)))));
+  var green: i32 = max(0, min(255, i32(floor((theColor.y * 256.0)))));
+  var blue: i32 = max(0, min(255, i32(floor((theColor.z * 256.0)))));
+  return vec3i(red, green, blue);
+}
+
+var<private> jwx_glsl_acrilic_Density_Pixels_c: f32 = 0.0;
+
+var<private> jwx_glsl_acrilic_Steps_c: f32 = 0.0;
+
+var<private> jwx_glsl_acrilic_p1_c: f32 = 0.0;
+
+var<private> jwx_glsl_acrilic_time_c: f32 = 0.0;
+
+var<private> jwx_glsl_acrilic_p2_c: f32 = 0.0;
+
+var<private> jwx_glsl_acrilic_p3_c: f32 = 0.0;
+
+var<private> jwx_glsl_acrilic_p4_c: f32 = 0.0;
+
+var<private> jwx_glsl_acrilic_p5_c: f32 = 0.0;
+
+var<private> jwx_glsl_acrilic_p6_c: f32 = 0.0;
+
+var<private> jwx_glsl_acrilic_Red_Fac__c: f32 = 0.0;
+
+var<private> jwx_glsl_acrilic_Green_Fac__c: f32 = 0.0;
+
+var<private> jwx_glsl_acrilic_Blue_Fac__c: f32 = 0.0;
+
+var<private> jwx_glsl_acrilic_inited_: f32 = 0.0;
+
+var<private> jwx_glsl_acrilic_resolutionY: i32 = 0;`,
+    code: (w, p) => `{
+jwx_glsl_acrilic_Density_Pixels_c = ${p[0]};
+jwx_glsl_acrilic_Steps_c = min(max(${p[3]}, 3.0), 100.0);
+jwx_glsl_acrilic_p1_c = min(max(${p[4]}, 1.0), 100.0);
+jwx_glsl_acrilic_time_c = ${p[2]};
+jwx_glsl_acrilic_p2_c = min(max(${p[5]}, 1.0), 100.0);
+jwx_glsl_acrilic_p3_c = min(max(${p[6]}, 1.0), 100.0);
+jwx_glsl_acrilic_p4_c = min(max(${p[7]}, 1.0), 100.0);
+jwx_glsl_acrilic_p5_c = min(max(${p[8]}, 1.0), 100.0);
+jwx_glsl_acrilic_p6_c = min(max(${p[9]}, 1.0), 100.0);
+jwx_glsl_acrilic_Red_Fac__c = ${p[10]};
+jwx_glsl_acrilic_Green_Fac__c = ${p[11]};
+jwx_glsl_acrilic_Blue_Fac__c = ${p[12]};
+if ((jwx_glsl_acrilic_inited_ == 0.0)) {
+  jwx_glsl_acrilic_inited_ = 1.0;
+  jwx_glsl_acrilic_resolutionY = i32(${p[0]});
+}
+jwx_glsl_acrilic_resolutionY = i32(${p[0]});
+var i: i32 = i32((rnd(rs) * ${p[0]}));
+var j: i32 = i32((rnd(rs) * f32(jwx_glsl_acrilic_resolutionY)));
+var color: vec3f = vec3f(0.0, 0.0, 0.0);
+color = glsl_acrilic_getRGBColor(i, j);
+if ((min(max(${p[13]}, 0.0), 1.0) == 0)) {
+  var tcolor: vec3i = dbl2int(color);
+  (*rgb).w = select(0.0, 1.0, true);
+  (*rgb).x = (f32(tcolor.x) / 255.0);
+  (*rgb).y = (f32(tcolor.y) / 255.0);
+  (*rgb).z = (f32(tcolor.z) / 255.0);
+} else {
+  var s: f32 = ((color.x + color.y) + color.z);
+  var red: f32 = (color.x / s);
+  (*cp) = sin(red);
+}
+v.x += (${w} * ((f32(i) / ${p[0]}) - 0.5));
+v.y += (${w} * ((f32(j) / f32(jwx_glsl_acrilic_resolutionY)) - 0.5));
+}`,
+  },
+  "glsl_circlesblue": {
+    params: [{ name: "Density Pixels", def: 1000000 }, { name: "Seed", def: 10000 }, { name: "time", def: 1 }, { name: "Radiusy", def: 0.04 }, { name: "Bubles", def: 40 }, { name: "Gradient", def: 0 }],
+    verified: true, priority: 0, flags: ["dc","rgb","state"], types: ["SIMULATION","DC","BASE_SHAPE"],
+    funcNames: ["jwx_glsl_circlesblue_Density_Pixels_c","jwx_glsl_circlesblue_Bubles_c","jwx_glsl_circlesblue_Radiusy_c","jwx_glsl_circlesblue_time_c","jwx_glsl_circlesblue_inited_","jwx_glsl_circlesblue_resolutionY","atan2j","powc","smoothstepc","glsl_circlesblue_getRGBColor","dbl2int"],
+    funcs: `fn atan2j(y: f32, x: f32) -> f32 { if (x == 0.0 && y == 0.0) { return select(0.0, PI, (bitcast<u32>(x) >> 31u) == 1u) * select(1.0, -1.0, (bitcast<u32>(y) >> 31u) == 1u); } return atan2(y, x); }
+
+fn powc(x: f32, y: f32) -> f32 {
+  if (x >= 0.0) { return pow(x, y); }
+  let yi = round(y);
+  if (abs(y - yi) > 1e-6) { return pow(x, y); }
+  let m = pow(-x, y);
+  return select(m, -m, (i32(yi) & 1) != 0);
+}
+
+fn smoothstepc(a: f32, b: f32, x: f32) -> f32 { if (a == b) { return step(a, x); } let t = clamp((x - a) / (b - a), 0.0, 1.0); return t * t * (3.0 - 2.0 * t); }
+
+fn glsl_circlesblue_getRGBColor(xp: i32, yp: i32) -> vec3f {
+  var x: f32 = (f32(xp) + 0.5);
+  var y: f32 = (f32(yp) + 0.5);
+  var uv: vec2f = vec2f((((2 * x) / jwx_glsl_circlesblue_Density_Pixels_c) - 1.0), (((2 * y) / f32(jwx_glsl_circlesblue_resolutionY)) - 1.0));
+  var color: vec3f = vec3f(0.0, 0.0, 0.0);
+  for (var i: i32 = 0; (f32(i) < jwx_glsl_circlesblue_Bubles_c); i++) {
+    var pha: f32 = ((tan(((f32(i) * 6.0) + 1.0)) * 0.5) + 0.5);
+    var siz: f32 = powc(((cos(((f32(i) * 2.4) + 5.0)) * 0.5) + 0.5), 4.0);
+    var pox: f32 = cos(((f32(i) * 3.55) + 4.1));
+    var rad: f32 = ((jwx_glsl_circlesblue_Radiusy_c + (sin(f32(i)) * 0.12)) + 0.08);
+    var pos: vec2f = vec2f((pox + sin((((jwx_glsl_circlesblue_time_c / 15.0) + pha) + siz))), ((-1.0 - rad) + ((2.0 + (2.0 * rad)) * mmod((pha + ((0.1 * (jwx_glsl_circlesblue_time_c / 5.0)) * (0.2 + (0.8 * siz)))), 1.0))));
+    var dis: f32 = length((uv - pos));
+    var col: vec3f = mix(vec3f(0.1, 0.2, 0.8), vec3f(0.2, 0.8, 0.6), (0.5 + (0.5 * sin(((f32(i) * sin(((jwx_glsl_circlesblue_time_c * pox) * 0.03))) + 1.9)))));
+    color = (color + ((col * vec3f((1.0 - smoothstepc((rad * (0.65 + (0.2 * sin((pox * jwx_glsl_circlesblue_time_c))))), rad, dis)))) * vec3f((1.0 - cos((pox * jwx_glsl_circlesblue_time_c))))));
+  }
+  return (color * vec3f(0.3));
+}
+
+fn dbl2int(theColor: vec3f) -> vec3i {
+  var red: i32 = max(0, min(255, i32(floor((theColor.x * 256.0)))));
+  var green: i32 = max(0, min(255, i32(floor((theColor.y * 256.0)))));
+  var blue: i32 = max(0, min(255, i32(floor((theColor.z * 256.0)))));
+  return vec3i(red, green, blue);
+}
+
+var<private> jwx_glsl_circlesblue_Density_Pixels_c: f32 = 0.0;
+
+var<private> jwx_glsl_circlesblue_Bubles_c: f32 = 0.0;
+
+var<private> jwx_glsl_circlesblue_Radiusy_c: f32 = 0.0;
+
+var<private> jwx_glsl_circlesblue_time_c: f32 = 0.0;
+
+var<private> jwx_glsl_circlesblue_inited_: f32 = 0.0;
+
+var<private> jwx_glsl_circlesblue_resolutionY: i32 = 0;`,
+    code: (w, p) => `{
+jwx_glsl_circlesblue_Density_Pixels_c = ${p[0]};
+jwx_glsl_circlesblue_Bubles_c = min(max(${p[4]}, 1.0), 100.0);
+jwx_glsl_circlesblue_Radiusy_c = min(max(${p[3]}, 0.0), 1.0);
+jwx_glsl_circlesblue_time_c = min(max(${p[2]}, 1.0), 1000.0);
+if ((jwx_glsl_circlesblue_inited_ == 0.0)) {
+  jwx_glsl_circlesblue_inited_ = 1.0;
+  jwx_glsl_circlesblue_resolutionY = i32(${p[0]});
+}
+jwx_glsl_circlesblue_resolutionY = i32(${p[0]});
+var i: i32 = i32((rnd(rs) * ${p[0]}));
+var j: i32 = i32((rnd(rs) * f32(jwx_glsl_circlesblue_resolutionY)));
+var color: vec3f = vec3f(0.0, 0.0, 0.0);
+color = glsl_circlesblue_getRGBColor(i, j);
+if ((min(max(${p[5]}, 0.0), 1.0) == 0)) {
+  var tcolor: vec3i = dbl2int(color);
+  (*rgb).w = select(0.0, 1.0, true);
+  (*rgb).x = (f32(tcolor.x) / 255.0);
+  (*rgb).y = (f32(tcolor.y) / 255.0);
+  (*rgb).z = (f32(tcolor.z) / 255.0);
+} else {
+  var s: f32 = ((color.x + color.y) + color.z);
+  var red: f32 = (color.x / s);
+  (*cp) = sin(red);
+}
+v.x += (${w} * ((f32(i) / ${p[0]}) - 0.5));
+v.y += (${w} * ((f32(j) / f32(jwx_glsl_circlesblue_resolutionY)) - 0.5));
+}`,
+  },
+  "glsl_kaliset": {
+    params: [{ name: "Density Pixels", def: 1000000 }, { name: "Seed", def: 10000 }, { name: "time", def: 200 }, { name: "N", def: 60 }, { name: "ShiftX", def: -0.22 }, { name: "ShiftY", def: -0.21 }, { name: "Gradient", def: 0 }],
+    verified: true, priority: 0, flags: ["dc","rgb","state"], types: ["SIMULATION","DC","BASE_SHAPE"],
+    funcNames: ["jwx_glsl_kaliset_Density_Pixels_c","jwx_glsl_kaliset_time_c","jwx_glsl_kaliset_ShiftX_c","jwx_glsl_kaliset_ShiftY_c","jwx_glsl_kaliset_N_c","jwx_glsl_kaliset_inited_","jwx_glsl_kaliset_resolutionY","atan2j","glsl_kaliset_getRGBColor","dbl2int"],
+    funcs: `fn atan2j(y: f32, x: f32) -> f32 { if (x == 0.0 && y == 0.0) { return select(0.0, PI, (bitcast<u32>(x) >> 31u) == 1u) * select(1.0, -1.0, (bitcast<u32>(y) >> 31u) == 1u); } return atan2(y, x); }
+
+fn glsl_kaliset_getRGBColor(xp: i32, yp: i32) -> vec3f {
+  var x: f32 = (f32(xp) + 0.5);
+  var y: f32 = (f32(yp) + 0.5);
+  var v_: vec2f = (vec2f(((x / jwx_glsl_kaliset_Density_Pixels_c) - 0.5), ((y / f32(jwx_glsl_kaliset_resolutionY)) - 0.5)) * vec2f(20.0));
+  var rsum: f32 = 0.0;
+  var pi2: f32 = (3.6 * 2.0);
+  var C: f32 = cos(((jwx_glsl_kaliset_time_c / 603.0) * pi2));
+  var S: f32 = sin(((jwx_glsl_kaliset_time_c / 407.4) * pi2));
+  var shift: vec2f = vec2f(jwx_glsl_kaliset_ShiftX_c, jwx_glsl_kaliset_ShiftY_c);
+  var zoom: f32 = ((jwx_glsl_kaliset_time_c / 184.0) + 1.0);
+  for (var i: i32 = 0; (f32(i) < jwx_glsl_kaliset_N_c); i++) {
+    var rr: f32 = ((v_.x * v_.x) + (v_.y * v_.y));
+    if ((rr > 1.0)) {
+      rr = (1.0 / rr);
+      v_.x = (v_.x * rr);
+      v_.y = (v_.y * rr);
+    }
+    rsum *= 0.99;
+    rsum += rr;
+    v_ = ((vec2f(((C * v_.x) - (S * v_.y)), ((S * v_.x) + (C * v_.y))) * vec2f(zoom)) + shift);
+  }
+  var col: f32 = (rsum * 0.5);
+  return vec3f(cos((col * 1.0)), cos((col * 2.0)), cos((col * 4.0)));
+}
+
+fn dbl2int(theColor: vec3f) -> vec3i {
+  var red: i32 = max(0, min(255, i32(floor((theColor.x * 256.0)))));
+  var green: i32 = max(0, min(255, i32(floor((theColor.y * 256.0)))));
+  var blue: i32 = max(0, min(255, i32(floor((theColor.z * 256.0)))));
+  return vec3i(red, green, blue);
+}
+
+var<private> jwx_glsl_kaliset_Density_Pixels_c: f32 = 0.0;
+
+var<private> jwx_glsl_kaliset_time_c: f32 = 0.0;
+
+var<private> jwx_glsl_kaliset_ShiftX_c: f32 = 0.0;
+
+var<private> jwx_glsl_kaliset_ShiftY_c: f32 = 0.0;
+
+var<private> jwx_glsl_kaliset_N_c: f32 = 0.0;
+
+var<private> jwx_glsl_kaliset_inited_: f32 = 0.0;
+
+var<private> jwx_glsl_kaliset_resolutionY: i32 = 0;`,
+    code: (w, p) => `{
+jwx_glsl_kaliset_Density_Pixels_c = ${p[0]};
+jwx_glsl_kaliset_time_c = min(max(${p[2]}, 1.0), 1000.0);
+jwx_glsl_kaliset_ShiftX_c = min(max(${p[4]}, -5.0), 5.0);
+jwx_glsl_kaliset_ShiftY_c = min(max(${p[5]}, -5.0), 5.0);
+jwx_glsl_kaliset_N_c = min(max(${p[3]}, 1.0), 100.0);
+if ((jwx_glsl_kaliset_inited_ == 0.0)) {
+  jwx_glsl_kaliset_inited_ = 1.0;
+  jwx_glsl_kaliset_resolutionY = i32(${p[0]});
+}
+jwx_glsl_kaliset_resolutionY = i32(${p[0]});
+var i: i32 = i32((rnd(rs) * ${p[0]}));
+var j: i32 = i32((rnd(rs) * f32(jwx_glsl_kaliset_resolutionY)));
+var color: vec3f = vec3f(0.0, 0.0, 0.0);
+color = glsl_kaliset_getRGBColor(i, j);
+if ((min(max(${p[6]}, 0.0), 1.0) == 0)) {
+  var tcolor: vec3i = dbl2int(color);
+  (*rgb).w = select(0.0, 1.0, true);
+  (*rgb).x = (f32(tcolor.x) / 255.0);
+  (*rgb).y = (f32(tcolor.y) / 255.0);
+  (*rgb).z = (f32(tcolor.z) / 255.0);
+} else {
+  var s: f32 = ((color.x + color.y) + color.z);
+  var red: f32 = (color.x / s);
+  (*cp) = sin(red);
+}
+v.x += (${w} * ((f32(i) / ${p[0]}) - 0.5));
+v.y += (${w} * ((f32(j) / f32(jwx_glsl_kaliset_resolutionY)) - 0.5));
+}`,
+  },
+  "glsl_kaliset2": {
+    params: [{ name: "Density Pixels", def: 1000000 }, { name: "Seed", def: 5000 }, { name: "time", def: 85.5 }, { name: "N", def: 100 }, { name: "radio", def: 1 }, { name: "ShiftX", def: -0.356 }, { name: "ShiftY", def: 0.686 }, { name: "Red Fac.", def: 1.8 }, { name: "Green Fac.", def: 1.9 }, { name: "Blue Fac.", def: 2.2 }, { name: "Gradient", def: 0 }],
+    verified: true, priority: 0, flags: ["dc","rgb","state"], types: ["SIMULATION","DC","BASE_SHAPE"],
+    funcNames: ["jwx_glsl_kaliset2_Density_Pixels_c","jwx_glsl_kaliset2_ShiftX_c","jwx_glsl_kaliset2_time_c","jwx_glsl_kaliset2_ShiftY_c","jwx_glsl_kaliset2_N_c","jwx_glsl_kaliset2_radio_c","jwx_glsl_kaliset2_Red_Fac__c","jwx_glsl_kaliset2_Green_Fac__c","jwx_glsl_kaliset2_Blue_Fac__c","jwx_glsl_kaliset2_inited_","jwx_glsl_kaliset2_resolutionY","atan2j","glsl_kaliset2_getRGBColor","dbl2int"],
+    funcs: `fn atan2j(y: f32, x: f32) -> f32 { if (x == 0.0 && y == 0.0) { return select(0.0, PI, (bitcast<u32>(x) >> 31u) == 1u) * select(1.0, -1.0, (bitcast<u32>(y) >> 31u) == 1u); } return atan2(y, x); }
+
+fn glsl_kaliset2_getRGBColor(xp: i32, yp: i32) -> vec3f {
+  var x: f32 = (f32(xp) + 0.5);
+  var y: f32 = (f32(yp) + 0.5);
+  var v_: vec2f = (vec2f(((x / jwx_glsl_kaliset2_Density_Pixels_c) - 0.5), ((y / f32(jwx_glsl_kaliset2_resolutionY)) - 0.5)) * vec2f(20.0));
+  var rsum: f32 = 0.0;
+  var PI2: f32 = 6.283185307;
+  var angle: f32 = (PI2 * jwx_glsl_kaliset2_ShiftX_c);
+  var C: f32 = cos(angle);
+  var S: f32 = sin(angle);
+  var shift: vec2f = vec2f(0.0, (2.0 + (2.0 * sin((0.03 * jwx_glsl_kaliset2_time_c)))));
+  var zoom: f32 = (2.0 + (5.0 * jwx_glsl_kaliset2_ShiftY_c));
+  for (var i: i32 = 0; (f32(i) < jwx_glsl_kaliset2_N_c); i++) {
+    var rr: f32 = ((v_.x * v_.x) + (v_.y * v_.y));
+    if ((rr > jwx_glsl_kaliset2_radio_c)) {
+      rr = (jwx_glsl_kaliset2_radio_c / rr);
+      v_.x = (v_.x * rr);
+      v_.y = (v_.y * rr);
+    }
+    rsum = max(rsum, rr);
+    v_ = ((vec2f(((C * v_.x) - (S * v_.y)), ((S * v_.x) + (C * v_.y))) * vec2f(zoom)) + shift);
+  }
+  var col: f32 = ((rsum * rsum) * ((500.0 / jwx_glsl_kaliset2_N_c) / jwx_glsl_kaliset2_radio_c));
+  return vec3f(cos((col * jwx_glsl_kaliset2_Red_Fac__c)), cos((col * jwx_glsl_kaliset2_Green_Fac__c)), cos((col * jwx_glsl_kaliset2_Blue_Fac__c)));
+}
+
+fn dbl2int(theColor: vec3f) -> vec3i {
+  var red: i32 = max(0, min(255, i32(floor((theColor.x * 256.0)))));
+  var green: i32 = max(0, min(255, i32(floor((theColor.y * 256.0)))));
+  var blue: i32 = max(0, min(255, i32(floor((theColor.z * 256.0)))));
+  return vec3i(red, green, blue);
+}
+
+var<private> jwx_glsl_kaliset2_Density_Pixels_c: f32 = 0.0;
+
+var<private> jwx_glsl_kaliset2_ShiftX_c: f32 = 0.0;
+
+var<private> jwx_glsl_kaliset2_time_c: f32 = 0.0;
+
+var<private> jwx_glsl_kaliset2_ShiftY_c: f32 = 0.0;
+
+var<private> jwx_glsl_kaliset2_N_c: f32 = 0.0;
+
+var<private> jwx_glsl_kaliset2_radio_c: f32 = 0.0;
+
+var<private> jwx_glsl_kaliset2_Red_Fac__c: f32 = 0.0;
+
+var<private> jwx_glsl_kaliset2_Green_Fac__c: f32 = 0.0;
+
+var<private> jwx_glsl_kaliset2_Blue_Fac__c: f32 = 0.0;
+
+var<private> jwx_glsl_kaliset2_inited_: f32 = 0.0;
+
+var<private> jwx_glsl_kaliset2_resolutionY: i32 = 0;`,
+    code: (w, p) => `{
+jwx_glsl_kaliset2_Density_Pixels_c = ${p[0]};
+jwx_glsl_kaliset2_ShiftX_c = min(max(${p[5]}, -1.0), 1.0);
+jwx_glsl_kaliset2_time_c = min(max(${p[2]}, 1.0), 1000.0);
+jwx_glsl_kaliset2_ShiftY_c = min(max(${p[6]}, -1.0), 1.0);
+jwx_glsl_kaliset2_N_c = min(max(${p[3]}, 1.0), 100.0);
+jwx_glsl_kaliset2_radio_c = min(max(${p[4]}, 0.1), 10.0);
+jwx_glsl_kaliset2_Red_Fac__c = ${p[7]};
+jwx_glsl_kaliset2_Green_Fac__c = ${p[8]};
+jwx_glsl_kaliset2_Blue_Fac__c = ${p[9]};
+if ((jwx_glsl_kaliset2_inited_ == 0.0)) {
+  jwx_glsl_kaliset2_inited_ = 1.0;
+  jwx_glsl_kaliset2_resolutionY = i32(${p[0]});
+}
+jwx_glsl_kaliset2_resolutionY = i32(${p[0]});
+var i: i32 = i32((rnd(rs) * ${p[0]}));
+var j: i32 = i32((rnd(rs) * f32(jwx_glsl_kaliset2_resolutionY)));
+var color: vec3f = vec3f(0.0, 0.0, 0.0);
+color = glsl_kaliset2_getRGBColor(i, j);
+if ((min(max(${p[10]}, 0.0), 1.0) == 0)) {
+  var tcolor: vec3i = dbl2int(color);
+  (*rgb).w = select(0.0, 1.0, true);
+  (*rgb).x = (f32(tcolor.x) / 255.0);
+  (*rgb).y = (f32(tcolor.y) / 255.0);
+  (*rgb).z = (f32(tcolor.z) / 255.0);
+} else {
+  var s: f32 = ((color.x + color.y) + color.z);
+  var red: f32 = (color.x / s);
+  (*cp) = sin(red);
+}
+v.x += (${w} * ((f32(i) / ${p[0]}) - 0.5));
+v.y += (${w} * ((f32(j) / f32(jwx_glsl_kaliset2_resolutionY)) - 0.5));
+}`,
+  },
+  "glsl_hyperbolictile": {
+    params: [{ name: "Density Pixels", def: 1000000 }, { name: "Gradient", def: 0 }],
+    verified: true, priority: 0, flags: ["dc","rgb","state"], types: ["SIMULATION","DC","BASE_SHAPE"],
+    funcNames: ["jwx_glsl_hyperbolictile_Density_Pixels_c","jwx_glsl_hyperbolictile_inited_","jwx_glsl_hyperbolictile_resolutionY","atan2j","glsl_hyperbolictile_topolar","glsl_hyperbolictile_tocart","glsl_hyperbolictile_mirror","glsl_hyperbolictile_getRGBColor","dbl2int"],
+    funcs: `fn atan2j(y: f32, x: f32) -> f32 { if (x == 0.0 && y == 0.0) { return select(0.0, PI, (bitcast<u32>(x) >> 31u) == 1u) * select(1.0, -1.0, (bitcast<u32>(y) >> 31u) == 1u); } return atan2(y, x); }
+
+fn glsl_hyperbolictile_topolar(cart: vec2f) -> vec2f {
+  var r_: f32 = sqrt(((cart.x * cart.x) + (cart.y * cart.y)));
+  var alpha: f32 = atan2j(cart.y, cart.x);
+  return vec2f(r_, alpha);
+}
+
+fn glsl_hyperbolictile_tocart(polar: vec2f) -> vec2f {
+  return vec2f((polar.x * cos(polar.y)), (polar.x * sin(polar.y)));
+}
+
+fn glsl_hyperbolictile_mirror(line: vec2f, point: vec2f) -> vec2f {
+  var r1: f32 = line.x;
+  if ((r1 < 100.0)) {
+    var linecenter: vec2f = glsl_hyperbolictile_tocart(line);
+    var cart: vec2f = glsl_hyperbolictile_tocart(point);
+    var dx: f32 = (cart.x - linecenter.x);
+    var dy: f32 = (cart.y - linecenter.y);
+    r1 = ((line.x * line.x) - 1.0);
+    var r2_: f32 = ((dx * dx) + (dy * dy));
+    var rr: f32 = (r1 / r2_);
+    var dx2: f32 = (dx * rr);
+    var dy2: f32 = (dy * rr);
+    return glsl_hyperbolictile_topolar((linecenter + vec2f(dx2, dy2)));
+  } else {
+    return vec2f(point.x, ((-point.y + (2.0 * line.y)) + PI));
+  }
+}
+
+fn glsl_hyperbolictile_getRGBColor(xp: i32, yp: i32) -> vec3f {
+  var x: f32 = (f32(xp) + 0.5);
+  var y: f32 = (f32(yp) + 0.5);
+  var position: vec2f = vec2f((((2.0 * x) / jwx_glsl_hyperbolictile_Density_Pixels_c) - 1.0), (((2.0 * y) / f32(jwx_glsl_hyperbolictile_resolutionY)) - 1.0));
+  var l1: vec2f = vec2f(1000.0, 0.0);
+  var l2: vec2f = vec2f(1000.0, (PI / 8.0));
+  var l3: vec2f = vec2f(sqrt((sqrt(2.0) + 1.0)), (PI / 2.0));
+  var p_: vec2f = glsl_hyperbolictile_topolar(position);
+  var color: f32;
+  if ((p_.x > 1.0)) {
+    color = 0.0;
+  } else {
+    var g2: i32 = 0;
+    var k1: i32 = 1;
+    for (var i: i32 = 0; (i < 7); i++) {
+      if ((k1 == 0)) {
+        continue;
+      }
+      var k: i32 = 1;
+      for (var j: i32 = 1; (j < 8); j++) {
+        if (((k == 0) || ((p_.y >= (PI / 2.0)) && (p_.y < (PI * 0.75))))) {
+          k = 0;
+        } else {
+          g2 = (g2 + 1);
+          p_ = glsl_hyperbolictile_mirror(l2, glsl_hyperbolictile_mirror(l1, p_));
+        }
+      }
+      var p1: vec2f = glsl_hyperbolictile_mirror(l3, p_);
+      if (((p1.y >= (PI / 2.0)) && (p1.y < (PI * 0.75)))) {
+        k1 = 0;
+      }
+      p_ = p1;
+    }
+    color = (mmod(f32(g2), 2.0) / 1.0);
+  }
+  return vec3f(color, color, color);
+}
+
+fn dbl2int(theColor: vec3f) -> vec3i {
+  var red: i32 = max(0, min(255, i32(floor((theColor.x * 256.0)))));
+  var green: i32 = max(0, min(255, i32(floor((theColor.y * 256.0)))));
+  var blue: i32 = max(0, min(255, i32(floor((theColor.z * 256.0)))));
+  return vec3i(red, green, blue);
+}
+
+var<private> jwx_glsl_hyperbolictile_Density_Pixels_c: f32 = 0.0;
+
+var<private> jwx_glsl_hyperbolictile_inited_: f32 = 0.0;
+
+var<private> jwx_glsl_hyperbolictile_resolutionY: i32 = 0;`,
+    code: (w, p) => `{
+jwx_glsl_hyperbolictile_Density_Pixels_c = ${p[0]};
+if ((jwx_glsl_hyperbolictile_inited_ == 0.0)) {
+  jwx_glsl_hyperbolictile_inited_ = 1.0;
+  jwx_glsl_hyperbolictile_resolutionY = i32(${p[0]});
+}
+jwx_glsl_hyperbolictile_resolutionY = i32(${p[0]});
+var i: i32 = i32((rnd(rs) * ${p[0]}));
+var j: i32 = i32((rnd(rs) * f32(jwx_glsl_hyperbolictile_resolutionY)));
+var color: vec3f = vec3f(0.0, 0.0, 0.0);
+color = glsl_hyperbolictile_getRGBColor(i, j);
+if ((min(max(${p[1]}, 0.0), 1.0) == 0)) {
+  var tcolor: vec3i = dbl2int(color);
+  (*rgb).w = select(0.0, 1.0, true);
+  (*rgb).x = (f32(tcolor.x) / 255.0);
+  (*rgb).y = (f32(tcolor.y) / 255.0);
+  (*rgb).z = (f32(tcolor.z) / 255.0);
+} else {
+  var s: f32 = ((color.x + color.y) + color.z);
+  var red: f32 = (color.x / s);
+  (*cp) = sin(red);
+}
+v.x += (${w} * ((f32(i) / ${p[0]}) - 0.5));
+v.y += (${w} * ((f32(j) / f32(jwx_glsl_hyperbolictile_resolutionY)) - 0.5));
+}`,
+  },
+  "glsl_squares": {
+    params: [{ name: "Density Pixels", def: 1000000 }, { name: "Seed", def: 5000 }, { name: "time", def: 85.5 }, { name: "N", def: 3 }, { name: "Direction", def: 1 }, { name: "Red Fac.", def: 1.8 }, { name: "Green Fac.", def: 1.9 }, { name: "Blue Fac.", def: 2.2 }, { name: "Gradient", def: 0 }],
+    verified: true, priority: 0, flags: ["dc","rgb","state"], types: ["SIMULATION","DC","BASE_SHAPE"],
+    funcNames: ["jwx_glsl_squares_Direction_c","jwx_glsl_squares_N_c","jwx_glsl_squares_time_c","jwx_glsl_squares_Density_Pixels_c","jwx_glsl_squares_Red_Fac__c","jwx_glsl_squares_Green_Fac__c","jwx_glsl_squares_Blue_Fac__c","jwx_glsl_squares_inited_","jwx_glsl_squares_resolutionY","atan2j","powc","mmod2","glsl_squares_hit","glsl_squares_getRGBColor","dbl2int"],
+    funcs: `fn atan2j(y: f32, x: f32) -> f32 { if (x == 0.0 && y == 0.0) { return select(0.0, PI, (bitcast<u32>(x) >> 31u) == 1u) * select(1.0, -1.0, (bitcast<u32>(y) >> 31u) == 1u); } return atan2(y, x); }
+
+fn powc(x: f32, y: f32) -> f32 {
+  if (x >= 0.0) { return pow(x, y); }
+  let yi = round(y);
+  if (abs(y - yi) > 1e-6) { return pow(x, y); }
+  let m = pow(-x, y);
+  return select(m, -m, (i32(yi) & 1) != 0);
+}
+
+fn mmod2(a: vec2f, b: vec2f) -> vec2f { return a - b * floor(a / b); }
+
+fn glsl_squares_hit(p_: vec2f) -> bool {
+  var direction: f32;
+  if ((jwx_glsl_squares_Direction_c == 1)) {
+    direction = 0.1;
+  } else {
+    direction = -1.0;
+  }
+  var sectors: vec2f;
+  var lim: i32 = i32(jwx_glsl_squares_N_c);
+  var coordIter: vec2f = (p_ / vec2f(powc(0.5, mmod((direction * jwx_glsl_squares_time_c), 1.0))));
+  for (var i: i32 = 0; (i < lim); i++) {
+    sectors = floor((coordIter * vec2f(3.0)));
+    if (((sectors.x == 1) && (sectors.y == 1))) {
+      return false;
+    } else {
+      coordIter = ((coordIter * vec2f(3.0)) - sectors);
+    }
+  }
+  return true;
+}
+
+fn glsl_squares_getRGBColor(xp: i32, yp: i32) -> vec3f {
+  var x: f32 = (f32(xp) + 0.5);
+  var y: f32 = (f32(yp) + 0.5);
+  var coordOrig: vec2f = vec2f(abs(((x / jwx_glsl_squares_Density_Pixels_c) - 0.5)), abs(((y / f32(jwx_glsl_squares_resolutionY)) - 0.5)));
+  coordOrig = mmod2(coordOrig, vec2f(1.0));
+  var color: vec3f = vec3f(cos(jwx_glsl_squares_time_c), tan(jwx_glsl_squares_time_c), sin(jwx_glsl_squares_time_c));
+  for (var i: i32 = 0; (i < 4); i++) {
+    if (glsl_squares_hit((vec2f((f32(i) * 0.1), (f32(i) * 0.1)) + coordOrig))) {
+      color = (vec3f(1.0, 1.0, 1.0) - color);
+    }
+  }
+  return vec3f(cos((color.x * jwx_glsl_squares_Red_Fac__c)), cos((color.y * jwx_glsl_squares_Green_Fac__c)), cos((color.z * jwx_glsl_squares_Blue_Fac__c)));
+}
+
+fn dbl2int(theColor: vec3f) -> vec3i {
+  var red: i32 = max(0, min(255, i32(floor((theColor.x * 256.0)))));
+  var green: i32 = max(0, min(255, i32(floor((theColor.y * 256.0)))));
+  var blue: i32 = max(0, min(255, i32(floor((theColor.z * 256.0)))));
+  return vec3i(red, green, blue);
+}
+
+var<private> jwx_glsl_squares_Direction_c: f32 = 0.0;
+
+var<private> jwx_glsl_squares_N_c: f32 = 0.0;
+
+var<private> jwx_glsl_squares_time_c: f32 = 0.0;
+
+var<private> jwx_glsl_squares_Density_Pixels_c: f32 = 0.0;
+
+var<private> jwx_glsl_squares_Red_Fac__c: f32 = 0.0;
+
+var<private> jwx_glsl_squares_Green_Fac__c: f32 = 0.0;
+
+var<private> jwx_glsl_squares_Blue_Fac__c: f32 = 0.0;
+
+var<private> jwx_glsl_squares_inited_: f32 = 0.0;
+
+var<private> jwx_glsl_squares_resolutionY: i32 = 0;`,
+    code: (w, p) => `{
+jwx_glsl_squares_Direction_c = min(max(${p[4]}, 0.0), 1.0);
+jwx_glsl_squares_N_c = min(max(${p[3]}, 1.0), 20.0);
+jwx_glsl_squares_time_c = min(max(${p[2]}, 0.0), 1000.0);
+jwx_glsl_squares_Density_Pixels_c = ${p[0]};
+jwx_glsl_squares_Red_Fac__c = ${p[5]};
+jwx_glsl_squares_Green_Fac__c = ${p[6]};
+jwx_glsl_squares_Blue_Fac__c = ${p[7]};
+if ((jwx_glsl_squares_inited_ == 0.0)) {
+  jwx_glsl_squares_inited_ = 1.0;
+  jwx_glsl_squares_resolutionY = i32(${p[0]});
+}
+jwx_glsl_squares_resolutionY = i32(${p[0]});
+var i: i32 = i32((rnd(rs) * ${p[0]}));
+var j: i32 = i32((rnd(rs) * f32(jwx_glsl_squares_resolutionY)));
+var color: vec3f = vec3f(0.0, 0.0, 0.0);
+color = glsl_squares_getRGBColor(i, j);
+if ((min(max(${p[8]}, 0.0), 1.0) == 0)) {
+  var tcolor: vec3i = dbl2int(color);
+  (*rgb).w = select(0.0, 1.0, true);
+  (*rgb).x = (f32(tcolor.x) / 255.0);
+  (*rgb).y = (f32(tcolor.y) / 255.0);
+  (*rgb).z = (f32(tcolor.z) / 255.0);
+} else {
+  var s: f32 = ((color.x + color.y) + color.z);
+  var red: f32 = (color.x / s);
+  (*cp) = sin(red);
+}
+v.x += (${w} * ((f32(i) / ${p[0]}) - 0.5));
+v.y += (${w} * ((f32(j) / f32(jwx_glsl_squares_resolutionY)) - 0.5));
 }`,
   },
   "tile_reverse": {
@@ -25648,6 +26666,93 @@ if ((rnd(rs) < 0.5)) {
 }
 }`,
   },
+  "truchetflow": {
+    params: [{ name: "randomize", def: 0 }, { name: "zoom", def: 5 }, { name: "invert", def: 0 }],
+    verified: true, priority: 0, flags: ["hide","state","z"], types: ["2D","SIMULATION"],
+    funcNames: ["jwx_truchetflow_inited_","jwx_truchetflow_uvx","jwx_truchetflow_uvy","powc","smoothstepc","atan2j","truchetflow_N21"],
+    funcs: `fn powc(x: f32, y: f32) -> f32 {
+  if (x >= 0.0) { return pow(x, y); }
+  let yi = round(y);
+  if (abs(y - yi) > 1e-6) { return pow(x, y); }
+  let m = pow(-x, y);
+  return select(m, -m, (i32(yi) & 1) != 0);
+}
+
+fn smoothstepc(a: f32, b: f32, x: f32) -> f32 { if (a == b) { return step(a, x); } let t = clamp((x - a) / (b - a), 0.0, 1.0); return t * t * (3.0 - 2.0 * t); }
+
+fn atan2j(y: f32, x: f32) -> f32 { if (x == 0.0 && y == 0.0) { return select(0.0, PI, (bitcast<u32>(x) >> 31u) == 1u) * select(1.0, -1.0, (bitcast<u32>(y) >> 31u) == 1u); } return atan2(y, x); }
+
+fn truchetflow_N21(p__in: vec2f) -> f32 {
+  var p_: vec2f = p__in;
+  p_ = fract((p_ * vec2f(234.234, 823.923)));
+  p_ = (p_ + vec2f(dot(p_, (p_ + vec2f(42.34)))));
+  return fract((p_.x * p_.y));
+}
+
+var<private> jwx_truchetflow_inited_: f32 = 0.0;
+
+var<private> jwx_truchetflow_uvx: f32 = 0.0;
+
+var<private> jwx_truchetflow_uvy: f32 = 0.0;`,
+    code: (w, p) => `{
+var tol: f32 = 0.0;
+if ((jwx_truchetflow_inited_ == 0.0)) {
+  jwx_truchetflow_inited_ = 1.0;
+  jwx_truchetflow_uvx = 0.0;
+  jwx_truchetflow_uvy = 0.0;
+}
+var x: f32;
+var y: f32;
+var cx: f32;
+var cy: f32;
+x = rnd(rs);
+y = rnd(rs);
+cx = 0.5;
+cy = 0.5;
+var uv: vec2f = vec2f((x - 0.5), (y - 0.5));
+var UV: vec2f = vec2f(x, y);
+var UV2: vec2f = abs(vec2f((UV.x - 0.5), (UV.y - 0.5)));
+jwx_truchetflow_uvx = (f32(i32(${p[0]})) * sin(((f32(i32(${p[0]})) * 180.0) / PI)));
+jwx_truchetflow_uvy = (f32(i32(${p[0]})) * sin(((f32(i32(${p[0]})) * 180.0) / PI)));
+uv = vec2f(((uv.x * min(max(${p[1]}, 0.1), 50.0)) - jwx_truchetflow_uvx), ((uv.y * min(max(${p[1]}, 0.1), 50.0)) - jwx_truchetflow_uvy));
+var gv: vec2f = (fract(uv) - vec2f(0.5));
+var id: vec2f = floor(uv);
+var n: f32 = truchetflow_N21(id);
+var band: f32 = (-0.03 + powc((0.5 * UV.y), 1.5));
+var width: f32 = (0.01 + (0.1 * UV.x));
+if ((n > 0.5)) {
+  gv.x *= -1.0;
+}
+var s: f32 = (0.5 * sign(((gv.x + gv.y) + 0.001)));
+var d: f32 = (length(vec2f((gv.x - s), (gv.y - s))) - 0.5);
+d = abs(d);
+d = abs((d - band));
+d = abs((d - band));
+d = abs((d - band));
+d = (abs(d) - width);
+var fuzzy: f32 = (0.01 + (0.2 * powc((UV2.x + UV2.y), 2.0)));
+var col: f32 = smoothstepc(fuzzy, 0.0, d);
+(*hd) = false;
+if ((min(max(${p[2]}, 0.0), 1.0) == 0)) {
+  if ((col > tol)) {
+    x = 0.0;
+    y = 0.0;
+    (*hd) = true;
+  }
+} else {
+  if ((col <= tol)) {
+    x = 0.0;
+    y = 0.0;
+    (*hd) = true;
+  }
+}
+v.x = (${w} * (x - cx));
+v.y = (${w} * (y - cy));
+if (false) {
+  pz_ += (${w} * z_);
+}
+}`,
+  },
   "cut_truchet": {
     params: [{ name: "mode", def: 1 }, { name: "type", def: 0 }, { name: "seed", def: 1000 }, { name: "zoom", def: 10 }, { name: "invert", def: 0 }],
     verified: true, priority: 0, flags: ["hide"], types: ["2D","BASE_SHAPE","SIMULATION"],
@@ -29551,16 +30656,16 @@ if ((min(max(${p[4]}, 0.0), 1.0) == 0)) {
     pz_ = (${w} * pz_);
   } else {
     pz_ = 0;
+    v.x = pz_;
     v.y = pz_;
-    v.x = v.y;
     (*hd) = true;
     break;
   }
 } else if ((min(max(${p[4]}, 0.0), 1.0) == 1)) {
   if ((((((rx <= ${p[0]}) && (rx >= -(${p[0]}))) || ((ry <= ${p[1]}) && (ry >= -(${p[1]})))) && (pz_ <= ${p[2]})) && (pz_ >= -(${p[2]})))) {
     pz_ = 0;
+    v.x = pz_;
     v.y = pz_;
-    v.x = v.y;
     (*hd) = true;
     break;
   } else {
@@ -29924,6 +31029,98 @@ v.x = (${w} * x);
 v.y = (${w} * y);
 }`,
   },
+  "crop_polygon": {
+    params: [{ name: "type", def: 4 }, { name: "radius", def: 0.35 }, { name: "invert", def: 0 }],
+    verified: true, priority: 0, flags: ["hide","z"], types: ["CROP"],
+    funcNames: ["atan2j","crop_polygon_sdHexagram","crop_polygon_sdOctogon","crop_polygon_sdHexagon","crop_polygon_sdPentagon","crop_polygon_sdCircle"],
+    funcs: `fn atan2j(y: f32, x: f32) -> f32 { if (x == 0.0 && y == 0.0) { return select(0.0, PI, (bitcast<u32>(x) >> 31u) == 1u) * select(1.0, -1.0, (bitcast<u32>(y) >> 31u) == 1u); } return atan2(y, x); }
+
+fn crop_polygon_sdHexagram(p__in: vec2f, r_: f32) -> f32 {
+  var p_: vec2f = p__in;
+  var k: vec4f = vec4f(-0.5, 0.86602540378, 0.57735026919, 1.73205080757);
+  p_ = abs(p_);
+  var t0: f32 = dot(vec2f(k.x, k.y), p_);
+  var t1: vec2f = ((vec2f(k.x, k.y) * vec2f(2.0, 2.0)) * vec2f(min(t0, 0.0)));
+  p_ = (p_ - t1);
+  t0 = dot(vec2f(k.y, k.x), p_);
+  t1 = ((vec2f(k.y, k.x) * vec2f(2.0)) * vec2f(min(t0, 0)));
+  p_ = (p_ - t1);
+  p_ = (p_ - vec2f(clamp(p_.x, (r_ * k.z), (r_ * k.w)), r_));
+  return (length(p_) * sign(p_.y));
+}
+
+fn crop_polygon_sdOctogon(p__in: vec2f, r_: f32) -> f32 {
+  var p_: vec2f = p__in;
+  var k: vec3f = vec3f(-0.9238795325, 0.3826834323, 0.4142135623);
+  p_ = abs(p_);
+  p_ = (p_ - (vec2f(k.x, k.y) * vec2f((2.0 * min(dot(vec2f(k.x, k.y), p_), 0.0)))));
+  p_ = (p_ - (vec2f(-k.x, k.y) * vec2f((2.0 * min(dot(vec2f(-k.x, k.y), p_), 0.0)))));
+  p_ = (p_ - vec2f(clamp(p_.x, (-k.z * r_), (k.z * r_)), r_));
+  return (length(p_) * sign(p_.y));
+}
+
+fn crop_polygon_sdHexagon(p__in: vec2f, r_: f32) -> f32 {
+  var p_: vec2f = p__in;
+  var k: vec3f = vec3f(-0.866025404, 0.5, 0.577350269);
+  p_ = abs(p_);
+  p_ = (p_ - (vec2f(k.x, k.y) * vec2f((2.0 * min(dot(vec2f(k.x, k.y), p_), 0.0)))));
+  p_ = (p_ - vec2f(clamp(p_.x, (-k.z * r_), (k.z * r_)), r_));
+  return (length(p_) * sign(p_.y));
+}
+
+fn crop_polygon_sdPentagon(p__in: vec2f, r_: f32) -> f32 {
+  var p_: vec2f = p__in;
+  var k: vec3f = vec3f(0.809016994, 0.587785252, 0.726542528);
+  p_.y = -p_.y;
+  p_.x = abs(p_.x);
+  p_ = (p_ - (vec2f(-k.x, k.y) * vec2f((2.0 * min(dot(vec2f(-k.x, k.y), p_), 0.0)))));
+  p_ = (p_ - (vec2f(k.x, k.y) * vec2f((2.0 * min(dot(vec2f(k.x, k.y), p_), 0.0)))));
+  p_ = (p_ - vec2f(clamp(p_.x, (-r_ * k.z), (r_ * k.z)), r_));
+  return (length(p_) * sign(p_.y));
+}
+
+fn crop_polygon_sdCircle(p_: vec2f, r_: f32) -> f32 {
+  return (length(p_) - r_);
+}`,
+    code: (w, p) => `{
+var x: f32;
+var y: f32;
+x = t.x;
+y = t.y;
+var p_: vec2f = vec2f(x, y);
+var d: f32 = 0.0;
+if ((min(max(${p[0]}, 0.0), 4.0) == 4)) {
+  d = crop_polygon_sdHexagram(p_, ${p[1]});
+} else if ((min(max(${p[0]}, 0.0), 4.0) == 3)) {
+  d = crop_polygon_sdOctogon(p_, ${p[1]});
+} else if ((min(max(${p[0]}, 0.0), 4.0) == 2)) {
+  d = crop_polygon_sdHexagon(p_, ${p[1]});
+} else if ((min(max(${p[0]}, 0.0), 4.0) == 1)) {
+  d = crop_polygon_sdPentagon(p_, ${p[1]});
+} else if ((min(max(${p[0]}, 0.0), 4.0) == 0)) {
+  d = crop_polygon_sdCircle(p_, ${p[1]});
+}
+(*hd) = false;
+if ((min(max(${p[2]}, 0.0), 1.0) == 0)) {
+  if ((d > 0.0)) {
+    x = 0.0;
+    y = 0.0;
+    (*hd) = true;
+  }
+} else {
+  if ((d <= 0.0)) {
+    x = 0.0;
+    y = 0.0;
+    (*hd) = true;
+  }
+}
+v.x = (${w} * x);
+v.y = (${w} * y);
+if (false) {
+  pz_ += (${w} * z_);
+}
+}`,
+  },
   "post_crop_polygon": {
     params: [{ name: "type", def: 4 }, { name: "radius", def: 0.35 }, { name: "invert", def: 0 }],
     verified: true, priority: 1, flags: ["hide"], types: ["CROP","POST"],
@@ -30013,6 +31210,56 @@ v.x = (${w} * x);
 v.y = (${w} * y);
 }`,
   },
+  "crop_rhombus": {
+    params: [{ name: "width", def: 0.5 }, { name: "height", def: 0.5 }, { name: "invert", def: 0 }],
+    verified: true, priority: 0, flags: ["hide","z"], types: ["CROP"],
+    funcNames: ["atan2j","crop_rhombus_ndot","crop_rhombus_sdRhombus"],
+    funcs: `fn atan2j(y: f32, x: f32) -> f32 { if (x == 0.0 && y == 0.0) { return select(0.0, PI, (bitcast<u32>(x) >> 31u) == 1u) * select(1.0, -1.0, (bitcast<u32>(y) >> 31u) == 1u); } return atan2(y, x); }
+
+fn crop_rhombus_ndot(a: vec2f, b: vec2f) -> f32 {
+  return ((a.x * b.x) - (a.y * b.y));
+}
+
+fn crop_rhombus_sdRhombus(p_: vec2f, b: vec2f) -> f32 {
+  var q: vec2f = abs(p_);
+  var h: f32 = clamp((((-2.0 * crop_rhombus_ndot(q, b)) + crop_rhombus_ndot(b, b)) / dot(b, b)), -1.0, 1.0);
+  var d: f32 = length((q - ((b * vec2f((1.0 - h), (1.0 + h))) * vec2f(0.5))));
+  d *= sign((((q.x * b.y) + (q.y * b.x)) - (b.x * b.y)));
+  return d;
+}`,
+    code: (w, p) => `{
+var thick: f32 = 0.001;
+var x: f32;
+var y: f32;
+x = t.x;
+y = t.y;
+var p_: vec2f = vec2f(x, y);
+var d: f32 = 0.0;
+{
+  var ra: vec2f = vec2f(${p[0]}, ${p[1]});
+  d = crop_rhombus_sdRhombus(p_, ra);
+}
+(*hd) = false;
+if ((min(max(${p[2]}, 0.0), 1.0) == 0)) {
+  if ((d > 0.0)) {
+    x = 0.0;
+    y = 0.0;
+    (*hd) = true;
+  }
+} else {
+  if ((d <= 0.0)) {
+    x = 0.0;
+    y = 0.0;
+    (*hd) = true;
+  }
+}
+v.x = (${w} * x);
+v.y = (${w} * y);
+if (false) {
+  pz_ += (${w} * z_);
+}
+}`,
+  },
   "post_crop_rhombus": {
     params: [{ name: "width", def: 0.5 }, { name: "height", def: 0.5 }, { name: "invert", def: 0 }],
     verified: true, priority: 1, flags: ["hide"], types: ["CROP","POST"],
@@ -30055,6 +31302,58 @@ if ((min(max(${p[2]}, 0.0), 1.0) == 0)) {
 }
 v.x = (${w} * x);
 v.y = (${w} * y);
+}`,
+  },
+  "crop_stars": {
+    params: [{ name: "radius", def: 0.35 }, { name: "n", def: 3 }, { name: "r2", def: 0.333 }, { name: "invert", def: 0 }],
+    verified: true, priority: 0, flags: ["hide","z"], types: ["CROP"],
+    funcNames: ["atan2j","crop_stars_sdStar"],
+    funcs: `fn atan2j(y: f32, x: f32) -> f32 { if (x == 0.0 && y == 0.0) { return select(0.0, PI, (bitcast<u32>(x) >> 31u) == 1u) * select(1.0, -1.0, (bitcast<u32>(y) >> 31u) == 1u); } return atan2(y, x); }
+
+fn crop_stars_sdStar(p__in: vec2f, r_: f32, n: i32, m: f32) -> f32 {
+  var p_: vec2f = p__in;
+  var an: f32 = (3.141593 / f32(n));
+  var en: f32 = (6.283185 / m);
+  var acs: vec2f = vec2f(cos(an), sin(an));
+  var ecs: vec2f = vec2f(cos(en), sin(en));
+  var bn: f32 = (mmod(atan2j(p_.x, p_.y), (2.0 * an)) - an);
+  p_ = (vec2f(cos(bn), abs(sin(bn))) * vec2f(length(p_)));
+  p_ = (p_ - (acs * vec2f(r_)));
+  p_ = (p_ + (ecs * vec2f(clamp(-(dot(p_, ecs)), 0.0, ((r_ * acs.y) / ecs.y)))));
+  return (length(p_) * sign(p_.x));
+}`,
+    code: (w, p) => `{
+var thick: f32 = 0.0;
+var x: f32;
+var y: f32;
+x = t.x;
+y = t.y;
+var p_: vec2f = vec2f(x, y);
+var d: f32 = 0.0;
+{
+  var a: f32 = min(max(${p[2]}, 0.0), 1.0);
+  var m: f32 = (4.0 + ((a * a) * ((min(max(${p[1]}, 3.0), 9.0) * 2.0) - 4.0)));
+  d = crop_stars_sdStar(p_, ${p[0]}, i32(min(max(${p[1]}, 3.0), 9.0)), m);
+}
+(*hd) = false;
+if ((min(max(${p[3]}, 0.0), 1.0) == 0)) {
+  if ((d > 0.0)) {
+    x = 0.0;
+    y = 0.0;
+    (*hd) = true;
+  }
+} else {
+  if ((d <= 0.0)) {
+    x = 0.0;
+    y = 0.0;
+    (*hd) = true;
+  }
+}
+v.x = (${w} * x);
+v.y = (${w} * y);
+if (false) {
+  pz_ += (${w} * z_);
+}
 }`,
   },
   "post_crop_stars": {
@@ -30105,6 +31404,61 @@ v.x = (${w} * x);
 v.y = (${w} * y);
 }`,
   },
+  "crop_trapezoid": {
+    params: [{ name: "Base Sup.", def: 0.5 }, { name: "Base Inf.", def: 0.2 }, { name: "height", def: 0.5 }, { name: "invert", def: 0 }],
+    verified: true, priority: 0, flags: ["hide","z"], types: ["CROP"],
+    funcNames: ["atan2j","crop_trapezoid_dot2","crop_trapezoid_sdTrapezoid"],
+    funcs: `fn atan2j(y: f32, x: f32) -> f32 { if (x == 0.0 && y == 0.0) { return select(0.0, PI, (bitcast<u32>(x) >> 31u) == 1u) * select(1.0, -1.0, (bitcast<u32>(y) >> 31u) == 1u); } return atan2(y, x); }
+
+fn crop_trapezoid_dot2(v_: vec2f) -> f32 {
+  return dot(v_, v_);
+}
+
+fn crop_trapezoid_sdTrapezoid(p__in: vec2f, r1: f32, r2_: f32, he: f32) -> f32 {
+  var p_: vec2f = p__in;
+  var k1: vec2f = vec2f(r2_, he);
+  var k2: vec2f = vec2f((r2_ - r1), (2.0 * he));
+  p_.x = abs(p_.x);
+  var ca: vec2f = vec2f(max(0.0, (p_.x - select(r2_, r1, (p_.y < 0.0)))), (abs(p_.y) - he));
+  var t0: f32 = (dot((k1 - p_), k2) / crop_trapezoid_dot2(k2));
+  var cb: vec2f = ((p_ - k1) + (k2 * vec2f(clamp(t0, 0.0, 1.0))));
+  var s: f32 = select(1.0, -1.0, ((cb.x < 0.0) && (ca.y < 0.0)));
+  return (s * sqrt(min(crop_trapezoid_dot2(ca), crop_trapezoid_dot2(cb))));
+}`,
+    code: (w, p) => `{
+var thick: f32 = 0.0;
+var x: f32;
+var y: f32;
+x = t.x;
+y = t.y;
+var p_: vec2f = vec2f(x, y);
+var d: f32 = 0.0;
+{
+  var ra: f32 = ${p[0]};
+  var rb: f32 = ${p[1]};
+  d = crop_trapezoid_sdTrapezoid(p_, ra, rb, ${p[2]});
+}
+(*hd) = false;
+if ((min(max(${p[3]}, 0.0), 1.0) == 0)) {
+  if ((d > 0.0)) {
+    x = 0.0;
+    y = 0.0;
+    (*hd) = true;
+  }
+} else {
+  if ((d <= 0.0)) {
+    x = 0.0;
+    y = 0.0;
+    (*hd) = true;
+  }
+}
+v.x = (${w} * x);
+v.y = (${w} * y);
+if (false) {
+  pz_ += (${w} * z_);
+}
+}`,
+  },
   "post_crop_trapezoid": {
     params: [{ name: "LMay", def: 0.5 }, { name: "LMin", def: 0.2 }, { name: "height", def: 0.5 }, { name: "invert", def: 0 }],
     verified: true, priority: 1, flags: ["hide"], types: ["CROP","POST"],
@@ -30151,6 +31505,57 @@ if ((min(max(${p[3]}, 0.0), 1.0) == 0)) {
 }
 v.x = (${w} * x);
 v.y = (${w} * y);
+}`,
+  },
+  "crop_cross": {
+    params: [{ name: "width", def: 0.5 }, { name: "Size", def: 0.5 }, { name: "round", def: 0.001 }, { name: "invert", def: 0 }],
+    verified: true, priority: 0, flags: ["hide","z"], types: ["CROP"],
+    funcNames: ["atan2j","crop_cross_sdCross"],
+    funcs: `fn atan2j(y: f32, x: f32) -> f32 { if (x == 0.0 && y == 0.0) { return select(0.0, PI, (bitcast<u32>(x) >> 31u) == 1u) * select(1.0, -1.0, (bitcast<u32>(y) >> 31u) == 1u); } return atan2(y, x); }
+
+fn crop_cross_sdCross(p__in: vec2f, b: vec2f, r_: f32) -> f32 {
+  var p_: vec2f = p__in;
+  p_ = abs(p_);
+  p_ = select(vec2f(p_.x, p_.y), vec2f(p_.y, p_.x), (p_.y > p_.x));
+  var q: vec2f = (p_ - b);
+  var k: f32 = max(q.y, q.x);
+  var w_: vec2f = select(vec2f((b.y - p_.x), -k), q, (k > 0.0));
+  return ((sign(k) * length(max(w_, vec2f(0.0)))) + r_);
+}`,
+    code: (w, p) => `{
+var x: f32;
+var y: f32;
+x = t.x;
+y = t.y;
+var p_: vec2f = vec2f(x, y);
+var d: f32 = 0.0;
+{
+  var si: vec2f = vec2f(${p[0]}, ${p[1]});
+  if ((si.x < si.y)) {
+    si = vec2f(si.y, si.x);
+  }
+  var ra: f32 = (0.1 * sin((${p[2]} * 1.2)));
+  d = crop_cross_sdCross(p_, si, ra);
+}
+(*hd) = false;
+if ((min(max(${p[3]}, 0.0), 1.0) == 0)) {
+  if ((d > 0.0)) {
+    x = 0.0;
+    y = 0.0;
+    (*hd) = true;
+  }
+} else {
+  if ((d <= 0.0)) {
+    x = 0.0;
+    y = 0.0;
+    (*hd) = true;
+  }
+}
+v.x = (${w} * x);
+v.y = (${w} * y);
+if (false) {
+  pz_ += (${w} * z_);
+}
 }`,
   },
   "post_crop_cross": {
@@ -30201,6 +31606,47 @@ v.x = (${w} * x);
 v.y = (${w} * y);
 }`,
   },
+  "crop_box": {
+    params: [{ name: "width", def: 0.5 }, { name: "height", def: 0.5 }, { name: "invert", def: 0 }],
+    verified: true, priority: 0, flags: ["hide","z"], types: ["CROP"],
+    funcNames: ["atan2j","crop_box_sdBox"],
+    funcs: `fn atan2j(y: f32, x: f32) -> f32 { if (x == 0.0 && y == 0.0) { return select(0.0, PI, (bitcast<u32>(x) >> 31u) == 1u) * select(1.0, -1.0, (bitcast<u32>(y) >> 31u) == 1u); } return atan2(y, x); }
+
+fn crop_box_sdBox(p_: vec2f, b: vec2f) -> f32 {
+  var d: vec2f = (abs(p_) - b);
+  return (length(max(d, vec2f(0, 0))) + min(max(d.x, d.y), 0.0));
+}`,
+    code: (w, p) => `{
+var thick: f32 = 0.001;
+var x: f32;
+var y: f32;
+x = t.x;
+y = t.y;
+var p_: vec2f = vec2f(x, y);
+var d: f32 = 0.0;
+var ra: vec2f = vec2f(${p[0]}, ${p[1]});
+d = crop_box_sdBox(p_, ra);
+(*hd) = false;
+if ((min(max(${p[2]}, 0.0), 1.0) == 0)) {
+  if ((d > 0.0)) {
+    x = 0.0;
+    y = 0.0;
+    (*hd) = true;
+  }
+} else {
+  if ((d <= 0.0)) {
+    x = 0.0;
+    y = 0.0;
+    (*hd) = true;
+  }
+}
+v.x = (${w} * x);
+v.y = (${w} * y);
+if (false) {
+  pz_ += (${w} * z_);
+}
+}`,
+  },
   "post_crop_box": {
     params: [{ name: "width", def: 0.5 }, { name: "height", def: 0.5 }, { name: "invert", def: 0 }],
     verified: true, priority: 1, flags: ["hide"], types: ["CROP","POST"],
@@ -30236,6 +31682,49 @@ if ((min(max(${p[2]}, 0.0), 1.0) == 0)) {
 }
 v.x = (${w} * x);
 v.y = (${w} * y);
+}`,
+  },
+  "crop_vesica": {
+    params: [{ name: "width", def: 0.2 }, { name: "height", def: 0.1 }, { name: "invert", def: 0 }],
+    verified: true, priority: 0, flags: ["hide","z"], types: ["CROP"],
+    funcNames: ["atan2j","crop_vesica_sdVesica"],
+    funcs: `fn atan2j(y: f32, x: f32) -> f32 { if (x == 0.0 && y == 0.0) { return select(0.0, PI, (bitcast<u32>(x) >> 31u) == 1u) * select(1.0, -1.0, (bitcast<u32>(y) >> 31u) == 1u); } return atan2(y, x); }
+
+fn crop_vesica_sdVesica(p__in: vec2f, r_: f32, d: f32) -> f32 {
+  var p_: vec2f = p__in;
+  p_ = abs(p_);
+  var b: f32 = sqrt(((r_ * r_) - (d * d)));
+  return select((length((p_ - vec2f(-d, 0.0))) - r_), length((p_ - vec2f(0.0, b))), (((p_.y - b) * d) > (p_.x * b)));
+}`,
+    code: (w, p) => `{
+var x: f32;
+var y: f32;
+x = t.x;
+y = t.y;
+var p_: vec2f = vec2f(x, y);
+var d: f32 = 0.0;
+{
+  d = crop_vesica_sdVesica(p_, (1.0 + ${p[1]}), (0.8 + ${p[0]}));
+}
+(*hd) = false;
+if ((min(max(${p[2]}, 0.0), 1.0) == 0)) {
+  if ((d > 0.0)) {
+    x = 0.0;
+    y = 0.0;
+    (*hd) = true;
+  }
+} else {
+  if ((d <= 0.0)) {
+    x = 0.0;
+    y = 0.0;
+    (*hd) = true;
+  }
+}
+v.x = (${w} * x);
+v.y = (${w} * y);
+if (false) {
+  pz_ += (${w} * z_);
+}
 }`,
   },
   "post_crop_vesica": {
@@ -30276,6 +31765,42 @@ v.x = (${w} * x);
 v.y = (${w} * y);
 }`,
   },
+  "crop_x": {
+    params: [{ name: "radius", def: 0.1 }, { name: "w", def: 0.5 }, { name: "invert", def: 0 }],
+    verified: true, priority: 0, flags: ["hide","z"], types: ["CROP"],
+    funcNames: ["atan2j","crop_x_sdRoundedX"],
+    funcs: `fn atan2j(y: f32, x: f32) -> f32 { if (x == 0.0 && y == 0.0) { return select(0.0, PI, (bitcast<u32>(x) >> 31u) == 1u) * select(1.0, -1.0, (bitcast<u32>(y) >> 31u) == 1u); } return atan2(y, x); }
+
+fn crop_x_sdRoundedX(p__in: vec2f, w_: f32, r_: f32) -> f32 {
+  var p_: vec2f = p__in;
+  p_ = abs(p_);
+  return (length((p_ - vec2f((min((p_.x + p_.y), w_) * 0.5), (min((p_.x + p_.y), w_) * 0.5)))) - r_);
+}`,
+    code: (w, p) => `{
+var x: f32;
+var y: f32;
+x = t.x;
+y = t.y;
+var p_: vec2f = vec2f(x, y);
+var d: f32 = 0.0;
+d = crop_x_sdRoundedX(p_, min(max(${p[1]}, 0.0), 1.0), ${p[0]});
+(*hd) = false;
+if ((min(max(${p[2]}, 0.0), 1.0) == 0)) {
+  if ((d > 0.0)) {
+    (*hd) = true;
+  }
+} else {
+  if ((d <= 0.0)) {
+    (*hd) = true;
+  }
+}
+v.x = (${w} * x);
+v.y = (${w} * y);
+if (false) {
+  pz_ += (${w} * z_);
+}
+}`,
+  },
   "post_crop_x": {
     params: [{ name: "radius", def: 0.1 }, { name: "width", def: 0.5 }, { name: "invert", def: 0 }],
     verified: true, priority: 1, flags: ["hide"], types: ["CROP","POST"],
@@ -30312,6 +31837,54 @@ if ((min(max(${p[2]}, 0.0), 1.0) == 0)) {
 }
 v.x = (${w} * x);
 v.y = (${w} * y);
+}`,
+  },
+  "pre_c_symmetry": {
+    params: [{ name: "p1", def: 3 }, { name: "p2", def: 3 }],
+    verified: true, priority: -1, flags: ["z"], types: ["2D","PRE"],
+    funcNames: ["atan2j","powc"],
+    funcs: `fn atan2j(y: f32, x: f32) -> f32 { if (x == 0.0 && y == 0.0) { return select(0.0, PI, (bitcast<u32>(x) >> 31u) == 1u) * select(1.0, -1.0, (bitcast<u32>(y) >> 31u) == 1u); } return atan2(y, x); }
+
+fn powc(x: f32, y: f32) -> f32 {
+  if (x >= 0.0) { return pow(x, y); }
+  let yi = round(y);
+  if (abs(y - yi) > 1e-6) { return pow(x, y); }
+  let m = pow(-x, y);
+  return select(m, -m, (i32(yi) & 1) != 0);
+}`,
+    code: (w, p) => `{
+var uv: vec2f = vec2f(t.x, t.y);
+var t_: f32 = (${p[0]} * atan2j(uv.y, uv.x));
+uv = (vec2f(cos(t_), sin(t_)) * vec2f(powc(length(uv), ${p[1]})));
+t.x = (${w} * uv.x);
+t.y = (${w} * uv.y);
+if (false) {
+  z_ = (${w} * z_);
+}
+}`,
+  },
+  "post_c_symmetry": {
+    params: [{ name: "p1", def: 3 }, { name: "p2", def: 3 }],
+    verified: true, priority: 1, flags: ["z"], types: ["2D","POST"],
+    funcNames: ["atan2j","powc"],
+    funcs: `fn atan2j(y: f32, x: f32) -> f32 { if (x == 0.0 && y == 0.0) { return select(0.0, PI, (bitcast<u32>(x) >> 31u) == 1u) * select(1.0, -1.0, (bitcast<u32>(y) >> 31u) == 1u); } return atan2(y, x); }
+
+fn powc(x: f32, y: f32) -> f32 {
+  if (x >= 0.0) { return pow(x, y); }
+  let yi = round(y);
+  if (abs(y - yi) > 1e-6) { return pow(x, y); }
+  let m = pow(-x, y);
+  return select(m, -m, (i32(yi) & 1) != 0);
+}`,
+    code: (w, p) => `{
+var uv: vec2f = vec2f(v.x, v.y);
+var t_: f32 = (${p[0]} * atan2j(uv.y, uv.x));
+uv = (vec2f(cos(t_), sin(t_)) * vec2f(powc(length(uv), ${p[1]})));
+v.x = (${w} * uv.x);
+v.y = (${w} * uv.y);
+if (false) {
+  pz_ = (${w} * z_);
+}
 }`,
   },
   "pixel_flow": {
@@ -32629,8 +34202,8 @@ for (var i: i32 = 0; (f32(i) < min(max(${p[2]}, 0.0), 250.0)); i++) {
   } else {
     (*hd) = true;
     pz_ = 0;
+    v.x = pz_;
     v.y = pz_;
-    v.x = v.y;
   }
 }
 }`,
@@ -32692,8 +34265,8 @@ for (var i: i32 = 0; (f32(i) < min(max(${p[3]}, 0.0), 250.0)); i++) {
   } else {
     (*hd) = true;
     pz_ = 0;
+    v.x = pz_;
     v.y = pz_;
-    v.x = v.y;
   }
 }
 }`,
@@ -32764,6 +34337,55 @@ v.x += (${w} * ((rn * t.x) / r_));
 v.y += (${w} * ((rn * t.y) / r_));
 }`,
   },
+  "post_aexion_crop": {
+    params: [{ name: "Iters", def: 100 }, { name: "cadd", def: -0.8 }, { name: "bailout", def: 10 }, { name: "scaleX", def: 1 }, { name: "scaleY", def: 1 }, { name: "ScaleZ", def: 1 }, { name: "color", def: 1 }],
+    verified: true, priority: 1, flags: ["3d","dc","z"], types: ["3D","CROP","POST","ESCAPE_TIME_FRACTAL","DC"],
+    funcNames: ["atan2j"],
+    funcs: `fn atan2j(y: f32, x: f32) -> f32 { if (x == 0.0 && y == 0.0) { return select(0.0, PI, (bitcast<u32>(x) >> 31u) == 1u) * select(1.0, -1.0, (bitcast<u32>(y) >> 31u) == 1u); } return atan2(y, x); }`,
+    code: (w, p) => `{
+var z: vec4f = vec4f(v.x, v.y, pz_, 1.0);
+var auxc: vec4f = vec4f(v.x, v.y, pz_, 1.0);
+var r_: f32 = length(z);
+var cx: f32 = (abs(((auxc.x + auxc.y) + auxc.z)) + ${p[1]});
+var cy: f32 = (abs(((-auxc.x - auxc.y) + auxc.z)) + ${p[1]});
+var cz: f32 = (abs(((-auxc.x + auxc.y) - auxc.z)) + ${p[1]});
+var cw: f32 = (abs(((auxc.x - auxc.y) - auxc.z)) + ${p[1]});
+var p0: vec4f = vec4f(cx, cy, cz, cw);
+auxc.x = (cx * ${p[3]});
+auxc.y = (cy * ${p[4]});
+auxc.z = (cz * ${p[5]});
+auxc.w = (cw * 1.0);
+var tempX: f32 = (abs(((z.x + z.y) + z.z)) + ${p[1]});
+var tempY: f32 = (abs(((-z.x - z.y) + z.z)) + ${p[1]});
+var tempZ: f32 = (abs(((-z.x + z.y) - z.z)) + ${p[1]});
+var tempW: f32 = (abs(((z.x - z.y) - z.z)) + ${p[1]});
+z.x = (tempX * p0.x);
+z.y = (tempY * p0.y);
+z.z = (tempZ * p0.z);
+z.w = (tempW * p0.w);
+for (var i: i32 = 0; (f32(i) < min(max(${p[0]}, 1.0), 250.0)); i++) {
+  tempX = ((((z.x * z.x) - (z.y * z.y)) + ((2.0 * z.w) * z.z)) + auxc.x);
+  tempY = ((((z.y * z.y) - (z.x * z.x)) + ((2.0 * z.w) * z.z)) + auxc.y);
+  tempZ = ((((z.z * z.z) - (z.w * z.w)) + ((2.0 * z.x) * z.y)) + auxc.z);
+  z.x = tempX;
+  z.y = tempY;
+  z.z = tempZ;
+  z.w = tempW;
+  z = (z + p0);
+  r_ = length(z);
+  if ((r_ < ${p[2]})) {
+    v.x = (${w} * v.x);
+    v.y = (${w} * v.y);
+    pz_ = (${w} * pz_);
+    (*cp) = (sin(r_) * min(max(${p[6]}, 0.0), 1.0));
+  } else {
+    pz_ = 0;
+    v.y = pz_;
+    v.x = v.y;
+  }
+}
+}`,
+  },
   "post_bulbtorus_crop": {
     params: [{ name: "power1", def: 9 }, { name: "power2", def: 9 }, { name: "iterations", def: 12 }, { name: "bailout", def: 16 }, { name: "scaleX", def: 1 }, { name: "scaleY", def: 1 }, { name: "ScaleZ", def: 1 }, { name: "color", def: 1 }],
     verified: true, priority: 0, flags: ["3d","dc","z"], types: ["3D","CROP","ESCAPE_TIME_FRACTAL","DC"],
@@ -32811,8 +34433,8 @@ for (var i: i32 = 0; (f32(i) < min(max(${p[2]}, 0.0), 250.0)); i++) {
     (*cp) = (sin(r_) * ${p[7]});
   } else {
     pz_ = 0;
+    v.x = pz_;
     v.y = pz_;
-    v.x = v.y;
   }
 }
 }`,
@@ -32847,8 +34469,8 @@ for (var i: i32 = 0; (f32(i) < min(max(${p[0]}, 0.0), 250.0)); i++) {
     (*cp) = (sin(r_) * min(max(${p[5]}, 0.0), 1.0));
   } else {
     pz_ = 0;
+    v.x = pz_;
     v.y = pz_;
-    v.x = v.y;
   }
 }
 }`,
@@ -32890,8 +34512,8 @@ for (var i: i32 = 0; (f32(i) < min(max(${p[0]}, 0.0), 250.0)); i++) {
     (*cp) = (sin(r_) * min(max(${p[5]}, 0.0), 1.0));
   } else {
     pz_ = 0;
+    v.x = pz_;
     v.y = pz_;
-    v.x = v.y;
   }
 }
 }`,
@@ -37104,9 +38726,9 @@ for (var i: i32 = 0; (i < iter); i++) {
     z_res = (((((nz_num * dt_den) - (nx_num * dy_den)) + (ny_num * dx_den)) - (nt_num * dz_den)) * inv_denom);
   } else {
     z_res = 0.0;
-    y_res = z_res;
-    x_res = y_res;
+    x_res = z_res;
     t_res_quat = x_res;
+    y_res = z_res;
   }
 }
 var x_unmapped: f32 = x_res;

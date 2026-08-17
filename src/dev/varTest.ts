@@ -100,7 +100,8 @@ fn main(@builtin(global_invocation_id) gid: vec3u) {
   _ = rnd(&rsv); _ = rnd(&rsv);
   // warm-up: the oracle runs one instance over all points in order, so point pi's samples are
   // steps [pi*S, (pi+1)*S) of one trajectory — replay the earlier steps first (state only)
-  for (var s_ = 0u; s_ < pi * S; s_++) { _ = snip_(inp[pi], &rsv); }
+  // (capped: unbounded warm-up on heavy stateful bodies can hang the GPU for seconds per dispatch)
+  for (var s_ = 0u; s_ < min(pi * S, 4096u); s_++) { _ = snip_(inp[pi], &rsv); }
   for (var s_ = 0u; s_ < S; s_++) { let i = pi * S + s_;` : `let i = gid.x;
   if (i >= arrayLength(&inp) * S) { return; }
   let pi = i / S;
@@ -301,6 +302,11 @@ export async function runVarTest(device: GPUDevice, opts: { only?: string[]; ver
   return results;
 }
 
+/** Every name the oracle spec knows (for batched runs). */
+export async function allVarNames(): Promise<string[]> {
+  const spec: Spec = await (await fetch('/scripts/jwf-port/oracle-spec.json')).json();
+  return spec.entries.map((e) => e.name);
+}
 /** Persist verdicts to scripts/jwf-port/verified.json via the dev-server sink (vite.config.ts). */
 export async function saveVerified(results: VarTestResult[]): Promise<void> {
   const fmt = (x: VarTestResult) => x.status + (x.perSet ? ' sets ' + x.perSet.map((f) => (f * 100).toFixed(0)).join('/') : '') + (x.random ? ' random' : '') + (x.flags?.length ? ' [' + x.flags.join(',') + ']' : '');

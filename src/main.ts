@@ -288,6 +288,19 @@ async function boot() {
       return runVarTest(renderer.gpuDevice, opts);
     },
     varShader: async (name: string, source?: 'hand' | 'jwf') => (await import('./dev/varTest')).shaderFor(name, source),
+    // Run varTest in batches (kinder to the GPU than one 870-variation sweep) and save the merged verdicts
+    varTestAll: async (batch = 120) => {
+      const { runVarTest, saveVerified, allVarNames } = await import('./dev/varTest');
+      const names = await allVarNames();
+      const results = [];
+      for (let i = 0; i < names.length; i += batch) {
+        results.push(...await runVarTest(renderer.gpuDevice, { only: names.slice(i, i + batch), save: false }));
+        console.log(`varTestAll ${Math.min(i + batch, names.length)}/${names.length}`);
+        await new Promise((r) => setTimeout(r, 200));
+      }
+      await saveVerified(results);
+      return results;
+    },
     // Import + compile every JWildfire fixture flame (scripts/jwf-port/testflames)
     flameTest: async (opts?: { files?: string[]; verbose?: boolean }) => {
       const { runFlameTest } = await import('./dev/flameTest');

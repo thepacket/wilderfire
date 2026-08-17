@@ -9,7 +9,7 @@
 import { readFileSync, writeFileSync } from 'node:fs';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { transpileSnippet, TranspileError, type Binding, type Env } from './cwgsl.ts';
+import { transpileSnippet, TranspileError, type Binding, type Env, type Ty } from './cwgsl.ts';
 import { OVERRIDES } from './overrides.ts';
 import clampsJson from './data/param-clamps.json' with { type: 'json' };
 const PARAM_CLAMPS = clampsJson as Record<string, Record<string, [number, number]>>;
@@ -47,7 +47,7 @@ const FORCE_VERIFIED: Record<string, string> = {
   arch: 'same formula as the CPU (v·sin, v·sin²/cos); the 1/cos tail makes per-point mean/std statistics meaningless',
   rays: 'same formula as the CPU (v²·tan(rnd·π·v)/r²); the tan tail makes per-point mean/std statistics meaningless',
   starfractal: 'CPU keeps x,y across calls (a chaos game with its own RNG); the GPU iterates the same IFS 500× per point — same attractor, but the per-point statistics of the heavy-tailed inversions do not compare',
-  ...Object.fromEntries(['hopalong', 'macmillan', 'threeply', 'gumowski_mira'].map((n) => [n, 'chaotic attractor iterated as per-thread state (Java port, line by line); f32 and f64 trajectories decorrelate after a few hundred steps and the spread of these maps keeps evolving, so per-segment statistics do not compare'])),
+  ...Object.fromEntries(['hopalong', 'macmillan', 'threeply', 'gumowski_mira', 'gingerbread_man'].map((n) => [n, 'chaotic attractor iterated as per-thread state (Java port, line by line); f32 and f64 trajectories decorrelate after a few hundred steps and the spread of these maps keeps evolving, so per-segment statistics do not compare'])),
   circular: 'the jitter is a sin(x·12.9898+y·78.233+seed)·43758 hash of the continuous input point: identical in distribution, but the value at a given point depends on the f64/f32 rounding of that point, so the per-point oracle cannot compare it',
   circular2: 'see circular',
   minkQM: 'Minkowski ?-function: at e near 1 the sum is dominated by late Stern–Brocot branches, which flip when a grid coordinate is (nearly) a small rational — an f32 boundary artefact of the test grid, not a port difference (f32 CPU model matches the Java)',
@@ -121,7 +121,10 @@ function bindingsFor(v: DumpVar): Env {
   const assigned = new Set<string>();
   for (const m of src.matchAll(/(__[A-Za-z0-9_]+)\s*(?:=(?!=)|\+=|-=|\*=|\/=|\+\+|--)/g)) assigned.add(m[1]);
   for (const m of src.matchAll(/(?:\+\+|--)\s*(__[A-Za-z0-9_]+)/g)) assigned.add(m[1]);
-  const extra = new Set(v.extraParams ?? []);
+  // extra params: "name" (f32) or "name:float2|float3|int" (typed per-thread state from java2cu)
+  const extraTypes = new Map<string, string>((v.extraParams ?? []).map((e) => { const [n, t] = e.split(':'); return [n, t ?? 'f32']; }));
+  const extra = new Set(extraTypes.keys());
+  const tyOf = (t: string) => t === 'float2' ? { k: 'vec', n: 2, e: 'f32' } as const : t === 'float3' ? { k: 'vec', n: 3, e: 'f32' } as const : t === 'int' ? I : F;
   const resolveMagic = (name: string): Binding | null => {
     if (name === '__' + v.name || name === '__amount_') {
       if (assigned.has(name) || assigned.has('__amount_') || assigned.has('__' + v.name)) return { code: 'w_', ty: F, lvalue: true, decl: 'var w_: f32 = ${w};' };
@@ -138,7 +141,7 @@ function bindingsFor(v: DumpVar): Env {
       }
       if (extra.has(pn)) {
         // per-thread state (JWildfire "extra GPU parameters" are instance state)
-        return { code: `jwx_${v.name}_${pn}`.replace(/\W/g, '_'), ty: F, lvalue: true, flag: 'state' };
+        return { code: `jwx_${v.name}_${pn}`.replace(/\W/g, '_'), ty: tyOf(extraTypes.get(pn)!) as Ty, lvalue: true, flag: 'state' };
       }
     }
     return null;
@@ -305,12 +308,15 @@ for (let v0 of dump) {
     // per-thread state for JWildfire "extra GPU params"
     let funcs = r.functions, code = r.code;
     const funcNames: string[] = [];
-    for (const pn of v.extraParams ?? []) {
+    for (const pe of v.extraParams ?? []) {
+      const [pn, pt] = pe.split(':');
+      const wty = pt === 'float2' ? 'vec2f' : pt === 'float3' ? 'vec3f' : pt === 'int' ? 'i32' : 'f32';
+      const init = pt === 'float2' ? 'vec2f(0.0)' : pt === 'float3' ? 'vec3f(0.0)' : pt === 'int' ? '0' : '0.0';
       const gname = `jwx_${v.name}_${pn}`.replace(/\W/g, '_');
       if (new RegExp(`\\b${gname}\\b`).test(code) || new RegExp(`\\b${gname}\\b`).test(funcs ?? '')) {
-        funcs = (funcs ? funcs + '\n\n' : '') + `var<private> ${gname}: f32 = 0.0;`;
+        funcs = (funcs ? funcs + '\n\n' : '') + `var<private> ${gname}: ${wty} = ${init};`;
         funcNames.push(gname);
-        fnRegistry.set(gname, `var<private> ${gname}: f32 = 0.0;`);
+        fnRegistry.set(gname, `var<private> ${gname}: ${wty} = ${init};`);
       }
     }
     for (const n of r.functionNames) {

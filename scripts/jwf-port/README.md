@@ -28,7 +28,7 @@ JWildfire source ──Oracle.java─▶ oracle-out.jsonl ◀── oracle-spec.
 | `data/dc-base.json` | Which `dc_*` classes inherit / copy `DC_BaseFunc.transform` (sampling `rnd−0.5`) — drives the DC family fix in `gen.ts`. |
 | `data/jwf-variations.jsonl` | Metadata + GPU code for all 1026 JWildfire variations (name, params/defaults/int-ness, priority, types, GPU code, helper functions). Produced by `Dump.java`; checked in so regeneration does not need Java. |
 | `data/kernel-lib.cu` | Helper library extracted from JWildfire's `Flam4_3dKernal_TemplateJWF.cu` (Complex/Mat2/Jacobi/noise/misc); transpiled on demand. |
-| `java2cu.ts`, `data/jwf-java-ports.jsonl` | Java → CUDA-dialect pre-processor for the variations that have *no* GPU snippet in JWildfire: extracts fields, params (from `setParameter`), `init()`, helper methods and `transform()` from the Java class, rewrites the Java idioms (`pAffineTP.x`→`__x`, `pVarTP.x`→`__px`, `pAmount`→`__amount_`, `pContext.random()`, `Math.*`/MathLib statics, `sinAndCos`, `this.` fields, locals shadowing fields, `random(Integer.MAX_VALUE)`→31-bit `RANDINT`), replays setParameter-derived fields, turns per-instance state (attractors) into per-thread `varpar->` state initialised on the first call, and copies helper-used params/fields into state. Output feeds `gen.ts` exactly like a dump entry. Needs the JWildfire source tree (`--jwf`). |
+| `java2cu.ts`, `data/jwf-java-ports.jsonl` | Java → CUDA-dialect pre-processor for the variations that have *no* GPU snippet in JWildfire: extracts fields, params (from `setParameter`), `init()`, helper methods and `transform()` from the Java class, rewrites the Java idioms (`pAffineTP.x`→`__x`, `pVarTP.x`→`__px`, `pAmount`→`__amount_`, `pContext.random()`, `Math.*`/MathLib statics, `sinAndCos`, `this.` fields, locals shadowing fields, `random(Integer.MAX_VALUE)`→31-bit `RANDINT`), replays setParameter-derived fields, turns per-instance state (attractors) into per-thread `varpar->` state initialised on the first call, and copies helper-used params/fields into state. GLSL-style Java (js.glsl `vec2`/`vec3`/`vec4` objects, `G.*` statics, `new mat2(…)` in `.times()`) goes through a small expression parser that turns method chains into vector arithmetic (`crop_*`, `glsl_*`, `truchetflow`); the abstract `GLSLFunc` parent's fields/params are merged in. Output feeds `gen.ts` exactly like a dump entry. Needs the JWildfire source tree (`--jwf`). |
 | `Dump.java` | Dumps the catalogue by reflection against a compiled JWildfire tree. |
 | `Oracle.java` | Headless JWildfire oracle: evaluates each variation's Java `transform()` on the spec grid; deterministic → exact values, random → per-point mean/std/hide-fraction over 256 samples. |
 | `oracle-spec.ts` | Emits the shared test spec (130-point grid × 3 parameter sets: defaults, floats perturbed, ints perturbed) for every known variation. |
@@ -72,23 +72,23 @@ node scripts/jwf-port/gen.ts            # re-emit with the new verdicts
 
 ## Status
 
-Of JWildfire's 1026 variations, 786 carry a GPU snippet and 62 more are ported
-straight from their Java `transform()` by `java2cu.ts` (848 transpile);
-**834 verify numerically against the Java oracle in 3D**, 12 more are verified
+Of JWildfire's 1026 variations, 786 carry a GPU snippet and 85 more are ported
+straight from their Java `transform()` by `java2cu.ts` (871 transpile);
+**856 verify numerically against the Java oracle in 3D**, 13 more are verified
 by inspection where the per-point oracle cannot compare (`FORCE_VERIFIED` in
 `gen.ts`, each with its reason: `arch`/`rays`/`starfractal` heavy-tailed
 statistics, the chaotic attractors `hopalong`/`macmillan`/`threeply`/
-`gumowski_mira` and `post_point_crop` order-dependent state, `minkQM` f32
-boundary artefact of the test grid, `circular`/`circular2` hash of the
-continuous input point, `pre_flatten`), so 846 ship in `variations.jwf.ts`; 2
-stay in `variations.jwf.unverified.ts` because the Java itself is
+`gumowski_mira`/`gingerbread_man` and `post_point_crop` order-dependent state,
+`minkQM` f32 boundary artefact of the test grid, `circular`/`circular2` hash of
+the continuous input point, `pre_flatten`), so 869 ship in `variations.jwf.ts`;
+2 stay in `variations.jwf.unverified.ts` because the Java itself is
 order-dependent (`dc_circuits` accumulates a member `S` across points,
 `dc_gnarly` updates only 2 of its 6 gaussian summands — `& 5` — so its blur
-depends on the render's init randoms); the remaining 178 have neither a GPU
-snippet nor a Java transform the pre-processor handles yet (GLSL-style
-`vec2`/`vec3` classes: `crop_*`, `glsl_*`, `truchetflow`…; resources/images/
-sub-flames; DynamicArray/Complex helpers; `custom_wf`). Together with the 70
-hand-written flam3 entries the app registry has 848 variations.
+depends on the render's init randoms); the remaining 155 have neither a GPU
+snippet nor a Java transform the pre-processor handles yet (resources/images/
+sub-flames/text, `DrawFunc`/`DynamicArray`/`Complex`/BigInteger helpers, JWildfire
+`XYZPoint`/`Point` objects, `custom_wf`). Together with the 70 hand-written
+flam3 entries the app registry has 871 variations.
 
 Systematic GPU≠CPU families fixed at generator level: the 17 `*3D` solid
 samplers (CPU rejection-samples up to 50 times before hiding — `retry`
@@ -134,7 +134,7 @@ edges) and `distance` has a typed builtin. Direct RGB colour (`__useRgb`,
 supported: the kernel passes an `rgb` out-pointer and each layer's palette base
 (`PALB_`) into every transform function. The oracle uses a Mersenne-Twister RNG
 because JWildfire's Marsaglia generator degenerates for some seeds. Run
-`await window.wilderfire.varTest()` in the dev console for the current verdicts
+`await window.wilderfire.varTestAll()` in the dev console for the current verdicts
 (each failing result carries `why` — which criterion failed per set — and a
 few `samples`) and `await window.wilderfire.flameTest()` to import + compile
 every fixture flame.
@@ -146,8 +146,11 @@ in both the harness and the kernel. Stateful variations (`state`/`stateful`
 flags: attractors, `mandelbrot`, `post_point_crop`) are evaluated as one
 sequential trajectory per point — the oracle runs one Java instance over all
 points in order, so point *i*'s samples are steps [i·256, (i+1)·256) of one
-trajectory; the harness replays the earlier steps as warm-up (state only) and
-then records — `mandelbrot` verifies numerically that way. Scalar `atan2` goes
+trajectory; the harness replays the earlier steps as warm-up (state only,
+capped at 4096 steps — an unbounded warm-up on a heavy body can hang the GPU)
+and then records — `mandelbrot` verifies numerically that way. Run the sweep
+with `await window.wilderfire.varTestAll()` (batches of 100, then saves
+`verified.json`) rather than one 870-variation `varTest()`. Scalar `atan2` goes
 through `atan2j` because the Metal GPU returns NaN for atan2(0, 0) where Java
 gives ±0/±π (and fast-math then folds NaN·0 to 0).
 
