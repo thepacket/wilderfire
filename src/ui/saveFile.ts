@@ -69,3 +69,38 @@ export async function saveBlob(blob: Blob, opts: SaveOpts): Promise<boolean> {
 }
 
 export const saveText = (text: string, opts: SaveOpts) => saveBlob(new Blob([text], { type: opts.mime }), opts);
+
+export interface DirTarget {
+  /** 'dir' = user-picked folder (File System Access API), 'download' = one browser download per file. */
+  kind: 'dir' | 'download';
+  /** Folder name for display ('' for downloads). */
+  name: string;
+  write(fileName: string, blob: Blob): Promise<void>;
+}
+
+type DirHandle = { name: string; getFileHandle(name: string, o: { create: boolean }): Promise<FSHandle> };
+
+export const hasDirDialog = () => typeof (window as any).showDirectoryPicker === 'function' && window.isSecureContext;
+
+/** Ask for a folder to write several files into (batch export). Falls back to per-file
+ *  downloads where there is no directory picker. Returns null if the user cancelled. */
+export async function pickDirectory(): Promise<DirTarget | null> {
+  const downloads: DirTarget = { kind: 'download', name: '', write: (name, blob) => downloadTarget(name).write(blob) };
+  if (!hasDirDialog()) return downloads;
+  try {
+    const dir = await ((window as any).showDirectoryPicker as (o: { mode: string }) => Promise<DirHandle>)({ mode: 'readwrite' });
+    return {
+      kind: 'dir',
+      name: dir.name,
+      async write(fileName, blob) {
+        const h = await dir.getFileHandle(fileName, { create: true });
+        const w = await h.createWritable();
+        await w.write(blob);
+        await w.close();
+      },
+    };
+  } catch (e) {
+    if ((e as DOMException)?.name === 'AbortError') return null;
+    return downloads;
+  }
+}

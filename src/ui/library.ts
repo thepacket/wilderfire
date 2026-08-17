@@ -7,13 +7,16 @@ const LS_LIB = 'wilderfire.library';
 const LS_AUTOSAVE = 'wilderfire.autosave';
 const MAX_ENTRIES = 48;
 
-interface LibEntry {
+export interface LibEntry {
   id: string;
   name: string;
   date: number;
   flame: unknown;
   thumb: string; // jpeg data URL
 }
+
+/** The saved flames, newest first (for the batch export queue). */
+export const listLibrary = (): LibEntry[] => loadLib();
 
 function loadLib(): LibEntry[] {
   try {

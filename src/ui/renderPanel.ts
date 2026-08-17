@@ -3,6 +3,8 @@ import { App, el, slider } from './common';
 import { flameToJSON } from '../core/flame';
 import { flameToXML, importFlameText } from '../core/flameXML';
 import { pickSave, saveBlob, saveText } from './saveFile';
+import { renderHiRes, resolveSize, SIZE_OPTIONS, QUALITY_OPTIONS } from './hiresExport';
+import { openBatchExport } from './batchExport';
 
 const SRC = 'render';
 
@@ -286,25 +288,20 @@ export function buildRenderPanel(app: App, root: HTMLElement) {
   ioRow.append(pngBtn, jsonBtn, xmlBtn, loadBtn, fileInp);
   io.append(ioRow);
 
-  // Hi-res tiled export
+  // Hi-res tiled export (src/ui/hiresExport.ts) + batch queue (src/ui/batchExport.ts)
   const hiRow = el('div', 'btn-row');
   const hiScale = el('select') as HTMLSelectElement;
   hiScale.title = 'Output size: a multiple of the canvas, or a fixed 16:9 frame (the flame is scaled to the width)';
-  for (const s of ['2', '3', '4']) {
-    const o = el('option', '', s + '×') as HTMLOptionElement;
-    o.value = s;
-    hiScale.append(o);
-  }
-  for (const [label, v] of [['1080p', '1920x1080'], ['1440p', '2560x1440'], ['4K', '3840x2160']] as const) {
-    const o = el('option', '', label) as HTMLOptionElement;
-    o.value = v;
+  for (const so of SIZE_OPTIONS) {
+    const o = el('option', '', so.label) as HTMLOptionElement;
+    o.value = so.value;
     hiScale.append(o);
   }
   const hiQ = el('select') as HTMLSelectElement;
-  for (const [label, v] of [['Fast', '250'], ['Good', '700'], ['Ultra', '1500']] as const) {
-    const o = el('option', '', label) as HTMLOptionElement;
-    o.value = v;
-    if (v === '700') o.selected = true;
+  for (const q of QUALITY_OPTIONS) {
+    const o = el('option', '', q.label) as HTMLOptionElement;
+    o.value = q.value;
+    if (q.value === '700') o.selected = true;
     hiQ.append(o);
   }
   const alphaChk = el('input') as HTMLInputElement;
@@ -314,61 +311,33 @@ export function buildRenderPanel(app: App, root: HTMLElement) {
   alphaLab.title = 'Transparent background';
   alphaLab.style.color = 'var(--fg-dim)';
   const hiBtn = el('button', '', '⬇ Hi-res PNG');
-  hiRow.append(hiBtn, hiScale, hiQ, alphaLab);
+  const batchBtn = el('button', '', '⬇ Batch…');
+  batchBtn.title = 'Export several flames (current + library) at several sizes in one go';
+  hiRow.append(hiBtn, hiScale, hiQ, alphaLab, batchBtn);
   io.append(hiRow);
   const hiStatus = el('div', 'hint',
-    'Load accepts WilderFire JSON and .flame XML (flam3 / Apophysis compatible). Hi-res renders tiled at up to 4× screen resolution.');
+    'Load accepts WilderFire JSON and .flame XML (flam3 / Apophysis compatible). Hi-res renders tiled at up to 4× screen resolution; Batch… queues several flames and sizes into a folder.');
   io.append(hiStatus);
+  batchBtn.onclick = () => openBatchExport(app);
 
   hiBtn.onclick = async () => {
     const r = app.renderer;
     const spp = parseInt(hiQ.value);
     const transparent = alphaChk.checked;
-    const fixed = /^(\d+)x(\d+)$/.exec(hiScale.value);
-    const scale = fixed ? 1 : parseInt(hiScale.value);
-    const fullW = fixed ? Number(fixed[1]) : (r.width * scale) & ~1;
-    const fullH = fixed ? Number(fixed[2]) : (r.height * scale) & ~1;
-    const TILE = 1024, PAD = 8;
+    const { w: fullW, h: fullH } = resolveSize(hiScale.value, r.width, r.height);
     const target = await pickSave({ suggestedName: `${baseName()}-${fullW}x${fullH}.png`, description: 'PNG image', mime: 'image/png', ext: '.png' });
     if (!target) return;
     hiBtn.disabled = true;
     if (app.solo) app.setSolo(false); // exports always render the whole flame
     r.exporting = true;
     try {
-      const out = document.createElement('canvas');
-      out.width = fullW;
-      out.height = fullH;
-      const ctx = out.getContext('2d')!;
-      const tilesX = Math.ceil(fullW / TILE);
-      const tilesY = Math.ceil(fullH / TILE);
-      let n = 0;
-      for (let ty = 0; ty < tilesY; ty++) {
-        for (let tx = 0; tx < tilesX; tx++) {
-          const x0 = tx * TILE, y0 = ty * TILE;
-          const tw = Math.min(TILE, fullW - x0);
-          const th = Math.min(TILE, fullH - y0);
-          // Render with padding so the DE filter doesn't seam at tile edges.
-          const pw = tw + 2 * PAD, ph = th + 2 * PAD;
-          const px = await r.renderRegion({
-            fullW, fullH, tileX: x0 - PAD, tileY: y0 - PAD,
-            tileW: pw, tileH: ph, spp, transparent,
-          });
-          const img = new ImageData(tw, th);
-          for (let y = 0; y < th; y++) {
-            const srcOff = ((y + PAD) * pw + PAD) * 4;
-            img.data.set(px.subarray(srcOff, srcOff + tw * 4), y * tw * 4);
-          }
-          ctx.putImageData(img, x0, y0);
-          n++;
-          hiStatus.textContent = `Hi-res: tile ${n}/${tilesX * tilesY} (${fullW}×${fullH})…`;
-        }
-      }
-      hiStatus.textContent = 'Encoding PNG…';
-      const blob = await new Promise<Blob | null>((res) => out.toBlob(res, 'image/png'));
-      if (blob) {
-        await target.write(blob);
-        hiStatus.textContent = `Saved ${fullW}×${fullH} PNG (${(blob.size / 1e6).toFixed(1)} MB).`;
-      }
+      const blob = await renderHiRes(r, app.flame, {
+        w: fullW, h: fullH, spp, transparent,
+        onTile: (n, total) => { hiStatus.textContent = `Hi-res: tile ${n}/${total} (${fullW}×${fullH})…`; },
+      });
+      hiStatus.textContent = 'Saving PNG…';
+      await target.write(blob);
+      hiStatus.textContent = `Saved ${fullW}×${fullH} PNG (${(blob.size / 1e6).toFixed(1)} MB).`;
     } catch (e) {
       hiStatus.textContent = '⚠ ' + (e as Error).message;
     } finally {

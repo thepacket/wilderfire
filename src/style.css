@@ -352,3 +352,22 @@ a { color: var(--accent2); }
 /* About dialog */
 .modal-body p { margin: 0 0 10px; line-height: 1.45; max-width: 52ch; }
 .modal-body a { color: var(--accent, #e8a33c); }
+
+/* ---------- Batch export ---------- */
+.batch-body { min-width: min(560px, 88vw); }
+.batch-sec { margin-bottom: 12px; }
+.batch-sec h4 { margin: 0 0 6px; font-size: 12px; text-transform: uppercase; letter-spacing: 0.04em; color: var(--fg-dim); }
+.batch-list { max-height: 34vh; overflow-y: auto; display: flex; flex-direction: column; gap: 3px; }
+.batch-item { display: flex; align-items: center; gap: 8px; font-size: 12px; padding: 3px 4px; border-radius: 6px; cursor: pointer; }
+.batch-item:hover { background: var(--bg3); }
+.batch-item img { width: 28px; height: 28px; border-radius: 4px; object-fit: cover; }
+.batch-thumb-cur { width: 28px; text-align: center; color: var(--accent); }
+.batch-name { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.batch-sizes { display: flex; flex-wrap: wrap; gap: 4px 14px; font-size: 12px; margin-bottom: 4px; }
+.batch-size { display: flex; align-items: center; gap: 2px; cursor: pointer; }
+.batch-size .hint { margin: 0; }
+.batch-queue { max-height: 26vh; overflow-y: auto; font-size: 12px; font-family: ui-monospace, SFMono-Regular, Menlo, monospace; }
+.batch-job { display: flex; justify-content: space-between; gap: 12px; padding: 2px 4px; border-bottom: 1px solid var(--border); }
+.batch-file { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.batch-status { color: var(--fg-dim); white-space: nowrap; }
+.batch-status.busy { color: var(--accent); }

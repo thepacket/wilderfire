@@ -111,8 +111,10 @@ in the stack.
   (`resources/flames/TINA0001–TINA0033`, © Andreas Maschke, LGPL 2.1+),
   shipped with the app, loaded through the `.flame` importer and verified
   against headless JWildfire renders — plus a curated **randomizer**
-- PNG export, **hi-res tiled export** (2-4× screen resolution, optional
-  transparent background), flame **JSON save/load**, and **.flame XML
+- PNG export, **hi-res tiled export** (2-4× screen resolution or 1080p / 1440p /
+  4K, optional transparent background), a **batch export queue** (several
+  flames from the library × several sizes into a folder, cancellable), flame
+  **JSON save/load**, and **.flame XML
   import/export** compatible with flam3 / Apophysis / JWildfire (coefs, chaos,
   color_speed / symmetry, all three palette encodings, `<layer>` blocks,
   3D camera, DOF, dimish-z, tonemap/filter/DE settings, motion curves,
