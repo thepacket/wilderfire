@@ -18,6 +18,8 @@ export const FIXTURES = [
   'Painterly_0', 'Painterly_1', 'Phoenix_0', 'Phoenix_1', 'Rays_0', 'Rays_1', 'Sierpinsky_0', 'Sierpinsky_1',
   'Spherical_0', 'Spherical_1', 'Spirals_0', 'Spirals_1', 'Splits_0', 'Splits_1',
   'yflip', // hand-made Sierpinski with the wide base at +y: must render base-down like flam3/JWildfire
+  // Sierpinsky_0 with a JWildfire weighting field on one xform (amount / jitter / int+amount param modulation / cellular colour / value-fractal jitter)
+  'wfield_amount', 'wfield_jitter', 'wfield_ppow', 'wfield_cell', 'wfield_value',
 ];
 
 export async function runFlameTest(device: GPUDevice, palette: RGB[], opts: { files?: string[]; verbose?: boolean } = {}): Promise<FlameTestResult[]> {

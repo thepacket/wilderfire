@@ -21,9 +21,10 @@
 import type { Flame, XForm, VarInstance } from '../core/flame';
 import { visibleLayers } from '../core/flame';
 import { VARIATIONS } from '../core/variations';
+import { WFIELD_WGSL } from './wfield.wgsl';
 
 const CDF_ROW = 16;
-const HEADER = 48;    // floats per xform block header (6 affine, 6 post, color, colorSpeed, opacity, pad, 24 3D affines, 8 colour modifiers)
+const HEADER = 64;    // floats per xform block header (6 affine, 6 post, color, colorSpeed, opacity, pad, 24 3D affines, 8 colour modifiers, 16 weighting field)
 const XD_HEADER = 16; // floats reserved at the front of xd
 
 export interface CompiledFlame {
@@ -75,6 +76,14 @@ function collectFuncs(flame: Flame): string {
       }
     }
   }
+  // JWildfire weighting fields: FastNoise + wfieldValue (deduped item by item against the variation helpers)
+  if (visibleLayers(flame).some((ly) => [...ly.xforms, ...(ly.final ? [ly.final] : []), ...ly.moreFinals].some((x) => x.wfield && WFIELD_TYPE_ORD[x.wfield.type]))) {
+    for (const [nm, text] of splitItems(WFIELD_WGSL)) {
+      if (seen.has('item:' + nm)) continue;
+      seen.add('item:' + nm);
+      parts.push(text);
+    }
+  }
   return parts.join('\n\n');
 }
 
@@ -93,6 +102,13 @@ function genXformFn(name: string, x: XForm, B: number, palBase: number): string 
   const A = (i: number) => `xd[${B + i}u]`;
   const [pre, main, post] = varLists(x);
   let off = B + HEADER;
+  // JWildfire weighting field (slots 48..63): the noise value wfv scales amounts/params/colour and jitters the output
+  const wf = x.wfield && WFIELD_TYPE_ORD[x.wfield.type] ? x.wfield : null;
+  const wfParamScale = (vname: string, pname: string): string => {
+    if (!wf) return '';
+    const k = wf.params.findIndex((pp) => pp.varName === vname && pp.paramName === pname);
+    return k >= 0 ? ` * (1.0 + wfv * ${A(61 + k)})` : '';
+  };
 
   // Emits one stage. The point (t), its polar precalcs and the accumulator (v)
   // are all mutable so JWildfire-style pre-priority variations can rewrite the
@@ -107,8 +123,9 @@ function genXformFn(name: string, x: XForm, B: number, palBase: number): string 
     const bound = list.map((vi) => {
       const def = VARIATIONS[vi.name];
       if (!def) return null;
-      const w = `xd[${off}u]`;
-      const p = (def.params ?? []).map((_, k) => `xd[${off + 1 + k}u]`);
+      const w = wf ? `(xd[${off}u] * wfAmp${wfParamScale(vi.name, 'amount')})` : `xd[${off}u]`;
+      // a modulated int param is rounded like JWildfire's Tools.FTOI (the snippet's own (int) cast would truncate)
+      const p = (def.params ?? []).map((pd, k) => (wf && wfParamScale(vi.name, pd.name) ? (pd.int ? `round(xd[${off + 1 + k}u]${wfParamScale(vi.name, pd.name)})` : `(xd[${off + 1 + k}u]${wfParamScale(vi.name, pd.name)})`) : `xd[${off + 1 + k}u]`));
       off += 1 + (def.params?.length ?? 0);
       const dprio = def.priority ?? 0;
       // JWildfire per-instance override: only a normal variation forced to pre/post has a distinct meaning
@@ -166,11 +183,29 @@ ${snips}    ${output} = v;${zOut ? `\n    ${zOut} = pz_;` : ''}
   let zin = az3 + ${A(21)} + ${A(27)};
 `;
   body += '  var zout = zin;\n';
+  if (wf) {
+    const wfArgs = `i32(${A(48)}), i32(${A(53)}), ${A(54)}, i32(${A(55)}), ${A(56)}, ${A(57)}, i32(${A(58)}), i32(${A(59)}), i32(${A(60)})`;
+    body += `  let wfp = select(vec3f(t0, zin), pin, ${A(49)} > 0.5);\n  let wfv = wfieldValue(${wfArgs}, wfp.x, wfp.y, wfp.z);\n  let wfAmp = 1.0 + wfv * ${A(50)};\n`;
+  }
   if (pre.length) body += genStage(pre, 't0', 't0', 'vec2f(0.0, 0.0)', 'zin', null);
   body += '  var vout = vec2f(0.0, 0.0);\n';
   body += genStage(main, 't0', 'vout', 'vec2f(0.0, 0.0)', 'zin', 'zout');
   if (post.length) body += genStage(post, 'vout', 'vout', 'vec2f(0.0, 0.0)', 'zout', null);
 
+  let tail = `  return vec3f(px3 + ${A(8)} + ${A(36)}, py2 + ${A(11)} + ${A(30)}, pz3 + ${A(33)} + ${A(39)});`;
+  if (wf) {
+    // JWildfire: after the post affine the field jitters the output (×0.1, x/y/z each from a permuted lookup) and scales the colour (×0.1)
+    const wfArgs = `i32(${A(48)}), i32(${A(53)}), ${A(54)}, i32(${A(55)}), ${A(56)}, ${A(57)}, i32(${A(58)}), i32(${A(59)}), i32(${A(60)})`;
+    tail = `  var out_ = vec3f(px3 + ${A(8)} + ${A(36)}, py2 + ${A(11)} + ${A(30)}, pz3 + ${A(33)} + ${A(39)});
+  if (abs(${A(52)}) > 1e-9) {
+    let ji = 0.1 * ${A(52)};
+    out_.x += wfieldValue(${wfArgs}, out_.x, out_.y, out_.z) * ji;
+    out_.y += wfieldValue(${wfArgs}, out_.y, out_.x, out_.z) * ji;
+    out_.z += wfieldValue(${wfArgs}, out_.z, out_.x, out_.y) * ji;
+  }
+  if (abs(${A(51)}) > 1e-9) { *cp = *cp * (1.0 + wfv * ${A(51)} * 0.1); }
+  return out_;`;
+  }
   return `fn ${name}(pin: vec3f, cp: ptr<function, f32>, rs: ptr<function, u32>, hd: ptr<function, bool>, rgb: ptr<function, vec4f>) -> vec3f {
   let PALB_: u32 = ${palBase}u; // this layer's palette base (direct-colour variations read it)
 ${body}  let px1 = ${A(6)}*vout.x + ${A(7)}*vout.y;
@@ -179,9 +214,12 @@ ${body}  let px1 = ${A(6)}*vout.x + ${A(7)}*vout.y;
   let pz2 = ${A(31)}*py1 + ${A(32)}*zout;
   let px3 = ${A(34)}*px1 + ${A(35)}*pz2;
   let pz3 = ${A(37)}*px1 + ${A(38)}*pz2;
-  return vec3f(px3 + ${A(8)} + ${A(36)}, py2 + ${A(11)} + ${A(30)}, pz3 + ${A(33)} + ${A(39)});
+${tail}
 }`;
 }
+
+// JWildfire WeightingFieldType ordinals (as wfieldValue() expects them); IMAGE_MAP is not supported (needs an image)
+const WFIELD_TYPE_ORD: Record<string, number> = { CELLULAR_NOISE: 1, CUBIC_NOISE: 2, CUBIC_FRACTAL_NOISE: 3, PERLIN_NOISE: 4, PERLIN_FRACTAL_NOISE: 5, SIMPLEX_NOISE: 6, SIMPLEX_FRACTAL_NOISE: 7, VALUE_NOISE: 8, VALUE_FRACTAL_NOISE: 9, WHITE_NOISE: 10 };
 
 // JWildfire per-transform colour modifiers (DefaultRenderIterationState.transformPlotColor + its
 // HSLRGBConverter, ported literally incl. quirks): the four modifier values travel with the point and
@@ -571,6 +609,18 @@ ${lcases}
         for (let i = 0; i < 6; i++) out[B + 28 + i] = x.yzPost?.[i] ?? I[i];
         for (let i = 0; i < 6; i++) out[B + 34 + i] = x.zxPost?.[i] ?? I[i];
         for (let i = 0; i < 8; i++) out[B + 40 + i] = x.colorMods?.[i] ?? 0;
+        for (let i = 0; i < 16; i++) out[B + 48 + i] = 0;
+        if (x.wfield && WFIELD_TYPE_ORD[x.wfield.type]) {
+          const w = x.wfield;
+          out[B + 48] = WFIELD_TYPE_ORD[w.type]; out[B + 49] = w.input === 'POSITION' ? 1 : 0;
+          out[B + 50] = w.varAmount; out[B + 51] = w.color; out[B + 52] = w.jitter;
+          out[B + 53] = w.seed; out[B + 54] = w.frequency; out[B + 55] = w.octaves; out[B + 56] = w.gain; out[B + 57] = w.lacunarity;
+          out[B + 58] = w.fractalType === 'BILLOW' ? 1 : w.fractalType === 'RIGID_MULTI' ? 2 : 0;
+          out[B + 59] = w.cellDistance === 'MANHATTAN' ? 1 : w.cellDistance === 'NATURAL' ? 2 : 0;
+          out[B + 60] = ['CELL_VALUE', 'DISTANCE', 'DISTANCE2', 'DISTANCE_ADD', 'DISTANCE_SUB', 'DISTANCE_MUL', 'DISTANCE_DIV'].indexOf(w.cellReturn);
+          if (out[B + 60] < 0) out[B + 60] = 2;
+          w.params.slice(0, 3).forEach((pp, k) => { out[B + 61 + k] = pp.intensity; });
+        }
         let o = B + HEADER;
         for (const list of varLists(x)) {
           for (const vi of list) {

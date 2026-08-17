@@ -15,6 +15,30 @@ export interface VarInstance {
   priority?: number;
 }
 
+export interface WeightingField {
+  /** JWildfire WeightingFieldType name: CELLULAR_NOISE, CUBIC_NOISE, CUBIC_FRACTAL_NOISE, PERLIN_NOISE, PERLIN_FRACTAL_NOISE,
+   *  SIMPLEX_NOISE, SIMPLEX_FRACTAL_NOISE, VALUE_NOISE, VALUE_FRACTAL_NOISE, WHITE_NOISE (IMAGE_MAP is not supported). */
+  type: string;
+  input: 'AFFINE' | 'POSITION';
+  varAmount: number;
+  color: number;
+  jitter: number;
+  seed: number;
+  frequency: number;
+  fractalType: 'FBM' | 'BILLOW' | 'RIGID_MULTI';
+  octaves: number;
+  gain: number;
+  lacunarity: number;
+  cellReturn: 'CELL_VALUE' | 'DISTANCE' | 'DISTANCE2' | 'DISTANCE_ADD' | 'DISTANCE_SUB' | 'DISTANCE_MUL' | 'DISTANCE_DIV';
+  cellDistance: 'EUCLIDIAN' | 'MANHATTAN' | 'NATURAL';
+  /** up to three (variation name, param name or "amount", intensity) modulations */
+  params: { varName: string; paramName: string; intensity: number }[];
+}
+export const WFIELD_TYPES = ['CELLULAR_NOISE', 'CUBIC_NOISE', 'CUBIC_FRACTAL_NOISE', 'PERLIN_NOISE', 'PERLIN_FRACTAL_NOISE', 'SIMPLEX_NOISE', 'SIMPLEX_FRACTAL_NOISE', 'VALUE_NOISE', 'VALUE_FRACTAL_NOISE', 'WHITE_NOISE'];
+export function defaultWeightingField(type = 'SIMPLEX_NOISE'): WeightingField {
+  return { type, input: 'AFFINE', varAmount: 0, color: 0, jitter: 0, seed: 1337, frequency: 1, fractalType: 'FBM', octaves: 3, gain: 0.5, lacunarity: 2, cellReturn: 'DISTANCE2', cellDistance: 'EUCLIDIAN', params: [] };
+}
+
 export interface XForm {
   affine: Affine;
   post: Affine;
@@ -34,6 +58,10 @@ export interface XForm {
    *  blended per transform like the colour (m' = m·(1+speed)/2 + value·(1−speed)/2), and applied
    *  to the plotted RGB. Absent/zeros = no effect (the default). */
   colorMods?: number[];
+  /** JWildfire weighting field: a noise value per point (of the affine result or the incoming position) that
+   *  scales the variation amounts (`varAmount`), up to three named variation params (`params`), the colour
+   *  (`color`, ×0.1) and jitters the output (`jitter`, ×0.1). Absent = none. */
+  wfield?: WeightingField;
   opacity: number;     // 0..1 plot opacity
   variations: VarInstance[];
   /** Optional variation stages evaluated BEFORE the main sum (transforming the
@@ -190,7 +218,7 @@ export function visibleLayers(f: Flame): Layer[] {
 /** Structural signature — when this changes, the WGSL shader must be regenerated. */
 export function flameSignature(f: Flame): string {
   const names = (l?: VarInstance[]) => (l ?? []).map((v) => v.name + (v.priority !== undefined ? '@' + v.priority : '')).join(',');
-  const sig = (x: XForm) => `${names(x.preVariations)}<${names(x.variations)}>${names(x.postVariations)}`;
+  const sig = (x: XForm) => `${names(x.preVariations)}<${names(x.variations)}>${names(x.postVariations)}` + (x.wfield ? `~wf(${x.wfield.params.map((p) => p.varName + '.' + p.paramName).join(',')})` : '');
   return visibleLayers(f)
     .map((l) => l.xforms.map(sig).join('|') + '#' + [l.final, ...l.moreFinals].map((x) => (x ? sig(x) : '-')).join('#'))
     .join('@@') + (visibleLayers(f).some((l) => [...l.xforms, l.final, ...l.moreFinals].some((x) => x?.colorMods?.some((v) => v !== 0))) ? '~mods' : '');
@@ -241,6 +269,7 @@ function normXForm(x: any): XForm {
     color: clamp01(num(x?.color, 0)),
     colorSpeed: clamp01(num(x?.colorSpeed, 0.5)),
     ...(Array.isArray(x?.colorMods) && x.colorMods.some((v: unknown) => Number(v)) ? { colorMods: Array.from({ length: 8 }, (_, i) => num(x.colorMods[i], 0)) } : {}),
+    ...(x?.wfield && typeof x.wfield.type === 'string' && WFIELD_TYPES.includes(x.wfield.type) ? { wfield: { ...defaultWeightingField(x.wfield.type), ...x.wfield, params: Array.isArray(x.wfield.params) ? x.wfield.params.slice(0, 3) : [] } } : {}),
     opacity: clamp01(num(x?.opacity, 1)),
     variations: vars.length ? vars : d.variations,
   };

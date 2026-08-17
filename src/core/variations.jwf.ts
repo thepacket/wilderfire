@@ -150,7 +150,7 @@ pz_ += (${w} * z_);
 }`,
   },
   "julian": {
-    params: [{ name: "power", def: 3 }, { name: "dist", def: 1 }],
+    params: [{ name: "power", def: 3, int: true }, { name: "dist", def: 1 }],
     verified: true, priority: 0, flags: [], types: ["2D"],
     funcNames: ["powc","atan2j"],
     funcs: `fn powc(x: f32, y: f32) -> f32 {
@@ -657,7 +657,7 @@ break;
 }`,
   },
   "ringer": {
-    params: [{ name: "hide_inner", def: 0 }, { name: "innerradius", def: 0.5 }, { name: "outerradius", def: 1 }, { name: "thickness", def: 0 }, { name: "contrast", def: 0 }, { name: "pow", def: 1 }, { name: "scatter_area", def: 0 }, { name: "hide_outer", def: 1 }],
+    params: [{ name: "hide_inner", def: 0, int: true }, { name: "innerradius", def: 0.5 }, { name: "outerradius", def: 1 }, { name: "thickness", def: 0 }, { name: "contrast", def: 0 }, { name: "pow", def: 1 }, { name: "scatter_area", def: 0 }, { name: "hide_outer", def: 1, int: true }],
     verified: true, priority: 0, flags: ["hide","state"], types: ["2D"],
     funcNames: ["jwx_ringer_inited_","jwx_ringer_oldx","jwx_ringer_oldy","jwx_ringer__radius1","jwx_ringer__radius2","jwx_ringer__gamma","ringer_Point","sqr","powc","atan2j","ringer_circle2"],
     funcs: `struct ringer_Point {
@@ -799,7 +799,7 @@ v.y += (${w} * (sin((${p[2]} * t.x)) - cos((${p[3]} * t.y))));
 }`,
   },
   "juliascope": {
-    params: [{ name: "power", def: 3 }, { name: "dist", def: 1 }],
+    params: [{ name: "power", def: 3, int: true }, { name: "dist", def: 1 }],
     verified: true, priority: 0, flags: [], types: ["2D"],
     funcNames: ["powc","atan2j"],
     funcs: `fn powc(x: f32, y: f32) -> f32 {
@@ -823,7 +823,7 @@ v.y += ((${w} * rnew) * sin(t_));
 }`,
   },
   "julia3D": {
-    params: [{ name: "power", def: 3 }],
+    params: [{ name: "power", def: 3, int: true }],
     verified: true, priority: 0, flags: ["3d","z"], types: ["3D"],
     funcNames: ["roundc","powc","atan2j"],
     funcs: `fn roundc(x: f32) -> f32 { return sign(x) * floor(abs(x) + 0.5); }
@@ -855,7 +855,7 @@ pz_ += (r_ * _z);
 }`,
   },
   "julia3Dz": {
-    params: [{ name: "power", def: 3 }],
+    params: [{ name: "power", def: 3, int: true }],
     verified: true, priority: 0, flags: ["3d","z"], types: ["3D"],
     funcNames: ["roundc","powc","atan2j"],
     funcs: `fn roundc(x: f32) -> f32 { return sign(x) * floor(abs(x) + 0.5); }
@@ -1167,7 +1167,7 @@ v.y += (((${w} * y0) * 2.0) / PI);
 }`,
   },
   "wedge": {
-    params: [{ name: "angle", def: 1.5707963267948966 }, { name: "hole", def: 0 }, { name: "count", def: 1 }, { name: "swirl", def: 0.1 }],
+    params: [{ name: "angle", def: 1.5707963267948966 }, { name: "hole", def: 0 }, { name: "count", def: 1, int: true }, { name: "swirl", def: 0.1 }],
     verified: true, priority: 0, flags: [], types: ["2D"],
     funcNames: ["atan2j"],
     funcs: `fn atan2j(y: f32, x: f32) -> f32 { if (x == 0.0 && y == 0.0) { return select(0.0, PI, (bitcast<u32>(x) >> 31u) == 1u) * select(1.0, -1.0, (bitcast<u32>(y) >> 31u) == 1u); } return atan2(y, x); }`,
@@ -1279,7 +1279,7 @@ if ((d != 0.0)) {
 }`,
   },
   "rose_wf": {
-    params: [{ name: "amp", def: 0.5 }, { name: "waves", def: 4 }, { name: "filled", def: 0.85 }],
+    params: [{ name: "amp", def: 0.5 }, { name: "waves", def: 4, int: true }, { name: "filled", def: 0.85 }],
     verified: true, priority: 0, flags: [], types: ["BASE_SHAPE"],
     funcNames: ["roundc","atan2j"],
     funcs: `fn roundc(x: f32) -> f32 { return sign(x) * floor(abs(x) + 0.5); }
@@ -1986,7 +1986,7 @@ v.y += (r_ * sina);
 }`,
   },
   "post_mirror_wf": {
-    params: [{ name: "xaxis", def: 1 }, { name: "yaxis", def: 0 }, { name: "zaxis", def: 0 }, { name: "xshift", def: 0 }, { name: "yshift", def: 0 }, { name: "zshift", def: 0 }, { name: "xscale", def: 1 }, { name: "yscale", def: 1 }, { name: "xcolorshift", def: 0 }, { name: "ycolorshift", def: 0 }, { name: "zcolorshift", def: 0 }],
+    params: [{ name: "xaxis", def: 1, int: true }, { name: "yaxis", def: 0, int: true }, { name: "zaxis", def: 0, int: true }, { name: "xshift", def: 0 }, { name: "yshift", def: 0 }, { name: "zshift", def: 0 }, { name: "xscale", def: 1 }, { name: "yscale", def: 1 }, { name: "xcolorshift", def: 0 }, { name: "ycolorshift", def: 0 }, { name: "zcolorshift", def: 0 }],
     verified: true, priority: 1, flags: ["dc","z"], types: ["2D","DC","POST"],
     funcNames: ["atan2j"],
     funcs: `fn atan2j(y: f32, x: f32) -> f32 { if (x == 0.0 && y == 0.0) { return select(0.0, PI, (bitcast<u32>(x) >> 31u) == 1u) * select(1.0, -1.0, (bitcast<u32>(y) >> 31u) == 1u); } return atan2(y, x); }`,
@@ -2141,7 +2141,7 @@ if ((x > 0.0)) {
 }`,
   },
   "elliptic": {
-    params: [{ name: "mode", def: 1 }],
+    params: [{ name: "mode", def: 1, int: true }],
     verified: true, priority: 0, flags: [], types: ["2D"],
     funcNames: ["roundc","atan2j","elliptic_sqrt1pm1","elliptic_sqrt_safe"],
     funcs: `fn roundc(x: f32) -> f32 { return sign(x) * floor(abs(x) + 0.5); }
@@ -2205,7 +2205,7 @@ if ((mode == 2)) {
 }`,
   },
   "waves2_wf": {
-    params: [{ name: "scalex", def: 0.25 }, { name: "scaley", def: 0.5 }, { name: "freqx", def: 1.5707963267948966 }, { name: "freqy", def: 0.7853981633974483 }, { name: "use_cos_x", def: 1 }, { name: "use_cos_y", def: 0 }, { name: "dampx", def: 0 }, { name: "dampy", def: 0 }],
+    params: [{ name: "scalex", def: 0.25 }, { name: "scaley", def: 0.5 }, { name: "freqx", def: 1.5707963267948966 }, { name: "freqy", def: 0.7853981633974483 }, { name: "use_cos_x", def: 1, int: true }, { name: "use_cos_y", def: 0, int: true }, { name: "dampx", def: 0 }, { name: "dampy", def: 0 }],
     verified: true, priority: 0, flags: [], types: ["2D"],
     funcNames: ["atan2j"],
     funcs: `fn atan2j(y: f32, x: f32) -> f32 { if (x == 0.0 && y == 0.0) { return select(0.0, PI, (bitcast<u32>(x) >> 31u) == 1u) * select(1.0, -1.0, (bitcast<u32>(y) >> 31u) == 1u); } return atan2(y, x); }`,
@@ -2227,7 +2227,7 @@ if (use_cos_y) {
 }`,
   },
   "crop": {
-    params: [{ name: "left", def: -1 }, { name: "right", def: 1 }, { name: "top", def: -1 }, { name: "bottom", def: 1 }, { name: "scatter_area", def: 0 }, { name: "zero", def: 0 }],
+    params: [{ name: "left", def: -1 }, { name: "right", def: 1 }, { name: "top", def: -1 }, { name: "bottom", def: 1 }, { name: "scatter_area", def: 0 }, { name: "zero", def: 0, int: true }],
     verified: true, priority: 0, flags: ["hide"], types: ["CROP"],
     funcNames: ["roundc","atan2j"],
     funcs: `fn roundc(x: f32) -> f32 { return sign(x) * floor(abs(x) + 0.5); }
@@ -2270,7 +2270,7 @@ if ((((((x < xmin) || (x > xmax)) || (y < ymin)) || (y > ymax)) && (i32(roundc(m
 }`,
   },
   "post_crop": {
-    params: [{ name: "left", def: -1 }, { name: "right", def: 1 }, { name: "top", def: -1 }, { name: "bottom", def: 1 }, { name: "scatter_area", def: 0 }, { name: "zero", def: 0 }],
+    params: [{ name: "left", def: -1 }, { name: "right", def: 1 }, { name: "top", def: -1 }, { name: "bottom", def: 1 }, { name: "scatter_area", def: 0 }, { name: "zero", def: 0, int: true }],
     verified: true, priority: 1, flags: ["hide"], types: ["CROP","POST"],
     funcNames: ["atan2j"],
     funcs: `fn atan2j(y: f32, x: f32) -> f32 { if (x == 0.0 && y == 0.0) { return select(0.0, PI, (bitcast<u32>(x) >> 31u) == 1u) * select(1.0, -1.0, (bitcast<u32>(y) >> 31u) == 1u); } return atan2(y, x); }`,
@@ -2305,7 +2305,7 @@ if ((((((x < xmin) || (x > xmax)) || (y < ymin)) || (y > ymax)) && (min(max(${p[
 }`,
   },
   "pre_crop": {
-    params: [{ name: "left", def: -1 }, { name: "right", def: 1 }, { name: "top", def: -1 }, { name: "bottom", def: 1 }, { name: "scatter_area", def: 0 }, { name: "zero", def: 0 }],
+    params: [{ name: "left", def: -1 }, { name: "right", def: 1 }, { name: "top", def: -1 }, { name: "bottom", def: 1 }, { name: "scatter_area", def: 0 }, { name: "zero", def: 0, int: true }],
     verified: true, priority: -1, flags: ["hide"], types: ["CROP","PRE"],
     funcNames: ["atan2j"],
     funcs: `fn atan2j(y: f32, x: f32) -> f32 { if (x == 0.0 && y == 0.0) { return select(0.0, PI, (bitcast<u32>(x) >> 31u) == 1u) * select(1.0, -1.0, (bitcast<u32>(y) >> 31u) == 1u); } return atan2(y, x); }`,
@@ -2361,7 +2361,7 @@ break;
 }`,
   },
   "circlecrop": {
-    params: [{ name: "radius", def: 1 }, { name: "x", def: 0 }, { name: "y", def: 0 }, { name: "scatter_area", def: 0 }, { name: "zero", def: 1 }],
+    params: [{ name: "radius", def: 1 }, { name: "x", def: 0 }, { name: "y", def: 0 }, { name: "scatter_area", def: 0 }, { name: "zero", def: 1, int: true }],
     verified: true, priority: 0, flags: ["hide"], types: ["CROP"],
     funcNames: ["atan2j","roundc"],
     funcs: `fn atan2j(y: f32, x: f32) -> f32 { if (x == 0.0 && y == 0.0) { return select(0.0, PI, (bitcast<u32>(x) >> 31u) == 1u) * select(1.0, -1.0, (bitcast<u32>(y) >> 31u) == 1u); } return atan2(y, x); }
@@ -2401,7 +2401,7 @@ if (((cr0 != 0) && (esc != 0))) {
 }`,
   },
   "pre_circlecrop": {
-    params: [{ name: "radius", def: 1 }, { name: "x", def: 0 }, { name: "y", def: 0 }, { name: "scatter_area", def: 0 }, { name: "zero", def: 1 }],
+    params: [{ name: "radius", def: 1 }, { name: "x", def: 0 }, { name: "y", def: 0 }, { name: "scatter_area", def: 0 }, { name: "zero", def: 1, int: true }],
     verified: true, priority: -1, flags: ["hide"], types: ["CROP","PRE"],
     funcNames: ["atan2j","roundc"],
     funcs: `fn atan2j(y: f32, x: f32) -> f32 { if (x == 0.0 && y == 0.0) { return select(0.0, PI, (bitcast<u32>(x) >> 31u) == 1u) * select(1.0, -1.0, (bitcast<u32>(y) >> 31u) == 1u); } return atan2(y, x); }
@@ -2449,7 +2449,7 @@ if ((ph > PI)) {
 }`,
   },
   "post_circlecrop": {
-    params: [{ name: "radius", def: 1 }, { name: "x", def: 0 }, { name: "y", def: 0 }, { name: "scatter_area", def: 0 }, { name: "zero", def: 1 }],
+    params: [{ name: "radius", def: 1 }, { name: "x", def: 0 }, { name: "y", def: 0 }, { name: "scatter_area", def: 0 }, { name: "zero", def: 1, int: true }],
     verified: true, priority: 1, flags: ["hide"], types: ["CROP","POST"],
     funcNames: ["atan2j","roundc"],
     funcs: `fn atan2j(y: f32, x: f32) -> f32 { if (x == 0.0 && y == 0.0) { return select(0.0, PI, (bitcast<u32>(x) >> 31u) == 1u) * select(1.0, -1.0, (bitcast<u32>(y) >> 31u) == 1u); } return atan2(y, x); }
@@ -2857,7 +2857,7 @@ if ((abs(${p[0]}) > 0.000001)) {
 }`,
   },
   "mandelbrot": {
-    params: [{ name: "iter", def: 100 }, { name: "xmin", def: -1.6 }, { name: "xmax", def: 1.6 }, { name: "ymin", def: -1.2 }, { name: "ymax", def: 1.2 }, { name: "invert", def: 0 }, { name: "skin", def: 0.012 }, { name: "cx", def: 0 }, { name: "cy", def: 0 }, { name: "max_points", def: -1 }, { name: "seed", def: 1234 }, { name: "rnd_z_range", def: 0 }],
+    params: [{ name: "iter", def: 100, int: true }, { name: "xmin", def: -1.6 }, { name: "xmax", def: 1.6 }, { name: "ymin", def: -1.2 }, { name: "ymax", def: 1.2 }, { name: "invert", def: 0, int: true }, { name: "skin", def: 0.012 }, { name: "cx", def: 0 }, { name: "cy", def: 0 }, { name: "max_points", def: -1, int: true }, { name: "seed", def: 1234, int: true }, { name: "rnd_z_range", def: 0 }],
     verified: true, priority: 0, flags: ["3d","state","z"], types: ["3D","SIMULATION","BASE_SHAPE","ESCAPE_TIME_FRACTAL"],
     funcNames: ["jwx_mandelbrot_x0","jwx_mandelbrot_y0","jwx_mandelbrot_z0","atan2j"],
     funcs: `fn atan2j(y: f32, x: f32) -> f32 { if (x == 0.0 && y == 0.0) { return select(0.0, PI, (bitcast<u32>(x) >> 31u) == 1u) * select(1.0, -1.0, (bitcast<u32>(y) >> 31u) == 1u); } return atan2(y, x); }
@@ -2959,7 +2959,7 @@ v.y += (${w} * ((d4 + (${p[2]} * sin(d1))) + d2));
 }`,
   },
   "truchet": {
-    params: [{ name: "extended", def: 0 }, { name: "exponent", def: 2 }, { name: "arc_width", def: 0.5 }, { name: "rotation", def: 0 }, { name: "size", def: 1 }, { name: "seed", def: 50 }, { name: "direct_color", def: 0 }],
+    params: [{ name: "extended", def: 0, int: true }, { name: "exponent", def: 2 }, { name: "arc_width", def: 0.5 }, { name: "rotation", def: 0 }, { name: "size", def: 1 }, { name: "seed", def: 50 }, { name: "direct_color", def: 0, int: true }],
     verified: true, priority: 0, flags: ["dc"], types: ["DC","SIMULATION"],
     funcNames: ["roundc","powc","atan2j"],
     funcs: `fn roundc(x: f32) -> f32 { return sign(x) * floor(abs(x) + 0.5); }
@@ -3186,7 +3186,7 @@ if ((t.y > 0)) {
 }`,
   },
   "waves3_wf": {
-    params: [{ name: "scalex", def: 0.25 }, { name: "scaley", def: 0.5 }, { name: "freqx", def: 1.5707963267948966 }, { name: "freqy", def: 0.7853981633974483 }, { name: "use_cos_x", def: 1 }, { name: "use_cos_y", def: 0 }, { name: "dampx", def: 0 }, { name: "dampy", def: 0 }],
+    params: [{ name: "scalex", def: 0.25 }, { name: "scaley", def: 0.5 }, { name: "freqx", def: 1.5707963267948966 }, { name: "freqy", def: 0.7853981633974483 }, { name: "use_cos_x", def: 1, int: true }, { name: "use_cos_y", def: 0, int: true }, { name: "dampx", def: 0 }, { name: "dampy", def: 0 }],
     verified: true, priority: 0, flags: [], types: ["2D"],
     funcNames: ["atan2j"],
     funcs: `fn atan2j(y: f32, x: f32) -> f32 { if (x == 0.0 && y == 0.0) { return select(0.0, PI, (bitcast<u32>(x) >> 31u) == 1u) * select(1.0, -1.0, (bitcast<u32>(y) >> 31u) == 1u); } return atan2(y, x); }`,
@@ -3208,7 +3208,7 @@ if (use_cos_y) {
 }`,
   },
   "waves4_wf": {
-    params: [{ name: "scalex", def: 0.25 }, { name: "scaley", def: 0.5 }, { name: "freqx", def: 1.5707963267948966 }, { name: "freqy", def: 0.7853981633974483 }, { name: "use_cos_x", def: 1 }, { name: "use_cos_y", def: 0 }, { name: "dampx", def: 0 }, { name: "dampy", def: 0 }],
+    params: [{ name: "scalex", def: 0.25 }, { name: "scaley", def: 0.5 }, { name: "freqx", def: 1.5707963267948966 }, { name: "freqy", def: 0.7853981633974483 }, { name: "use_cos_x", def: 1, int: true }, { name: "use_cos_y", def: 0, int: true }, { name: "dampx", def: 0 }, { name: "dampy", def: 0 }],
     verified: true, priority: 0, flags: [], types: ["2D"],
     funcNames: ["atan2j"],
     funcs: `fn atan2j(y: f32, x: f32) -> f32 { if (x == 0.0 && y == 0.0) { return select(0.0, PI, (bitcast<u32>(x) >> 31u) == 1u) * select(1.0, -1.0, (bitcast<u32>(y) >> 31u) == 1u); } return atan2(y, x); }`,
@@ -3429,7 +3429,7 @@ if ((abs(t.y) <= ${w})) {
 }`,
   },
   "spherical3D_wf": {
-    params: [{ name: "invert", def: 0 }, { name: "exponent", def: 2 }],
+    params: [{ name: "invert", def: 0, int: true }, { name: "exponent", def: 2 }],
     verified: true, priority: 0, flags: ["3d","z"], types: ["3D"],
     funcNames: ["powc","atan2j"],
     funcs: `fn powc(x: f32, y: f32) -> f32 {
@@ -3480,7 +3480,7 @@ pz_ = ((${w} * pz_) + ${p[0]});
 }`,
   },
   "nBlur": {
-    params: [{ name: "numEdges", def: 3 }, { name: "numStripes", def: 0 }, { name: "ratioStripes", def: 1 }, { name: "ratioHole", def: 0 }, { name: "circumCircle", def: 0 }, { name: "adjustToLinear", def: 1 }, { name: "equalBlur", def: 1 }, { name: "exactCalc", def: 0 }, { name: "highlightEdges", def: 1 }],
+    params: [{ name: "numEdges", def: 3, int: true }, { name: "numStripes", def: 0, int: true }, { name: "ratioStripes", def: 1 }, { name: "ratioHole", def: 0 }, { name: "circumCircle", def: 0, int: true }, { name: "adjustToLinear", def: 1, int: true }, { name: "equalBlur", def: 1, int: true }, { name: "exactCalc", def: 0, int: true }, { name: "highlightEdges", def: 1 }],
     verified: true, priority: 0, flags: ["state","z"], types: ["2D","BASE_SHAPE"],
     funcNames: ["jwx_nBlur_exactCalc_c","jwx_nBlur_numEdges_c","jwx_nBlur_ratioStripes_c","jwx_nBlur_equalBlur_c","jwx_nBlur_circumCircle_c","jwx_nBlur_ratioHole_c","jwx_nBlur_inited_","jwx_nBlur__speedCalc1","jwx_nBlur__speedCalc2","jwx_nBlur__nb_ratioComplement","jwx_nBlur__midAngle","jwx_nBlur__angStripes","jwx_nBlur__angStart","jwx_nBlur__tan90_m_2","jwx_nBlur__hasStripes","jwx_nBlur__negStripes","jwx_nBlur__maxStripes","jwx_nBlur__arc_tan1","jwx_nBlur__arc_tan2","jwx_nBlur__sina","jwx_nBlur__cosa","nBlur_RandXYData","powc","atan2j","nBlur_rand","nBlur_randXY"],
     funcs: `struct nBlur_RandXYData {
@@ -3927,7 +3927,7 @@ pz_ += ((select(1.0, -1.0, (z_ < 0.0)) * powc(abs(z_), ${p[2]})) * ${w});
 }`,
   },
   "npolar": {
-    params: [{ name: "parity", def: 0 }, { name: "n", def: 1 }],
+    params: [{ name: "parity", def: 0, int: true }, { name: "n", def: 1, int: true }],
     verified: true, priority: 0, flags: [], types: ["2D"],
     funcNames: ["roundc","atan2j","powc"],
     funcs: `fn roundc(x: f32) -> f32 { return sign(x) * floor(abs(x) + 0.5); }
@@ -3979,7 +3979,7 @@ v.y += (${w} * ((y1 + (${p[4]} * t_)) + (${p[6]} * y0)));
 }`,
   },
   "waffle": {
-    params: [{ name: "slices", def: 6 }, { name: "xthickness", def: 0.5 }, { name: "ythickness", def: 0.5 }, { name: "rotation", def: 0 }],
+    params: [{ name: "slices", def: 6, int: true }, { name: "xthickness", def: 0.5 }, { name: "ythickness", def: 0.5 }, { name: "rotation", def: 0 }],
     verified: true, priority: 0, flags: [], types: [],
     funcNames: ["atan2j"],
     funcs: `fn atan2j(y: f32, x: f32) -> f32 { if (x == 0.0 && y == 0.0) { return select(0.0, PI, (bitcast<u32>(x) >> 31u) == 1u) * select(1.0, -1.0, (bitcast<u32>(y) >> 31u) == 1u); } return atan2(y, x); }`,
@@ -4094,7 +4094,7 @@ pz_ += ((${p[2]} * r_) * cv);
 }`,
   },
   "falloff2": {
-    params: [{ name: "scatter", def: 1 }, { name: "mindist", def: 0.5 }, { name: "mul_x", def: 1 }, { name: "mul_y", def: 1 }, { name: "mul_z", def: 0 }, { name: "mul_c", def: 0 }, { name: "x0", def: 0 }, { name: "y0", def: 0 }, { name: "z0", def: 0 }, { name: "invert", def: 0 }, { name: "type", def: 0 }],
+    params: [{ name: "scatter", def: 1 }, { name: "mindist", def: 0.5 }, { name: "mul_x", def: 1 }, { name: "mul_y", def: 1 }, { name: "mul_z", def: 0 }, { name: "mul_c", def: 0 }, { name: "x0", def: 0 }, { name: "y0", def: 0 }, { name: "z0", def: 0 }, { name: "invert", def: 0, int: true }, { name: "type", def: 0, int: true }],
     verified: true, priority: 0, flags: ["3d","dc","z"], types: ["3D","BLUR"],
     funcNames: ["roundc","atan2j","sqrf","fracf"],
     funcs: `fn roundc(x: f32) -> f32 { return sign(x) * floor(abs(x) + 0.5); }
@@ -4190,7 +4190,7 @@ switch i32(roundc(min(max(${p[10]}, 0.0), 2.0))) {
 }`,
   },
   "post_falloff2": {
-    params: [{ name: "scatter", def: 1 }, { name: "mindist", def: 0.5 }, { name: "mul_x", def: 1 }, { name: "mul_y", def: 1 }, { name: "mul_z", def: 0 }, { name: "mul_c", def: 0 }, { name: "x0", def: 0 }, { name: "y0", def: 0 }, { name: "z0", def: 0 }, { name: "invert", def: 0 }, { name: "type", def: 0 }],
+    params: [{ name: "scatter", def: 1 }, { name: "mindist", def: 0.5 }, { name: "mul_x", def: 1 }, { name: "mul_y", def: 1 }, { name: "mul_z", def: 0 }, { name: "mul_c", def: 0 }, { name: "x0", def: 0 }, { name: "y0", def: 0 }, { name: "z0", def: 0 }, { name: "invert", def: 0, int: true }, { name: "type", def: 0, int: true }],
     verified: true, priority: 1, flags: ["3d","dc","z"], types: ["3D","POST","BLUR"],
     funcNames: ["roundc","atan2j","sqrf","fracf"],
     funcs: `fn roundc(x: f32) -> f32 { return sign(x) * floor(abs(x) + 0.5); }
@@ -4403,7 +4403,7 @@ v.y += ((${w} * a) * s);
 }`,
   },
   "collideoscope": {
-    params: [{ name: "a", def: 0.2 }, { name: "num", def: 1 }],
+    params: [{ name: "a", def: 0.2 }, { name: "num", def: 1, int: true }],
     verified: true, priority: 0, flags: [], types: ["2D"],
     funcNames: ["atan2j"],
     funcs: `fn atan2j(y: f32, x: f32) -> f32 { if (x == 0.0 && y == 0.0) { return select(0.0, PI, (bitcast<u32>(x) >> 31u) == 1u) * select(1.0, -1.0, (bitcast<u32>(y) >> 31u) == 1u); } return atan2(y, x); }`,
@@ -4439,7 +4439,7 @@ v.y += (r_ * s);
 }`,
   },
   "hypertile": {
-    params: [{ name: "p", def: 3 }, { name: "q", def: 7 }, { name: "n", def: 1 }],
+    params: [{ name: "p", def: 3, int: true }, { name: "q", def: 7, int: true }, { name: "n", def: 1, int: true }],
     verified: true, priority: 0, flags: [], types: ["2D"],
     funcNames: ["atan2j"],
     funcs: `fn atan2j(y: f32, x: f32) -> f32 { if (x == 0.0 && y == 0.0) { return select(0.0, PI, (bitcast<u32>(x) >> 31u) == 1u) * select(1.0, -1.0, (bitcast<u32>(y) >> 31u) == 1u); } return atan2(y, x); }`,
@@ -4468,7 +4468,7 @@ v.y += (vr * ((b * c) - (a * d)));
 }`,
   },
   "hypertile1": {
-    params: [{ name: "p", def: 3 }, { name: "q", def: 7 }],
+    params: [{ name: "p", def: 3, int: true }, { name: "q", def: 7, int: true }],
     verified: true, priority: 0, flags: [], types: ["2D"],
     funcNames: ["roundc","atan2j"],
     funcs: `fn roundc(x: f32) -> f32 { return sign(x) * floor(abs(x) + 0.5); }
@@ -4501,7 +4501,7 @@ v.y += (vr * ((b * c) - (a * d)));
 }`,
   },
   "hypertile2": {
-    params: [{ name: "p", def: 3 }, { name: "q", def: 7 }],
+    params: [{ name: "p", def: 3, int: true }, { name: "q", def: 7, int: true }],
     verified: true, priority: 0, flags: [], types: ["2D"],
     funcNames: ["roundc","atan2j"],
     funcs: `fn roundc(x: f32) -> f32 { return sign(x) * floor(abs(x) + 0.5); }
@@ -4533,7 +4533,7 @@ v.y += (vr * ((y * cosa) - (x * sina)));
 }`,
   },
   "dc_perlin": {
-    params: [{ name: "shape", def: 0 }, { name: "map", def: 0 }, { name: "select_centre", def: 0 }, { name: "select_range", def: 1 }, { name: "centre", def: 0.25 }, { name: "range", def: 0.25 }, { name: "edge", def: 0 }, { name: "scale", def: 1 }, { name: "octaves", def: 2 }, { name: "amps", def: 2 }, { name: "freqs", def: 2 }, { name: "z", def: 0 }, { name: "select_bailout", def: 10 }, { name: "color_only", def: 0 }],
+    params: [{ name: "shape", def: 0, int: true }, { name: "map", def: 0, int: true }, { name: "select_centre", def: 0 }, { name: "select_range", def: 1 }, { name: "centre", def: 0.25 }, { name: "range", def: 0.25 }, { name: "edge", def: 0 }, { name: "scale", def: 1 }, { name: "octaves", def: 2, int: true }, { name: "amps", def: 2 }, { name: "freqs", def: 2 }, { name: "z", def: 0 }, { name: "select_bailout", def: 10, int: true }, { name: "color_only", def: 0, int: true }],
     verified: true, priority: 0, flags: ["dc"], types: ["SIMULATION","DC","BASE_SHAPE"],
     funcNames: ["jpostinc","atan2j","dc_perlin_p","dc_perlin_grad3","dc_perlin_simplexNoise3D","dc_perlin_perlinNoise3D"],
     funcs: `fn jpostinc(t: ptr<function, i32>) -> i32 { let v = *t; *t = v + 1; return v; }
@@ -5574,7 +5574,7 @@ if ((ph > PI)) {
 }`,
   },
   "bCollide": {
-    params: [{ name: "num", def: 1 }, { name: "a", def: 0 }],
+    params: [{ name: "num", def: 1, int: true }, { name: "a", def: 0 }],
     verified: true, priority: 0, flags: [], types: ["2D"],
     funcNames: ["roundc","atan2j","sqrf"],
     funcs: `fn roundc(x: f32) -> f32 { return sign(x) * floor(abs(x) + 0.5); }
@@ -5684,7 +5684,7 @@ if ((temp != 0)) {
 }`,
   },
   "bTransform": {
-    params: [{ name: "rotate", def: 0 }, { name: "power", def: 1 }, { name: "move", def: 0 }, { name: "split", def: 0 }],
+    params: [{ name: "rotate", def: 0 }, { name: "power", def: 1, int: true }, { name: "move", def: 0 }, { name: "split", def: 0 }],
     verified: true, priority: 0, flags: [], types: ["2D"],
     funcNames: ["atan2j","sqrf"],
     funcs: `fn atan2j(y: f32, x: f32) -> f32 { if (x == 0.0 && y == 0.0) { return select(0.0, PI, (bitcast<u32>(x) >> 31u) == 1u) * select(1.0, -1.0, (bitcast<u32>(y) >> 31u) == 1u); } return atan2(y, x); }
@@ -5762,7 +5762,7 @@ pz_ += (${w} * cos(t.x));
 }`,
   },
   "eCollide": {
-    params: [{ name: "num", def: 1 }, { name: "a", def: 0 }],
+    params: [{ name: "num", def: 1, int: true }, { name: "a", def: 0 }],
     verified: true, priority: 0, flags: [], types: ["2D"],
     funcNames: ["roundc","atan2j","sqrtf_safe"],
     funcs: `fn roundc(x: f32) -> f32 { return sign(x) * floor(abs(x) + 0.5); }
@@ -5818,7 +5818,7 @@ v.y += (((${w} * sqrt((xmax - 1.0))) * sqrt((xmax + 1.0))) * sinnu);
 }`,
   },
   "eJulia": {
-    params: [{ name: "power", def: 2 }],
+    params: [{ name: "power", def: 2, int: true }],
     verified: true, priority: 0, flags: [], types: ["2D"],
     funcNames: ["atan2j","sqrtf_safe"],
     funcs: `fn atan2j(y: f32, x: f32) -> f32 { if (x == 0.0 && y == 0.0) { return select(0.0, PI, (bitcast<u32>(x) >> 31u) == 1u) * select(1.0, -1.0, (bitcast<u32>(y) >> 31u) == 1u); } return atan2(y, x); }
@@ -6154,7 +6154,7 @@ if (false) {
 }`,
   },
   "dc_ztransl": {
-    params: [{ name: "x0", def: 0 }, { name: "x1", def: 1 }, { name: "factor", def: 1 }, { name: "overwrite", def: 1 }, { name: "clamp", def: 0 }],
+    params: [{ name: "x0", def: 0 }, { name: "x1", def: 1 }, { name: "factor", def: 1 }, { name: "overwrite", def: 1, int: true }, { name: "clamp", def: 0, int: true }],
     verified: true, priority: 0, flags: ["3d","dc","z"], types: ["ZTRANSFORM","3D"],
     funcNames: ["roundc","atan2j"],
     funcs: `fn roundc(x: f32) -> f32 { return sign(x) * floor(abs(x) + 0.5); }
@@ -6178,7 +6178,7 @@ if ((i32(roundc(min(max(${p[3]}, 0.0), 1.0))) == 0)) {
 }`,
   },
   "pre_dcztransl": {
-    params: [{ name: "x0", def: 0 }, { name: "x1", def: 1 }, { name: "factor", def: 1 }, { name: "overwrite", def: 1 }, { name: "clamp", def: 0 }],
+    params: [{ name: "x0", def: 0 }, { name: "x1", def: 1 }, { name: "factor", def: 1 }, { name: "overwrite", def: 1, int: true }, { name: "clamp", def: 0, int: true }],
     verified: true, priority: -1, flags: ["3d","dc","z"], types: ["3D","PRE"],
     funcNames: ["roundc","atan2j"],
     funcs: `fn roundc(x: f32) -> f32 { return sign(x) * floor(abs(x) + 0.5); }
@@ -6222,7 +6222,7 @@ v.y += (${w} * atan2j(t.y, t.x));
 }`,
   },
   "ripple": {
-    params: [{ name: "frequency", def: 2 }, { name: "velocity", def: 1 }, { name: "amplitude", def: 0.5 }, { name: "centerx", def: 0 }, { name: "centery", def: 0 }, { name: "phase", def: 0 }, { name: "scale", def: 1 }, { name: "fixed_dist_calc", def: 0 }],
+    params: [{ name: "frequency", def: 2 }, { name: "velocity", def: 1 }, { name: "amplitude", def: 0.5 }, { name: "centerx", def: 0 }, { name: "centery", def: 0 }, { name: "phase", def: 0 }, { name: "scale", def: 1 }, { name: "fixed_dist_calc", def: 0, int: true }],
     verified: true, priority: 0, flags: [], types: ["2D"],
     funcNames: ["roundc","atan2j","lerpf"],
     funcs: `fn roundc(x: f32) -> f32 { return sign(x) * floor(abs(x) + 0.5); }
@@ -6270,7 +6270,7 @@ v.y = ((${w} * lerpf(v1, v2, _p)) * _is);
 }`,
   },
   "julian2": {
-    params: [{ name: "power", def: 3 }, { name: "dist", def: 1 }, { name: "a", def: 1 }, { name: "b", def: 0 }, { name: "c", def: 0 }, { name: "d", def: 1 }, { name: "e", def: 0 }, { name: "f", def: 0 }],
+    params: [{ name: "power", def: 3, int: true }, { name: "dist", def: 1 }, { name: "a", def: 1 }, { name: "b", def: 0 }, { name: "c", def: 0 }, { name: "d", def: 1 }, { name: "e", def: 0 }, { name: "f", def: 0 }],
     verified: true, priority: 0, flags: [], types: ["2D"],
     funcNames: ["roundc","atan2j","powc"],
     funcs: `fn roundc(x: f32) -> f32 { return sign(x) * floor(abs(x) + 0.5); }
@@ -6487,7 +6487,7 @@ pz_ = (r_ * (pz_ + (_cz * r2_)));
 }`,
   },
   "fract_dragon_wf": {
-    params: [{ name: "max_iter", def: 100 }, { name: "xmin", def: -0.25 }, { name: "xmax", def: 1.2 }, { name: "ymin", def: -0.75 }, { name: "ymax", def: 0.75 }, { name: "buddhabrot_mode", def: 0 }, { name: "xseed", def: 1.4 }, { name: "yseed", def: 0.85 }, { name: "direct_color", def: 1 }, { name: "scalez", def: 1 }, { name: "clip_iter_min", def: 4 }, { name: "clip_iter_max", def: -5 }, { name: "max_clip_iter", def: 3 }, { name: "buddhabrot_min_iter", def: 7 }, { name: "scale", def: 5 }, { name: "offsetx", def: -0.5 }, { name: "offsety", def: 0 }, { name: "offsetz", def: 0 }, { name: "z_fill", def: 0 }, { name: "z_logscale", def: 0 }, { name: "color_only", def: 0 }],
+    params: [{ name: "max_iter", def: 100, int: true }, { name: "xmin", def: -0.25 }, { name: "xmax", def: 1.2 }, { name: "ymin", def: -0.75 }, { name: "ymax", def: 0.75 }, { name: "buddhabrot_mode", def: 0, int: true }, { name: "xseed", def: 1.4 }, { name: "yseed", def: 0.85 }, { name: "direct_color", def: 1, int: true }, { name: "scalez", def: 1 }, { name: "clip_iter_min", def: 4, int: true }, { name: "clip_iter_max", def: -5, int: true }, { name: "max_clip_iter", def: 3, int: true }, { name: "buddhabrot_min_iter", def: 7, int: true }, { name: "scale", def: 5 }, { name: "offsetx", def: -0.5 }, { name: "offsety", def: 0 }, { name: "offsetz", def: 0 }, { name: "z_fill", def: 0 }, { name: "z_logscale", def: 0, int: true }, { name: "color_only", def: 0, int: true }],
     verified: true, priority: 0, flags: ["dc","hide","state","z"], types: ["SIMULATION","DC","BASE_SHAPE","ESCAPE_TIME_FRACTAL"],
     funcNames: ["jwx_fract_dragon_wf_chooseNewPoint","jwx_fract_dragon_wf_xs","jwx_fract_dragon_wf_ys","jwx_fract_dragon_wf_currIter","jwx_fract_dragon_wf_maxIter","jwx_fract_dragon_wf_startX","jwx_fract_dragon_wf_startY","jwx_fract_dragon_wf_currX","jwx_fract_dragon_wf_currY","jwx_fract_dragon_wf_xseed_c","jwx_fract_dragon_wf_yseed_c","jwx_fract_dragon_wf_buddhabrot_min_iter_c","roundc","atan2j","fract_dragon_wf_init","fract_dragon_wf_setCurrPoint","fract_dragon_wf_nextIteration","fract_dragon_wf_preBuddhaIterate","fract_dragon_wf_iterate"],
     funcs: `fn roundc(x: f32) -> f32 { return sign(x) * floor(abs(x) + 0.5); }
@@ -6671,7 +6671,7 @@ if ((${p[5]} > 0)) {
 }`,
   },
   "fract_mandelbrot_wf": {
-    params: [{ name: "max_iter", def: 100 }, { name: "xmin", def: -2.35 }, { name: "xmax", def: 0.75 }, { name: "ymin", def: -1.2 }, { name: "ymax", def: 1.2 }, { name: "buddhabrot_mode", def: 0 }, { name: "power", def: 2 }, { name: "direct_color", def: 1 }, { name: "scalez", def: 1 }, { name: "clip_iter_min", def: 3 }, { name: "clip_iter_max", def: -5 }, { name: "max_clip_iter", def: 3 }, { name: "buddhabrot_min_iter", def: 7 }, { name: "scale", def: 4 }, { name: "offsetx", def: 0.55 }, { name: "offsety", def: 0 }, { name: "offsetz", def: 0 }, { name: "z_fill", def: 0 }, { name: "z_logscale", def: 0 }, { name: "color_only", def: 0 }],
+    params: [{ name: "max_iter", def: 100, int: true }, { name: "xmin", def: -2.35 }, { name: "xmax", def: 0.75 }, { name: "ymin", def: -1.2 }, { name: "ymax", def: 1.2 }, { name: "buddhabrot_mode", def: 0, int: true }, { name: "power", def: 2, int: true }, { name: "direct_color", def: 1, int: true }, { name: "scalez", def: 1 }, { name: "clip_iter_min", def: 3, int: true }, { name: "clip_iter_max", def: -5, int: true }, { name: "max_clip_iter", def: 3, int: true }, { name: "buddhabrot_min_iter", def: 7, int: true }, { name: "scale", def: 4 }, { name: "offsetx", def: 0.55 }, { name: "offsety", def: 0 }, { name: "offsetz", def: 0 }, { name: "z_fill", def: 0 }, { name: "z_logscale", def: 0, int: true }, { name: "color_only", def: 0, int: true }],
     verified: true, priority: 0, flags: ["dc","hide","state","z"], types: ["SIMULATION","DC","BASE_SHAPE","ESCAPE_TIME_FRACTAL"],
     funcNames: ["jwx_fract_mandelbrot_wf_chooseNewPoint","jwx_fract_mandelbrot_wf_xs","jwx_fract_mandelbrot_wf_ys","jwx_fract_mandelbrot_wf_currIter","jwx_fract_mandelbrot_wf_maxIter","jwx_fract_mandelbrot_wf_startX","jwx_fract_mandelbrot_wf_startY","jwx_fract_mandelbrot_wf_currX","jwx_fract_mandelbrot_wf_currY","jwx_fract_mandelbrot_wf_power_c","jwx_fract_mandelbrot_wf_buddhabrot_min_iter_c","roundc","atan2j","fract_mandelbrot_wf_init","fract_mandelbrot_wf_setCurrPoint","fract_mandelbrot_wf_nextIteration","fract_mandelbrot_wf_preBuddhaIterate","fract_mandelbrot_wf_iterate"],
     funcs: `fn roundc(x: f32) -> f32 { return sign(x) * floor(abs(x) + 0.5); }
@@ -6900,7 +6900,7 @@ if ((${p[5]} > 0)) {
 }`,
   },
   "fract_meteors_wf": {
-    params: [{ name: "max_iter", def: 100 }, { name: "xmin", def: -1.7 }, { name: "xmax", def: 1.7 }, { name: "ymin", def: -1.1 }, { name: "ymax", def: 1.1 }, { name: "buddhabrot_mode", def: 0 }, { name: "direct_color", def: 1 }, { name: "scalez", def: 1 }, { name: "clip_iter_min", def: 3 }, { name: "clip_iter_max", def: -5 }, { name: "max_clip_iter", def: 3 }, { name: "buddhabrot_min_iter", def: 7 }, { name: "scale", def: 5.7 }, { name: "offsetx", def: 0 }, { name: "offsety", def: 0 }, { name: "offsetz", def: 0 }, { name: "z_fill", def: 0 }, { name: "z_logscale", def: 0 }, { name: "color_only", def: 0 }],
+    params: [{ name: "max_iter", def: 100, int: true }, { name: "xmin", def: -1.7 }, { name: "xmax", def: 1.7 }, { name: "ymin", def: -1.1 }, { name: "ymax", def: 1.1 }, { name: "buddhabrot_mode", def: 0, int: true }, { name: "direct_color", def: 1, int: true }, { name: "scalez", def: 1 }, { name: "clip_iter_min", def: 3, int: true }, { name: "clip_iter_max", def: -5, int: true }, { name: "max_clip_iter", def: 3, int: true }, { name: "buddhabrot_min_iter", def: 7, int: true }, { name: "scale", def: 5.7 }, { name: "offsetx", def: 0 }, { name: "offsety", def: 0 }, { name: "offsetz", def: 0 }, { name: "z_fill", def: 0 }, { name: "z_logscale", def: 0, int: true }, { name: "color_only", def: 0, int: true }],
     verified: true, priority: 0, flags: ["dc","hide","state","z"], types: ["SIMULATION","DC","BASE_SHAPE","ESCAPE_TIME_FRACTAL"],
     funcNames: ["jwx_fract_meteors_wf_chooseNewPoint","jwx_fract_meteors_wf_xs","jwx_fract_meteors_wf_ys","jwx_fract_meteors_wf_currIter","jwx_fract_meteors_wf_maxIter","jwx_fract_meteors_wf_startX","jwx_fract_meteors_wf_startY","jwx_fract_meteors_wf_currX","jwx_fract_meteors_wf_currY","jwx_fract_meteors_wf_buddhabrot_min_iter_c","roundc","atan2j","fract_meteors_wf_init","fract_meteors_wf_setCurrPoint","fract_meteors_wf_nextIteration","fract_meteors_wf_preBuddhaIterate","fract_meteors_wf_iterate"],
     funcs: `fn roundc(x: f32) -> f32 { return sign(x) * floor(abs(x) + 0.5); }
@@ -7078,7 +7078,7 @@ if ((${p[5]} > 0)) {
 }`,
   },
   "fract_julia_wf": {
-    params: [{ name: "max_iter", def: 100 }, { name: "xmin", def: -1 }, { name: "xmax", def: 1 }, { name: "ymin", def: -1.2 }, { name: "ymax", def: 1.2 }, { name: "buddhabrot_mode", def: 0 }, { name: "power", def: 2 }, { name: "xseed", def: 0.35 }, { name: "yseed", def: 0.09 }, { name: "direct_color", def: 1 }, { name: "scalez", def: 1 }, { name: "clip_iter_min", def: 4 }, { name: "clip_iter_max", def: -5 }, { name: "max_clip_iter", def: 3 }, { name: "buddhabrot_min_iter", def: 7 }, { name: "scale", def: 3.8 }, { name: "offsetx", def: 0 }, { name: "offsety", def: 0 }, { name: "offsetz", def: 0 }, { name: "z_fill", def: 0 }, { name: "z_logscale", def: 0 }, { name: "color_only", def: 0 }],
+    params: [{ name: "max_iter", def: 100, int: true }, { name: "xmin", def: -1 }, { name: "xmax", def: 1 }, { name: "ymin", def: -1.2 }, { name: "ymax", def: 1.2 }, { name: "buddhabrot_mode", def: 0, int: true }, { name: "power", def: 2, int: true }, { name: "xseed", def: 0.35 }, { name: "yseed", def: 0.09 }, { name: "direct_color", def: 1, int: true }, { name: "scalez", def: 1 }, { name: "clip_iter_min", def: 4, int: true }, { name: "clip_iter_max", def: -5, int: true }, { name: "max_clip_iter", def: 3, int: true }, { name: "buddhabrot_min_iter", def: 7, int: true }, { name: "scale", def: 3.8 }, { name: "offsetx", def: 0 }, { name: "offsety", def: 0 }, { name: "offsetz", def: 0 }, { name: "z_fill", def: 0 }, { name: "z_logscale", def: 0, int: true }, { name: "color_only", def: 0, int: true }],
     verified: true, priority: 0, flags: ["dc","hide","state","z"], types: ["SIMULATION","DC","BASE_SHAPE","ESCAPE_TIME_FRACTAL"],
     funcNames: ["jwx_fract_julia_wf_chooseNewPoint","jwx_fract_julia_wf_xs","jwx_fract_julia_wf_ys","jwx_fract_julia_wf_currIter","jwx_fract_julia_wf_maxIter","jwx_fract_julia_wf_startX","jwx_fract_julia_wf_startY","jwx_fract_julia_wf_currX","jwx_fract_julia_wf_currY","jwx_fract_julia_wf_power_c","jwx_fract_julia_wf_yseed_c","jwx_fract_julia_wf_xseed_c","jwx_fract_julia_wf_buddhabrot_min_iter_c","roundc","atan2j","fract_julia_wf_init","fract_julia_wf_setCurrPoint","fract_julia_wf_nextIteration","fract_julia_wf_preBuddhaIterate","fract_julia_wf_iterate"],
     funcs: `fn roundc(x: f32) -> f32 { return sign(x) * floor(abs(x) + 0.5); }
@@ -7313,7 +7313,7 @@ if ((${p[5]} > 0)) {
 }`,
   },
   "fract_pearls_wf": {
-    params: [{ name: "max_iter", def: 100 }, { name: "xmin", def: -2 }, { name: "xmax", def: 2 }, { name: "ymin", def: -2 }, { name: "ymax", def: 2 }, { name: "buddhabrot_mode", def: 0 }, { name: "xseed", def: 0 }, { name: "yseed", def: -0.31 }, { name: "direct_color", def: 1 }, { name: "scalez", def: 1 }, { name: "clip_iter_min", def: 1 }, { name: "clip_iter_max", def: -5 }, { name: "max_clip_iter", def: 3 }, { name: "buddhabrot_min_iter", def: 7 }, { name: "scale", def: 2.45 }, { name: "offsetx", def: 0 }, { name: "offsety", def: 0 }, { name: "offsetz", def: 0 }, { name: "z_fill", def: 0 }, { name: "z_logscale", def: 0 }, { name: "color_only", def: 0 }],
+    params: [{ name: "max_iter", def: 100, int: true }, { name: "xmin", def: -2 }, { name: "xmax", def: 2 }, { name: "ymin", def: -2 }, { name: "ymax", def: 2 }, { name: "buddhabrot_mode", def: 0, int: true }, { name: "xseed", def: 0 }, { name: "yseed", def: -0.31 }, { name: "direct_color", def: 1, int: true }, { name: "scalez", def: 1 }, { name: "clip_iter_min", def: 1, int: true }, { name: "clip_iter_max", def: -5, int: true }, { name: "max_clip_iter", def: 3, int: true }, { name: "buddhabrot_min_iter", def: 7, int: true }, { name: "scale", def: 2.45 }, { name: "offsetx", def: 0 }, { name: "offsety", def: 0 }, { name: "offsetz", def: 0 }, { name: "z_fill", def: 0 }, { name: "z_logscale", def: 0, int: true }, { name: "color_only", def: 0, int: true }],
     verified: true, priority: 0, flags: ["dc","hide","state","z"], types: ["SIMULATION","DC","BASE_SHAPE","ESCAPE_TIME_FRACTAL"],
     funcNames: ["jwx_fract_pearls_wf_chooseNewPoint","jwx_fract_pearls_wf_xs","jwx_fract_pearls_wf_ys","jwx_fract_pearls_wf_currIter","jwx_fract_pearls_wf_maxIter","jwx_fract_pearls_wf_startX","jwx_fract_pearls_wf_startY","jwx_fract_pearls_wf_currX","jwx_fract_pearls_wf_currY","jwx_fract_pearls_wf_xseed_c","jwx_fract_pearls_wf_yseed_c","jwx_fract_pearls_wf_buddhabrot_min_iter_c","roundc","atan2j","fract_pearls_wf_init","fract_pearls_wf_setCurrPoint","fract_pearls_wf_nextIteration","fract_pearls_wf_preBuddhaIterate","fract_pearls_wf_iterate"],
     funcs: `fn roundc(x: f32) -> f32 { return sign(x) * floor(abs(x) + 0.5); }
@@ -7497,7 +7497,7 @@ if ((${p[5]} > 0)) {
 }`,
   },
   "fract_salamander_wf": {
-    params: [{ name: "max_iter", def: 100 }, { name: "xmin", def: -2 }, { name: "xmax", def: 2 }, { name: "ymin", def: -2 }, { name: "ymax", def: 2 }, { name: "buddhabrot_mode", def: 0 }, { name: "xseed", def: 0.8 }, { name: "yseed", def: -0.15 }, { name: "direct_color", def: 1 }, { name: "scalez", def: 1 }, { name: "clip_iter_min", def: 1 }, { name: "clip_iter_max", def: -5 }, { name: "max_clip_iter", def: 3 }, { name: "buddhabrot_min_iter", def: 7 }, { name: "scale", def: 2.45 }, { name: "offsetx", def: 0 }, { name: "offsety", def: 0 }, { name: "offsetz", def: 0 }, { name: "z_fill", def: 0 }, { name: "z_logscale", def: 0 }, { name: "color_only", def: 0 }],
+    params: [{ name: "max_iter", def: 100, int: true }, { name: "xmin", def: -2 }, { name: "xmax", def: 2 }, { name: "ymin", def: -2 }, { name: "ymax", def: 2 }, { name: "buddhabrot_mode", def: 0, int: true }, { name: "xseed", def: 0.8 }, { name: "yseed", def: -0.15 }, { name: "direct_color", def: 1, int: true }, { name: "scalez", def: 1 }, { name: "clip_iter_min", def: 1, int: true }, { name: "clip_iter_max", def: -5, int: true }, { name: "max_clip_iter", def: 3, int: true }, { name: "buddhabrot_min_iter", def: 7, int: true }, { name: "scale", def: 2.45 }, { name: "offsetx", def: 0 }, { name: "offsety", def: 0 }, { name: "offsetz", def: 0 }, { name: "z_fill", def: 0 }, { name: "z_logscale", def: 0, int: true }, { name: "color_only", def: 0, int: true }],
     verified: true, priority: 0, flags: ["3d","dc","hide","state","z"], types: ["3D","SIMULATION","DC","BASE_SHAPE","ESCAPE_TIME_FRACTAL"],
     funcNames: ["jwx_fract_salamander_wf_chooseNewPoint","jwx_fract_salamander_wf_xs","jwx_fract_salamander_wf_ys","jwx_fract_salamander_wf_currIter","jwx_fract_salamander_wf_maxIter","jwx_fract_salamander_wf_startX","jwx_fract_salamander_wf_startY","jwx_fract_salamander_wf_currX","jwx_fract_salamander_wf_currY","jwx_fract_salamander_wf_xseed_c","jwx_fract_salamander_wf_yseed_c","jwx_fract_salamander_wf_buddhabrot_min_iter_c","roundc","atan2j","fract_salamander_wf_init","fract_salamander_wf_setCurrPoint","fract_salamander_wf_nextIteration","fract_salamander_wf_preBuddhaIterate","fract_salamander_wf_iterate"],
     funcs: `fn roundc(x: f32) -> f32 { return sign(x) * floor(abs(x) + 0.5); }
@@ -7681,7 +7681,7 @@ if ((${p[5]} > 0)) {
 }`,
   },
   "xtrb": {
-    params: [{ name: "power", def: 2 }, { name: "radius", def: 1 }, { name: "width", def: 0.5 }, { name: "dist", def: 1 }, { name: "a", def: 1 }, { name: "b", def: 1 }],
+    params: [{ name: "power", def: 2, int: true }, { name: "radius", def: 1 }, { name: "width", def: 0.5 }, { name: "dist", def: 1 }, { name: "a", def: 1 }, { name: "b", def: 1 }],
     verified: true, priority: 0, flags: [], types: ["2D"],
     funcNames: ["roundc","atan2j","powc"],
     funcs: `fn roundc(x: f32) -> f32 { return sign(x) * floor(abs(x) + 0.5); }
@@ -7953,7 +7953,7 @@ v.y += (${w} * Y);
 }`,
   },
   "superShape3d": {
-    params: [{ name: "rho", def: 9.9 }, { name: "phi", def: 2.5 }, { name: "m1", def: 6 }, { name: "m2", def: 3 }, { name: "a1", def: 1 }, { name: "a2", def: 1 }, { name: "b1", def: 1 }, { name: "b2", def: 1 }, { name: "n1_1", def: 1 }, { name: "n1_2", def: 1 }, { name: "n2_1", def: 1 }, { name: "n2_2", def: 1 }, { name: "n3_1", def: 1 }, { name: "n3_2", def: 1 }, { name: "spiral", def: 0 }, { name: "toroidmap", def: 0 }],
+    params: [{ name: "rho", def: 9.9 }, { name: "phi", def: 2.5 }, { name: "m1", def: 6 }, { name: "m2", def: 3 }, { name: "a1", def: 1 }, { name: "a2", def: 1 }, { name: "b1", def: 1 }, { name: "b2", def: 1 }, { name: "n1_1", def: 1 }, { name: "n1_2", def: 1 }, { name: "n2_1", def: 1 }, { name: "n2_2", def: 1 }, { name: "n3_1", def: 1 }, { name: "n3_2", def: 1 }, { name: "spiral", def: 0 }, { name: "toroidmap", def: 0, int: true }],
     verified: true, priority: 0, flags: ["3d","z"], types: ["3D","BASE_SHAPE"],
     funcNames: ["powc","roundc","atan2j"],
     funcs: `fn powc(x: f32, y: f32) -> f32 {
@@ -8315,7 +8315,7 @@ if (((x > ${w}) || (y > ${w}))) {
 }`,
   },
   "hypertile3D": {
-    params: [{ name: "p", def: 3 }, { name: "q", def: 7 }, { name: "n", def: 0 }],
+    params: [{ name: "p", def: 3, int: true }, { name: "q", def: 7, int: true }, { name: "n", def: 0, int: true }],
     verified: true, priority: 0, flags: ["3d","z"], types: ["3D"],
     funcNames: ["roundc","atan2j"],
     funcs: `fn roundc(x: f32) -> f32 { return sign(x) * floor(abs(x) + 0.5); }
@@ -8357,7 +8357,7 @@ pz_ += (d * (z_ * s2z));
 }`,
   },
   "hypertile3D1": {
-    params: [{ name: "p", def: 3 }, { name: "q", def: 7 }],
+    params: [{ name: "p", def: 3, int: true }, { name: "q", def: 7, int: true }],
     verified: true, priority: 0, flags: ["3d","z"], types: ["3D"],
     funcNames: ["roundc","atan2j"],
     funcs: `fn roundc(x: f32) -> f32 { return sign(x) * floor(abs(x) + 0.5); }
@@ -8398,7 +8398,7 @@ pz_ += (d * (z_ * s2z));
 }`,
   },
   "hypertile3D2": {
-    params: [{ name: "p", def: 3 }, { name: "q", def: 7 }],
+    params: [{ name: "p", def: 3, int: true }, { name: "q", def: 7, int: true }],
     verified: true, priority: 0, flags: ["3d","z"], types: ["3D"],
     funcNames: ["roundc","atan2j"],
     funcs: `fn roundc(x: f32) -> f32 { return sign(x) * floor(abs(x) + 0.5); }
@@ -8477,7 +8477,7 @@ pz_ += (d * ((z_ * s2z) + (cz * (((y2cy + x2cx) - r2_) - 1))));
 }`,
   },
   "gdoffs": {
-    params: [{ name: "delta_x", def: 0 }, { name: "delta_y", def: 0 }, { name: "area_x", def: 2 }, { name: "area_y", def: 2 }, { name: "center_x", def: 0 }, { name: "center_y", def: 0 }, { name: "gamma", def: 1 }, { name: "square", def: 0 }],
+    params: [{ name: "delta_x", def: 0 }, { name: "delta_y", def: 0 }, { name: "area_x", def: 2 }, { name: "area_y", def: 2 }, { name: "center_x", def: 0 }, { name: "center_y", def: 0 }, { name: "gamma", def: 1, int: true }, { name: "square", def: 0, int: true }],
     verified: true, priority: 0, flags: [], types: ["2D"],
     funcNames: ["atan2j","gdoffs_fclp","gdoffs_fscl","gdoffs_fosc","gdoffs_flip"],
     funcs: `fn atan2j(y: f32, x: f32) -> f32 { if (x == 0.0 && y == 0.0) { return select(0.0, PI, (bitcast<u32>(x) >> 31u) == 1u) * select(1.0, -1.0, (bitcast<u32>(y) >> 31u) == 1u); } return atan2(y, x); }
@@ -8760,7 +8760,7 @@ v.y += ((${p[3]} * t.x) * ${w});
 }`,
   },
   "octagon": {
-    params: [{ name: "x", def: 0 }, { name: "y", def: 0 }, { name: "z", def: 0 }, { name: "mode", def: 1 }],
+    params: [{ name: "x", def: 0 }, { name: "y", def: 0 }, { name: "z", def: 0 }, { name: "mode", def: 1, int: true }],
     verified: true, priority: 0, flags: ["3d","z"], types: ["3D"],
     funcNames: ["roundc","atan2j","sqrf"],
     funcs: `fn roundc(x: f32) -> f32 { return sign(x) * floor(abs(x) + 0.5); }
@@ -8976,7 +8976,7 @@ v.y += ((${w} * mod2) * s);
 }`,
   },
   "juliaq": {
-    params: [{ name: "power", def: 3 }, { name: "divisor", def: 2 }],
+    params: [{ name: "power", def: 3, int: true }, { name: "divisor", def: 2, int: true }],
     verified: true, priority: 0, flags: [], types: ["2D"],
     funcNames: ["roundc","atan2j","powc"],
     funcs: `fn roundc(x: f32) -> f32 { return sign(x) * floor(abs(x) + 0.5); }
@@ -9005,7 +9005,7 @@ v.y += (r_ * sina);
 }`,
   },
   "julia3Dq": {
-    params: [{ name: "power", def: 3 }, { name: "divisor", def: 2 }],
+    params: [{ name: "power", def: 3, int: true }, { name: "divisor", def: 2, int: true }],
     verified: true, priority: 0, flags: ["3d","z"], types: ["3D"],
     funcNames: ["roundc","atan2j","powc"],
     funcs: `fn roundc(x: f32) -> f32 { return sign(x) * floor(abs(x) + 0.5); }
@@ -9043,7 +9043,7 @@ v.y += (r_ * sina);
 }`,
   },
   "post_juliaq": {
-    params: [{ name: "power", def: 3 }, { name: "divisor", def: 2 }],
+    params: [{ name: "power", def: 3, int: true }, { name: "divisor", def: 2, int: true }],
     verified: true, priority: 1, flags: [], types: ["2D","POST"],
     funcNames: ["atan2j","sqr","powc"],
     funcs: `fn atan2j(y: f32, x: f32) -> f32 { if (x == 0.0 && y == 0.0) { return select(0.0, PI, (bitcast<u32>(x) >> 31u) == 1u) * select(1.0, -1.0, (bitcast<u32>(y) >> 31u) == 1u); } return atan2(y, x); }
@@ -9075,7 +9075,7 @@ v.y = (r_ * sina);
 }`,
   },
   "post_julia3Dq": {
-    params: [{ name: "power", def: 3 }, { name: "divisor", def: 2 }],
+    params: [{ name: "power", def: 3, int: true }, { name: "divisor", def: 2, int: true }],
     verified: true, priority: 1, flags: ["z"], types: ["2D","POST"],
     funcNames: ["atan2j","sqr","powc"],
     funcs: `fn atan2j(y: f32, x: f32) -> f32 { if (x == 0.0 && y == 0.0) { return select(0.0, PI, (bitcast<u32>(x) >> 31u) == 1u) * select(1.0, -1.0, (bitcast<u32>(y) >> 31u) == 1u); } return atan2(y, x); }
@@ -9113,7 +9113,7 @@ v.y = (r_ * sina);
 }`,
   },
   "post_smartcrop": {
-    params: [{ name: "power", def: 4 }, { name: "radius", def: 1 }, { name: "roundstr", def: 0 }, { name: "roundwidth", def: 1 }, { name: "distortion", def: 1 }, { name: "edge", def: 0 }, { name: "scatter", def: 0 }, { name: "offset", def: 0 }, { name: "cropmode", def: 1 }, { name: "static", def: 2 }],
+    params: [{ name: "power", def: 4 }, { name: "radius", def: 1 }, { name: "roundstr", def: 0 }, { name: "roundwidth", def: 1 }, { name: "distortion", def: 1 }, { name: "edge", def: 0 }, { name: "scatter", def: 0 }, { name: "offset", def: 0 }, { name: "cropmode", def: 1, int: true }, { name: "static", def: 2, int: true }],
     verified: true, priority: 1, flags: ["dc","z"], types: ["2D","CROP","POST"],
     funcNames: ["roundc","atan2j"],
     funcs: `fn roundc(x: f32) -> f32 { return sign(x) * floor(abs(x) + 0.5); }
@@ -9292,7 +9292,7 @@ v.y += (r_ * s);
 }`,
   },
   "starblur": {
-    params: [{ name: "power", def: 5 }, { name: "range", def: 0.40162283177245456 }],
+    params: [{ name: "power", def: 5, int: true }, { name: "range", def: 0.40162283177245456 }],
     verified: true, priority: 0, flags: [], types: ["BASE_SHAPE"],
     funcNames: ["roundc","atan2j"],
     funcs: `fn roundc(x: f32) -> f32 { return sign(x) * floor(abs(x) + 0.5); }
@@ -9375,7 +9375,7 @@ v.y += ((vv * syd) * ((((yrng - f32(i32(yrng))) * syw) + f32(i32(yrng))) + ((0.5
 }`,
   },
   "primitives_wf": {
-    params: [{ name: "shape", def: 1 }, { name: "a", def: 1 }, { name: "b", def: 1 }, { name: "filled", def: 0 }],
+    params: [{ name: "shape", def: 1, int: true }, { name: "a", def: 1 }, { name: "b", def: 1 }, { name: "filled", def: 0, int: true }],
     verified: true, priority: 0, flags: ["3d","z"], types: ["3D","BASE_SHAPE"],
     funcNames: ["atan2j","primitives_wf_insideUnitTriangle"],
     funcs: `fn atan2j(y: f32, x: f32) -> f32 { if (x == 0.0 && y == 0.0) { return select(0.0, PI, (bitcast<u32>(x) >> 31u) == 1u) * select(1.0, -1.0, (bitcast<u32>(y) >> 31u) == 1u); } return atan2(y, x); }
@@ -9607,7 +9607,7 @@ v.y += (${w} * (((t.y + ${p[2]}) * _z) - ${p[2]}));
 }`,
   },
   "lazyjess": {
-    params: [{ name: "n", def: 4 }, { name: "spin", def: 3.141592653589793 }, { name: "space", def: 0 }, { name: "corner", def: 1 }],
+    params: [{ name: "n", def: 4, int: true }, { name: "spin", def: 3.141592653589793 }, { name: "space", def: 0 }, { name: "corner", def: 1, int: true }],
     verified: true, priority: 0, flags: ["z"], types: ["2D"],
     funcNames: ["atan2j"],
     funcs: `fn atan2j(y: f32, x: f32) -> f32 { if (x == 0.0 && y == 0.0) { return select(0.0, PI, (bitcast<u32>(x) >> 31u) == 1u) * select(1.0, -1.0, (bitcast<u32>(y) >> 31u) == 1u); } return atan2(y, x); }`,
@@ -9691,7 +9691,7 @@ if (false) {
 }`,
   },
   "voron": {
-    params: [{ name: "k", def: 0.99 }, { name: "step", def: 0.25 }, { name: "num", def: 1 }, { name: "xseed", def: 3 }, { name: "yseed", def: 7 }],
+    params: [{ name: "k", def: 0.99 }, { name: "step", def: 0.25 }, { name: "num", def: 1, int: true }, { name: "xseed", def: 3, int: true }, { name: "yseed", def: 7, int: true }],
     verified: true, priority: 0, flags: [], types: ["2D","SIMULATION"],
     funcNames: ["atan2j"],
     funcs: `fn atan2j(y: f32, x: f32) -> f32 { if (x == 0.0 && y == 0.0) { return select(0.0, PI, (bitcast<u32>(x) >> 31u) == 1u) * select(1.0, -1.0, (bitcast<u32>(y) >> 31u) == 1u); } return atan2(y, x); }`,
@@ -9836,7 +9836,7 @@ if ((r_ < 1.0)) {
 }`,
   },
   "synth": {
-    params: [{ name: "a", def: 1 }, { name: "mode", def: 3 }, { name: "power", def: -2 }, { name: "mix", def: 1 }, { name: "smooth", def: 0 }, { name: "b", def: 0 }, { name: "b_type", def: 0 }, { name: "b_skew", def: 0 }, { name: "b_frq", def: 1 }, { name: "b_phs", def: 0 }, { name: "b_layer", def: 0 }, { name: "c", def: 0 }, { name: "c_type", def: 0 }, { name: "c_skew", def: 0 }, { name: "c_frq", def: 1 }, { name: "c_phs", def: 0 }, { name: "c_layer", def: 0 }, { name: "d", def: 0 }, { name: "d_type", def: 0 }, { name: "d_skew", def: 0 }, { name: "d_frq", def: 1 }, { name: "d_phs", def: 0 }, { name: "d_layer", def: 0 }, { name: "e", def: 0 }, { name: "e_type", def: 0 }, { name: "e_skew", def: 0 }, { name: "e_frq", def: 1 }, { name: "e_phs", def: 0 }, { name: "e_layer", def: 0 }, { name: "f", def: 0 }, { name: "f_type", def: 0 }, { name: "f_skew", def: 0 }, { name: "f_frq", def: 1 }, { name: "f_phs", def: 0 }, { name: "f_layer", def: 0 }],
+    params: [{ name: "a", def: 1 }, { name: "mode", def: 3, int: true }, { name: "power", def: -2 }, { name: "mix", def: 1 }, { name: "smooth", def: 0, int: true }, { name: "b", def: 0 }, { name: "b_type", def: 0, int: true }, { name: "b_skew", def: 0 }, { name: "b_frq", def: 1 }, { name: "b_phs", def: 0 }, { name: "b_layer", def: 0, int: true }, { name: "c", def: 0 }, { name: "c_type", def: 0, int: true }, { name: "c_skew", def: 0 }, { name: "c_frq", def: 1 }, { name: "c_phs", def: 0 }, { name: "c_layer", def: 0, int: true }, { name: "d", def: 0 }, { name: "d_type", def: 0, int: true }, { name: "d_skew", def: 0 }, { name: "d_frq", def: 1 }, { name: "d_phs", def: 0 }, { name: "d_layer", def: 0, int: true }, { name: "e", def: 0 }, { name: "e_type", def: 0, int: true }, { name: "e_skew", def: 0 }, { name: "e_frq", def: 1 }, { name: "e_phs", def: 0 }, { name: "e_layer", def: 0, int: true }, { name: "f", def: 0 }, { name: "f_type", def: 0, int: true }, { name: "f_skew", def: 0 }, { name: "f_frq", def: 1 }, { name: "f_phs", def: 0 }, { name: "f_layer", def: 0, int: true }],
     verified: true, priority: 0, flags: ["state","z"], types: ["2D","SIMULATION"],
     funcNames: ["jwx_synth_a_c","jwx_synth_b_c","jwx_synth_b_phs_c","jwx_synth_b_frq_c","jwx_synth_b_skew_c","jwx_synth_b_type_c","jwx_synth_b_layer_c","jwx_synth_c_c","jwx_synth_c_phs_c","jwx_synth_c_frq_c","jwx_synth_c_skew_c","jwx_synth_c_type_c","jwx_synth_c_layer_c","jwx_synth_d_c","jwx_synth_d_phs_c","jwx_synth_d_frq_c","jwx_synth_d_skew_c","jwx_synth_d_type_c","jwx_synth_d_layer_c","jwx_synth_e_c","jwx_synth_e_phs_c","jwx_synth_e_frq_c","jwx_synth_e_skew_c","jwx_synth_e_type_c","jwx_synth_e_layer_c","jwx_synth_f_c","jwx_synth_f_phs_c","jwx_synth_f_frq_c","jwx_synth_f_skew_c","jwx_synth_f_type_c","jwx_synth_f_layer_c","jwx_synth_mix_c","synth_SinCosPair","atan2j","powc","synth_SinCosPair_zero","synth_synth_value","synth_bezier_quad_map","synth_interpolate","synth_synthsincos"],
     funcs: `struct synth_SinCosPair {
@@ -10695,7 +10695,7 @@ pz_ += (z1 + z_);
 }`,
   },
   "bubbleT3D": {
-    params: [{ name: "number_of_stripes", def: 0 }, { name: "ratio_of_stripes", def: 1 }, { name: "angle_of_hole", def: 0 }, { name: "exponent_z", def: 1 }, { name: "symmetry_z", def: 0 }, { name: "modus_blur", def: 0 }],
+    params: [{ name: "number_of_stripes", def: 0, int: true }, { name: "ratio_of_stripes", def: 1 }, { name: "angle_of_hole", def: 0 }, { name: "exponent_z", def: 1 }, { name: "symmetry_z", def: 0, int: true }, { name: "modus_blur", def: 0, int: true }],
     verified: true, priority: 0, flags: ["3d","z"], types: ["3D"],
     funcNames: ["atan2j","powc","sqrf"],
     funcs: `fn atan2j(y: f32, x: f32) -> f32 { if (x == 0.0 && y == 0.0) { return select(0.0, PI, (bitcast<u32>(x) >> 31u) == 1u) * select(1.0, -1.0, (bitcast<u32>(y) >> 31u) == 1u); } return atan2(y, x); }
@@ -11380,7 +11380,7 @@ if ((0.0 != s)) {
 }`,
   },
   "murl": {
-    params: [{ name: "c", def: 0.1 }, { name: "power", def: 1 }],
+    params: [{ name: "c", def: 0.1 }, { name: "power", def: 1, int: true }],
     verified: true, priority: 0, flags: [], types: ["2D"],
     funcNames: ["atan2j","powc"],
     funcs: `fn atan2j(y: f32, x: f32) -> f32 { if (x == 0.0 && y == 0.0) { return select(0.0, PI, (bitcast<u32>(x) >> 31u) == 1u) * select(1.0, -1.0, (bitcast<u32>(y) >> 31u) == 1u); } return atan2(y, x); }
@@ -11413,7 +11413,7 @@ v.y += (r1 * ((t.y * re) - (t.x * im)));
 }`,
   },
   "murl2": {
-    params: [{ name: "c", def: 0.1 }, { name: "power", def: 3 }],
+    params: [{ name: "c", def: 0.1 }, { name: "power", def: 3, int: true }],
     verified: true, priority: 0, flags: [], types: ["2D"],
     funcNames: ["powc","atan2j"],
     funcs: `fn powc(x: f32, y: f32) -> f32 {
@@ -11479,7 +11479,7 @@ t.y = (((y * re) - (x * im)) * r_);
 }`,
   },
   "falloff3": {
-    params: [{ name: "blur_type", def: 0 }, { name: "blur_shape", def: 0 }, { name: "blur_strength", def: 1 }, { name: "min_distance", def: 0.5 }, { name: "invert_distance", def: 0 }, { name: "mul_x", def: 1 }, { name: "mul_y", def: 1 }, { name: "mul_z", def: 0 }, { name: "mul_c", def: 0 }, { name: "center_x", def: 0 }, { name: "center_y", def: 0 }, { name: "center_z", def: 0 }, { name: "alpha", def: 0 }],
+    params: [{ name: "blur_type", def: 0, int: true }, { name: "blur_shape", def: 0, int: true }, { name: "blur_strength", def: 1 }, { name: "min_distance", def: 0.5 }, { name: "invert_distance", def: 0, int: true }, { name: "mul_x", def: 1 }, { name: "mul_y", def: 1 }, { name: "mul_z", def: 0 }, { name: "mul_c", def: 0 }, { name: "center_x", def: 0 }, { name: "center_y", def: 0 }, { name: "center_z", def: 0 }, { name: "alpha", def: 0 }],
     verified: true, priority: 0, flags: ["3d","dc","state","z"], types: ["3D","BLUR"],
     funcNames: ["jwx_falloff3_alpha_c","jwx_falloff3_inited_","jwx_falloff3_r_max","falloff3_Double4","falloff3_Double3","atan2j","sqr","falloff3_Double4_zero","falloff3_Double4_make","falloff3_Double3_make","falloff3_bs_circle","falloff3_bs_square","falloff3_bt_gaussian","falloff3_bt_radial","falloff3_sgnd","falloff3_log_map","falloff3_log_scale","falloff3_bt_log"],
     funcs: `struct falloff3_Double4 {
@@ -11639,7 +11639,7 @@ switch i32(${p[0]}) {
 }`,
   },
   "pre_falloff3": {
-    params: [{ name: "blur_type", def: 0 }, { name: "blur_shape", def: 0 }, { name: "blur_strength", def: 1 }, { name: "min_distance", def: 0.5 }, { name: "invert_distance", def: 0 }, { name: "mul_x", def: 1 }, { name: "mul_y", def: 1 }, { name: "mul_z", def: 0 }, { name: "mul_c", def: 0 }, { name: "center_x", def: 0 }, { name: "center_y", def: 0 }, { name: "center_z", def: 0 }, { name: "alpha", def: 0 }],
+    params: [{ name: "blur_type", def: 0, int: true }, { name: "blur_shape", def: 0, int: true }, { name: "blur_strength", def: 1 }, { name: "min_distance", def: 0.5 }, { name: "invert_distance", def: 0, int: true }, { name: "mul_x", def: 1 }, { name: "mul_y", def: 1 }, { name: "mul_z", def: 0 }, { name: "mul_c", def: 0 }, { name: "center_x", def: 0 }, { name: "center_y", def: 0 }, { name: "center_z", def: 0 }, { name: "alpha", def: 0 }],
     verified: true, priority: -1, flags: ["3d","dc","state","z"], types: ["3D","PRE","BLUR"],
     funcNames: ["jwx_pre_falloff3_alpha_c","jwx_pre_falloff3_inited_","jwx_pre_falloff3_r_max","pre_falloff3_Double4","pre_falloff3_Double3","atan2j","sqr","pre_falloff3_Double4_zero","pre_falloff3_Double4_make","pre_falloff3_Double3_make","pre_falloff3_bs_circle","pre_falloff3_bs_square","pre_falloff3_bt_gaussian","pre_falloff3_bt_radial","pre_falloff3_sgnd","pre_falloff3_log_map","pre_falloff3_log_scale","pre_falloff3_bt_log"],
     funcs: `struct pre_falloff3_Double4 {
@@ -11808,7 +11808,7 @@ if ((ph > PI)) {
 }`,
   },
   "post_falloff3": {
-    params: [{ name: "blur_type", def: 0 }, { name: "blur_shape", def: 0 }, { name: "blur_strength", def: 1 }, { name: "min_distance", def: 0.5 }, { name: "invert_distance", def: 0 }, { name: "mul_x", def: 1 }, { name: "mul_y", def: 1 }, { name: "mul_z", def: 0 }, { name: "mul_c", def: 0 }, { name: "center_x", def: 0 }, { name: "center_y", def: 0 }, { name: "center_z", def: 0 }, { name: "alpha", def: 0 }],
+    params: [{ name: "blur_type", def: 0, int: true }, { name: "blur_shape", def: 0, int: true }, { name: "blur_strength", def: 1 }, { name: "min_distance", def: 0.5 }, { name: "invert_distance", def: 0, int: true }, { name: "mul_x", def: 1 }, { name: "mul_y", def: 1 }, { name: "mul_z", def: 0 }, { name: "mul_c", def: 0 }, { name: "center_x", def: 0 }, { name: "center_y", def: 0 }, { name: "center_z", def: 0 }, { name: "alpha", def: 0 }],
     verified: true, priority: 1, flags: ["3d","dc","state","z"], types: ["3D","POST","BLUR"],
     funcNames: ["jwx_post_falloff3_alpha_c","jwx_post_falloff3_inited_","jwx_post_falloff3_r_max","post_falloff3_Double4","post_falloff3_Double3","atan2j","sqr","post_falloff3_Double4_zero","post_falloff3_Double4_make","post_falloff3_Double3_make","post_falloff3_bs_circle","post_falloff3_bs_square","post_falloff3_bt_gaussian","post_falloff3_bt_radial","post_falloff3_sgnd","post_falloff3_log_map","post_falloff3_log_scale","post_falloff3_bt_log"],
     funcs: `struct post_falloff3_Double4 {
@@ -11968,7 +11968,7 @@ switch i32(${p[0]}) {
 }`,
   },
   "julian3Dx": {
-    params: [{ name: "power", def: 3 }, { name: "dist", def: 1 }, { name: "a", def: 1 }, { name: "b", def: 0 }, { name: "c", def: 0 }, { name: "d", def: 1 }, { name: "e", def: 0 }, { name: "f", def: 0 }],
+    params: [{ name: "power", def: 3, int: true }, { name: "dist", def: 1 }, { name: "a", def: 1 }, { name: "b", def: 0 }, { name: "c", def: 0 }, { name: "d", def: 1 }, { name: "e", def: 0 }, { name: "f", def: 0 }],
     verified: true, priority: 0, flags: ["z"], types: ["2D"],
     funcNames: ["powc","atan2j"],
     funcs: `fn powc(x: f32, y: f32) -> f32 {
@@ -12141,7 +12141,7 @@ if (((min(max(${p[3]}, -10.0), 10.0) >= 0.0) && (min(max(${p[3]}, -10.0), 10.0) 
 }`,
   },
   "bwrands": {
-    params: [{ name: "cellsize", def: 1 }, { name: "space", def: 0 }, { name: "gain", def: 1.25 }, { name: "inner_twist", def: 0 }, { name: "outer_twist", def: 0 }, { name: "seed", def: 3210 }, { name: "rrot", def: 1 }, { name: "rmin", def: 0.25 }, { name: "loonie_chance", def: 0.5 }, { name: "petals_chance", def: 0.5 }, { name: "minpetals", def: 3 }, { name: "maxpetals", def: 20 }],
+    params: [{ name: "cellsize", def: 1 }, { name: "space", def: 0 }, { name: "gain", def: 1.25 }, { name: "inner_twist", def: 0 }, { name: "outer_twist", def: 0 }, { name: "seed", def: 3210, int: true }, { name: "rrot", def: 1 }, { name: "rmin", def: 0.25 }, { name: "loonie_chance", def: 0.5 }, { name: "petals_chance", def: 0.5 }, { name: "minpetals", def: 3, int: true }, { name: "maxpetals", def: 20, int: true }],
     verified: true, priority: 0, flags: [], types: ["2D"],
     funcNames: ["atan2j","sqrf","bwrands_bytemix","bwrands_byteshf","bwrands_bytexim","bwrands_byteprimes"],
     funcs: `fn atan2j(y: f32, x: f32) -> f32 { if (x == 0.0 && y == 0.0) { return select(0.0, PI, (bitcast<u32>(x) >> 31u) == 1u) * select(1.0, -1.0, (bitcast<u32>(y) >> 31u) == 1u); } return atan2(y, x); }
@@ -12289,7 +12289,7 @@ if ((abs(${p[0]}) < 0.000001)) {
 }`,
   },
   "loonie2": {
-    params: [{ name: "sides", def: 4 }, { name: "star", def: 0.15 }, { name: "circle", def: 0.25 }],
+    params: [{ name: "sides", def: 4, int: true }, { name: "star", def: 0.15 }, { name: "circle", def: 0.25 }],
     verified: true, priority: 0, flags: [], types: ["2D"],
     funcNames: ["roundc","atan2j"],
     funcs: `fn roundc(x: f32) -> f32 { return sign(x) * floor(abs(x) + 0.5); }
@@ -12696,7 +12696,7 @@ v.y = ((0.5 * ${w}) * (cos((r2 + 1.0e-20)) * (2.0 * t.y)));
 }`,
   },
   "funnel": {
-    params: [{ name: "effect", def: 8 }],
+    params: [{ name: "effect", def: 8, int: true }],
     verified: true, priority: 0, flags: [], types: ["2D"],
     funcNames: ["atan2j"],
     funcs: `fn atan2j(y: f32, x: f32) -> f32 { if (x == 0.0 && y == 0.0) { return select(0.0, PI, (bitcast<u32>(x) >> 31u) == 1u) * select(1.0, -1.0, (bitcast<u32>(y) >> 31u) == 1u); } return atan2(y, x); }`,
@@ -12856,7 +12856,7 @@ if ((p_ <= (1.0 * s))) {
 }`,
   },
   "squish": {
-    params: [{ name: "power", def: 2 }],
+    params: [{ name: "power", def: 2, int: true }],
     verified: true, priority: 0, flags: [], types: ["2D"],
     funcNames: ["atan2j"],
     funcs: `fn atan2j(y: f32, x: f32) -> f32 { if (x == 0.0 && y == 0.0) { return select(0.0, PI, (bitcast<u32>(x) >> 31u) == 1u) * select(1.0, -1.0, (bitcast<u32>(y) >> 31u) == 1u); } return atan2(y, x); }`,
@@ -12992,7 +12992,7 @@ if ((abs(t.y) <= t_)) {
 }`,
   },
   "scry2": {
-    params: [{ name: "sides", def: 4 }, { name: "star", def: 0 }, { name: "circle", def: 0 }],
+    params: [{ name: "sides", def: 4, int: true }, { name: "star", def: 0 }, { name: "circle", def: 0 }],
     verified: true, priority: 0, flags: [], types: ["2D"],
     funcNames: ["roundc","atan2j"],
     funcs: `fn roundc(x: f32) -> f32 { return sign(x) * floor(abs(x) + 0.5); }
@@ -13282,7 +13282,7 @@ if ((((t.x + ${p[0]}) == 0) || ((t.x + ${p[0]}) == PI))) {
 }`,
   },
   "polylogarithm": {
-    params: [{ name: "n", def: 2 }, { name: "zpow", def: 1 }],
+    params: [{ name: "n", def: 2, int: true }, { name: "zpow", def: 1 }],
     verified: true, priority: 0, flags: [], types: ["2D"],
     funcNames: ["Complex","powc","atan2j","polylogarithm_HarmonicS","Complex_Init","Complex_One","Complex_Mag2","Complex_MagInv","Complex_Recip","Complex_Radius","Complex_Neg","Complex_Sqrt","Complex_Sqr","Complex_Arg","Complex_ToP","Complex_UnP","Complex_Copy","Complex_Pow","Complex_DivR","Complex_Add","Complex_Scale","Complex_Mul","Complex_Mag2eps","Complex_Log","polylogarithm_Riemann_Z","polylogarithm_factorial"],
     funcs: `struct Complex {
@@ -13574,7 +13574,7 @@ v.y += (yy * (1 + r_));
 }`,
   },
   "yin_yang": {
-    params: [{ name: "radius", def: 0.5 }, { name: "ang1", def: 0 }, { name: "ang2", def: 0 }, { name: "dual_t", def: 1 }, { name: "outside", def: 0 }],
+    params: [{ name: "radius", def: 0.5 }, { name: "ang1", def: 0 }, { name: "ang2", def: 0 }, { name: "dual_t", def: 1, int: true }, { name: "outside", def: 0, int: true }],
     verified: true, priority: 0, flags: [], types: ["2D"],
     funcNames: ["roundc","atan2j"],
     funcs: `fn roundc(x: f32) -> f32 { return sign(x) * floor(abs(x) + 0.5); }
@@ -13625,7 +13625,7 @@ if ((R2 < 1.0)) {
 }`,
   },
   "target_sp": {
-    params: [{ name: "twist", def: 0 }, { name: "n_of_sp", def: 1 }, { name: "size", def: 2.062080971874641 }, { name: "tightness", def: 0.5152404038564685 }],
+    params: [{ name: "twist", def: 0 }, { name: "n_of_sp", def: 1, int: true }, { name: "size", def: 2.062080971874641 }, { name: "tightness", def: 0.5152404038564685 }],
     verified: true, priority: 0, flags: [], types: ["2D"],
     funcNames: ["atan2j"],
     funcs: `fn atan2j(y: f32, x: f32) -> f32 { if (x == 0.0 && y == 0.0) { return select(0.0, PI, (bitcast<u32>(x) >> 31u) == 1u) * select(1.0, -1.0, (bitcast<u32>(y) >> 31u) == 1u); } return atan2(y, x); }`,
@@ -13796,7 +13796,7 @@ if ((ph > PI)) {
 }`,
   },
   "vogel": {
-    params: [{ name: "n", def: 20 }, { name: "scale", def: 1 }],
+    params: [{ name: "n", def: 20, int: true }, { name: "scale", def: 1 }],
     verified: true, priority: 0, flags: [], types: ["2D"],
     funcNames: ["roundc","atan2j"],
     funcs: `fn roundc(x: f32) -> f32 { return sign(x) * floor(abs(x) + 0.5); }
@@ -13905,7 +13905,7 @@ v.y += (${w} * (((${A(3)} * x) + (${A(4)} * y)) + ${A(5)}));
 }`,
   },
   "dc_bubble": {
-    params: [{ name: "centerx", def: 0 }, { name: "centery", def: 0 }, { name: "scale", def: 1 }, { name: "invert", def: 1 }],
+    params: [{ name: "centerx", def: 0 }, { name: "centery", def: 0 }, { name: "scale", def: 1 }, { name: "invert", def: 1, int: true }],
     verified: true, priority: 0, flags: ["dc","z"], types: ["2D","DC","BASE_SHAPE"],
     funcNames: ["sqr","atan2j"],
     funcs: `fn sqr(x: f32) -> f32 { return x * x; }
@@ -13925,7 +13925,7 @@ pz_ += (${w} * ((2.0 / select(r_, t_, (${p[3]} == 1))) - 1.0));
 }`,
   },
   "dc_triangle": {
-    params: [{ name: "scatter_area", def: 0 }, { name: "zero_edges", def: 0 }],
+    params: [{ name: "scatter_area", def: 0 }, { name: "zero_edges", def: 0, int: true }],
     verified: true, priority: 0, flags: ["affine","dc","z"], types: ["2D","DC"],
     funcNames: ["atan2j"],
     funcs: `fn atan2j(y: f32, x: f32) -> f32 { if (x == 0.0 && y == 0.0) { return select(0.0, PI, (bitcast<u32>(x) >> 31u) == 1u) * select(1.0, -1.0, (bitcast<u32>(y) >> 31u) == 1u); } return atan2(y, x); }`,
@@ -13996,7 +13996,7 @@ if (false) {
 }`,
   },
   "waveblur_wf": {
-    params: [{ name: "count", def: 5 }, { name: "phase", def: 0 }, { name: "amplitude_z", def: 0.5 }, { name: "damping_z", def: 0 }, { name: "direct_color", def: 0 }, { name: "color_scale", def: 0.5 }, { name: "color_offset", def: 0 }],
+    params: [{ name: "count", def: 5, int: true }, { name: "phase", def: 0 }, { name: "amplitude_z", def: 0.5 }, { name: "damping_z", def: 0 }, { name: "direct_color", def: 0, int: true }, { name: "color_scale", def: 0.5 }, { name: "color_offset", def: 0 }],
     verified: true, priority: 0, flags: ["3d","dc","z"], types: ["3D","BASE_SHAPE","DC"],
     funcNames: ["roundc","atan2j"],
     funcs: `fn roundc(x: f32) -> f32 { return sign(x) * floor(abs(x) + 0.5); }
@@ -14192,7 +14192,7 @@ if (((${p[4]} != 0) && (pz_ <= (-1 * ${p[4]})))) {
 }`,
   },
   "rosoni": {
-    params: [{ name: "maxiter", def: 25 }, { name: "sweetiter", def: 3 }, { name: "altshapes", def: 0 }, { name: "cutoff", def: 1 }, { name: "radius", def: 0.4 }, { name: "dx", def: 0.6 }, { name: "dy", def: 0 }],
+    params: [{ name: "maxiter", def: 25, int: true }, { name: "sweetiter", def: 3, int: true }, { name: "altshapes", def: 0, int: true }, { name: "cutoff", def: 1 }, { name: "radius", def: 0.4 }, { name: "dx", def: 0.6 }, { name: "dy", def: 0 }],
     verified: true, priority: 0, flags: ["z"], types: ["2D"],
     funcNames: ["sqr","atan2j"],
     funcs: `fn sqr(x: f32) -> f32 { return x * x; }
@@ -14361,7 +14361,7 @@ v.y += ((((${p[4]} * pry) + ((${p[5]} * t.y) * pry)) + ((${p[6]} * t.y) * pr)) +
 }`,
   },
   "rhodonea": {
-    params: [{ name: "knumer", def: 3 }, { name: "kdenom", def: 4 }, { name: "inner_mode", def: 1 }, { name: "outer_mode", def: 1 }, { name: "inner_spread", def: 0 }, { name: "outer_spread", def: 0 }, { name: "inner_spread_ratio", def: 1 }, { name: "outer_spread_ratio", def: 1 }, { name: "spread_split", def: 1 }, { name: "fill", def: 0 }, { name: "radial_offset", def: 0 }, { name: "cycles", def: 0 }, { name: "cycle_offset", def: 0 }, { name: "metacycles", def: 1 }, { name: "metacycle_expansion", def: 0 }],
+    params: [{ name: "knumer", def: 3 }, { name: "kdenom", def: 4 }, { name: "inner_mode", def: 1, int: true }, { name: "outer_mode", def: 1, int: true }, { name: "inner_spread", def: 0 }, { name: "outer_spread", def: 0 }, { name: "inner_spread_ratio", def: 1 }, { name: "outer_spread_ratio", def: 1 }, { name: "spread_split", def: 1 }, { name: "fill", def: 0 }, { name: "radial_offset", def: 0 }, { name: "cycles", def: 0 }, { name: "cycle_offset", def: 0 }, { name: "metacycles", def: 1 }, { name: "metacycle_expansion", def: 0 }],
     verified: true, priority: 0, flags: ["hide","z"], types: ["BASE_SHAPE","SIMULATION"],
     funcNames: ["atan2j","jgcd"],
     funcs: `fn atan2j(y: f32, x: f32) -> f32 { if (x == 0.0 && y == 0.0) { return select(0.0, PI, (bitcast<u32>(x) >> 31u) == 1u) * select(1.0, -1.0, (bitcast<u32>(y) >> 31u) == 1u); } return atan2(y, x); }
@@ -14590,7 +14590,7 @@ if (false) {
 }`,
   },
   "butterfly_fay": {
-    params: [{ name: "offset", def: 0 }, { name: "unified_inner_outer", def: 1 }, { name: "outer_mode", def: 1 }, { name: "inner_mode", def: 1 }, { name: "outer_spread", def: 0 }, { name: "inner_spread", def: 0 }, { name: "outer_spread_ratio", def: 1 }, { name: "inner_spread_ratio", def: 1 }, { name: "spread_split", def: 1 }, { name: "cycles", def: 0 }, { name: "fill", def: 0 }],
+    params: [{ name: "offset", def: 0 }, { name: "unified_inner_outer", def: 1, int: true }, { name: "outer_mode", def: 1, int: true }, { name: "inner_mode", def: 1, int: true }, { name: "outer_spread", def: 0 }, { name: "inner_spread", def: 0 }, { name: "outer_spread_ratio", def: 1 }, { name: "inner_spread_ratio", def: 1 }, { name: "spread_split", def: 1 }, { name: "cycles", def: 0 }, { name: "fill", def: 0 }],
     verified: true, priority: 0, flags: [], types: ["BASE_SHAPE"],
     funcNames: ["atan2j","powc"],
     funcs: `fn atan2j(y: f32, x: f32) -> f32 { if (x == 0.0 && y == 0.0) { return select(0.0, PI, (bitcast<u32>(x) >> 31u) == 1u) * select(1.0, -1.0, (bitcast<u32>(y) >> 31u) == 1u); } return atan2(y, x); }
@@ -14773,7 +14773,7 @@ v.y += (v_ * ((y0 + (${p[1]} * (rnd(rs) - 0.5))) + 0.5));
 }`,
   },
   "circleLinear": {
-    params: [{ name: "Sc", def: 1 }, { name: "K", def: 0.5 }, { name: "Dens1", def: 0.5 }, { name: "Dens2", def: 0.5 }, { name: "Reverse", def: 1 }, { name: "Seed", def: 0 }],
+    params: [{ name: "Sc", def: 1 }, { name: "K", def: 0.5 }, { name: "Dens1", def: 0.5 }, { name: "Dens2", def: 0.5 }, { name: "Reverse", def: 1 }, { name: "Seed", def: 0, int: true }],
     verified: true, priority: 0, flags: [], types: ["2D"],
     funcNames: ["atan2j","circleLinear_DiscretNoise2"],
     funcs: `fn atan2j(y: f32, x: f32) -> f32 { if (x == 0.0 && y == 0.0) { return select(0.0, PI, (bitcast<u32>(x) >> 31u) == 1u) * select(1.0, -1.0, (bitcast<u32>(y) >> 31u) == 1u); } return atan2(y, x); }
@@ -14826,7 +14826,7 @@ v.y += (${w} * (Y + (f32(((N * 2) + 1)) * ${p[0]})));
 }`,
   },
   "circleRand": {
-    params: [{ name: "Sc", def: 1 }, { name: "Dens", def: 0.5 }, { name: "X", def: 10 }, { name: "Y", def: 10 }, { name: "Seed", def: 0 }],
+    params: [{ name: "Sc", def: 1 }, { name: "Dens", def: 0.5 }, { name: "X", def: 10 }, { name: "Y", def: 10 }, { name: "Seed", def: 0, int: true }],
     verified: true, priority: 0, flags: [], types: ["2D"],
     funcNames: ["roundc","atan2j","circleRand_AM","circleRand_DiscretNoise2"],
     funcs: `fn roundc(x: f32) -> f32 { return sign(x) * floor(abs(x) + 0.5); }
@@ -14868,7 +14868,7 @@ v.y += (${w} * (Y + (f32(((N * 2) + 1)) * ${p[0]})));
 }`,
   },
   "circleTrans1": {
-    params: [{ name: "Sc", def: 1 }, { name: "Dens", def: 0.5 }, { name: "X", def: 10 }, { name: "Y", def: 10 }, { name: "Seed", def: 0 }],
+    params: [{ name: "Sc", def: 1 }, { name: "Dens", def: 0.5 }, { name: "X", def: 10 }, { name: "Y", def: 10 }, { name: "Seed", def: 0, int: true }],
     verified: true, priority: 0, flags: [], types: ["2D"],
     funcNames: ["atan2j","circleTrans1_Trans","circleTrans1_DiscretNoise2","circleTrans1_CircleR"],
     funcs: `fn atan2j(y: f32, x: f32) -> f32 { if (x == 0.0 && y == 0.0) { return select(0.0, PI, (bitcast<u32>(x) >> 31u) == 1u) * select(1.0, -1.0, (bitcast<u32>(y) >> 31u) == 1u); } return atan2(y, x); }
@@ -15036,7 +15036,7 @@ if ((t.x > 0.0)) {
 }`,
   },
   "w": {
-    params: [{ name: "angle", def: 0.09781437082593158 }, { name: "hypergon", def: 0.1377259416851756 }, { name: "hypergon_n", def: 4 }, { name: "hypergon_r", def: 1 }, { name: "star", def: 0 }, { name: "star_n", def: 5 }, { name: "star_slope", def: 2 }, { name: "lituus", def: 0 }, { name: "lituus_a", def: 1 }, { name: "super", def: 0 }, { name: "super_m", def: 1 }, { name: "super_n1", def: 1 }, { name: "super_n2", def: 1 }, { name: "super_n3", def: 0 }],
+    params: [{ name: "angle", def: 0.09781437082593158 }, { name: "hypergon", def: 0.1377259416851756 }, { name: "hypergon_n", def: 4, int: true }, { name: "hypergon_r", def: 1 }, { name: "star", def: 0 }, { name: "star_n", def: 5, int: true }, { name: "star_slope", def: 2 }, { name: "lituus", def: 0 }, { name: "lituus_a", def: 1 }, { name: "super", def: 0 }, { name: "super_m", def: 1 }, { name: "super_n1", def: 1 }, { name: "super_n2", def: 1 }, { name: "super_n3", def: 0 }],
     verified: true, priority: 0, flags: ["z"], types: ["2D"],
     funcNames: ["sqr","atan2j","powc"],
     funcs: `fn sqr(x: f32) -> f32 { return x * x; }
@@ -15142,7 +15142,7 @@ if (false) {
 }`,
   },
   "x": {
-    params: [{ name: "hypergon", def: 0.17196723657259583 }, { name: "hypergon_n", def: 4 }, { name: "hypergon_r", def: 1 }, { name: "star", def: 0.6838208070780045 }, { name: "star_n", def: 5 }, { name: "star_slope", def: 2 }, { name: "lituus", def: 0 }, { name: "lituus_a", def: 1 }, { name: "super", def: 0 }, { name: "super_m", def: 1 }, { name: "super_n1", def: 1 }, { name: "super_n2", def: 1 }, { name: "super_n3", def: 0 }],
+    params: [{ name: "hypergon", def: 0.17196723657259583 }, { name: "hypergon_n", def: 4, int: true }, { name: "hypergon_r", def: 1 }, { name: "star", def: 0.6838208070780045 }, { name: "star_n", def: 5, int: true }, { name: "star_slope", def: 2 }, { name: "lituus", def: 0 }, { name: "lituus_a", def: 1 }, { name: "super", def: 0 }, { name: "super_m", def: 1 }, { name: "super_n1", def: 1 }, { name: "super_n2", def: 1 }, { name: "super_n3", def: 0 }],
     verified: true, priority: 0, flags: ["z"], types: ["2D"],
     funcNames: ["sqr","atan2j","powc"],
     funcs: `fn sqr(x: f32) -> f32 { return x * x; }
@@ -15213,7 +15213,7 @@ if (false) {
 }`,
   },
   "y": {
-    params: [{ name: "hypergon", def: 0.34081247904676326 }, { name: "hypergon_n", def: 4 }, { name: "hypergon_r", def: 1 }, { name: "star", def: 0.38658797815496504 }, { name: "star_n", def: 5 }, { name: "star_slope", def: 2 }, { name: "lituus", def: 0 }, { name: "lituus_a", def: 1 }, { name: "super", def: 0 }, { name: "super_m", def: 1 }, { name: "super_n1", def: 1 }, { name: "super_n2", def: 1 }, { name: "super_n3", def: 0 }],
+    params: [{ name: "hypergon", def: 0.34081247904676326 }, { name: "hypergon_n", def: 4, int: true }, { name: "hypergon_r", def: 1 }, { name: "star", def: 0.38658797815496504 }, { name: "star_n", def: 5, int: true }, { name: "star_slope", def: 2 }, { name: "lituus", def: 0 }, { name: "lituus_a", def: 1 }, { name: "super", def: 0 }, { name: "super_m", def: 1 }, { name: "super_n1", def: 1 }, { name: "super_n2", def: 1 }, { name: "super_n3", def: 0 }],
     verified: true, priority: 0, flags: ["z"], types: ["2D"],
     funcNames: ["sqr","atan2j","powc"],
     funcs: `fn sqr(x: f32) -> f32 { return x * x; }
@@ -15284,7 +15284,7 @@ if (false) {
 }`,
   },
   "z": {
-    params: [{ name: "hypergon", def: 0.35723087226661476 }, { name: "hypergon_n", def: 4 }, { name: "hypergon_r", def: 1 }, { name: "star", def: 0.2695635392890874 }, { name: "star_n", def: 5 }, { name: "star_slope", def: 2 }, { name: "lituus", def: 0 }, { name: "lituus_a", def: 1 }, { name: "super", def: 0 }, { name: "super_m", def: 1 }, { name: "super_n1", def: 1 }, { name: "super_n2", def: 1 }, { name: "super_n3", def: 0 }],
+    params: [{ name: "hypergon", def: 0.35723087226661476 }, { name: "hypergon_n", def: 4, int: true }, { name: "hypergon_r", def: 1 }, { name: "star", def: 0.2695635392890874 }, { name: "star_n", def: 5, int: true }, { name: "star_slope", def: 2 }, { name: "lituus", def: 0 }, { name: "lituus_a", def: 1 }, { name: "super", def: 0 }, { name: "super_m", def: 1 }, { name: "super_n1", def: 1 }, { name: "super_n2", def: 1 }, { name: "super_n3", def: 0 }],
     verified: true, priority: 0, flags: ["z"], types: ["2D"],
     funcNames: ["sqr","atan2j","powc"],
     funcs: `fn sqr(x: f32) -> f32 { return x * x; }
@@ -15355,7 +15355,7 @@ if (false) {
 }`,
   },
   "post_point_symmetry_wf": {
-    params: [{ name: "centre_x", def: 0.25 }, { name: "centre_y", def: 0.5 }, { name: "order", def: 3 }, { name: "colorshift", def: 0 }],
+    params: [{ name: "centre_x", def: 0.25 }, { name: "centre_y", def: 0.5 }, { name: "order", def: 3, int: true }, { name: "colorshift", def: 0 }],
     verified: true, priority: 1, flags: ["dc"], types: ["2D","DC","POST"],
     funcNames: ["roundc","atan2j"],
     funcs: `fn roundc(x: f32) -> f32 { return sign(x) * floor(abs(x) + 0.5); }
@@ -15387,7 +15387,7 @@ v.y = ((${p[1]} + (dy * _cosa[idx])) - (dx * _sina[idx]));
 }`,
   },
   "post_axis_symmetry_wf": {
-    params: [{ name: "axis", def: 0 }, { name: "centre_x", def: 0.25 }, { name: "centre_y", def: 0.5 }, { name: "centre_z", def: 0.5 }, { name: "rotation", def: 30 }, { name: "x1colorshift", def: 0 }, { name: "y1colorshift", def: 0 }, { name: "z1colorshift", def: 0 }, { name: "x2colorshift", def: 0 }, { name: "y2colorshift", def: 0 }, { name: "z2colorshift", def: 0 }],
+    params: [{ name: "axis", def: 0, int: true }, { name: "centre_x", def: 0.25 }, { name: "centre_y", def: 0.5 }, { name: "centre_z", def: 0.5 }, { name: "rotation", def: 30 }, { name: "x1colorshift", def: 0 }, { name: "y1colorshift", def: 0 }, { name: "z1colorshift", def: 0 }, { name: "x2colorshift", def: 0 }, { name: "y2colorshift", def: 0 }, { name: "z2colorshift", def: 0 }],
     verified: true, priority: 1, flags: ["dc","z"], types: ["2D","DC","POST"],
     funcNames: ["roundc","atan2j"],
     funcs: `fn roundc(x: f32) -> f32 { return sign(x) * floor(abs(x) + 0.5); }
@@ -15504,7 +15504,7 @@ switch i32(roundc(${p[0]})) {
 }`,
   },
   "mobius_strip": {
-    params: [{ name: "radius", def: 1 }, { name: "width", def: 1 }, { name: "twists", def: 1 }, { name: "range x", def: 1 }, { name: "range y", def: 1 }, { name: "rotate x", def: 0 }, { name: "rotate y", def: 0 }, { name: "modify z", def: 1 }, { name: "width mode", def: 0 }, { name: "radial mode", def: 0 }],
+    params: [{ name: "radius", def: 1 }, { name: "width", def: 1 }, { name: "twists", def: 1 }, { name: "range x", def: 1 }, { name: "range y", def: 1 }, { name: "rotate x", def: 0 }, { name: "rotate y", def: 0 }, { name: "modify z", def: 1 }, { name: "width mode", def: 0, int: true }, { name: "radial mode", def: 0, int: true }],
     verified: true, priority: 0, flags: ["3d","hide","z"], types: ["3D"],
     funcNames: ["atan2j"],
     funcs: `fn atan2j(y: f32, x: f32) -> f32 { if (x == 0.0 && y == 0.0) { return select(0.0, PI, (bitcast<u32>(x) >> 31u) == 1u) * select(1.0, -1.0, (bitcast<u32>(y) >> 31u) == 1u); } return atan2(y, x); }`,
@@ -15664,7 +15664,7 @@ v.y += ((${w} * r_) * sina);
 }`,
   },
   "checkerboard_wf": {
-    params: [{ name: "position", def: 3 }, { name: "size", def: 10 }, { name: "axis", def: 2 }, { name: "checker_size", def: 0.1288059511246287 }, { name: "displ_amount", def: 0.05 }, { name: "checker_color1", def: 0.16441937783940141 }, { name: "checker_color2", def: 0.5191409549303291 }, { name: "side_color", def: 0.673703045064045 }, { name: "with_sides", def: 1 }],
+    params: [{ name: "position", def: 3 }, { name: "size", def: 10 }, { name: "axis", def: 2, int: true }, { name: "checker_size", def: 0.1288059511246287 }, { name: "displ_amount", def: 0.05 }, { name: "checker_color1", def: 0.16441937783940141 }, { name: "checker_color2", def: 0.5191409549303291 }, { name: "side_color", def: 0.673703045064045 }, { name: "with_sides", def: 1, int: true }],
     verified: true, priority: 0, flags: ["3d","dc","z"], types: ["3D","DC"],
     funcNames: ["atan2j","checkerboard_wf_getDisplacement","checkerboard_wf_getColor"],
     funcs: `fn atan2j(y: f32, x: f32) -> f32 { if (x == 0.0 && y == 0.0) { return select(0.0, PI, (bitcast<u32>(x) >> 31u) == 1u) * select(1.0, -1.0, (bitcast<u32>(y) >> 31u) == 1u); } return atan2(y, x); }
@@ -16396,7 +16396,7 @@ pz_ += (C * z_);
 }`,
   },
   "spirograph3D": {
-    params: [{ name: "a", def: 1 }, { name: "b", def: -0.3 }, { name: "c", def: 0.4 }, { name: "tmin", def: 0 }, { name: "tmax", def: 1000 }, { name: "width", def: 0 }, { name: "mode", def: 0 }, { name: "direct_color", def: 0 }],
+    params: [{ name: "a", def: 1 }, { name: "b", def: -0.3 }, { name: "c", def: 0.4 }, { name: "tmin", def: 0 }, { name: "tmax", def: 1000 }, { name: "width", def: 0 }, { name: "mode", def: 0, int: true }, { name: "direct_color", def: 0, int: true }],
     verified: true, priority: 0, flags: ["3d","dc","z"], types: ["3D","DC"],
     funcNames: ["atan2j"],
     funcs: `fn atan2j(y: f32, x: f32) -> f32 { if (x == 0.0 && y == 0.0) { return select(0.0, PI, (bitcast<u32>(x) >> 31u) == 1u) * select(1.0, -1.0, (bitcast<u32>(y) >> 31u) == 1u); } return atan2(y, x); }`,
@@ -16613,7 +16613,7 @@ if (false) {
 }`,
   },
   "atan": {
-    params: [{ name: "Mode", def: 0 }, { name: "Stretch", def: 1 }],
+    params: [{ name: "Mode", def: 0, int: true }, { name: "Stretch", def: 1 }],
     verified: true, priority: 0, flags: [], types: ["2D"],
     funcNames: ["roundc","atan2j"],
     funcs: `fn roundc(x: f32) -> f32 { return sign(x) * floor(abs(x) + 0.5); }
@@ -16696,7 +16696,7 @@ v.y += (${w} * ((t.y - (cs * ${p[1]})) - (sn * ${p[0]})));
 }`,
   },
   "chunk": {
-    params: [{ name: "a", def: 1 }, { name: "b", def: 0 }, { name: "c", def: 1 }, { name: "d", def: 0 }, { name: "e", def: 0 }, { name: "f", def: -1 }, { name: "mode", def: 0 }],
+    params: [{ name: "a", def: 1 }, { name: "b", def: 0 }, { name: "c", def: 1 }, { name: "d", def: 0 }, { name: "e", def: 0 }, { name: "f", def: -1 }, { name: "mode", def: 0, int: true }],
     verified: true, priority: 0, flags: [], types: ["2D"],
     funcNames: ["atan2j"],
     funcs: `fn atan2j(y: f32, x: f32) -> f32 { if (x == 0.0 && y == 0.0) { return select(0.0, PI, (bitcast<u32>(x) >> 31u) == 1u) * select(1.0, -1.0, (bitcast<u32>(y) >> 31u) == 1u); } return atan2(y, x); }`,
@@ -16727,7 +16727,7 @@ switch i32(min(max(${p[6]}, 0.0), 1.0)) {
 }`,
   },
   "crob": {
-    params: [{ name: "top", def: -1 }, { name: "bottom", def: 1 }, { name: "left", def: -1 }, { name: "right", def: 1 }, { name: "blur", def: 1 }, { name: "ratioBlur", def: 0.05 }, { name: "directBlur", def: 2 }],
+    params: [{ name: "top", def: -1 }, { name: "bottom", def: 1 }, { name: "left", def: -1 }, { name: "right", def: 1 }, { name: "blur", def: 1, int: true }, { name: "ratioBlur", def: 0.05 }, { name: "directBlur", def: 2 }],
     verified: true, priority: 0, flags: [], types: ["CROP"],
     funcNames: ["powc","atan2j"],
     funcs: `fn powc(x: f32, y: f32) -> f32 {
@@ -16869,7 +16869,7 @@ v.y += yTmp;
 }`,
   },
   "hole2": {
-    params: [{ name: "a", def: 1 }, { name: "b", def: 2 }, { name: "c", def: 1 }, { name: "d", def: 1 }, { name: "inside", def: 0 }, { name: "shape", def: 0 }],
+    params: [{ name: "a", def: 1 }, { name: "b", def: 2 }, { name: "c", def: 1 }, { name: "d", def: 1 }, { name: "inside", def: 0, int: true }, { name: "shape", def: 0, int: true }],
     verified: true, priority: 0, flags: [], types: ["2D"],
     funcNames: ["roundc","powc","atan2j"],
     funcs: `fn roundc(x: f32) -> f32 { return sign(x) * floor(abs(x) + 0.5); }
@@ -16933,7 +16933,7 @@ v.y += (r1 * sin(theta));
 }`,
   },
   "cpow2": {
-    params: [{ name: "r", def: 1 }, { name: "a", def: 0 }, { name: "divisor", def: 1 }, { name: "range", def: 1 }],
+    params: [{ name: "r", def: 1 }, { name: "a", def: 0 }, { name: "divisor", def: 1 }, { name: "range", def: 1, int: true }],
     verified: true, priority: 0, flags: [], types: ["2D"],
     funcNames: ["roundc","atan2j"],
     funcs: `fn roundc(x: f32) -> f32 { return sign(x) * floor(abs(x) + 0.5); }
@@ -17111,7 +17111,7 @@ v.y += (vv * y);
 }`,
   },
   "dc_cracklep_wf": {
-    params: [{ name: "preset", def: 0 }, { name: "cellsize", def: 1 }, { name: "power", def: 0.2 }, { name: "distort", def: 0 }, { name: "scale", def: 1 }, { name: "z", def: 0 }, { name: "color_scale", def: 0.5 }, { name: "color_offset", def: 0 }],
+    params: [{ name: "preset", def: 0, int: true }, { name: "cellsize", def: 1 }, { name: "power", def: 0.2 }, { name: "distort", def: 0 }, { name: "scale", def: 1 }, { name: "z", def: 0 }, { name: "color_scale", def: 0.5 }, { name: "color_offset", def: 0 }],
     verified: true, priority: 0, flags: ["dc","stateful"], types: ["2D","SIMULATION","DC"],
     funcNames: ["powc","atan2j","F3","fastFloor","G3","G33","X_PRIME","Y_PRIME","Z_PRIME","GRAD_3D_x","GRAD_3D_y","GRAD_3D_z","gradCoord3D","singleSimplex","jw_state0_dc_cracklep_wf_position","jw_state0_dc_cracklep_wf_closest","jw_state0_dc_cracklep_wf_vratio","jw_state0_dc_cracklep_wf_voronoi"],
     funcs: `fn powc(x: f32, y: f32) -> f32 {
@@ -17600,7 +17600,7 @@ v.y += (${w} * by);
 }`,
   },
   "truchet_ae": {
-    params: [{ name: "seed", def: 0 }, { name: "step", def: 0.5 }, { name: "width", def: 0.25 }, { name: "angle", def: 0 }, { name: "layout", def: 0 }, { name: "style", def: 0 }, { name: "K01A", def: 0.5 }, { name: "K02A", def: 0.5 }, { name: "K01B", def: 0.5 }, { name: "K02B", def: 0.5 }, { name: "K11A", def: 0.5 }, { name: "K12A", def: 0.5 }, { name: "K11B", def: 0.5 }, { name: "K12B", def: 0.5 }, { name: "K21A", def: 0.5 }, { name: "K22A", def: 0.5 }, { name: "K21B", def: 0.5 }, { name: "K22B", def: 0.5 }, { name: "K31A", def: 0.5 }, { name: "K32A", def: 0.5 }, { name: "K31B", def: 0.5 }, { name: "K32B", def: 0.5 }],
+    params: [{ name: "seed", def: 0, int: true }, { name: "step", def: 0.5 }, { name: "width", def: 0.25 }, { name: "angle", def: 0 }, { name: "layout", def: 0, int: true }, { name: "style", def: 0, int: true }, { name: "K01A", def: 0.5 }, { name: "K02A", def: 0.5 }, { name: "K01B", def: 0.5 }, { name: "K02B", def: 0.5 }, { name: "K11A", def: 0.5 }, { name: "K12A", def: 0.5 }, { name: "K11B", def: 0.5 }, { name: "K12B", def: 0.5 }, { name: "K21A", def: 0.5 }, { name: "K22A", def: 0.5 }, { name: "K21B", def: 0.5 }, { name: "K22B", def: 0.5 }, { name: "K31A", def: 0.5 }, { name: "K32A", def: 0.5 }, { name: "K31B", def: 0.5 }, { name: "K32B", def: 0.5 }],
     verified: true, priority: 0, flags: ["dc","state","z"], types: ["BASE_SHAPE","DC","SIMULATION"],
     funcNames: ["jwx_truchet_ae_inited_","jwx_truchet_ae_x","jwx_truchet_ae_y","jwx_truchet_ae_z1","jwx_truchet_ae_z2","jwx_truchet_ae_AM","atan2j","truchet_ae_fmod2","truchet_ae_dn1"],
     funcs: `fn atan2j(y: f32, x: f32) -> f32 { if (x == 0.0 && y == 0.0) { return select(0.0, PI, (bitcast<u32>(x) >> 31u) == 1u) * select(1.0, -1.0, (bitcast<u32>(y) >> 31u) == 1u); } return atan2(y, x); }
@@ -18390,7 +18390,7 @@ v.y += ((vv * rad) * s);
 }`,
   },
   "jubiQ": {
-    params: [{ name: "power", def: 3 }, { name: "dist", def: 1 }, { name: "a", def: 1 }, { name: "b", def: 0 }, { name: "c", def: 0 }, { name: "d", def: 1 }, { name: "e", def: 0 }, { name: "f", def: 0 }, { name: "qat", def: 0 }, { name: "qax", def: 0 }, { name: "qay", def: 0 }, { name: "qaz", def: 0 }, { name: "qbt", def: 0 }, { name: "qbx", def: 0 }, { name: "qby", def: 0 }, { name: "qbz", def: 0 }, { name: "qct", def: 0 }, { name: "qcx", def: 0 }, { name: "qcy", def: 0 }, { name: "qcz", def: 0 }, { name: "qdt", def: 1 }, { name: "qdx", def: 0 }, { name: "qdy", def: 0 }, { name: "qdz", def: 0 }, { name: "zmode", def: 0 }],
+    params: [{ name: "power", def: 3, int: true }, { name: "dist", def: 1 }, { name: "a", def: 1 }, { name: "b", def: 0 }, { name: "c", def: 0 }, { name: "d", def: 1 }, { name: "e", def: 0 }, { name: "f", def: 0 }, { name: "qat", def: 0 }, { name: "qax", def: 0 }, { name: "qay", def: 0 }, { name: "qaz", def: 0 }, { name: "qbt", def: 0 }, { name: "qbx", def: 0 }, { name: "qby", def: 0 }, { name: "qbz", def: 0 }, { name: "qct", def: 0 }, { name: "qcx", def: 0 }, { name: "qcy", def: 0 }, { name: "qcz", def: 0 }, { name: "qdt", def: 1 }, { name: "qdx", def: 0 }, { name: "qdy", def: 0 }, { name: "qdz", def: 0 }, { name: "zmode", def: 0, int: true }],
     verified: true, priority: 0, flags: ["3d","z"], types: ["3D"],
     funcNames: ["roundc","sqr","atan2j","powc"],
     funcs: `fn roundc(x: f32) -> f32 { return sign(x) * floor(abs(x) + 0.5); }
@@ -18808,7 +18808,7 @@ pz_ += z;
 }`,
   },
   "crop3D": {
-    params: [{ name: "left", def: -1 }, { name: "right", def: 1 }, { name: "top", def: -1 }, { name: "bottom", def: 1 }, { name: "floor", def: -1 }, { name: "ceiling", def: 1 }, { name: "scatter_area", def: 0 }, { name: "zero", def: 0 }],
+    params: [{ name: "left", def: -1 }, { name: "right", def: 1 }, { name: "top", def: -1 }, { name: "bottom", def: 1 }, { name: "floor", def: -1 }, { name: "ceiling", def: 1 }, { name: "scatter_area", def: 0 }, { name: "zero", def: 0, int: true }],
     verified: true, priority: 0, flags: ["hide","z"], types: ["CROP"],
     funcNames: ["atan2j"],
     funcs: `fn atan2j(y: f32, x: f32) -> f32 { if (x == 0.0 && y == 0.0) { return select(0.0, PI, (bitcast<u32>(x) >> 31u) == 1u) * select(1.0, -1.0, (bitcast<u32>(y) >> 31u) == 1u); } return atan2(y, x); }`,
@@ -18869,7 +18869,7 @@ break;
 }`,
   },
   "spherecrop": {
-    params: [{ name: "radius", def: 1 }, { name: "x", def: 0 }, { name: "y", def: 0 }, { name: "z", def: 0 }, { name: "scatter_area", def: 0 }, { name: "zero", def: 1 }],
+    params: [{ name: "radius", def: 1 }, { name: "x", def: 0 }, { name: "y", def: 0 }, { name: "z", def: 0 }, { name: "scatter_area", def: 0 }, { name: "zero", def: 1, int: true }],
     verified: true, priority: 0, flags: ["3d","hide","z"], types: ["3D","CROP"],
     funcNames: ["atan2j"],
     funcs: `fn atan2j(y: f32, x: f32) -> f32 { if (x == 0.0 && y == 0.0) { return select(0.0, PI, (bitcast<u32>(x) >> 31u) == 1u) * select(1.0, -1.0, (bitcast<u32>(y) >> 31u) == 1u); } return atan2(y, x); }`,
@@ -18916,7 +18916,7 @@ if ((cr0 && esc)) {
 }`,
   },
   "sattractor_js": {
-    params: [{ name: "m", def: 10 }],
+    params: [{ name: "m", def: 10, int: true }],
     verified: true, priority: 0, flags: [], types: ["2D"],
     funcNames: ["atan2j"],
     funcs: `fn atan2j(y: f32, x: f32) -> f32 { if (x == 0.0 && y == 0.0) { return select(0.0, PI, (bitcast<u32>(x) >> 31u) == 1u) * select(1.0, -1.0, (bitcast<u32>(y) >> 31u) == 1u); } return atan2(y, x); }`,
@@ -19111,7 +19111,7 @@ v.y += (y * ${w});
 }`,
   },
   "siercarpet_js": {
-    params: [{ name: "m", def: 3 }],
+    params: [{ name: "m", def: 3, int: true }],
     verified: true, priority: 0, flags: [], types: ["2D","SIMULATION"],
     funcNames: ["atan2j"],
     funcs: `fn atan2j(y: f32, x: f32) -> f32 { if (x == 0.0 && y == 0.0) { return select(0.0, PI, (bitcast<u32>(x) >> 31u) == 1u) * select(1.0, -1.0, (bitcast<u32>(y) >> 31u) == 1u); } return atan2(y, x); }`,
@@ -19136,7 +19136,7 @@ v.y += (y * ${w});
 }`,
   },
   "woggle_js": {
-    params: [{ name: "m", def: 2 }],
+    params: [{ name: "m", def: 2, int: true }],
     verified: true, priority: 0, flags: [], types: ["2D"],
     funcNames: ["atan2j"],
     funcs: `fn atan2j(y: f32, x: f32) -> f32 { if (x == 0.0 && y == 0.0) { return select(0.0, PI, (bitcast<u32>(x) >> 31u) == 1u) * select(1.0, -1.0, (bitcast<u32>(y) >> 31u) == 1u); } return atan2(y, x); }`,
@@ -19197,7 +19197,7 @@ v.y += (y * ${w});
 }`,
   },
   "harmonograph_js": {
-    params: [{ name: "seed", def: 1234 }, { name: "time", def: 100 }, { name: "a1", def: 128 }, { name: "f1", def: 5 }, { name: "p1", def: 113 }, { name: "d1", def: 0.001301650295393377 }, { name: "a2", def: 0 }, { name: "f2", def: 3 }, { name: "p2", def: 33 }, { name: "d2", def: 0.0013211574142884402 }, { name: "a3", def: 49 }, { name: "f3", def: -4 }, { name: "p3", def: 57 }, { name: "d3", def: 0.001107815803330482 }, { name: "a4", def: 97 }, { name: "f4", def: 1 }, { name: "p4", def: 68 }, { name: "d4", def: 0.0011498156833428647 }],
+    params: [{ name: "seed", def: 1234, int: true }, { name: "time", def: 100, int: true }, { name: "a1", def: 128, int: true }, { name: "f1", def: 5 }, { name: "p1", def: 113, int: true }, { name: "d1", def: 0.001301650295393377 }, { name: "a2", def: 0, int: true }, { name: "f2", def: 3 }, { name: "p2", def: 33, int: true }, { name: "d2", def: 0.0013211574142884402 }, { name: "a3", def: 49, int: true }, { name: "f3", def: -4 }, { name: "p3", def: 57, int: true }, { name: "d3", def: 0.001107815803330482 }, { name: "a4", def: 97, int: true }, { name: "f4", def: 1 }, { name: "p4", def: 68, int: true }, { name: "d4", def: 0.0011498156833428647 }],
     verified: true, priority: 0, flags: [], types: ["2D","BASE_SHAPE"],
     funcNames: ["atan2j","harmonograph_js_mo"],
     funcs: `fn atan2j(y: f32, x: f32) -> f32 { if (x == 0.0 && y == 0.0) { return select(0.0, PI, (bitcast<u32>(x) >> 31u) == 1u) * select(1.0, -1.0, (bitcast<u32>(y) >> 31u) == 1u); } return atan2(y, x); }
@@ -19475,7 +19475,7 @@ break;
 }`,
   },
   "prepost_circlize": {
-    params: [{ name: "n", def: 4 }, { name: "rotation", def: 45 }, { name: "reverse", def: 0 }],
+    params: [{ name: "n", def: 4, int: true }, { name: "rotation", def: 45 }, { name: "reverse", def: 0, int: true }],
     verified: true, priority: 2, flags: [], types: ["2D","PREPOST"],
     funcNames: ["atan2j","prepost_circlize_lerp"],
     funcs: `fn atan2j(y: f32, x: f32) -> f32 { if (x == 0.0 && y == 0.0) { return select(0.0, PI, (bitcast<u32>(x) >> 31u) == 1u) * select(1.0, -1.0, (bitcast<u32>(y) >> 31u) == 1u); } return atan2(y, x); }
@@ -19597,7 +19597,7 @@ if ((ph > PI)) {
 }`,
   },
   "pTransform": {
-    params: [{ name: "rotate", def: 0.3 }, { name: "power", def: 2 }, { name: "move", def: 0.4 }, { name: "split", def: 0 }, { name: "use_log", def: 1 }],
+    params: [{ name: "rotate", def: 0.3 }, { name: "power", def: 2, int: true }, { name: "move", def: 0.4 }, { name: "split", def: 0 }, { name: "use_log", def: 1, int: true }],
     verified: true, priority: 0, flags: [], types: ["2D"],
     funcNames: ["roundc","atan2j"],
     funcs: `fn roundc(x: f32) -> f32 { return sign(x) * floor(abs(x) + 0.5); }
@@ -19621,7 +19621,7 @@ v.y += ((${w} * rho) * sin(theta));
 }`,
   },
   "dc_dmodulus": {
-    params: [{ name: "x", def: 2 }, { name: "y", def: 2 }, { name: "angle", def: 45 }, { name: "shiftx", def: 0 }, { name: "shifty", def: 0 }, { name: "color1", def: 0 }, { name: "speed1", def: 0 }, { name: "color2", def: 1 }, { name: "speed2", def: 0 }, { name: "square", def: 1 }],
+    params: [{ name: "x", def: 2 }, { name: "y", def: 2 }, { name: "angle", def: 45 }, { name: "shiftx", def: 0 }, { name: "shifty", def: 0 }, { name: "color1", def: 0 }, { name: "speed1", def: 0 }, { name: "color2", def: 1 }, { name: "speed2", def: 0 }, { name: "square", def: 1, int: true }],
     verified: true, priority: 0, flags: ["dc","state","z"], types: ["2D","DC"],
     funcNames: ["jwx_dc_dmodulus_inited_","jwx_dc_dmodulus_oldColor","jwx_dc_dmodulus_newColor","jwx_dc_dmodulus__xr","jwx_dc_dmodulus__yr","jwx_dc_dmodulus_c11","jwx_dc_dmodulus_c12","jwx_dc_dmodulus_c21","jwx_dc_dmodulus_c22","atan2j"],
     funcs: `fn atan2j(y: f32, x: f32) -> f32 { if (x == 0.0 && y == 0.0) { return select(0.0, PI, (bitcast<u32>(x) >> 31u) == 1u) * select(1.0, -1.0, (bitcast<u32>(y) >> 31u) == 1u); } return atan2(y, x); }
@@ -19779,7 +19779,7 @@ if (false) {
 }`,
   },
   "iconattractor_js": {
-    params: [{ name: "presetId", def: 4 }, { name: "degree", def: 3 }, { name: "a", def: -2.5 }, { name: "b", def: 0 }, { name: "g", def: 0.9 }, { name: "o", def: 0 }, { name: "l", def: 2.5 }, { name: "centerx", def: 0 }, { name: "centery", def: 0 }, { name: "scale", def: 5 }],
+    params: [{ name: "presetId", def: 4, int: true }, { name: "degree", def: 3, int: true }, { name: "a", def: -2.5 }, { name: "b", def: 0 }, { name: "g", def: 0.9 }, { name: "o", def: 0 }, { name: "l", def: 2.5 }, { name: "centerx", def: 0 }, { name: "centery", def: 0 }, { name: "scale", def: 5 }],
     verified: true, priority: 0, flags: ["dc"], types: ["2D","SIMULATION","DC","BASE_SHAPE"],
     funcNames: ["atan2j","sqrf"],
     funcs: `fn atan2j(y: f32, x: f32) -> f32 { if (x == 0.0 && y == 0.0) { return select(0.0, PI, (bitcast<u32>(x) >> 31u) == 1u) * select(1.0, -1.0, (bitcast<u32>(y) >> 31u) == 1u); } return atan2(y, x); }
@@ -19866,7 +19866,7 @@ v.y += (r_ * sin(u));
 }`,
   },
   "seashell3D": {
-    params: [{ name: "final_radius", def: 0.25 }, { name: "height", def: 3.5 }, { name: "inner_radius", def: 0.4 }, { name: "nSpirals", def: 3 }],
+    params: [{ name: "final_radius", def: 0.25 }, { name: "height", def: 3.5 }, { name: "inner_radius", def: 0.4 }, { name: "nSpirals", def: 3, int: true }],
     verified: true, priority: 0, flags: ["z"], types: ["BASE_SHAPE"],
     funcNames: ["roundc","atan2j"],
     funcs: `fn roundc(x: f32) -> f32 { return sign(x) * floor(abs(x) + 0.5); }
@@ -19909,7 +19909,7 @@ v.y += (y * ${w});
 }`,
   },
   "recurrenceplot": {
-    params: [{ name: "func_id", def: 0 }, { name: "a", def: 0.5 }, { name: "b", def: 10 }, { name: "k", def: 5 }, { name: "Density", def: 700 }, { name: "dc", def: 0 }, { name: "scale", def: 1 }, { name: "angle", def: 0 }, { name: "offset", def: 0 }, { name: "tolerance", def: 5 }],
+    params: [{ name: "func_id", def: 0, int: true }, { name: "a", def: 0.5 }, { name: "b", def: 10 }, { name: "k", def: 5, int: true }, { name: "Density", def: 700 }, { name: "dc", def: 0, int: true }, { name: "scale", def: 1 }, { name: "angle", def: 0 }, { name: "offset", def: 0 }, { name: "tolerance", def: 5 }],
     verified: true, priority: 0, flags: ["dc","state","stateful"], types: ["BASE_SHAPE","SIMULATION"],
     funcNames: ["jwx_recurrenceplot_oldx","jwx_recurrenceplot_oldy","atan2j","powc","recurrenceplot_F6","recurrenceplot_F22","recurrenceplot_F23","recurrenceplot_F24","recurrenceplot_F25","recurrenceplot_F26","recurrenceplot_F27","recurrenceplot_F28","F29"],
     funcs: `fn atan2j(y: f32, x: f32) -> f32 { if (x == 0.0 && y == 0.0) { return select(0.0, PI, (bitcast<u32>(x) >> 31u) == 1u) * select(1.0, -1.0, (bitcast<u32>(y) >> 31u) == 1u); } return atan2(y, x); }
@@ -20566,7 +20566,7 @@ v.y += ((((${p[9]} * t.x) * t.y) + ((${w} * ${p[10]}) * t.y)) + ((${p[11]} * t.y
 }`,
   },
   "curliecue2": {
-    params: [{ name: "seed", def: 1000 }],
+    params: [{ name: "seed", def: 1000, int: true }],
     verified: true, priority: 0, flags: ["state","z"], types: ["2D"],
     funcNames: ["jwx_curliecue2_inited_","jwx_curliecue2_x0","jwx_curliecue2_y0","jwx_curliecue2_x1","jwx_curliecue2_y1","jwx_curliecue2_theta","jwx_curliecue2_phi","jwx_curliecue2_s","jrand_","atan2j","rndi","jrand_make","jrand_next","jrand_nextDouble"],
     funcs: `struct jrand_ {
@@ -20666,7 +20666,7 @@ if (false) {
 }`,
   },
   "starfractal": {
-    params: [{ name: "m", def: 3 }],
+    params: [{ name: "m", def: 3, int: true }],
     verified: true, priority: 0, flags: [], types: ["2D","SIMULATION","BASE_SHAPE"],
     funcNames: ["atan2j"],
     funcs: `fn atan2j(y: f32, x: f32) -> f32 { if (x == 0.0 && y == 0.0) { return select(0.0, PI, (bitcast<u32>(x) >> 31u) == 1u) * select(1.0, -1.0, (bitcast<u32>(y) >> 31u) == 1u); } return atan2(y, x); }`,
@@ -20711,7 +20711,7 @@ pz_ += (${w} * sin(((6.0 * cos(rad)) - (f32(i32(${p[0]})) * ang))));
 }`,
   },
   "jac_asn": {
-    params: [{ name: "kr", def: 0.5 }, { name: "ki", def: 0 }, { name: "type", def: 1 }],
+    params: [{ name: "kr", def: 0.5 }, { name: "ki", def: 0 }, { name: "type", def: 1, int: true }],
     verified: true, priority: 0, flags: [], types: ["2D"],
     funcNames: ["Complex","atan2j","Complex_Init","Complex_sin","Complex_times_ov1","Complex_minus","Complex_mag","Complex_arg","Complex_sqrt","Complex_plus","Complex_ln","Complex_times","Complex_asin","Complex_acos","Complex_asinh","Complex_Copy","Complex_norm","Complex_divideBy","Complex_tan"],
     funcs: `struct Complex {
@@ -21138,7 +21138,7 @@ if ((${w} != 0.0)) {
 }`,
   },
   "hypershift2": {
-    params: [{ name: "p", def: 3 }, { name: "q", def: 7 }],
+    params: [{ name: "p", def: 3, int: true }, { name: "q", def: 7, int: true }],
     verified: true, priority: 0, flags: ["3d","z"], types: ["3D"],
     funcNames: ["sqr","rndi","atan2j"],
     funcs: `fn sqr(x: f32) -> f32 { return x * x; }
@@ -21173,7 +21173,7 @@ pz_ = (z_ * rad);
 }`,
   },
   "hypercrop": {
-    params: [{ name: "n", def: 4 }, { name: "rad", def: 1 }, { name: "zero", def: 0 }],
+    params: [{ name: "n", def: 4, int: true }, { name: "rad", def: 1 }, { name: "zero", def: 0 }],
     verified: true, priority: 0, flags: ["3d","z"], types: ["3D","CROP"],
     funcNames: ["atan2j"],
     funcs: `fn atan2j(y: f32, x: f32) -> f32 { if (x == 0.0 && y == 0.0) { return select(0.0, PI, (bitcast<u32>(x) >> 31u) == 1u) * select(1.0, -1.0, (bitcast<u32>(y) >> 31u) == 1u); } return atan2(y, x); }`,
@@ -21213,7 +21213,7 @@ pz_ += (FZ * ${w});
 }`,
   },
   "truchet2": {
-    params: [{ name: "exponent1", def: 1 }, { name: "exponent2", def: 2 }, { name: "width1", def: 0.5 }, { name: "width2", def: 0.5 }, { name: "scale", def: 10 }, { name: "seed", def: 50 }, { name: "inverse", def: 0 }],
+    params: [{ name: "exponent1", def: 1 }, { name: "exponent2", def: 2 }, { name: "width1", def: 0.5 }, { name: "width2", def: 0.5 }, { name: "scale", def: 10 }, { name: "seed", def: 50 }, { name: "inverse", def: 0, int: true }],
     verified: true, priority: 0, flags: [], types: ["SIMULATION"],
     funcNames: ["roundc","powc","atan2j"],
     funcs: `fn roundc(x: f32) -> f32 { return sign(x) * floor(abs(x) + 0.5); }
@@ -22229,7 +22229,7 @@ if ((rnd(rs) < ${p[7]})) {
 }`,
   },
   "julia_outside": {
-    params: [{ name: "re_div", def: 1 }, { name: "im_div", def: 0 }, { name: "mode", def: 0 }],
+    params: [{ name: "re_div", def: 1 }, { name: "im_div", def: 0 }, { name: "mode", def: 0, int: true }],
     verified: true, priority: 0, flags: [], types: ["2D"],
     funcNames: ["Complex","atan2j","Complex_Init","Complex_Radius","Complex_Neg","Complex_Sqrt","Complex_Inc","Complex_Sqr","Complex_Dec","Complex_Mag2","Complex_MagInv","Complex_Div"],
     funcs: `struct Complex {
@@ -22341,7 +22341,7 @@ if (((min(max(${p[2]}, 0.0), 2.0) == 0.0) || (min(max(${p[2]}, 0.0), 2.0) == 1.0
 }`,
   },
   "pointgrid_wf": {
-    params: [{ name: "xmin", def: -3 }, { name: "xmax", def: 3 }, { name: "xcount", def: 32 }, { name: "ymin", def: -3 }, { name: "ymax", def: 3 }, { name: "ycount", def: 32 }, { name: "distortion", def: 2.3 }, { name: "seed", def: 1234 }],
+    params: [{ name: "xmin", def: -3 }, { name: "xmax", def: 3 }, { name: "xcount", def: 32, int: true }, { name: "ymin", def: -3 }, { name: "ymax", def: 3 }, { name: "ycount", def: 32, int: true }, { name: "distortion", def: 2.3 }, { name: "seed", def: 1234, int: true }],
     verified: true, priority: 0, flags: [], types: ["2D"],
     funcNames: ["atan2j","pointgrid_u","pointgrid_v","pointgrid_randomize","pointgrid_random"],
     funcs: `fn atan2j(y: f32, x: f32) -> f32 { if (x == 0.0 && y == 0.0) { return select(0.0, PI, (bitcast<u32>(x) >> 31u) == 1u) * select(1.0, -1.0, (bitcast<u32>(y) >> 31u) == 1u); } return atan2(y, x); }
@@ -22384,7 +22384,7 @@ v.y += (y * ${w});
 }`,
   },
   "pointgrid3d_wf": {
-    params: [{ name: "xmin", def: -3 }, { name: "xmax", def: 3 }, { name: "xcount", def: 10 }, { name: "ymin", def: -3 }, { name: "ymax", def: 3 }, { name: "ycount", def: 10 }, { name: "zmin", def: -1 }, { name: "zmax", def: 1 }, { name: "zcount", def: 10 }, { name: "distortion", def: 2.3 }, { name: "seed", def: 1234 }],
+    params: [{ name: "xmin", def: -3 }, { name: "xmax", def: 3 }, { name: "xcount", def: 10, int: true }, { name: "ymin", def: -3 }, { name: "ymax", def: 3 }, { name: "ycount", def: 10, int: true }, { name: "zmin", def: -1 }, { name: "zmax", def: 1 }, { name: "zcount", def: 10, int: true }, { name: "distortion", def: 2.3 }, { name: "seed", def: 1234, int: true }],
     verified: true, priority: 0, flags: ["3d","z"], types: ["3D"],
     funcNames: ["atan2j","pointgrid3d_u","pointgrid3d_v","pointgrid3d_randomize","pointgrid3d_random"],
     funcs: `fn atan2j(y: f32, x: f32) -> f32 { if (x == 0.0 && y == 0.0) { return select(0.0, PI, (bitcast<u32>(x) >> 31u) == 1u) * select(1.0, -1.0, (bitcast<u32>(y) >> 31u) == 1u); } return atan2(y, x); }
@@ -22435,7 +22435,7 @@ pz_ += (z * ${w});
 }`,
   },
   "glsl_mandala": {
-    params: [{ name: "Density Pixels", def: 1000000 }, { name: "mX", def: 0.025 }, { name: "mY", def: -0.001245675 }, { name: "scale", def: 2 }, { name: "sides", def: 12 }, { name: "multiply", def: 1.5 }, { name: "loops", def: 64 }, { name: "iR", def: 0 }, { name: "iG", def: 0 }, { name: "iB", def: 1 }, { name: "Gradient", def: 0 }],
+    params: [{ name: "Density Pixels", def: 1000000, int: true }, { name: "mX", def: 0.025 }, { name: "mY", def: -0.001245675 }, { name: "scale", def: 2 }, { name: "sides", def: 12 }, { name: "multiply", def: 1.5 }, { name: "loops", def: 64 }, { name: "iR", def: 0, int: true }, { name: "iG", def: 0, int: true }, { name: "iB", def: 1, int: true }, { name: "Gradient", def: 0, int: true }],
     verified: true, priority: 0, flags: ["dc","rgb","state"], types: ["SIMULATION","DC","BASE_SHAPE"],
     funcNames: ["jwx_glsl_mandala_scale_c","jwx_glsl_mandala_Density_Pixels_c","jwx_glsl_mandala_sides_c","jwx_glsl_mandala_multiply_c","jwx_glsl_mandala_mX_c","jwx_glsl_mandala_loops_c","jwx_glsl_mandala_mY_c","jwx_glsl_mandala_iR_c","jwx_glsl_mandala_iG_c","jwx_glsl_mandala_iB_c","jwx_glsl_mandala_inited_","jwx_glsl_mandala_resolutionY","atan2j","mmod2","G_Kscope","glsl_mandala_getRGBColor","dbl2int"],
     funcs: `fn atan2j(y: f32, x: f32) -> f32 { if (x == 0.0 && y == 0.0) { return select(0.0, PI, (bitcast<u32>(x) >> 31u) == 1u) * select(1.0, -1.0, (bitcast<u32>(y) >> 31u) == 1u); } return atan2(y, x); }
@@ -22554,7 +22554,7 @@ v.y += (${w} * ((f32(j) / f32(jwx_glsl_mandala_resolutionY)) - 0.5));
 }`,
   },
   "glsl_apollonian": {
-    params: [{ name: "Density Pixels", def: 1000000 }, { name: "seed", def: 10000 }, { name: "time", def: 0 }, { name: "Gradient", def: 0 }],
+    params: [{ name: "Density Pixels", def: 1000000, int: true }, { name: "seed", def: 10000, int: true }, { name: "time", def: 0 }, { name: "Gradient", def: 0, int: true }],
     verified: true, priority: 0, flags: ["dc","rgb","state"], types: ["SIMULATION","DC","BASE_SHAPE"],
     funcNames: ["jwx_glsl_apollonian_Density_Pixels_c","jwx_glsl_apollonian_time_c","jwx_glsl_apollonian_inited_","jwx_glsl_apollonian_resolutionY","mat3_","atan2j","rndi","mat3_make","G_rot","mat3_scale","G_app","glsl_apollonian_getRGBColor","dbl2int"],
     funcs: `struct mat3_ {
@@ -22670,7 +22670,7 @@ v.y += (${w} * ((f32(j) / f32(jwx_glsl_apollonian_resolutionY)) - 0.5));
 }`,
   },
   "glsl_fractaldots": {
-    params: [{ name: "Density Pixels", def: 1000000 }, { name: "iterations", def: 9 }, { name: "DotSize", def: 400 }, { name: "MaxIterations", def: 10 }, { name: "complexity", def: 0.001245675 }, { name: "pattern", def: 2.5 }, { name: "spacing", def: 12 }, { name: "rotate1", def: 1.5 }, { name: "rotate2", def: 64 }, { name: "zoom", def: 64 }, { name: "Gradient", def: 0 }],
+    params: [{ name: "Density Pixels", def: 1000000, int: true }, { name: "iterations", def: 9, int: true }, { name: "DotSize", def: 400 }, { name: "MaxIterations", def: 10 }, { name: "complexity", def: 0.001245675 }, { name: "pattern", def: 2.5 }, { name: "spacing", def: 12 }, { name: "rotate1", def: 1.5 }, { name: "rotate2", def: 64 }, { name: "zoom", def: 64 }, { name: "Gradient", def: 0, int: true }],
     verified: true, priority: 0, flags: ["dc","rgb","state"], types: ["SIMULATION","DC","BASE_SHAPE"],
     funcNames: ["jwx_glsl_fractaldots_Density_Pixels_c","jwx_glsl_fractaldots_rotate1_c","jwx_glsl_fractaldots_zoom_c","jwx_glsl_fractaldots_spacing_c","jwx_glsl_fractaldots_MaxIterations_c","jwx_glsl_fractaldots_complexity_c","jwx_glsl_fractaldots_rotate2_c","jwx_glsl_fractaldots_pattern_c","jwx_glsl_fractaldots_iterations_c","jwx_glsl_fractaldots_inited_","jwx_glsl_fractaldots_resolutionY","jwx_glsl_fractaldots_circleSize","powc","atan2j","glsl_fractaldots_rot","glsl_fractaldots_getRGBColor","dbl2int"],
     funcs: `fn powc(x: f32, y: f32) -> f32 {
@@ -22773,7 +22773,7 @@ v.y += (${w} * ((f32(j) / f32(jwx_glsl_fractaldots_resolutionY)) - 0.5));
 }`,
   },
   "glsl_circuits": {
-    params: [{ name: "Density Pixels", def: 1000000 }, { name: "time", def: 0 }, { name: "rate", def: 0.8 }, { name: "intensity", def: 0.9 }, { name: "focus", def: 1.5 }, { name: "pulse", def: 10 }, { name: "glow", def: 2 }, { name: "loops", def: 15 }, { name: "zoom", def: 1 }, { name: "Gradient", def: 0 }],
+    params: [{ name: "Density Pixels", def: 1000000, int: true }, { name: "time", def: 0 }, { name: "rate", def: 0.8 }, { name: "intensity", def: 0.9 }, { name: "focus", def: 1.5 }, { name: "pulse", def: 10 }, { name: "glow", def: 2 }, { name: "loops", def: 15 }, { name: "zoom", def: 1 }, { name: "Gradient", def: 0, int: true }],
     verified: true, priority: 0, flags: ["dc","rgb","state"], types: ["SIMULATION","DC","BASE_SHAPE"],
     funcNames: ["jwx_glsl_circuits_loops_c","jwx_glsl_circuits_zoom_c","jwx_glsl_circuits_intensity_c","jwx_glsl_circuits_pulse_c","jwx_glsl_circuits_Density_Pixels_c","jwx_glsl_circuits_time_c","jwx_glsl_circuits_rate_c","jwx_glsl_circuits_focus_c","jwx_glsl_circuits_inited_","jwx_glsl_circuits_S","jwx_glsl_circuits_resolutionY","atan2j","powc","glsl_circuits_formula","glsl_circuits_getRGBColor","dbl2int"],
     funcs: `fn atan2j(y: f32, x: f32) -> f32 { if (x == 0.0 && y == 0.0) { return select(0.0, PI, (bitcast<u32>(x) >> 31u) == 1u) * select(1.0, -1.0, (bitcast<u32>(y) >> 31u) == 1u); } return atan2(y, x); }
@@ -22928,7 +22928,7 @@ v.y += (${w} * ((f32(j) / f32(jwx_glsl_circuits_resolutionY)) - 0.5));
 }`,
   },
   "glsl_mandelbox2D": {
-    params: [{ name: "Density Pixels", def: 1000000 }, { name: "seed", def: 10000 }, { name: "time", def: 0 }, { name: "Gradient", def: 0 }],
+    params: [{ name: "Density Pixels", def: 1000000, int: true }, { name: "seed", def: 10000, int: true }, { name: "time", def: 0 }, { name: "Gradient", def: 0, int: true }],
     verified: true, priority: 0, flags: ["dc","rgb","state"], types: ["SIMULATION","DC","BASE_SHAPE"],
     funcNames: ["jwx_glsl_mandelbox2D_Density_Pixels_c","jwx_glsl_mandelbox2D_time_c","jwx_glsl_mandelbox2D_inited_","jwx_glsl_mandelbox2D_resolutionY","jrand_","atan2j","rndi","powc","jrand_next","jrand_nextDouble","glsl_mandelbox2D_random","glsl_mandelbox2D_getRGBColor","dbl2int"],
     funcs: `struct jrand_ {
@@ -23042,7 +23042,7 @@ v.y += (${w} * ((f32(j) / f32(jwx_glsl_mandelbox2D_resolutionY)) - 0.5));
 }`,
   },
   "glsl_hoshi": {
-    params: [{ name: "Density Pixels", def: 1000000 }, { name: "Seed", def: 100000 }, { name: "time", def: 10 }, { name: "Steps", def: 28 }, { name: "Scale", def: 1.25 }, { name: "Translate", def: 1.5 }, { name: "Gradient", def: 0 }],
+    params: [{ name: "Density Pixels", def: 1000000, int: true }, { name: "Seed", def: 100000, int: true }, { name: "time", def: 10 }, { name: "Steps", def: 28, int: true }, { name: "Scale", def: 1.25 }, { name: "Translate", def: 1.5 }, { name: "Gradient", def: 0, int: true }],
     verified: true, priority: 0, flags: ["dc","rgb","state"], types: ["SIMULATION","DC","BASE_SHAPE"],
     funcNames: ["jwx_glsl_hoshi_Density_Pixels_c","jwx_glsl_hoshi_Steps_c","jwx_glsl_hoshi_time_c","jwx_glsl_hoshi_inited_","jwx_glsl_hoshi_resolutionY","jwx_glsl_hoshi_fold","jwx_glsl_hoshi_translate","jwx_glsl_hoshi_scale","jrand_","atan2j","rndi","mmod2","smoothstepc","jrand_next","jrand_nextDouble","glsl_hoshi_random","glsl_hoshi_rotate","glsl_hoshi_hsv","glsl_hoshi_getRGBColor","dbl2int"],
     funcs: `struct jrand_ {
@@ -23181,7 +23181,7 @@ v.y += (${w} * ((f32(j) / f32(jwx_glsl_hoshi_resolutionY)) - 0.5));
 }`,
   },
   "glsl_kaleidocomplex": {
-    params: [{ name: "Density Pixels", def: 1000000 }, { name: "Seed", def: 10000 }, { name: "time", def: 0 }, { name: "iMax", def: 12 }, { name: "Color", def: 2 }, { name: "Red Fac.", def: 1 }, { name: "Green Fac.", def: 1 }, { name: "Blue Fac.", def: 1 }, { name: "Gradient", def: 0 }],
+    params: [{ name: "Density Pixels", def: 1000000, int: true }, { name: "Seed", def: 10000, int: true }, { name: "time", def: 0 }, { name: "iMax", def: 12, int: true }, { name: "Color", def: 2 }, { name: "Red Fac.", def: 1 }, { name: "Green Fac.", def: 1 }, { name: "Blue Fac.", def: 1 }, { name: "Gradient", def: 0, int: true }],
     verified: true, priority: 0, flags: ["dc","rgb","state"], types: ["SIMULATION","DC","BASE_SHAPE"],
     funcNames: ["jwx_glsl_kaleidocomplex_Density_Pixels_c","jwx_glsl_kaleidocomplex_iMax_c","jwx_glsl_kaleidocomplex_time_c","jwx_glsl_kaleidocomplex_Color_c","jwx_glsl_kaleidocomplex_Red_Fac__c","jwx_glsl_kaleidocomplex_Green_Fac__c","jwx_glsl_kaleidocomplex_Blue_Fac__c","jwx_glsl_kaleidocomplex_inited_","jwx_glsl_kaleidocomplex_resolutionY","jrand_","atan2j","rndi","jrand_next","jrand_nextDouble","glsl_kaleidocomplex_random","glsl_kaleidocomplex_cmult","glsl_kaleidocomplex_getRGBColor","dbl2int"],
     funcs: `struct jrand_ {
@@ -23335,7 +23335,7 @@ v.y += (${w} * ((f32(j) / f32(jwx_glsl_kaleidocomplex_resolutionY)) - 0.5));
 }`,
   },
   "glsl_starsfield": {
-    params: [{ name: "Density Pixels", def: 1000000 }, { name: "Seed", def: 10000 }, { name: "time", def: 0 }, { name: "Z distance", def: 2 }, { name: "Glow", def: 2 }, { name: "Gradient", def: 0 }],
+    params: [{ name: "Density Pixels", def: 1000000, int: true }, { name: "Seed", def: 10000, int: true }, { name: "time", def: 0 }, { name: "Z distance", def: 2 }, { name: "Glow", def: 2 }, { name: "Gradient", def: 0, int: true }],
     verified: true, priority: 0, flags: ["dc","rgb","state"], types: ["SIMULATION","DC","BASE_SHAPE"],
     funcNames: ["jwx_glsl_starsfield_Z_distance_c","jwx_glsl_starsfield_time_c","jwx_glsl_starsfield_Glow_c","jwx_glsl_starsfield_Density_Pixels_c","jwx_glsl_starsfield_inited_","jwx_glsl_starsfield_resolutionY","jrand_","atan2j","rndi","smoothstepc","jrand_next","jrand_nextDouble","glsl_starsfield_random","glsl_starsfield_rotate","glsl_starsfield_hash11","glsl_starsfield_hash22","glsl_starsfield_hash21","glsl_starsfield_layer","glsl_starsfield_render","glsl_starsfield_getRGBColor","dbl2int"],
     funcs: `struct jrand_ {
@@ -23502,7 +23502,7 @@ v.y += (${w} * ((f32(j) / f32(jwx_glsl_starsfield_resolutionY)) - 0.5));
 }`,
   },
   "glsl_kaleidoscopic": {
-    params: [{ name: "Density Pixels", def: 1000000 }, { name: "Seed", def: 10000 }, { name: "time", def: 0 }, { name: "Sides", def: 8 }, { name: "zoom", def: 0 }, { name: "P1", def: 0 }, { name: "Radial", def: 0 }, { name: "Gradient", def: 0 }],
+    params: [{ name: "Density Pixels", def: 1000000, int: true }, { name: "Seed", def: 10000, int: true }, { name: "time", def: 0 }, { name: "Sides", def: 8, int: true }, { name: "zoom", def: 0 }, { name: "P1", def: 0 }, { name: "Radial", def: 0, int: true }, { name: "Gradient", def: 0, int: true }],
     verified: true, priority: 0, flags: ["dc","rgb","state"], types: ["SIMULATION","DC","BASE_SHAPE"],
     funcNames: ["jwx_glsl_kaleidoscopic_time_c","jwx_glsl_kaleidoscopic_Density_Pixels_c","jwx_glsl_kaleidoscopic_zoom_c","jwx_glsl_kaleidoscopic_Radial_c","jwx_glsl_kaleidoscopic_P1_c","jwx_glsl_kaleidoscopic_inited_","jwx_glsl_kaleidoscopic_KA","jwx_glsl_kaleidoscopic_resolutionY","jrand_","atan2j","rndi","jrand_next","jrand_nextDouble","glsl_kaleidoscopic_random","glsl_kaleidoscopic_smallKoleidoscope","glsl_kaleidoscopic_getRGBColor","dbl2int"],
     funcs: `struct jrand_ {
@@ -23629,7 +23629,7 @@ v.y += (${w} * ((f32(j) / f32(jwx_glsl_kaleidoscopic_resolutionY)) - 0.5));
 }`,
   },
   "glsl_randomoctree": {
-    params: [{ name: "Density Pixels", def: 1000000 }, { name: "Seed", def: 10000 }, { name: "time", def: 0 }, { name: "Steps", def: 10 }, { name: "Rot. L-R", def: 0 }, { name: "Rot. U-D", def: 0 }, { name: "Grid", def: 0 }, { name: "Borders", def: 1 }, { name: "Black Borders", def: 1 }, { name: "Gradient", def: 0 }],
+    params: [{ name: "Density Pixels", def: 1000000, int: true }, { name: "Seed", def: 10000, int: true }, { name: "time", def: 0 }, { name: "Steps", def: 10, int: true }, { name: "Rot. L-R", def: 0 }, { name: "Rot. U-D", def: 0 }, { name: "Grid", def: 0, int: true }, { name: "Borders", def: 1, int: true }, { name: "Black Borders", def: 1, int: true }, { name: "Gradient", def: 0, int: true }],
     verified: true, priority: 0, flags: ["dc","rgb","state"], types: ["SIMULATION","DC","BASE_SHAPE"],
     funcNames: ["jwx_glsl_randomoctree_Density_Pixels_c","jwx_glsl_randomoctree_time_c","jwx_glsl_randomoctree_Rot__L_R_c","jwx_glsl_randomoctree_Rot__U_D_c","jwx_glsl_randomoctree_Steps_c","jwx_glsl_randomoctree_Grid_c","jwx_glsl_randomoctree_Borders_c","jwx_glsl_randomoctree_Black_Borders_c","jwx_glsl_randomoctree_inited_","jwx_glsl_randomoctree_HASHSCALE3","jwx_glsl_randomoctree_emptycells","jwx_glsl_randomoctree_subdivisions","jwx_glsl_randomoctree_resolutionY","jwx_glsl_randomoctree_detail","jrand_","atan2j","rndi","mmod3","jrand_next","jrand_nextDouble","glsl_randomoctree_random","glsl_randomoctree_rot","glsl_randomoctree_rnd","glsl_randomoctree_getvoxel","glsl_randomoctree_voxel","glsl_randomoctree_getRGBColor","dbl2int"],
     funcs: `struct jrand_ {
@@ -23890,7 +23890,7 @@ v.y += (${w} * ((f32(j) / f32(jwx_glsl_randomoctree_resolutionY)) - 0.5));
 }`,
   },
   "glsl_acrilic": {
-    params: [{ name: "Density Pixels", def: 1000000 }, { name: "Seed", def: 10000 }, { name: "time", def: 0 }, { name: "Steps", def: 10 }, { name: "p1", def: 12 }, { name: "p2", def: 12 }, { name: "p3", def: 12 }, { name: "p4", def: 12 }, { name: "p5", def: 75 }, { name: "p6", def: 75 }, { name: "Red Fac.", def: 1 }, { name: "Green Fac.", def: 1 }, { name: "Blue Fac.", def: 1 }, { name: "Gradient", def: 0 }],
+    params: [{ name: "Density Pixels", def: 1000000, int: true }, { name: "Seed", def: 10000, int: true }, { name: "time", def: 0 }, { name: "Steps", def: 10, int: true }, { name: "p1", def: 12 }, { name: "p2", def: 12 }, { name: "p3", def: 12 }, { name: "p4", def: 12 }, { name: "p5", def: 75 }, { name: "p6", def: 75 }, { name: "Red Fac.", def: 1 }, { name: "Green Fac.", def: 1 }, { name: "Blue Fac.", def: 1 }, { name: "Gradient", def: 0, int: true }],
     verified: true, priority: 0, flags: ["dc","rgb","state"], types: ["SIMULATION","DC","BASE_SHAPE"],
     funcNames: ["jwx_glsl_acrilic_Density_Pixels_c","jwx_glsl_acrilic_Steps_c","jwx_glsl_acrilic_p1_c","jwx_glsl_acrilic_time_c","jwx_glsl_acrilic_p2_c","jwx_glsl_acrilic_p3_c","jwx_glsl_acrilic_p4_c","jwx_glsl_acrilic_p5_c","jwx_glsl_acrilic_p6_c","jwx_glsl_acrilic_Red_Fac__c","jwx_glsl_acrilic_Green_Fac__c","jwx_glsl_acrilic_Blue_Fac__c","jwx_glsl_acrilic_inited_","jwx_glsl_acrilic_resolutionY","jrand_","atan2j","rndi","jrand_next","jrand_nextDouble","glsl_acrilic_random","glsl_acrilic_sq","glsl_acrilic_getRGBColor","dbl2int"],
     funcs: `struct jrand_ {
@@ -24038,7 +24038,7 @@ v.y += (${w} * ((f32(j) / f32(jwx_glsl_acrilic_resolutionY)) - 0.5));
 }`,
   },
   "glsl_circlesblue": {
-    params: [{ name: "Density Pixels", def: 1000000 }, { name: "Seed", def: 10000 }, { name: "time", def: 1 }, { name: "Radiusy", def: 0.04 }, { name: "Bubles", def: 40 }, { name: "Gradient", def: 0 }],
+    params: [{ name: "Density Pixels", def: 1000000, int: true }, { name: "Seed", def: 10000, int: true }, { name: "time", def: 1 }, { name: "Radiusy", def: 0.04 }, { name: "Bubles", def: 40, int: true }, { name: "Gradient", def: 0, int: true }],
     verified: true, priority: 0, flags: ["dc","rgb","state"], types: ["SIMULATION","DC","BASE_SHAPE"],
     funcNames: ["jwx_glsl_circlesblue_Density_Pixels_c","jwx_glsl_circlesblue_Bubles_c","jwx_glsl_circlesblue_Radiusy_c","jwx_glsl_circlesblue_time_c","jwx_glsl_circlesblue_inited_","jwx_glsl_circlesblue_resolutionY","jrand_","atan2j","rndi","powc","smoothstepc","jrand_next","jrand_nextDouble","glsl_circlesblue_random","glsl_circlesblue_getRGBColor","dbl2int"],
     funcs: `struct jrand_ {
@@ -24162,7 +24162,7 @@ v.y += (${w} * ((f32(j) / f32(jwx_glsl_circlesblue_resolutionY)) - 0.5));
 }`,
   },
   "glsl_kaliset": {
-    params: [{ name: "Density Pixels", def: 1000000 }, { name: "Seed", def: 10000 }, { name: "time", def: 200 }, { name: "N", def: 60 }, { name: "ShiftX", def: -0.22 }, { name: "ShiftY", def: -0.21 }, { name: "Gradient", def: 0 }],
+    params: [{ name: "Density Pixels", def: 1000000, int: true }, { name: "Seed", def: 10000, int: true }, { name: "time", def: 200 }, { name: "N", def: 60, int: true }, { name: "ShiftX", def: -0.22 }, { name: "ShiftY", def: -0.21 }, { name: "Gradient", def: 0, int: true }],
     verified: true, priority: 0, flags: ["dc","rgb","state"], types: ["SIMULATION","DC","BASE_SHAPE"],
     funcNames: ["jwx_glsl_kaliset_Density_Pixels_c","jwx_glsl_kaliset_time_c","jwx_glsl_kaliset_ShiftX_c","jwx_glsl_kaliset_ShiftY_c","jwx_glsl_kaliset_N_c","jwx_glsl_kaliset_inited_","jwx_glsl_kaliset_resolutionY","jrand_","atan2j","rndi","jrand_next","jrand_nextDouble","glsl_kaliset_random","glsl_kaliset_getRGBColor","dbl2int"],
     funcs: `struct jrand_ {
@@ -24286,7 +24286,7 @@ v.y += (${w} * ((f32(j) / f32(jwx_glsl_kaliset_resolutionY)) - 0.5));
 }`,
   },
   "glsl_kaliset2": {
-    params: [{ name: "Density Pixels", def: 1000000 }, { name: "Seed", def: 5000 }, { name: "time", def: 85.5 }, { name: "N", def: 100 }, { name: "radio", def: 1 }, { name: "ShiftX", def: -0.356 }, { name: "ShiftY", def: 0.686 }, { name: "Red Fac.", def: 1.8 }, { name: "Green Fac.", def: 1.9 }, { name: "Blue Fac.", def: 2.2 }, { name: "Gradient", def: 0 }],
+    params: [{ name: "Density Pixels", def: 1000000, int: true }, { name: "Seed", def: 5000, int: true }, { name: "time", def: 85.5 }, { name: "N", def: 100, int: true }, { name: "radio", def: 1 }, { name: "ShiftX", def: -0.356 }, { name: "ShiftY", def: 0.686 }, { name: "Red Fac.", def: 1.8 }, { name: "Green Fac.", def: 1.9 }, { name: "Blue Fac.", def: 2.2 }, { name: "Gradient", def: 0, int: true }],
     verified: true, priority: 0, flags: ["dc","rgb","state"], types: ["SIMULATION","DC","BASE_SHAPE"],
     funcNames: ["jwx_glsl_kaliset2_Density_Pixels_c","jwx_glsl_kaliset2_ShiftX_c","jwx_glsl_kaliset2_time_c","jwx_glsl_kaliset2_ShiftY_c","jwx_glsl_kaliset2_N_c","jwx_glsl_kaliset2_radio_c","jwx_glsl_kaliset2_Red_Fac__c","jwx_glsl_kaliset2_Green_Fac__c","jwx_glsl_kaliset2_Blue_Fac__c","jwx_glsl_kaliset2_inited_","jwx_glsl_kaliset2_resolutionY","jrand_","atan2j","rndi","jrand_next","jrand_nextDouble","glsl_kaliset2_random","glsl_kaliset2_getRGBColor","dbl2int"],
     funcs: `struct jrand_ {
@@ -24422,7 +24422,7 @@ v.y += (${w} * ((f32(j) / f32(jwx_glsl_kaliset2_resolutionY)) - 0.5));
 }`,
   },
   "glsl_grid3D": {
-    params: [{ name: "Density Pixels", def: 1000000 }, { name: "Seed", def: 10000 }, { name: "time", def: 200 }],
+    params: [{ name: "Density Pixels", def: 1000000, int: true }, { name: "Seed", def: 10000, int: true }, { name: "time", def: 200 }],
     verified: true, priority: 0, flags: ["dc","rgb","state"], types: ["SIMULATION","DC","BASE_SHAPE"],
     funcNames: ["jwx_glsl_grid3D_Density_Pixels_c","jwx_glsl_grid3D_time_c","jwx_glsl_grid3D_inited_","jwx_glsl_grid3D_resolutionY","jrand_","mat3_","atan2j","rndi","jrand_next","jrand_nextDouble","glsl_grid3D_random","mat3_make","glsl_grid3D_field","glsl_grid3D_getRGBColor","dbl2int"],
     funcs: `struct jrand_ {
@@ -24574,7 +24574,7 @@ v.y += (${w} * ((f32(j) / f32(jwx_glsl_grid3D_resolutionY)) - 0.5));
 }`,
   },
   "glsl_hyperbolictile": {
-    params: [{ name: "Density Pixels", def: 1000000 }, { name: "Gradient", def: 0 }],
+    params: [{ name: "Density Pixels", def: 1000000, int: true }, { name: "Gradient", def: 0, int: true }],
     verified: true, priority: 0, flags: ["dc","rgb","state"], types: ["SIMULATION","DC","BASE_SHAPE"],
     funcNames: ["jwx_glsl_hyperbolictile_Density_Pixels_c","jwx_glsl_hyperbolictile_inited_","jwx_glsl_hyperbolictile_resolutionY","atan2j","glsl_hyperbolictile_topolar","glsl_hyperbolictile_tocart","glsl_hyperbolictile_mirror","glsl_hyperbolictile_getRGBColor","dbl2int"],
     funcs: `fn atan2j(y: f32, x: f32) -> f32 { if (x == 0.0 && y == 0.0) { return select(0.0, PI, (bitcast<u32>(x) >> 31u) == 1u) * select(1.0, -1.0, (bitcast<u32>(y) >> 31u) == 1u); } return atan2(y, x); }
@@ -24684,7 +24684,7 @@ v.y += (${w} * ((f32(j) / f32(jwx_glsl_hyperbolictile_resolutionY)) - 0.5));
 }`,
   },
   "glsl_squares": {
-    params: [{ name: "Density Pixels", def: 1000000 }, { name: "Seed", def: 5000 }, { name: "time", def: 85.5 }, { name: "N", def: 3 }, { name: "Direction", def: 1 }, { name: "Red Fac.", def: 1.8 }, { name: "Green Fac.", def: 1.9 }, { name: "Blue Fac.", def: 2.2 }, { name: "Gradient", def: 0 }],
+    params: [{ name: "Density Pixels", def: 1000000, int: true }, { name: "Seed", def: 5000, int: true }, { name: "time", def: 85.5 }, { name: "N", def: 3, int: true }, { name: "Direction", def: 1, int: true }, { name: "Red Fac.", def: 1.8 }, { name: "Green Fac.", def: 1.9 }, { name: "Blue Fac.", def: 2.2 }, { name: "Gradient", def: 0, int: true }],
     verified: true, priority: 0, flags: ["dc","rgb","state"], types: ["SIMULATION","DC","BASE_SHAPE"],
     funcNames: ["jwx_glsl_squares_Direction_c","jwx_glsl_squares_N_c","jwx_glsl_squares_time_c","jwx_glsl_squares_Density_Pixels_c","jwx_glsl_squares_Red_Fac__c","jwx_glsl_squares_Green_Fac__c","jwx_glsl_squares_Blue_Fac__c","jwx_glsl_squares_inited_","jwx_glsl_squares_resolutionY","jrand_","atan2j","rndi","powc","mmod2","jrand_next","jrand_nextDouble","glsl_squares_random","glsl_squares_hit","glsl_squares_getRGBColor","dbl2int"],
     funcs: `struct jrand_ {
@@ -24834,7 +24834,7 @@ v.y += (${w} * ((f32(j) / f32(jwx_glsl_squares_resolutionY)) - 0.5));
 }`,
   },
   "tile_reverse": {
-    params: [{ name: "space", def: 1 }, { name: "reversal", def: 1 }, { name: "vertical", def: 0 }],
+    params: [{ name: "space", def: 1 }, { name: "reversal", def: 1 }, { name: "vertical", def: 0, int: true }],
     verified: true, priority: 0, flags: [], types: ["2D"],
     funcNames: ["atan2j"],
     funcs: `fn atan2j(y: f32, x: f32) -> f32 { if (x == 0.0 && y == 0.0) { return select(0.0, PI, (bitcast<u32>(x) >> 31u) == 1u) * select(1.0, -1.0, (bitcast<u32>(y) >> 31u) == 1u); } return atan2(y, x); }`,
@@ -25970,7 +25970,7 @@ v.y += k.im;
 }`,
   },
   "tqmirror": {
-    params: [{ name: "preset", def: 0 }, { name: "a", def: 1 }, { name: "b", def: 1 }, { name: "c", def: 1 }, { name: "d", def: 1 }, { name: "e", def: 1 }, { name: "f", def: 1 }, { name: "g", def: 1 }, { name: "h", def: 1 }, { name: "i", def: 1 }, { name: "j", def: 1 }, { name: "k", def: 1 }, { name: "l", def: 0 }, { name: "m", def: 0 }, { name: "n", def: 0 }, { name: "o", def: 0 }, { name: "p", def: 0 }, { name: "q", def: 0 }, { name: "r", def: 1 }, { name: "s", def: 1 }, { name: "type", def: 0 }, { name: "mode", def: 0 }],
+    params: [{ name: "preset", def: 0, int: true }, { name: "a", def: 1 }, { name: "b", def: 1 }, { name: "c", def: 1 }, { name: "d", def: 1 }, { name: "e", def: 1 }, { name: "f", def: 1 }, { name: "g", def: 1 }, { name: "h", def: 1 }, { name: "i", def: 1 }, { name: "j", def: 1 }, { name: "k", def: 1 }, { name: "l", def: 0 }, { name: "m", def: 0 }, { name: "n", def: 0 }, { name: "o", def: 0 }, { name: "p", def: 0 }, { name: "q", def: 0 }, { name: "r", def: 1 }, { name: "s", def: 1 }, { name: "type", def: 0, int: true }, { name: "mode", def: 0, int: true }],
     verified: true, priority: 0, flags: [], types: ["2D"],
     funcNames: ["atan2j"],
     funcs: `fn atan2j(y: f32, x: f32) -> f32 { if (x == 0.0 && y == 0.0) { return select(0.0, PI, (bitcast<u32>(x) >> 31u) == 1u) * select(1.0, -1.0, (bitcast<u32>(y) >> 31u) == 1u); } return atan2(y, x); }`,
@@ -26142,7 +26142,7 @@ if ((y <= 0.0)) {
 }`,
   },
   "dc_mandelbox2D": {
-    params: [{ name: "zoom", def: 7 }, { name: "seed", def: 10000 }, { name: "time", def: 0 }, { name: "ColorOnly", def: 0 }, { name: "Gradient", def: 0 }, { name: "scale_z", def: 0 }, { name: "offset_z", def: 0 }, { name: "reset_z", def: 1 }],
+    params: [{ name: "zoom", def: 7 }, { name: "seed", def: 10000, int: true }, { name: "time", def: 0 }, { name: "ColorOnly", def: 0, int: true }, { name: "Gradient", def: 0, int: true }, { name: "scale_z", def: 0 }, { name: "offset_z", def: 0 }, { name: "reset_z", def: 1, int: true }],
     verified: true, priority: 0, flags: ["dc","rgb","z"], types: ["SIMULATION","DC","BASE_SHAPE"],
     funcNames: ["read_imageStepMode","atan2j","powc","dc_mandelbox2D_getRGBColor","dbl2int","greyscale","distance_color"],
     funcs: `fn read_imageStepMode(base: u32, n: i32, t: f32) -> vec4f { return pal[base + u32(clamp(t, 0.0, 0.99999) * f32(max(n, 1)))]; }
@@ -26265,7 +26265,7 @@ if ((${p[7]} == 1)) {
 }`,
   },
   "dc_mandala": {
-    params: [{ name: "mX", def: 0.025 }, { name: "mY", def: -0.001245675 }, { name: "scale", def: 2 }, { name: "sides", def: 12 }, { name: "multiply", def: 1 }, { name: "loops", def: 64 }, { name: "iR", def: 0 }, { name: "iG", def: 0 }, { name: "iB", def: 1 }, { name: "ColorOnly", def: 0 }, { name: "Gradient", def: 0 }, { name: "scale_z", def: 0 }, { name: "offset_z", def: 0 }, { name: "reset_z", def: 1 }],
+    params: [{ name: "mX", def: 0.025 }, { name: "mY", def: -0.001245675 }, { name: "scale", def: 2 }, { name: "sides", def: 12, int: true }, { name: "multiply", def: 1, int: true }, { name: "loops", def: 64, int: true }, { name: "iR", def: 0, int: true }, { name: "iG", def: 0, int: true }, { name: "iB", def: 1, int: true }, { name: "ColorOnly", def: 0, int: true }, { name: "Gradient", def: 0, int: true }, { name: "scale_z", def: 0 }, { name: "offset_z", def: 0 }, { name: "reset_z", def: 1, int: true }],
     verified: true, priority: 0, flags: ["dc","rgb","z"], types: ["SIMULATION","DC","BASE_SHAPE"],
     funcNames: ["read_imageStepMode","atan2j","mmod2","dc_mandala_kscope","dc_mandala_getRGBColor","dbl2int","greyscale","distance_color"],
     funcs: `fn read_imageStepMode(base: u32, n: i32, t: f32) -> vec4f { return pal[base + u32(clamp(t, 0.0, 0.99999) * f32(max(n, 1)))]; }
@@ -26410,7 +26410,7 @@ if ((${p[13]} == 1)) {
 }`,
   },
   "dc_apollonian": {
-    params: [{ name: "seed", def: 10000 }, { name: "time", def: 0 }, { name: "ColorOnly", def: 0 }, { name: "Gradient", def: 0 }, { name: "scale_z", def: 0 }, { name: "offset_z", def: 0 }, { name: "reset_z", def: 1 }],
+    params: [{ name: "seed", def: 10000, int: true }, { name: "time", def: 0 }, { name: "ColorOnly", def: 0, int: true }, { name: "Gradient", def: 0, int: true }, { name: "scale_z", def: 0 }, { name: "offset_z", def: 0 }, { name: "reset_z", def: 1, int: true }],
     verified: true, priority: 0, flags: ["dc","rgb","z"], types: ["SIMULATION","DC","BASE_SHAPE"],
     funcNames: ["Mat3","read_imageStepMode","atan2j","Mat3_Init_ov1","dc_apollonian_rot","times_ov1","times_ov2","dc_apollonian_app","dc_apollonian_getRGBColor","dbl2int","greyscale","distance_color"],
     funcs: `struct Mat3 {
@@ -26575,7 +26575,7 @@ if ((${p[6]} == 1)) {
 }`,
   },
   "dc_fractaldots": {
-    params: [{ name: "iterations", def: 9 }, { name: "dotsize", def: 400 }, { name: "maxiterations", def: 10 }, { name: "complexity", def: 0.001245675 }, { name: "pattern", def: 2.5 }, { name: "spacing", def: 12 }, { name: "rotate1", def: 1.5 }, { name: "rotate2", def: 64 }, { name: "zoom", def: 64 }, { name: "ColorOnly", def: 0 }, { name: "Gradient", def: 0 }, { name: "scale_z", def: 0 }, { name: "offset_z", def: 0 }, { name: "reset_z", def: 1 }],
+    params: [{ name: "iterations", def: 9, int: true }, { name: "dotsize", def: 400 }, { name: "maxiterations", def: 10 }, { name: "complexity", def: 0.001245675 }, { name: "pattern", def: 2.5 }, { name: "spacing", def: 12 }, { name: "rotate1", def: 1.5 }, { name: "rotate2", def: 64 }, { name: "zoom", def: 64 }, { name: "ColorOnly", def: 0, int: true }, { name: "Gradient", def: 0, int: true }, { name: "scale_z", def: 0 }, { name: "offset_z", def: 0 }, { name: "reset_z", def: 1, int: true }],
     verified: true, priority: 0, flags: ["dc","rgb","z"], types: ["SIMULATION","DC","BASE_SHAPE"],
     funcNames: ["read_imageStepMode","atan2j","powc","dc_fractaldots_rot","dc_fractaldots_getRGBColor","dbl2int","greyscale","distance_color"],
     funcs: `fn read_imageStepMode(base: u32, n: i32, t: f32) -> vec4f { return pal[base + u32(clamp(t, 0.0, 0.99999) * f32(max(n, 1)))]; }
@@ -26701,7 +26701,7 @@ if ((${p[13]} == 1)) {
 }`,
   },
   "dc_hoshi": {
-    params: [{ name: "seed", def: 100000 }, { name: "time", def: 10 }, { name: "steps", def: 28 }, { name: "scale", def: 1.25 }, { name: "translate", def: 1.5 }, { name: "ColorOnly", def: 0 }, { name: "Gradient", def: 0 }, { name: "scale_z", def: 0 }, { name: "offset_z", def: 0 }, { name: "reset_z", def: 1 }],
+    params: [{ name: "seed", def: 100000, int: true }, { name: "time", def: 10 }, { name: "steps", def: 28, int: true }, { name: "scale", def: 1.25 }, { name: "translate", def: 1.5 }, { name: "ColorOnly", def: 0, int: true }, { name: "Gradient", def: 0, int: true }, { name: "scale_z", def: 0 }, { name: "offset_z", def: 0 }, { name: "reset_z", def: 1, int: true }],
     verified: true, priority: 0, flags: ["dc","rgb","z"], types: ["SIMULATION","DC","BASE_SHAPE"],
     funcNames: ["read_imageStepMode","atan2j","mmod2","smoothstepc","dc_hoshi_rotate","dc_hoshi_hsv","dc_hoshi_getRGBColor","dbl2int","greyscale","distance_color"],
     funcs: `fn read_imageStepMode(base: u32, n: i32, t: f32) -> vec4f { return pal[base + u32(clamp(t, 0.0, 0.99999) * f32(max(n, 1)))]; }
@@ -26828,7 +26828,7 @@ if ((${p[9]} == 1)) {
 }`,
   },
   "dc_kaleidocomplex": {
-    params: [{ name: "seed", def: 1000000 }, { name: "time", def: 0 }, { name: "iMax", def: 12 }, { name: "color", def: 2 }, { name: "redF", def: 1 }, { name: "greenF", def: 1 }, { name: "blueF", def: 1 }, { name: "ColorOnly", def: 0 }, { name: "Gradient", def: 0 }, { name: "scale_z", def: 0 }, { name: "offset_z", def: 0 }, { name: "reset_z", def: 1 }],
+    params: [{ name: "seed", def: 1000000, int: true }, { name: "time", def: 0 }, { name: "iMax", def: 12, int: true }, { name: "color", def: 2 }, { name: "redF", def: 1 }, { name: "greenF", def: 1 }, { name: "blueF", def: 1 }, { name: "ColorOnly", def: 0, int: true }, { name: "Gradient", def: 0, int: true }, { name: "scale_z", def: 0 }, { name: "offset_z", def: 0 }, { name: "reset_z", def: 1, int: true }],
     verified: true, priority: 0, flags: ["dc","rgb","z"], types: ["SIMULATION","DC","BASE_SHAPE"],
     funcNames: ["read_imageStepMode","atan2j","dc_kaleidocomplex_cmult","dc_kaleidocomplex_getRGBColor","dbl2int","greyscale","distance_color"],
     funcs: `fn read_imageStepMode(base: u32, n: i32, t: f32) -> vec4f { return pal[base + u32(clamp(t, 0.0, 0.99999) * f32(max(n, 1)))]; }
@@ -26966,7 +26966,7 @@ if ((${p[11]} == 1)) {
 }`,
   },
   "dc_starsfield": {
-    params: [{ name: "seed", def: 10000 }, { name: "time", def: 0 }, { name: "zdistance", def: 2 }, { name: "glow", def: 1 }, { name: "ColorOnly", def: 0 }, { name: "Gradient", def: 0 }, { name: "scale_z", def: 0 }, { name: "offset_z", def: 0 }, { name: "reset_z", def: 1 }],
+    params: [{ name: "seed", def: 10000, int: true }, { name: "time", def: 0 }, { name: "zdistance", def: 2 }, { name: "glow", def: 1 }, { name: "ColorOnly", def: 0, int: true }, { name: "Gradient", def: 0, int: true }, { name: "scale_z", def: 0 }, { name: "offset_z", def: 0 }, { name: "reset_z", def: 1, int: true }],
     verified: true, priority: 0, flags: ["dc","rgb","z"], types: ["SIMULATION","DC","BASE_SHAPE"],
     funcNames: ["Mat2","read_imageStepMode","atan2j","smoothstepc","Mat2_Init","dc_starsfield_rotate","times","dc_starsfield_hash11","dc_starsfield_hash22","hash21","dc_starsfield_layer","dc_starsfield_render","dc_starsfield_getRGBColor","dbl2int","greyscale","distance_color"],
     funcs: `struct Mat2 {
@@ -27148,7 +27148,7 @@ if ((${p[8]} == 1)) {
 }`,
   },
   "dc_kaleidoscopic": {
-    params: [{ name: "seed", def: 10000 }, { name: "time", def: 0 }, { name: "sides", def: 8 }, { name: "zoom", def: 1 }, { name: "p1", def: 0 }, { name: "radial", def: 1 }, { name: "ColorOnly", def: 0 }, { name: "Gradient", def: 0 }, { name: "scale_z", def: 0 }, { name: "offset_z", def: 0 }, { name: "reset_z", def: 1 }],
+    params: [{ name: "seed", def: 10000, int: true }, { name: "time", def: 0 }, { name: "sides", def: 8, int: true }, { name: "zoom", def: 1 }, { name: "p1", def: 0 }, { name: "radial", def: 1, int: true }, { name: "ColorOnly", def: 0, int: true }, { name: "Gradient", def: 0, int: true }, { name: "scale_z", def: 0 }, { name: "offset_z", def: 0 }, { name: "reset_z", def: 1, int: true }],
     verified: true, priority: 0, flags: ["dc","rgb","z"], types: ["SIMULATION","DC","BASE_SHAPE"],
     funcNames: ["read_imageStepMode","atan2j","dc_kaleidoscopic_smallKoleidoscope","dc_kaleidoscopic_getRGBColor","dbl2int","greyscale","distance_color"],
     funcs: `fn read_imageStepMode(base: u32, n: i32, t: f32) -> vec4f { return pal[base + u32(clamp(t, 0.0, 0.99999) * f32(max(n, 1)))]; }
@@ -27262,7 +27262,7 @@ if ((${p[10]} == 1)) {
 }`,
   },
   "dc_randomoctree": {
-    params: [{ name: "seed", def: 10000 }, { name: "time", def: 0 }, { name: "steps", def: 10 }, { name: "rotLR", def: 0 }, { name: "rotUD", def: 0 }, { name: "grid", def: 0 }, { name: "borders", def: 1 }, { name: "bBorders", def: 1 }, { name: "ColorOnly", def: 0 }, { name: "Gradient", def: 0 }, { name: "scale_z", def: 0 }, { name: "offset_z", def: 0 }, { name: "reset_z", def: 1 }],
+    params: [{ name: "seed", def: 10000, int: true }, { name: "time", def: 0 }, { name: "steps", def: 10, int: true }, { name: "rotLR", def: 0 }, { name: "rotUD", def: 0 }, { name: "grid", def: 0, int: true }, { name: "borders", def: 1, int: true }, { name: "bBorders", def: 1, int: true }, { name: "ColorOnly", def: 0, int: true }, { name: "Gradient", def: 0, int: true }, { name: "scale_z", def: 0 }, { name: "offset_z", def: 0 }, { name: "reset_z", def: 1, int: true }],
     verified: true, priority: 0, flags: ["dc","rgb","z"], types: ["SIMULATION","DC","BASE_SHAPE"],
     funcNames: ["Mat2","read_imageStepMode","atan2j","mmod3","Mat2_Init","dc_randomoctree_rot","times","dc_randomoctree_rnd","getvoxel","dc_randomoctree_voxel","dc_randomoctree_getRGBColor","dbl2int","greyscale","distance_color"],
     funcs: `struct Mat2 {
@@ -27515,7 +27515,7 @@ if ((${p[12]} == 1)) {
 }`,
   },
   "dc_acrilic": {
-    params: [{ name: "seed", def: 10000 }, { name: "time", def: 0 }, { name: "zoom", def: 0.7 }, { name: "steps", def: 10 }, { name: "p1", def: 12 }, { name: "p2", def: 12 }, { name: "p3", def: 12 }, { name: "p4", def: 12 }, { name: "p5", def: 75 }, { name: "p6", def: 75 }, { name: "redf", def: 1 }, { name: "greenf", def: 1 }, { name: "bluef", def: 1 }, { name: "ColorOnly", def: 0 }, { name: "Gradient", def: 0 }, { name: "scale_z", def: 0 }, { name: "offset_z", def: 0 }, { name: "reset_z", def: 1 }],
+    params: [{ name: "seed", def: 10000, int: true }, { name: "time", def: 0 }, { name: "zoom", def: 0.7 }, { name: "steps", def: 10, int: true }, { name: "p1", def: 12 }, { name: "p2", def: 12 }, { name: "p3", def: 12 }, { name: "p4", def: 12 }, { name: "p5", def: 75 }, { name: "p6", def: 75 }, { name: "redf", def: 1 }, { name: "greenf", def: 1 }, { name: "bluef", def: 1 }, { name: "ColorOnly", def: 0, int: true }, { name: "Gradient", def: 0, int: true }, { name: "scale_z", def: 0 }, { name: "offset_z", def: 0 }, { name: "reset_z", def: 1, int: true }],
     verified: true, priority: 0, flags: ["dc","rgb","z"], types: ["2D","SIMULATION","DC","BASE_SHAPE"],
     funcNames: ["read_imageStepMode","atan2j","dc_acrilic_sq","dc_acrilic_getRGBColor","dbl2int","greyscale","distance_color"],
     funcs: `fn read_imageStepMode(base: u32, n: i32, t: f32) -> vec4f { return pal[base + u32(clamp(t, 0.0, 0.99999) * f32(max(n, 1)))]; }
@@ -27633,7 +27633,7 @@ if ((${p[17]} == 1)) {
 }`,
   },
   "dc_circlesblue": {
-    params: [{ name: "seed", def: 10000 }, { name: "time", def: 1 }, { name: "zoom", def: 1 }, { name: "radius", def: 0.04 }, { name: "bubles", def: 40 }, { name: "ColorOnly", def: 0 }, { name: "Gradient", def: 0 }, { name: "scale_z", def: 0 }, { name: "offset_z", def: 0 }, { name: "reset_z", def: 1 }],
+    params: [{ name: "seed", def: 10000, int: true }, { name: "time", def: 1 }, { name: "zoom", def: 1 }, { name: "radius", def: 0.04 }, { name: "bubles", def: 40, int: true }, { name: "ColorOnly", def: 0, int: true }, { name: "Gradient", def: 0, int: true }, { name: "scale_z", def: 0 }, { name: "offset_z", def: 0 }, { name: "reset_z", def: 1, int: true }],
     verified: true, priority: 0, flags: ["dc","rgb","z"], types: ["SIMULATION","DC","BASE_SHAPE"],
     funcNames: ["read_imageStepMode","atan2j","powc","smoothstepc","dc_circlesblue_getRGBColor","dbl2int","greyscale","distance_color"],
     funcs: `fn read_imageStepMode(base: u32, n: i32, t: f32) -> vec4f { return pal[base + u32(clamp(t, 0.0, 0.99999) * f32(max(n, 1)))]; }
@@ -27750,7 +27750,7 @@ if ((${p[9]} == 1)) {
 }`,
   },
   "dc_kaliset": {
-    params: [{ name: "Seed", def: 10000 }, { name: "time", def: 200 }, { name: "zoom", def: 0.5 }, { name: "N", def: 60 }, { name: "shiftX", def: -0.22 }, { name: "shiftY", def: -0.21 }, { name: "ColorOnly", def: 0 }, { name: "Gradient", def: 0 }, { name: "scale_z", def: 0 }, { name: "offset_z", def: 0 }, { name: "reset_z", def: 1 }],
+    params: [{ name: "Seed", def: 10000, int: true }, { name: "time", def: 200 }, { name: "zoom", def: 0.5 }, { name: "N", def: 60, int: true }, { name: "shiftX", def: -0.22 }, { name: "shiftY", def: -0.21 }, { name: "ColorOnly", def: 0, int: true }, { name: "Gradient", def: 0, int: true }, { name: "scale_z", def: 0 }, { name: "offset_z", def: 0 }, { name: "reset_z", def: 1, int: true }],
     verified: true, priority: 0, flags: ["dc","rgb","z"], types: ["SIMULATION","DC","BASE_SHAPE"],
     funcNames: ["read_imageStepMode","atan2j","dc_kaliset_getRGBColor","dbl2int","greyscale","distance_color"],
     funcs: `fn read_imageStepMode(base: u32, n: i32, t: f32) -> vec4f { return pal[base + u32(clamp(t, 0.0, 0.99999) * f32(max(n, 1)))]; }
@@ -27865,7 +27865,7 @@ if ((${p[10]} == 1)) {
 }`,
   },
   "dc_kaliset2": {
-    params: [{ name: "seed", def: 5000 }, { name: "time", def: 85.5 }, { name: "zoom", def: 20 }, { name: "N", def: 100 }, { name: "radio", def: 1 }, { name: "shiftX", def: -0.356 }, { name: "shiftY", def: 0.686 }, { name: "redF", def: 1.8 }, { name: "greenF", def: 1.9 }, { name: "blueF", def: 2.2 }, { name: "ColorOnly", def: 0 }, { name: "Gradient", def: 0 }, { name: "scale_z", def: 0 }, { name: "offset_z", def: 0 }, { name: "reset_z", def: 1 }],
+    params: [{ name: "seed", def: 5000, int: true }, { name: "time", def: 85.5 }, { name: "zoom", def: 20 }, { name: "N", def: 100, int: true }, { name: "radio", def: 1 }, { name: "shiftX", def: -0.356 }, { name: "shiftY", def: 0.686 }, { name: "redF", def: 1.8 }, { name: "greenF", def: 1.9 }, { name: "blueF", def: 2.2 }, { name: "ColorOnly", def: 0, int: true }, { name: "Gradient", def: 0, int: true }, { name: "scale_z", def: 0 }, { name: "offset_z", def: 0 }, { name: "reset_z", def: 1, int: true }],
     verified: true, priority: 0, flags: ["dc","rgb","z"], types: ["SIMULATION","DC","BASE_SHAPE"],
     funcNames: ["read_imageStepMode","atan2j","dc_kaliset2_getRGBColor","dbl2int","greyscale","distance_color"],
     funcs: `fn read_imageStepMode(base: u32, n: i32, t: f32) -> vec4f { return pal[base + u32(clamp(t, 0.0, 0.99999) * f32(max(n, 1)))]; }
@@ -27980,7 +27980,7 @@ if ((${p[14]} == 1)) {
 }`,
   },
   "dc_grid3D": {
-    params: [{ name: "zoom", def: 1 }, { name: "Seed", def: 10000 }, { name: "time", def: 200 }, { name: "ColorOnly", def: 0 }, { name: "Gradient", def: 0 }, { name: "scale_z", def: 0 }, { name: "offset_z", def: 0 }, { name: "reset_z", def: 1 }],
+    params: [{ name: "zoom", def: 1 }, { name: "Seed", def: 10000, int: true }, { name: "time", def: 200 }, { name: "ColorOnly", def: 0, int: true }, { name: "Gradient", def: 0, int: true }, { name: "scale_z", def: 0 }, { name: "offset_z", def: 0 }, { name: "reset_z", def: 1, int: true }],
     verified: true, priority: 0, flags: ["dc","rgb","z"], types: ["SIMULATION","DC","BASE_SHAPE"],
     funcNames: ["Mat3","read_imageStepMode","atan2j","Mat3_Init","times_ov2","dc_grid3D_field","dc_grid3D_getRGBColor","dbl2int","greyscale","distance_color"],
     funcs: `struct Mat3 {
@@ -28138,7 +28138,7 @@ if ((${p[7]} == 1)) {
 }`,
   },
   "dc_hyperbolictile": {
-    params: [{ name: "zoom", def: 1 }, { name: "ColorOnly", def: 0 }, { name: "Gradient", def: 0 }, { name: "scale_z", def: 0 }, { name: "offset_z", def: 0 }, { name: "reset_z", def: 1 }],
+    params: [{ name: "zoom", def: 1 }, { name: "ColorOnly", def: 0, int: true }, { name: "Gradient", def: 0, int: true }, { name: "scale_z", def: 0 }, { name: "offset_z", def: 0 }, { name: "reset_z", def: 1, int: true }],
     verified: true, priority: 0, flags: ["dc","rgb","z"], types: ["SIMULATION","DC","BASE_SHAPE"],
     funcNames: ["read_imageStepMode","atan2j","dc_hyperbolictile_topolar","dc_hyperbolictile_tocart","dc_hyperbolictile_mirror","dc_hyperbolictile_getRGBColor","dbl2int","greyscale","distance_color"],
     funcs: `fn read_imageStepMode(base: u32, n: i32, t: f32) -> vec4f { return pal[base + u32(clamp(t, 0.0, 0.99999) * f32(max(n, 1)))]; }
@@ -28293,7 +28293,7 @@ if ((${p[5]} == 1)) {
 }`,
   },
   "dc_squares": {
-    params: [{ name: "seed", def: 5000 }, { name: "time", def: 85.5 }, { name: "N", def: 3 }, { name: "direction", def: 1 }, { name: "redF", def: 1.8 }, { name: "greenF", def: 1.9 }, { name: "blueF", def: 2.2 }, { name: "ColorOnly", def: 0 }, { name: "Gradient", def: 0 }, { name: "scale_z", def: 0 }, { name: "offset_z", def: 0 }, { name: "reset_z", def: 1 }],
+    params: [{ name: "seed", def: 5000, int: true }, { name: "time", def: 85.5 }, { name: "N", def: 3, int: true }, { name: "direction", def: 1, int: true }, { name: "redF", def: 1.8 }, { name: "greenF", def: 1.9 }, { name: "blueF", def: 2.2 }, { name: "ColorOnly", def: 0, int: true }, { name: "Gradient", def: 0, int: true }, { name: "scale_z", def: 0 }, { name: "offset_z", def: 0 }, { name: "reset_z", def: 1, int: true }],
     verified: true, priority: 0, flags: ["dc","rgb","z"], types: ["SIMULATION","DC","BASE_SHAPE"],
     funcNames: ["read_imageStepMode","atan2j","powc","mmod2","dc_squares_hit","dc_squares_getRGBColor","dbl2int","greyscale","distance_color"],
     funcs: `fn read_imageStepMode(base: u32, n: i32, t: f32) -> vec4f { return pal[base + u32(clamp(t, 0.0, 0.99999) * f32(max(n, 1)))]; }
@@ -28428,7 +28428,7 @@ if ((${p[11]} == 1)) {
 }`,
   },
   "dc_mandbrot": {
-    params: [{ name: "nIters", def: 250 }, { name: "N", def: 8 }, { name: "Complexity", def: 0.995 }, { name: "seed", def: 10000 }, { name: "time", def: 0 }, { name: "zoom", def: 4 }, { name: "red", def: 0.0314 }, { name: "green", def: 0.02 }, { name: "blue", def: 0.011 }, { name: "ColorOnly", def: 0 }, { name: "Gradient", def: 0 }, { name: "scale_z", def: 0 }, { name: "offset_z", def: 0 }, { name: "reset_z", def: 1 }],
+    params: [{ name: "nIters", def: 250, int: true }, { name: "N", def: 8, int: true }, { name: "Complexity", def: 0.995 }, { name: "seed", def: 10000, int: true }, { name: "time", def: 0 }, { name: "zoom", def: 4 }, { name: "red", def: 0.0314 }, { name: "green", def: 0.02 }, { name: "blue", def: 0.011 }, { name: "ColorOnly", def: 0, int: true }, { name: "Gradient", def: 0, int: true }, { name: "scale_z", def: 0 }, { name: "offset_z", def: 0 }, { name: "reset_z", def: 1, int: true }],
     verified: true, priority: 0, flags: ["dc","rgb","z"], types: ["SIMULATION","DC","BASE_SHAPE"],
     funcNames: ["Mat2","read_imageStepMode","atan2j","powc","Mat2_Init","dc_mandbrot_fractalize2","dc_mandbrot_mandelbrot","dc_mandbrot_getRGBColor","dbl2int","greyscale","distance_color"],
     funcs: `struct Mat2 {
@@ -28585,7 +28585,7 @@ if ((${p[13]} == 1)) {
 }`,
   },
   "dc_ducks": {
-    params: [{ name: "seed", def: 10000 }, { name: "time", def: 10 }, { name: "zoom", def: 1 }, { name: "ColorOnly", def: 0 }, { name: "Gradient", def: 0 }, { name: "scale_z", def: 0 }, { name: "offset_z", def: 0 }, { name: "reset_z", def: 1 }],
+    params: [{ name: "seed", def: 10000, int: true }, { name: "time", def: 10 }, { name: "zoom", def: 1 }, { name: "ColorOnly", def: 0, int: true }, { name: "Gradient", def: 0, int: true }, { name: "scale_z", def: 0 }, { name: "offset_z", def: 0 }, { name: "reset_z", def: 1, int: true }],
     verified: true, priority: 0, flags: ["dc","rgb","z"], types: ["SIMULATION","DC","BASE_SHAPE"],
     funcNames: ["read_imageStepMode","atan2j","dc_ducks_Bfunc","dc_ducks_Ffunc","dc_ducks_getRGBColor","dbl2int","greyscale","distance_color"],
     funcs: `fn read_imageStepMode(base: u32, n: i32, t: f32) -> vec4f { return pal[base + u32(clamp(t, 0.0, 0.99999) * f32(max(n, 1)))]; }
@@ -28703,7 +28703,7 @@ if ((${p[7]} == 1)) {
 }`,
   },
   "dc_layers": {
-    params: [{ name: "N", def: 8 }, { name: "Amplitude", def: 0.995 }, { name: "seed", def: 10000 }, { name: "time", def: 0 }, { name: "zoom", def: 8 }, { name: "ColorOnly", def: 0 }, { name: "Gradient", def: 0 }, { name: "scale_z", def: 0 }, { name: "offset_z", def: 0 }, { name: "reset_z", def: 1 }],
+    params: [{ name: "N", def: 8, int: true }, { name: "Amplitude", def: 0.995 }, { name: "seed", def: 10000, int: true }, { name: "time", def: 0 }, { name: "zoom", def: 8 }, { name: "ColorOnly", def: 0, int: true }, { name: "Gradient", def: 0, int: true }, { name: "scale_z", def: 0 }, { name: "offset_z", def: 0 }, { name: "reset_z", def: 1, int: true }],
     verified: true, priority: 0, flags: ["dc","rgb","z"], types: ["SIMULATION","DC","BASE_SHAPE"],
     funcNames: ["Mat3","read_imageStepMode","atan2j","smoothstepc","Mat3_Init","times_ov2","dc_layers_rotate","dc_layers_snoise","dc_layers_getRGBColor","dbl2int","greyscale","distance_color"],
     funcs: `struct Mat3 {
@@ -28854,7 +28854,7 @@ if ((${p[9]} == 1)) {
 }`,
   },
   "dc_tree": {
-    params: [{ name: "levels", def: 20 }, { name: "thicknes", def: 1000 }, { name: "style", def: 50 }, { name: "shift", def: 1.5 }, { name: "seed", def: 10000 }, { name: "time", def: 0 }, { name: "zoom", def: 4 }, { name: "ColorOnly", def: 0 }, { name: "Gradient", def: 0 }, { name: "scale_z", def: 0 }, { name: "offset_z", def: 0 }, { name: "reset_z", def: 1 }],
+    params: [{ name: "levels", def: 20, int: true }, { name: "thicknes", def: 1000 }, { name: "style", def: 50 }, { name: "shift", def: 1.5 }, { name: "seed", def: 10000, int: true }, { name: "time", def: 0 }, { name: "zoom", def: 4 }, { name: "ColorOnly", def: 0, int: true }, { name: "Gradient", def: 0, int: true }, { name: "scale_z", def: 0 }, { name: "offset_z", def: 0 }, { name: "reset_z", def: 1, int: true }],
     verified: true, priority: 0, flags: ["dc","rgb","z"], types: ["SIMULATION","DC","BASE_SHAPE"],
     funcNames: ["read_imageStepMode","atan2j","smoothstepc","dc_tree_po","dc_tree_ca","dc_tree_ln","dc_tree_getRGBColor","dbl2int","greyscale","distance_color"],
     funcs: `fn read_imageStepMode(base: u32, n: i32, t: f32) -> vec4f { return pal[base + u32(clamp(t, 0.0, 0.99999) * f32(max(n, 1)))]; }
@@ -28988,7 +28988,7 @@ if ((${p[11]} == 1)) {
 }`,
   },
   "dc_tesla": {
-    params: [{ name: "levels", def: 20 }, { name: "style", def: 10 }, { name: "seed", def: 10000 }, { name: "time", def: 0 }, { name: "zoom", def: 4 }, { name: "ColorOnly", def: 0 }, { name: "Gradient", def: 0 }, { name: "scale_z", def: 0 }, { name: "offset_z", def: 0 }, { name: "reset_z", def: 1 }],
+    params: [{ name: "levels", def: 20, int: true }, { name: "style", def: 10 }, { name: "seed", def: 10000, int: true }, { name: "time", def: 0 }, { name: "zoom", def: 4 }, { name: "ColorOnly", def: 0, int: true }, { name: "Gradient", def: 0, int: true }, { name: "scale_z", def: 0 }, { name: "offset_z", def: 0 }, { name: "reset_z", def: 1, int: true }],
     verified: true, priority: 0, flags: ["dc","rgb","z"], types: ["SIMULATION","DC","BASE_SHAPE"],
     funcNames: ["read_imageStepMode","atan2j","powc","dc_tesla_field21","dc_tesla_getRGBColor","dbl2int","greyscale","distance_color"],
     funcs: `fn read_imageStepMode(base: u32, n: i32, t: f32) -> vec4f { return pal[base + u32(clamp(t, 0.0, 0.99999) * f32(max(n, 1)))]; }
@@ -29111,7 +29111,7 @@ if ((${p[9]} == 1)) {
 }`,
   },
   "dc_rotations": {
-    params: [{ name: "levels", def: 20 }, { name: "seed", def: 10000 }, { name: "time", def: 0 }, { name: "zoom", def: 4 }, { name: "ColorOnly", def: 0 }, { name: "Gradient", def: 0 }, { name: "scale_z", def: 0 }, { name: "offset_z", def: 0 }, { name: "reset_z", def: 1 }],
+    params: [{ name: "levels", def: 20, int: true }, { name: "seed", def: 10000, int: true }, { name: "time", def: 0 }, { name: "zoom", def: 4 }, { name: "ColorOnly", def: 0, int: true }, { name: "Gradient", def: 0, int: true }, { name: "scale_z", def: 0 }, { name: "offset_z", def: 0 }, { name: "reset_z", def: 1, int: true }],
     verified: true, priority: 0, flags: ["dc","rgb","z"], types: ["SIMULATION","DC","BASE_SHAPE"],
     funcNames: ["Mat2","read_imageStepMode","atan2j","mmod3","Mat2_Init","dc_rotations_rot","times","dc_rotations_rotate","dc_rotations_hsv2rgb_smooth","dc_rotations_getRGBColor","dbl2int","greyscale","distance_color"],
     funcs: `struct Mat2 {
@@ -29267,7 +29267,7 @@ if ((${p[8]} == 1)) {
 }`,
   },
   "dc_hexagons": {
-    params: [{ name: "shape", def: 0 }, { name: "seed", def: 10000 }, { name: "time", def: 0 }, { name: "zoom", def: 4 }, { name: "ColorOnly", def: 0 }, { name: "Gradient", def: 0 }, { name: "scale_z", def: 0 }, { name: "offset_z", def: 0 }, { name: "reset_z", def: 1 }],
+    params: [{ name: "shape", def: 0, int: true }, { name: "seed", def: 10000, int: true }, { name: "time", def: 0 }, { name: "zoom", def: 4 }, { name: "ColorOnly", def: 0, int: true }, { name: "Gradient", def: 0, int: true }, { name: "scale_z", def: 0 }, { name: "offset_z", def: 0 }, { name: "reset_z", def: 1, int: true }],
     verified: true, priority: 0, flags: ["dc","rgb","z"], types: ["SIMULATION","DC","BASE_SHAPE"],
     funcNames: ["Mat2","read_imageStepMode","atan2j","mmod2","powc","smoothstepc","Mat2_Init","times","dc_hexagons_hex","dc_hexagons_getRGBColor","dbl2int","greyscale","distance_color"],
     funcs: `struct Mat2 {
@@ -29423,7 +29423,7 @@ if ((${p[8]} == 1)) {
 }`,
   },
   "dc_turbulence": {
-    params: [{ name: "seed", def: 10000 }, { name: "time", def: 0 }, { name: "zoom", def: 8 }, { name: "level", def: 3 }, { name: "ColorOnly", def: 0 }, { name: "Gradient", def: 0 }, { name: "scale_z", def: 0 }, { name: "offset_z", def: 0 }, { name: "reset_z", def: 1 }],
+    params: [{ name: "seed", def: 10000, int: true }, { name: "time", def: 0 }, { name: "zoom", def: 8 }, { name: "level", def: 3, int: true }, { name: "ColorOnly", def: 0, int: true }, { name: "Gradient", def: 0, int: true }, { name: "scale_z", def: 0 }, { name: "offset_z", def: 0 }, { name: "reset_z", def: 1, int: true }],
     verified: true, priority: 0, flags: ["dc","rgb","z"], types: ["SIMULATION","DC","BASE_SHAPE"],
     funcNames: ["read_imageStepMode","atan2j","dc_turbulence_getRGBColor","dbl2int","greyscale","distance_color"],
     funcs: `fn read_imageStepMode(base: u32, n: i32, t: f32) -> vec4f { return pal[base + u32(clamp(t, 0.0, 0.99999) * f32(max(n, 1)))]; }
@@ -29530,7 +29530,7 @@ if ((${p[8]} == 1)) {
 }`,
   },
   "dc_menger": {
-    params: [{ name: "zoom", def: 1 }, { name: "level", def: 3 }, { name: "ColorOnly", def: 0 }, { name: "Gradient", def: 0 }, { name: "scale_z", def: 0 }, { name: "offset_z", def: 0 }, { name: "reset_z", def: 1 }],
+    params: [{ name: "zoom", def: 1 }, { name: "level", def: 3, int: true }, { name: "ColorOnly", def: 0, int: true }, { name: "Gradient", def: 0, int: true }, { name: "scale_z", def: 0 }, { name: "offset_z", def: 0 }, { name: "reset_z", def: 1, int: true }],
     verified: true, priority: 0, flags: ["dc","rgb","z"], types: ["SIMULATION","DC","BASE_SHAPE"],
     funcNames: ["read_imageStepMode","atan2j","mmod2","dc_menger_sdBox","dc_menger_sdCross","dc_menger_sierpinskiCarpet","dc_menger_getRGBColor","dbl2int","greyscale","distance_color"],
     funcs: `fn read_imageStepMode(base: u32, n: i32, t: f32) -> vec4f { return pal[base + u32(clamp(t, 0.0, 0.99999) * f32(max(n, 1)))]; }
@@ -29656,7 +29656,7 @@ if ((${p[6]} == 1)) {
 }`,
   },
   "dc_truchet": {
-    params: [{ name: "type", def: 0 }, { name: "zoom", def: 10 }, { name: "ColorOnly", def: 0 }, { name: "Gradient", def: 0 }, { name: "scale_z", def: 0 }, { name: "offset_z", def: 0 }, { name: "reset_z", def: 1 }],
+    params: [{ name: "type", def: 0, int: true }, { name: "zoom", def: 10 }, { name: "ColorOnly", def: 0, int: true }, { name: "Gradient", def: 0, int: true }, { name: "scale_z", def: 0 }, { name: "offset_z", def: 0 }, { name: "reset_z", def: 1, int: true }],
     verified: true, priority: 0, flags: ["dc","rgb","z"], types: ["SIMULATION","DC","BASE_SHAPE"],
     funcNames: ["read_imageStepMode","atan2j","smoothstepc","dc_truchet_random","dc_truchet_truchetPattern","dc_truchet_getRGBColor","dbl2int","greyscale","distance_color"],
     funcs: `fn read_imageStepMode(base: u32, n: i32, t: f32) -> vec4f { return pal[base + u32(clamp(t, 0.0, 0.99999) * f32(max(n, 1)))]; }
@@ -29784,7 +29784,7 @@ if ((${p[6]} == 1)) {
 }`,
   },
   "dc_voronoise": {
-    params: [{ name: "zoom", def: 8 }, { name: "deltaX", def: 0.5 }, { name: "deltaY", def: 0.5 }, { name: "ColorOnly", def: 0 }, { name: "Gradient", def: 0 }, { name: "scale_z", def: 0 }, { name: "offset_z", def: 0 }, { name: "reset_z", def: 1 }],
+    params: [{ name: "zoom", def: 8 }, { name: "deltaX", def: 0.5 }, { name: "deltaY", def: 0.5 }, { name: "ColorOnly", def: 0, int: true }, { name: "Gradient", def: 0, int: true }, { name: "scale_z", def: 0 }, { name: "offset_z", def: 0 }, { name: "reset_z", def: 1, int: true }],
     verified: true, priority: 0, flags: ["dc","rgb","z"], types: ["SIMULATION","DC","BASE_SHAPE"],
     funcNames: ["read_imageStepMode","atan2j","powc","smoothstepc","dc_voronise_hash3","dc_voronise_iqnoise","dc_voronise_getRGBColor","dbl2int","greyscale","distance_color"],
     funcs: `fn read_imageStepMode(base: u32, n: i32, t: f32) -> vec4f { return pal[base + u32(clamp(t, 0.0, 0.99999) * f32(max(n, 1)))]; }
@@ -30016,7 +30016,7 @@ if (false) {
 }`,
   },
   "glynnspiro": {
-    params: [{ name: "radius", def: 1 }, { name: "radius1", def: 0.5 }, { name: "thickness", def: 1 }, { name: "phi1", def: 0 }, { name: "a", def: 1 }, { name: "b", def: -0.3 }, { name: "c", def: 0.4 }, { name: "time", def: 1000 }, { name: "mode", def: 0 }, { name: "width", def: 0 }, { name: "scale", def: 0.71 }, { name: "pow", def: 1.5 }, { name: "contrast", def: 0.5 }],
+    params: [{ name: "radius", def: 1 }, { name: "radius1", def: 0.5 }, { name: "thickness", def: 1 }, { name: "phi1", def: 0 }, { name: "a", def: 1 }, { name: "b", def: -0.3 }, { name: "c", def: 0.4 }, { name: "time", def: 1000 }, { name: "mode", def: 0, int: true }, { name: "width", def: 0 }, { name: "scale", def: 0.71 }, { name: "pow", def: 1.5 }, { name: "contrast", def: 0.5 }],
     verified: true, priority: 0, flags: ["state","z"], types: ["2D"],
     funcNames: ["jwx_glynnspiro_radius1_c","jwx_glynnspiro_thickness_c","jwx_glynnspiro_inited_","jwx_glynnspiro__x1","jwx_glynnspiro__y1","powc","sqr","atan2j","glynnspiro_spirograph3D","glynnspiro_circle"],
     funcs: `fn powc(x: f32, y: f32) -> f32 {
@@ -30599,7 +30599,7 @@ if (((((((((${p[3]} + ${p[4]}) + ${p[5]}) + ${p[6]}) + ${p[7]}) + ${p[8]}) + ${p
 }`,
   },
   "juliascope3Db": {
-    params: [{ name: "power", def: 3 }, { name: "dist", def: 1 }, { name: "type", def: 0 }, { name: "warp", def: 0 }, { name: "za", def: 1 }, { name: "zb", def: 1 }, { name: "zamount", def: 1 }, { name: "zdist", def: 1 }, { name: "mode", def: 0 }, { name: "wave1", def: 1 }, { name: "wave2", def: 1 }],
+    params: [{ name: "power", def: 3 }, { name: "dist", def: 1 }, { name: "type", def: 0, int: true }, { name: "warp", def: 0 }, { name: "za", def: 1 }, { name: "zb", def: 1 }, { name: "zamount", def: 1 }, { name: "zdist", def: 1 }, { name: "mode", def: 0, int: true }, { name: "wave1", def: 1 }, { name: "wave2", def: 1 }],
     verified: true, priority: 0, flags: ["3d","z"], types: ["3D"],
     funcNames: ["roundc","powc","atan2j"],
     funcs: `fn roundc(x: f32) -> f32 { return sign(x) * floor(abs(x) + 0.5); }
@@ -30645,7 +30645,7 @@ if ((i32(roundc(min(max(${p[8]}, 0.0), 1.0))) != 0)) {
 }`,
   },
   "dc_poincaredisc": {
-    params: [{ name: "zoom", def: 2 }, { name: "MaxIter", def: 10 }, { name: "N", def: 4 }, { name: "P", def: 5 }, { name: "checkers0", def: 1 }, { name: "checkers1", def: 1 }, { name: "checkers2", def: 1 }, { name: "ColorOnly", def: 0 }, { name: "Gradient", def: 0 }, { name: "scale_z", def: 0 }, { name: "offset_z", def: 0 }, { name: "reset_z", def: 1 }],
+    params: [{ name: "zoom", def: 2 }, { name: "MaxIter", def: 10, int: true }, { name: "N", def: 4, int: true }, { name: "P", def: 5, int: true }, { name: "checkers0", def: 1, int: true }, { name: "checkers1", def: 1, int: true }, { name: "checkers2", def: 1, int: true }, { name: "ColorOnly", def: 0, int: true }, { name: "Gradient", def: 0, int: true }, { name: "scale_z", def: 0 }, { name: "offset_z", def: 0 }, { name: "reset_z", def: 1, int: true }],
     verified: true, priority: 0, flags: ["dc","rgb","z"], types: ["SIMULATION","DC","BASE_SHAPE"],
     funcNames: ["Mat2","read_imageStepMode","atan2j","powc","dc_poincaredisc_mbtpc","dc_poincaredisc_radians","Mat2_Init","times","dc_poincaredisc_getRGBColor","dbl2int","greyscale","distance_color"],
     funcs: `struct Mat2 {
@@ -30844,7 +30844,7 @@ if ((${p[11]} == 1)) {
 }`,
   },
   "dc_worley": {
-    params: [{ name: "zoom", def: 7 }, { name: "pattern", def: 70 }, { name: "distort", def: 1 }, { name: "ColorOnly", def: 0 }, { name: "Gradient", def: 0 }, { name: "scale_z", def: 0 }, { name: "offset_z", def: 0 }, { name: "reset_z", def: 1 }],
+    params: [{ name: "zoom", def: 7 }, { name: "pattern", def: 70 }, { name: "distort", def: 1 }, { name: "ColorOnly", def: 0, int: true }, { name: "Gradient", def: 0, int: true }, { name: "scale_z", def: 0 }, { name: "offset_z", def: 0 }, { name: "reset_z", def: 1, int: true }],
     verified: true, priority: 0, flags: ["dc","rgb","z"], types: ["SIMULATION","DC","BASE_SHAPE"],
     funcNames: ["read_imageStepMode","atan2j","dc_worley_H","dc_worley_getRGBColor","dbl2int","greyscale","distance_color"],
     funcs: `fn read_imageStepMode(base: u32, n: i32, t: f32) -> vec4f { return pal[base + u32(clamp(t, 0.0, 0.99999) * f32(max(n, 1)))]; }
@@ -30967,7 +30967,7 @@ if ((${p[7]} == 1)) {
 }`,
   },
   "dc_glypho": {
-    params: [{ name: "zoom", def: 7 }, { name: "seed", def: 10000 }, { name: "time", def: 0 }, { name: "f1", def: 0.115 }, { name: "f2", def: 0.75 }, { name: "f3", def: 1.5 }, { name: "ColorOnly", def: 0 }, { name: "Gradient", def: 0 }, { name: "scale_z", def: 0 }, { name: "offset_z", def: 0 }, { name: "reset_z", def: 1 }],
+    params: [{ name: "zoom", def: 7 }, { name: "seed", def: 10000, int: true }, { name: "time", def: 0 }, { name: "f1", def: 0.115 }, { name: "f2", def: 0.75 }, { name: "f3", def: 1.5 }, { name: "ColorOnly", def: 0, int: true }, { name: "Gradient", def: 0, int: true }, { name: "scale_z", def: 0 }, { name: "offset_z", def: 0 }, { name: "reset_z", def: 1, int: true }],
     verified: true, priority: 0, flags: ["dc","rgb","z"], types: ["SIMULATION","DC","BASE_SHAPE"],
     funcNames: ["read_imageStepMode","atan2j","smoothstepc","dc_glypho_getRGBColor","dbl2int","greyscale","distance_color"],
     funcs: `fn read_imageStepMode(base: u32, n: i32, t: f32) -> vec4f { return pal[base + u32(clamp(t, 0.0, 0.99999) * f32(max(n, 1)))]; }
@@ -31080,7 +31080,7 @@ if ((${p[10]} == 1)) {
 }`,
   },
   "dc_fingerprint": {
-    params: [{ name: "zoom", def: 50 }, { name: "seed", def: 10000 }, { name: "time", def: 0 }, { name: "width", def: 0.8 }, { name: "ColorOnly", def: 0 }, { name: "Gradient", def: 0 }, { name: "scale_z", def: 0 }, { name: "offset_z", def: 0 }, { name: "reset_z", def: 1 }],
+    params: [{ name: "zoom", def: 50 }, { name: "seed", def: 10000, int: true }, { name: "time", def: 0 }, { name: "width", def: 0.8 }, { name: "ColorOnly", def: 0, int: true }, { name: "Gradient", def: 0, int: true }, { name: "scale_z", def: 0 }, { name: "offset_z", def: 0 }, { name: "reset_z", def: 1, int: true }],
     verified: true, priority: 0, flags: ["dc","rgb","z"], types: ["SIMULATION","DC","BASE_SHAPE"],
     funcNames: ["read_imageStepMode","atan2j","smoothstepc","dc_fingerprint_hash2","dc_fingerprint_getRGBColor","dbl2int","greyscale","distance_color"],
     funcs: `fn read_imageStepMode(base: u32, n: i32, t: f32) -> vec4f { return pal[base + u32(clamp(t, 0.0, 0.99999) * f32(max(n, 1)))]; }
@@ -31201,7 +31201,7 @@ if ((${p[8]} == 1)) {
 }`,
   },
   "dc_pentatiles": {
-    params: [{ name: "zoom", def: 20 }, { name: "border", def: 1 }, { name: "width", def: 0.1 }, { name: "ColorOnly", def: 0 }, { name: "Gradient", def: 0 }, { name: "scale_z", def: 0 }, { name: "offset_z", def: 0 }, { name: "reset_z", def: 1 }],
+    params: [{ name: "zoom", def: 20 }, { name: "border", def: 1, int: true }, { name: "width", def: 0.1 }, { name: "ColorOnly", def: 0, int: true }, { name: "Gradient", def: 0, int: true }, { name: "scale_z", def: 0 }, { name: "offset_z", def: 0 }, { name: "reset_z", def: 1, int: true }],
     verified: true, priority: 0, flags: ["dc","rgb","z"], types: ["SIMULATION","DC","BASE_SHAPE"],
     funcNames: ["read_imageStepMode","atan2j","smoothstepc","mmod2","dc_pentatiles_lfun","dc_pentatiles_Pfun","dc_pentatiles_sfun","dc_pentatiles_Sfun","dc_pentatiles_Lfun","dc_pentatiles_getRGBColor","dbl2int","greyscale","distance_color"],
     funcs: `fn read_imageStepMode(base: u32, n: i32, t: f32) -> vec4f { return pal[base + u32(clamp(t, 0.0, 0.99999) * f32(max(n, 1)))]; }
@@ -31347,7 +31347,7 @@ if ((${p[7]} == 1)) {
 }`,
   },
   "dc_quadtree": {
-    params: [{ name: "zoom", def: 1 }, { name: "seed", def: 10000 }, { name: "time", def: 0 }, { name: "width", def: 1000 }, { name: "levels", def: 30 }, { name: "ColorOnly", def: 0 }, { name: "Gradient", def: 0 }, { name: "scale_z", def: 0 }, { name: "offset_z", def: 0 }, { name: "reset_z", def: 1 }],
+    params: [{ name: "zoom", def: 1 }, { name: "seed", def: 10000, int: true }, { name: "time", def: 0 }, { name: "width", def: 1000 }, { name: "levels", def: 30, int: true }, { name: "ColorOnly", def: 0, int: true }, { name: "Gradient", def: 0, int: true }, { name: "scale_z", def: 0 }, { name: "offset_z", def: 0 }, { name: "reset_z", def: 1, int: true }],
     verified: true, priority: 0, flags: ["dc","rgb","z"], types: ["SIMULATION","DC","BASE_SHAPE"],
     funcNames: ["read_imageStepMode","atan2j","dc_quadtree_sfun","dc_quadtree_rnd","dc_quadtree_getRGBColor","dbl2int","greyscale","distance_color"],
     funcs: `fn read_imageStepMode(base: u32, n: i32, t: f32) -> vec4f { return pal[base + u32(clamp(t, 0.0, 0.99999) * f32(max(n, 1)))]; }
@@ -31475,7 +31475,7 @@ if ((${p[9]} == 1)) {
 }`,
   },
   "dc_sunflower": {
-    params: [{ name: "zoom", def: 7 }, { name: "step", def: 0.1 }, { name: "N", def: 30 }, { name: "Polar", def: 1 }, { name: "Dots", def: 1 }, { name: "GridX", def: 1 }, { name: "GridY", def: 1 }, { name: "ColorOnly", def: 0 }, { name: "Gradient", def: 0 }, { name: "scale_z", def: 0 }, { name: "offset_z", def: 0 }, { name: "reset_z", def: 1 }],
+    params: [{ name: "zoom", def: 7 }, { name: "step", def: 0.1 }, { name: "N", def: 30, int: true }, { name: "Polar", def: 1, int: true }, { name: "Dots", def: 1, int: true }, { name: "GridX", def: 1, int: true }, { name: "GridY", def: 1, int: true }, { name: "ColorOnly", def: 0, int: true }, { name: "Gradient", def: 0, int: true }, { name: "scale_z", def: 0 }, { name: "offset_z", def: 0 }, { name: "reset_z", def: 1, int: true }],
     verified: true, priority: 0, flags: ["dc","rgb","z"], types: ["SIMULATION","DC","BASE_SHAPE"],
     funcNames: ["read_imageStepMode","atan2j","smoothstepc","dc_sunflower_line","dc_sunflower_L","dc_sunflower_S","dc_sunflower_getRGBColor","dbl2int","greyscale","distance_color"],
     funcs: `fn read_imageStepMode(base: u32, n: i32, t: f32) -> vec4f { return pal[base + u32(clamp(t, 0.0, 0.99999) * f32(max(n, 1)))]; }
@@ -31624,7 +31624,7 @@ if ((${p[11]} == 1)) {
 }`,
   },
   "dc_gabornoise": {
-    params: [{ name: "seed", def: 10000 }, { name: "time", def: 0 }, { name: "zoom", def: 20 }, { name: "ColorOnly", def: 0 }, { name: "Gradient", def: 0 }, { name: "scale_z", def: 0 }, { name: "offset_z", def: 0 }, { name: "reset_z", def: 1 }],
+    params: [{ name: "seed", def: 10000, int: true }, { name: "time", def: 0 }, { name: "zoom", def: 20 }, { name: "ColorOnly", def: 0, int: true }, { name: "Gradient", def: 0, int: true }, { name: "scale_z", def: 0 }, { name: "offset_z", def: 0 }, { name: "reset_z", def: 1, int: true }],
     verified: true, priority: 0, flags: ["dc","rgb","z"], types: ["SIMULATION","DC","BASE_SHAPE"],
     funcNames: ["Mat2","read_imageStepMode","atan2j","dc_gabornoise_hash","Mat2_Init","times","dc_gabornoise_getRGBColor","dbl2int","greyscale","distance_color"],
     funcs: `struct Mat2 {
@@ -31758,7 +31758,7 @@ if ((${p[7]} == 1)) {
 }`,
   },
   "dc_cairotiles": {
-    params: [{ name: "zoom", def: 7 }, { name: "seed", def: 10000 }, { name: "time", def: 0 }, { name: "ColorOnly", def: 0 }, { name: "Gradient", def: 0 }, { name: "scale_z", def: 0 }, { name: "offset_z", def: 0 }, { name: "reset_z", def: 1 }],
+    params: [{ name: "zoom", def: 7 }, { name: "seed", def: 10000, int: true }, { name: "time", def: 0 }, { name: "ColorOnly", def: 0, int: true }, { name: "Gradient", def: 0, int: true }, { name: "scale_z", def: 0 }, { name: "offset_z", def: 0 }, { name: "reset_z", def: 1, int: true }],
     verified: true, priority: 0, flags: ["dc","rgb","z"], types: ["SIMULATION","DC","BASE_SHAPE"],
     funcNames: ["Mat2","read_imageStepMode","atan2j","mmod2","smoothstepc","Mat2_Init","times","dc_cairotiles_getRGBColor","dbl2int","greyscale","distance_color"],
     funcs: `struct Mat2 {
@@ -31905,7 +31905,7 @@ if ((${p[7]} == 1)) {
 }`,
   },
   "dc_moebiuslog": {
-    params: [{ name: "zoom", def: 7 }, { name: "seed", def: 10000 }, { name: "time", def: 0 }, { name: "Log", def: 1 }, { name: "Moebius", def: 1 }, { name: "scale", def: 5 }, { name: "angle", def: 5 }, { name: "ColorOnly", def: 0 }, { name: "Gradient", def: 0 }, { name: "scale_z", def: 0 }, { name: "offset_z", def: 0 }, { name: "reset_z", def: 1 }],
+    params: [{ name: "zoom", def: 7 }, { name: "seed", def: 10000, int: true }, { name: "time", def: 0 }, { name: "Log", def: 1, int: true }, { name: "Moebius", def: 1, int: true }, { name: "scale", def: 5 }, { name: "angle", def: 5 }, { name: "ColorOnly", def: 0, int: true }, { name: "Gradient", def: 0, int: true }, { name: "scale_z", def: 0 }, { name: "offset_z", def: 0 }, { name: "reset_z", def: 1, int: true }],
     verified: true, priority: 0, flags: ["dc","rgb","z"], types: ["SIMULATION","DC","BASE_SHAPE"],
     funcNames: ["Mat2","read_imageStepMode","atan2j","Mat2_Init","times","dc_moebiuslog_getRGBColor","dbl2int","greyscale","distance_color"],
     funcs: `struct Mat2 {
@@ -32035,7 +32035,7 @@ if ((${p[11]} == 1)) {
 }`,
   },
   "dc_inversion": {
-    params: [{ name: "seed", def: 10000 }, { name: "time", def: 0 }, { name: "iterations", def: 50 }, { name: "scaleX", def: 1.5 }, { name: "scaleY", def: 1.5 }, { name: "ColorOnly", def: 0 }, { name: "Gradient", def: 0 }, { name: "scale_z", def: 0 }, { name: "offset_z", def: 0 }, { name: "reset_z", def: 1 }],
+    params: [{ name: "seed", def: 10000, int: true }, { name: "time", def: 0 }, { name: "iterations", def: 50, int: true }, { name: "scaleX", def: 1.5 }, { name: "scaleY", def: 1.5 }, { name: "ColorOnly", def: 0, int: true }, { name: "Gradient", def: 0, int: true }, { name: "scale_z", def: 0 }, { name: "offset_z", def: 0 }, { name: "reset_z", def: 1, int: true }],
     verified: true, priority: 0, flags: ["dc","rgb","z"], types: ["SIMULATION","DC","BASE_SHAPE"],
     funcNames: ["read_imageStepMode","atan2j","powc","dc_inversion_CircleInversion","dc_inversion_Parabola","dc_inversion_getRGBColor","dbl2int","greyscale","distance_color"],
     funcs: `fn read_imageStepMode(base: u32, n: i32, t: f32) -> vec4f { return pal[base + u32(clamp(t, 0.0, 0.99999) * f32(max(n, 1)))]; }
@@ -32171,7 +32171,7 @@ if ((${p[9]} == 1)) {
 }`,
   },
   "waves22": {
-    params: [{ name: "scalex", def: 0.05 }, { name: "scaley", def: 0.05 }, { name: "freqx", def: 7 }, { name: "freqy", def: 13 }, { name: "modex", def: 0 }, { name: "modey", def: 0 }, { name: "powerx", def: 2 }, { name: "powery", def: 2 }],
+    params: [{ name: "scalex", def: 0.05 }, { name: "scaley", def: 0.05 }, { name: "freqx", def: 7 }, { name: "freqy", def: 13 }, { name: "modex", def: 0, int: true }, { name: "modey", def: 0, int: true }, { name: "powerx", def: 2 }, { name: "powery", def: 2 }],
     verified: true, priority: 0, flags: [], types: ["2D"],
     funcNames: ["powc","atan2j"],
     funcs: `fn powc(x: f32, y: f32) -> f32 {
@@ -32243,7 +32243,7 @@ v.y += (${w} * (y0 + (sin((x0 * ${p[3]})) * scaleyy)));
 }`,
   },
   "waves42": {
-    params: [{ name: "scalex", def: 0.05 }, { name: "scaley", def: 0.05 }, { name: "freqx", def: 7 }, { name: "freqy", def: 13 }, { name: "cont", def: 0 }, { name: "yfact", def: 0.1 }, { name: "freqx2", def: 1 }],
+    params: [{ name: "scalex", def: 0.05 }, { name: "scaley", def: 0.05 }, { name: "freqx", def: 7 }, { name: "freqy", def: 13 }, { name: "cont", def: 0, int: true }, { name: "yfact", def: 0.1 }, { name: "freqx2", def: 1 }],
     verified: true, priority: 0, flags: [], types: ["2D"],
     funcNames: ["df_add","op_","df_qts","df_ts","df_mulf","hsin_","df_mul","df_sin","df_cos","roundc","atan2j"],
     funcs: `fn df_add(x: vec2f, y: vec2f) -> vec2f { var s = df_ts(x.x, y.x); let t = df_ts(x.y, y.y); s.y = op_(s.y + t.x); s = df_qts(s.x, s.y); s.y = op_(s.y + t.y); return df_qts(s.x, s.y); }
@@ -32319,7 +32319,7 @@ v.y += (${w} * (y0 + (sin((x0 * ${p[3]})) * ${p[1]})));
 }`,
   },
   "waves4": {
-    params: [{ name: "scalex", def: 0.05 }, { name: "scaley", def: 0.05 }, { name: "freqx", def: 7 }, { name: "freqy", def: 13 }, { name: "cont", def: 0 }, { name: "yfact", def: 0.1 }],
+    params: [{ name: "scalex", def: 0.05 }, { name: "scaley", def: 0.05 }, { name: "freqx", def: 7 }, { name: "freqy", def: 13 }, { name: "cont", def: 0, int: true }, { name: "yfact", def: 0.1 }],
     verified: true, priority: 0, flags: [], types: ["2D"],
     funcNames: ["df_add","op_","df_qts","df_ts","df_mulf","hsin_","df_mul","df_sin","df_cos","roundc","atan2j"],
     funcs: `fn df_add(x: vec2f, y: vec2f) -> vec2f { var s = df_ts(x.x, y.x); let t = df_ts(x.y, y.y); s.y = op_(s.y + t.x); s = df_qts(s.x, s.y); s.y = op_(s.y + t.y); return df_qts(s.x, s.y); }
@@ -32433,7 +32433,7 @@ v.y += (FY * weight);
 }`,
   },
   "truchet_hex_crop": {
-    params: [{ name: "wd", def: 0.05 }, { name: "mode", def: 0 }, { name: "inv", def: 0 }, { name: "seed", def: 13 }],
+    params: [{ name: "wd", def: 0.05 }, { name: "mode", def: 0, int: true }, { name: "inv", def: 0, int: true }, { name: "seed", def: 13, int: true }],
     verified: true, priority: 0, flags: [], types: ["2D","CROP","SIMULATION"],
     funcNames: ["roundc","atan2j","sqrf"],
     funcs: `fn roundc(x: f32) -> f32 { return sign(x) * floor(abs(x) + 0.5); }
@@ -32537,7 +32537,7 @@ v.y += ((FY + FY_h) * ${w});
 }`,
   },
   "truchet_hex_fill": {
-    params: [{ name: "n", def: 3 }, { name: "flipx", def: 1 }, { name: "flipy", def: 1 }, { name: "spreadx", def: 1 }, { name: "spready", def: 1 }, { name: "seed", def: 13 }],
+    params: [{ name: "n", def: 3, int: true }, { name: "flipx", def: 1, int: true }, { name: "flipy", def: 1, int: true }, { name: "spreadx", def: 1 }, { name: "spready", def: 1 }, { name: "seed", def: 13, int: true }],
     verified: true, priority: 0, flags: [], types: ["2D","SIMULATION"],
     funcNames: ["atan2j"],
     funcs: `fn atan2j(y: f32, x: f32) -> f32 { if (x == 0.0 && y == 0.0) { return select(0.0, PI, (bitcast<u32>(x) >> 31u) == 1u) * select(1.0, -1.0, (bitcast<u32>(y) >> 31u) == 1u); } return atan2(y, x); }`,
@@ -32636,7 +32636,7 @@ if ((rnd(rs) < 0.5)) {
 }`,
   },
   "truchetflow": {
-    params: [{ name: "randomize", def: 0 }, { name: "zoom", def: 5 }, { name: "invert", def: 0 }],
+    params: [{ name: "randomize", def: 0, int: true }, { name: "zoom", def: 5 }, { name: "invert", def: 0, int: true }],
     verified: true, priority: 0, flags: ["hide","state","z"], types: ["2D","SIMULATION"],
     funcNames: ["jwx_truchetflow_inited_","jwx_truchetflow_uvx","jwx_truchetflow_uvy","powc","smoothstepc","atan2j","truchetflow_N21"],
     funcs: `fn powc(x: f32, y: f32) -> f32 {
@@ -32725,7 +32725,7 @@ if (false) {
 }`,
   },
   "cut_truchet": {
-    params: [{ name: "mode", def: 1 }, { name: "type", def: 0 }, { name: "seed", def: 1000 }, { name: "zoom", def: 10 }, { name: "invert", def: 0 }],
+    params: [{ name: "mode", def: 1, int: true }, { name: "type", def: 0, int: true }, { name: "seed", def: 1000, int: true }, { name: "zoom", def: 10 }, { name: "invert", def: 0, int: true }],
     verified: true, priority: 0, flags: ["hide"], types: ["2D","BASE_SHAPE","SIMULATION"],
     funcNames: ["smoothstepc","atan2j","cut_truchet_random2","cut_truchet_random","cut_truchet_truchetPattern"],
     funcs: `fn smoothstepc(a: f32, b: f32, x: f32) -> f32 { if (a == b) { return step(a, x); } let t = clamp((x - a) / (b - a), 0.0, 1.0); return t * t * (3.0 - 2.0 * t); }
@@ -32795,7 +32795,7 @@ v.y = (${w} * y);
 }`,
   },
   "cut_fingerprint": {
-    params: [{ name: "seed", def: 10000 }, { name: "mode", def: 1 }, { name: "zoom", def: 20 }, { name: "width", def: 0.8 }, { name: "invert", def: 0 }],
+    params: [{ name: "seed", def: 10000, int: true }, { name: "mode", def: 1, int: true }, { name: "zoom", def: 20 }, { name: "width", def: 0.8 }, { name: "invert", def: 0, int: true }],
     verified: true, priority: 0, flags: ["hide"], types: ["BASE_SHAPE","SIMULATION"],
     funcNames: ["atan2j","smoothstepc","cut_fingerprint_hash2","cut_fingerprint_getRGBColor"],
     funcs: `fn atan2j(y: f32, x: f32) -> f32 { if (x == 0.0 && y == 0.0) { return select(0.0, PI, (bitcast<u32>(x) >> 31u) == 1u) * select(1.0, -1.0, (bitcast<u32>(y) >> 31u) == 1u); } return atan2(y, x); }
@@ -32868,7 +32868,7 @@ if (!(*hd)) {
 }`,
   },
   "cut_glypho": {
-    params: [{ name: "mode", def: 1 }, { name: "zoom", def: 1 }, { name: "invert", def: 0 }, { name: "f1", def: 0.115 }, { name: "f2", def: 0.75 }, { name: "f3", def: 1.5 }],
+    params: [{ name: "mode", def: 1, int: true }, { name: "zoom", def: 1 }, { name: "invert", def: 0, int: true }, { name: "f1", def: 0.115 }, { name: "f2", def: 0.75 }, { name: "f3", def: 1.5 }],
     verified: true, priority: 0, flags: ["hide"], types: ["2D","BASE_SHAPE","SIMULATION"],
     funcNames: ["smoothstepc","atan2j"],
     funcs: `fn smoothstepc(a: f32, b: f32, x: f32) -> f32 { if (a == b) { return step(a, x); } let t = clamp((x - a) / (b - a), 0.0, 1.0); return t * t * (3.0 - 2.0 * t); }
@@ -32924,7 +32924,7 @@ if (!(*hd)) {
 }`,
   },
   "cut_metaballs": {
-    params: [{ name: "mode", def: 1 }, { name: "zoom", def: 7 }, { name: "invert", def: 0 }, { name: "time", def: 0 }],
+    params: [{ name: "mode", def: 1, int: true }, { name: "zoom", def: 7 }, { name: "invert", def: 0, int: true }, { name: "time", def: 0 }],
     verified: true, priority: 0, flags: ["hide"], types: ["2D","BASE_SHAPE","SIMULATION"],
     funcNames: ["atan2j","cut_metaballs_random2"],
     funcs: `fn atan2j(y: f32, x: f32) -> f32 { if (x == 0.0 && y == 0.0) { return select(0.0, PI, (bitcast<u32>(x) >> 31u) == 1u) * select(1.0, -1.0, (bitcast<u32>(y) >> 31u) == 1u); } return atan2(y, x); }
@@ -32985,7 +32985,7 @@ v.y = (${w} * (y - py_center));
 }`,
   },
   "cut_bricks": {
-    params: [{ name: "seed", def: 1000 }, { name: "mode", def: 1 }, { name: "size", def: 0.9 }, { name: "zoom", def: 3 }, { name: "invert", def: 0 }],
+    params: [{ name: "seed", def: 1000, int: true }, { name: "mode", def: 1, int: true }, { name: "size", def: 0.9 }, { name: "zoom", def: 3 }, { name: "invert", def: 0, int: true }],
     verified: true, priority: 0, flags: ["hide"], types: ["2D","BASE_SHAPE","SIMULATION"],
     funcNames: ["atan2j","cut_bricks_brickTile","cut_bricks_box"],
     funcs: `fn atan2j(y: f32, x: f32) -> f32 { if (x == 0.0 && y == 0.0) { return select(0.0, PI, (bitcast<u32>(x) >> 31u) == 1u) * select(1.0, -1.0, (bitcast<u32>(y) >> 31u) == 1u); } return atan2(y, x); }
@@ -33041,7 +33041,7 @@ v.y = (${w} * (y - py_center));
 }`,
   },
   "cut_shapes": {
-    params: [{ name: "mode", def: 1 }, { name: "type", def: 0 }, { name: "contour", def: 1 }, { name: "zoom", def: 1 }, { name: "invert", def: 0 }, { name: "n", def: 3 }, { name: "thick", def: 0.01 }, { name: "time", def: 0.5 }],
+    params: [{ name: "mode", def: 1, int: true }, { name: "type", def: 0, int: true }, { name: "contour", def: 1, int: true }, { name: "zoom", def: 1 }, { name: "invert", def: 0, int: true }, { name: "n", def: 3, int: true }, { name: "thick", def: 0.01 }, { name: "time", def: 0.5 }],
     verified: true, priority: 0, flags: ["hide"], types: ["2D","BASE_SHAPE","SIMULATION"],
     funcNames: ["Mat2","smoothstepc","atan2j","cut_shapes_sdHexagram","cut_shapes_sdEquilateralTriangle","cut_shapes_sdStar","cut_shapes_sdCross","cut_shapes_sdOctogon","cut_shapes_sdHexagon","cut_shapes_sdPentagon","cut_shapes_sdVesica","cut_shapes_dot2","cut_shapes_sdTrapezoid","cut_shapes_sdTrapezoid_ov1","Mat2_Init","times","cut_shapes_sdArc","cut_shapes_ndot","cut_shapes_sdRhombus","cut_shapes_sdCircle","cut_shapes_sdBox"],
     funcs: `struct Mat2 {
@@ -33304,7 +33304,7 @@ v.y = (${w} * y);
 }`,
   },
   "cut_kaleido": {
-    params: [{ name: "seed", def: 1000 }, { name: "mode", def: 1 }, { name: "time", def: 0 }, { name: "n", def: 6 }, { name: "zoom", def: 0.5 }, { name: "invert", def: 0 }],
+    params: [{ name: "seed", def: 1000, int: true }, { name: "mode", def: 1, int: true }, { name: "time", def: 0 }, { name: "n", def: 6, int: true }, { name: "zoom", def: 0.5 }, { name: "invert", def: 0, int: true }],
     verified: true, priority: 0, flags: ["hide"], types: ["2D","BASE_SHAPE","SIMULATION"],
     funcNames: ["atan2j","cut_kaleido_distToColor"],
     funcs: `fn atan2j(y: f32, x: f32) -> f32 { if (x == 0.0 && y == 0.0) { return select(0.0, PI, (bitcast<u32>(x) >> 31u) == 1u) * select(1.0, -1.0, (bitcast<u32>(y) >> 31u) == 1u); } return atan2(y, x); }
@@ -33353,7 +33353,7 @@ v.y = (${w} * y);
 }`,
   },
   "cut_pattern": {
-    params: [{ name: "seed", def: 1000 }, { name: "mode", def: 1 }, { name: "time", def: 0.9 }, { name: "zoom", def: 0.5 }, { name: "invert", def: 0 }],
+    params: [{ name: "seed", def: 1000, int: true }, { name: "mode", def: 1, int: true }, { name: "time", def: 0.9 }, { name: "zoom", def: 0.5 }, { name: "invert", def: 0, int: true }],
     verified: true, priority: 0, flags: ["hide"], types: ["2D","BASE_SHAPE","SIMULATION"],
     funcNames: ["Mat2","atan2j","Mat2_Init","times","cut_pattern_rotate2D","cut_pattern_rotateTilePattern"],
     funcs: `struct Mat2 {
@@ -33442,7 +33442,7 @@ v.y = (${w} * y);
 }`,
   },
   "cut_fun": {
-    params: [{ name: "seed", def: 1000 }, { name: "mode", def: 1 }, { name: "zoom", def: 10 }, { name: "invert", def: 0 }],
+    params: [{ name: "seed", def: 1000, int: true }, { name: "mode", def: 1, int: true }, { name: "zoom", def: 10 }, { name: "invert", def: 0, int: true }],
     verified: true, priority: 0, flags: ["hide"], types: ["2D","BASE_SHAPE","SIMULATION"],
     funcNames: ["atan2j","smoothstepc","cut_fun_rand","cut_fun_pix","cut_fun_hm"],
     funcs: `fn atan2j(y: f32, x: f32) -> f32 { if (x == 0.0 && y == 0.0) { return select(0.0, PI, (bitcast<u32>(x) >> 31u) == 1u) * select(1.0, -1.0, (bitcast<u32>(y) >> 31u) == 1u); } return atan2(y, x); }
@@ -33512,7 +33512,7 @@ v.y = (${w} * (y - py_center));
 }`,
   },
   "cut_snowflake": {
-    params: [{ name: "seed", def: 1000 }, { name: "mode", def: 1 }, { name: "time", def: 0 }, { name: "level", def: 10 }, { name: "zoom", def: 10 }, { name: "invert", def: 0 }],
+    params: [{ name: "seed", def: 1000, int: true }, { name: "mode", def: 1, int: true }, { name: "time", def: 0 }, { name: "level", def: 10, int: true }, { name: "zoom", def: 10 }, { name: "invert", def: 0, int: true }],
     verified: true, priority: 0, flags: ["hide"], types: ["2D","BASE_SHAPE","SIMULATION"],
     funcNames: ["atan2j"],
     funcs: `fn atan2j(y: f32, x: f32) -> f32 { if (x == 0.0 && y == 0.0) { return select(0.0, PI, (bitcast<u32>(x) >> 31u) == 1u) * select(1.0, -1.0, (bitcast<u32>(y) >> 31u) == 1u); } return atan2(y, x); }`,
@@ -33557,7 +33557,7 @@ v.y = (${w} * y);
 }`,
   },
   "cut_circdes": {
-    params: [{ name: "seed", def: 1000 }, { name: "mode", def: 1 }, { name: "time", def: 0 }, { name: "zoom", def: 10 }, { name: "invert", def: 0 }],
+    params: [{ name: "seed", def: 1000, int: true }, { name: "mode", def: 1, int: true }, { name: "time", def: 0 }, { name: "zoom", def: 10 }, { name: "invert", def: 0, int: true }],
     verified: true, priority: 0, flags: ["hide"], types: ["2D","BASE_SHAPE","SIMULATION"],
     funcNames: ["atan2j"],
     funcs: `fn atan2j(y: f32, x: f32) -> f32 { if (x == 0.0 && y == 0.0) { return select(0.0, PI, (bitcast<u32>(x) >> 31u) == 1u) * select(1.0, -1.0, (bitcast<u32>(y) >> 31u) == 1u); } return atan2(y, x); }`,
@@ -33615,7 +33615,7 @@ v.y = (${w} * (y - py_center));
 }`,
   },
   "cut_sincos": {
-    params: [{ name: "seed", def: 1000 }, { name: "mode", def: 1 }, { name: "time", def: 0.9 }, { name: "zoom", def: 0.5 }, { name: "invert", def: 0 }],
+    params: [{ name: "seed", def: 1000, int: true }, { name: "mode", def: 1, int: true }, { name: "time", def: 0.9 }, { name: "zoom", def: 0.5 }, { name: "invert", def: 0, int: true }],
     verified: true, priority: 0, flags: ["hide"], types: ["2D","BASE_SHAPE","SIMULATION"],
     funcNames: ["smoothstepc","atan2j"],
     funcs: `fn smoothstepc(a: f32, b: f32, x: f32) -> f32 { if (a == b) { return step(a, x); } let t = clamp((x - a) / (b - a), 0.0, 1.0); return t * t * (3.0 - 2.0 * t); }
@@ -33661,7 +33661,7 @@ v.y = (${w} * y);
 }`,
   },
   "cut_swarp": {
-    params: [{ name: "seed", def: 1000 }, { name: "mode", def: 1 }, { name: "time", def: 0 }, { name: "type", def: 0 }, { name: "zoom", def: 1 }, { name: "invert", def: 0 }],
+    params: [{ name: "seed", def: 1000, int: true }, { name: "mode", def: 1, int: true }, { name: "time", def: 0 }, { name: "type", def: 0, int: true }, { name: "zoom", def: 1 }, { name: "invert", def: 0, int: true }],
     verified: true, priority: 0, flags: ["hide"], types: ["2D","BASE_SHAPE","SIMULATION"],
     funcNames: ["atan2j","cut_swarp_dist"],
     funcs: `fn atan2j(y: f32, x: f32) -> f32 { if (x == 0.0 && y == 0.0) { return select(0.0, PI, (bitcast<u32>(x) >> 31u) == 1u) * select(1.0, -1.0, (bitcast<u32>(y) >> 31u) == 1u); } return atan2(y, x); }
@@ -33725,7 +33725,7 @@ v.y = (${w} * y);
 }`,
   },
   "cut_sqsplits": {
-    params: [{ name: "seed", def: 1000 }, { name: "mode", def: 1 }, { name: "time", def: 0.9 }, { name: "zoom", def: 2 }, { name: "invert", def: 0 }],
+    params: [{ name: "seed", def: 1000, int: true }, { name: "mode", def: 1, int: true }, { name: "time", def: 0.9 }, { name: "zoom", def: 2 }, { name: "invert", def: 0, int: true }],
     verified: true, priority: 0, flags: ["hide"], types: ["2D","BASE_SHAPE","SIMULATION"],
     funcNames: ["mmod2","atan2j"],
     funcs: `fn mmod2(a: vec2f, b: vec2f) -> vec2f { return a - b * floor(a / b); }
@@ -33769,7 +33769,7 @@ v.y = (${w} * y);
 }`,
   },
   "cut_sqcir": {
-    params: [{ name: "mode", def: 1 }, { name: "zoom", def: 2 }, { name: "invert", def: 0 }, { name: "power", def: 2 }],
+    params: [{ name: "mode", def: 1, int: true }, { name: "zoom", def: 2 }, { name: "invert", def: 0, int: true }, { name: "power", def: 2 }],
     verified: true, priority: 0, flags: ["hide"], types: ["2D","BASE_SHAPE","SIMULATION"],
     funcNames: ["powc","atan2j"],
     funcs: `fn powc(x: f32, y: f32) -> f32 {
@@ -33815,7 +33815,7 @@ v.y = (${w} * y);
 }`,
   },
   "shredded": {
-    params: [{ name: "x1", def: 1 }, { name: "x2", def: 3 }, { name: "x3", def: 1 }, { name: "x_blur_amount", def: 0.1 }, { name: "y1", def: 1 }, { name: "y2", def: 3 }, { name: "y3", def: 1 }, { name: "y_blur_amount", def: 0.1 }, { name: "z1", def: 1 }, { name: "z2", def: 3 }, { name: "z3", def: 1 }, { name: "z_blur_amount", def: 0.1 }, { name: "type", def: 0 }, { name: "blur", def: 0 }],
+    params: [{ name: "x1", def: 1 }, { name: "x2", def: 3 }, { name: "x3", def: 1 }, { name: "x_blur_amount", def: 0.1 }, { name: "y1", def: 1 }, { name: "y2", def: 3 }, { name: "y3", def: 1 }, { name: "y_blur_amount", def: 0.1 }, { name: "z1", def: 1 }, { name: "z2", def: 3 }, { name: "z3", def: 1 }, { name: "z_blur_amount", def: 0.1 }, { name: "type", def: 0, int: true }, { name: "blur", def: 0, int: true }],
     verified: true, priority: 0, flags: ["3d","z"], types: ["3D"],
     funcNames: ["atan2j"],
     funcs: `fn atan2j(y: f32, x: f32) -> f32 { if (x == 0.0 && y == 0.0) { return select(0.0, PI, (bitcast<u32>(x) >> 31u) == 1u) * select(1.0, -1.0, (bitcast<u32>(y) >> 31u) == 1u); } return atan2(y, x); }`,
@@ -33852,7 +33852,7 @@ if ((min(max(${p[13]}, 0.0), 1.0) != 0)) {
 }`,
   },
   "cut_rgrid": {
-    params: [{ name: "mode", def: 1 }, { name: "zoom", def: 7 }, { name: "invert", def: 0 }, { name: "angle", def: 0 }],
+    params: [{ name: "mode", def: 1, int: true }, { name: "zoom", def: 7 }, { name: "invert", def: 0, int: true }, { name: "angle", def: 0, int: true }],
     verified: true, priority: 0, flags: ["hide"], types: ["2D","BASE_SHAPE","SIMULATION"],
     funcNames: ["Mat2","mmod2","smoothstepc","atan2j","Mat2_Init","times"],
     funcs: `struct Mat2 {
@@ -33934,7 +33934,7 @@ v.y = (${w} * y);
 }`,
   },
   "cut_yuebing": {
-    params: [{ name: "mode", def: 1 }, { name: "zoom", def: 0.25 }, { name: "invert", def: 0 }, { name: "p1", def: 2 }, { name: "p2", def: 25 }],
+    params: [{ name: "mode", def: 1, int: true }, { name: "zoom", def: 0.25 }, { name: "invert", def: 0, int: true }, { name: "p1", def: 2 }, { name: "p2", def: 25 }],
     verified: true, priority: 0, flags: ["hide"], types: ["2D","BASE_SHAPE","SIMULATION"],
     funcNames: ["atan2j"],
     funcs: `fn atan2j(y: f32, x: f32) -> f32 { if (x == 0.0 && y == 0.0) { return select(0.0, PI, (bitcast<u32>(x) >> 31u) == 1u) * select(1.0, -1.0, (bitcast<u32>(y) >> 31u) == 1u); } return atan2(y, x); }`,
@@ -33971,7 +33971,7 @@ v.y = (${w} * y);
 }`,
   },
   "cut_randomtile": {
-    params: [{ name: "seed", def: 1000 }, { name: "mode", def: 1 }, { name: "zoom", def: 5 }, { name: "invert", def: 0 }],
+    params: [{ name: "seed", def: 1000, int: true }, { name: "mode", def: 1, int: true }, { name: "zoom", def: 5 }, { name: "invert", def: 0, int: true }],
     verified: true, priority: 0, flags: ["hide"], types: ["2D","BASE_SHAPE","SIMULATION"],
     funcNames: ["Mat2","smoothstepc","atan2j","cut_randomtile_hash21","Mat2_Init","cut_randomtile_rot2","times","cut_randomtile_TilePattern","Mat2_Init_ov1","cut_randomtile_n2D","cut_randomtile_sFract","cut_randomtile_GrungeTex","cut_randomtile_sstep"],
     funcs: `struct Mat2 {
@@ -34139,7 +34139,7 @@ v.y = (${w} * (y - py_center));
 }`,
   },
   "cut_tstruchet": {
-    params: [{ name: "seed", def: 1000 }, { name: "mode", def: 1 }, { name: "shape", def: 0 }, { name: "levels", def: 0 }, { name: "arcs", def: 0 }, { name: "zoom", def: 5 }, { name: "invert", def: 0 }],
+    params: [{ name: "seed", def: 1000, int: true }, { name: "mode", def: 1, int: true }, { name: "shape", def: 0, int: true }, { name: "levels", def: 0, int: true }, { name: "arcs", def: 0, int: true }, { name: "zoom", def: 5 }, { name: "invert", def: 0, int: true }],
     verified: true, priority: 0, flags: ["hide","state","z"], types: ["BASE_SHAPE","SIMULATION"],
     funcNames: ["jwx_cut_tstruchet_shape_c","jrand_","smoothstepc","atan2j","rndi","jrand_make","jrand_next","jrand_nextDouble","cut_tstruchet_hash22","cut_tstruchet_r2","cut_tstruchet_dist","cut_tstruchet_n2D","cut_tstruchet_fbm"],
     funcs: `struct jrand_ {
@@ -34353,7 +34353,7 @@ if (false) {
 }`,
   },
   "cut_alientext": {
-    params: [{ name: "seed", def: 1000 }, { name: "mode", def: 1 }, { name: "subdivisions", def: 3 }, { name: "zoom", def: 1 }, { name: "invert", def: 0 }],
+    params: [{ name: "seed", def: 1000, int: true }, { name: "mode", def: 1, int: true }, { name: "subdivisions", def: 3, int: true }, { name: "zoom", def: 1 }, { name: "invert", def: 0, int: true }],
     verified: true, priority: 0, flags: ["hide"], types: ["2D","BASE_SHAPE","SIMULATION"],
     funcNames: ["atan2j","cut_alientext_getCellIJ","cut_alientext_random2d","cut_alientext_letter"],
     funcs: `fn atan2j(y: f32, x: f32) -> f32 { if (x == 0.0 && y == 0.0) { return select(0.0, PI, (bitcast<u32>(x) >> 31u) == 1u) * select(1.0, -1.0, (bitcast<u32>(y) >> 31u) == 1u); } return atan2(y, x); }
@@ -34430,7 +34430,7 @@ v.y = (${w} * (y - py_center));
 }`,
   },
   "cut_triantess": {
-    params: [{ name: "mode", def: 1 }, { name: "Iters", def: 20 }, { name: "SRadius", def: 0.01 }, { name: "pParam", def: 3 }, { name: "qParam", def: 3 }, { name: "rParam", def: 4 }, { name: "uBaryc", def: 1 }, { name: "vBaryc", def: 1 }, { name: "wBaryc", def: 0 }, { name: "zoom", def: 2 }, { name: "invert", def: 0 }],
+    params: [{ name: "mode", def: 1, int: true }, { name: "Iters", def: 20, int: true }, { name: "SRadius", def: 0.01 }, { name: "pParam", def: 3, int: true }, { name: "qParam", def: 3, int: true }, { name: "rParam", def: 4, int: true }, { name: "uBaryc", def: 1 }, { name: "vBaryc", def: 1 }, { name: "wBaryc", def: 0 }, { name: "zoom", def: 2 }, { name: "invert", def: 0, int: true }],
     verified: true, priority: 0, flags: ["hide"], types: ["2D","BASE_SHAPE","SIMULATION"],
     funcNames: ["Mat2","smoothstepc","atan2j","cut_triantess_hdott","hlengtht","cut_triantess_hnormalizet","cut_triantess_hdots","Mat2_Init","times","cut_triantess_hlengths","cut_triantess_DD","cut_triantess_dist2Segment","cut_triantess_dist2Segments"],
     funcs: `struct Mat2 {
@@ -34584,7 +34584,7 @@ v.y = (${w} * y);
 }`,
   },
   "cut_2ewangtile": {
-    params: [{ name: "seed", def: 1000 }, { name: "mode", def: 1 }, { name: "zoom", def: 25 }, { name: "invert", def: 0 }],
+    params: [{ name: "seed", def: 1000, int: true }, { name: "mode", def: 1, int: true }, { name: "zoom", def: 25 }, { name: "invert", def: 0, int: true }],
     verified: true, priority: 0, flags: ["hide","state","z"], types: ["BASE_SHAPE","SIMULATION"],
     funcNames: ["jwx_cut_2ewangtile_inited_","jwx_cut_2ewangtile_K2","jwx_cut_2ewangtile_K3","jwx_cut_2ewangtile_k","jwx_cut_2ewangtile_HASHSCALE1","jrand_","smoothstepc","atan2j","rndi","jrand_make","jrand_next","jrand_nextDouble","cut_2ewangtile_hash","cut_2ewangtile_tile0","cut_2ewangtile_tile1","cut_2ewangtile_tile2","cut_2ewangtile_tile3","cut_2ewangtile_tile4","cut_2ewangtile_tile","cut_2ewangtile_map","cut_2ewangtile_height"],
     funcs: `struct jrand_ {
@@ -34822,7 +34822,7 @@ if (false) {
 }`,
   },
   "cut_booleans": {
-    params: [{ name: "seed", def: 1000 }, { name: "mode", def: 1 }, { name: "type", def: 0 }, { name: "zoom", def: 250 }, { name: "invert", def: 0 }],
+    params: [{ name: "seed", def: 1000, int: true }, { name: "mode", def: 1, int: true }, { name: "type", def: 0, int: true }, { name: "zoom", def: 250 }, { name: "invert", def: 0, int: true }],
     verified: true, priority: 0, flags: ["hide"], types: ["2D","BASE_SHAPE","SIMULATION"],
     funcNames: ["atan2j"],
     funcs: `fn atan2j(y: f32, x: f32) -> f32 { if (x == 0.0 && y == 0.0) { return select(0.0, PI, (bitcast<u32>(x) >> 31u) == 1u) * select(1.0, -1.0, (bitcast<u32>(y) >> 31u) == 1u); } return atan2(y, x); }`,
@@ -34872,7 +34872,7 @@ v.y = (${w} * (y - py_center));
 }`,
   },
   "cut_apollonian": {
-    params: [{ name: "mode", def: 1 }, { name: "levels", def: 4 }, { name: "zoom", def: 2 }, { name: "invert", def: 0 }],
+    params: [{ name: "mode", def: 1, int: true }, { name: "levels", def: 4, int: true }, { name: "zoom", def: 2 }, { name: "invert", def: 0, int: true }],
     verified: true, priority: 0, flags: ["hide"], types: ["2D","BASE_SHAPE","SIMULATION"],
     funcNames: ["atan2j","smoothstepc","cut_apollonian_apollo"],
     funcs: `fn atan2j(y: f32, x: f32) -> f32 { if (x == 0.0 && y == 0.0) { return select(0.0, PI, (bitcast<u32>(x) >> 31u) == 1u) * select(1.0, -1.0, (bitcast<u32>(y) >> 31u) == 1u); } return atan2(y, x); }
@@ -34928,7 +34928,7 @@ v.y = (${w} * y);
 }`,
   },
   "cut_truchetweaving": {
-    params: [{ name: "randomize", def: 0 }, { name: "mode", def: 1 }, { name: "type", def: 0 }, { name: "width", def: 0.15 }, { name: "zoom", def: 8 }, { name: "invert", def: 0 }],
+    params: [{ name: "randomize", def: 0, int: true }, { name: "mode", def: 1, int: true }, { name: "type", def: 0, int: true }, { name: "width", def: 0.15 }, { name: "zoom", def: 8 }, { name: "invert", def: 0, int: true }],
     verified: true, priority: 0, flags: ["hide"], types: ["2D","BASE_SHAPE","SIMULATION"],
     funcNames: ["Mat2","mmod2","atan2j","df_add","op_","df_qts","df_ts","df_mulf","hsin_","df_mul","df_sin","df_cos","smoothstepc","cut_truchetweaving_N21","Mat2_Init","times","cut_truchetweaving_UvCirc","cut_truchetweaving_UvBeam","cut_truchetweaving_Truchet"],
     funcs: `struct Mat2 {
@@ -35159,7 +35159,7 @@ v.y = (${w} * y);
 }`,
   },
   "cut_hextruchetflow": {
-    params: [{ name: "randomize", def: 0 }, { name: "mode", def: 1 }, { name: "grid", def: 0 }, { name: "zoom", def: 10 }, { name: "invert", def: 0 }],
+    params: [{ name: "randomize", def: 0, int: true }, { name: "mode", def: 1, int: true }, { name: "grid", def: 0, int: true }, { name: "zoom", def: 10 }, { name: "invert", def: 0, int: true }],
     verified: true, priority: 0, flags: ["hide"], types: ["2D","BASE_SHAPE","SIMULATION"],
     funcNames: ["atan2j","smoothstepc","cut_hextruchetflow_PixToHex","cut_hextruchetflow_HexToPix","cut_hextruchetflow_Hashfv2","cut_hextruchetflow_HexEdgeDist","cut_hextruchetflow_ShowScene"],
     funcs: `fn atan2j(y: f32, x: f32) -> f32 { if (x == 0.0 && y == 0.0) { return select(0.0, PI, (bitcast<u32>(x) >> 31u) == 1u) * select(1.0, -1.0, (bitcast<u32>(y) >> 31u) == 1u); } return atan2(y, x); }
@@ -35269,7 +35269,7 @@ v.y = (${w} * y);
 }`,
   },
   "cut_hexdots": {
-    params: [{ name: "mode", def: 1 }, { name: "size", def: 0.5 }, { name: "zoom", def: 4 }, { name: "invert", def: 0 }],
+    params: [{ name: "mode", def: 1, int: true }, { name: "size", def: 0.5 }, { name: "zoom", def: 4 }, { name: "invert", def: 0, int: true }],
     verified: true, priority: 0, flags: ["hide"], types: ["2D","BASE_SHAPE","SIMULATION"],
     funcNames: ["mmod2","atan2j"],
     funcs: `fn mmod2(a: vec2f, b: vec2f) -> vec2f { return a - b * floor(a / b); }
@@ -35310,7 +35310,7 @@ v.y = (${w} * y);
 }`,
   },
   "cut_jigsaw": {
-    params: [{ name: "seed", def: 1000 }, { name: "time", def: 0 }, { name: "mode", def: 1 }, { name: "zoom", def: 4 }, { name: "invert", def: 0 }],
+    params: [{ name: "seed", def: 1000, int: true }, { name: "time", def: 0 }, { name: "mode", def: 1, int: true }, { name: "zoom", def: 4 }, { name: "invert", def: 0, int: true }],
     verified: true, priority: 0, flags: ["hide"], types: ["2D","BASE_SHAPE","SIMULATION"],
     funcNames: ["mmod2","atan2j"],
     funcs: `fn mmod2(a: vec2f, b: vec2f) -> vec2f { return a - b * floor(a / b); }
@@ -35357,7 +35357,7 @@ v.y = (${w} * y);
 }`,
   },
   "cut_chains": {
-    params: [{ name: "shiftX", def: 0 }, { name: "shiftY", def: 0 }, { name: "mode", def: 1 }, { name: "zoom", def: 2.5 }, { name: "invert", def: 0 }],
+    params: [{ name: "shiftX", def: 0 }, { name: "shiftY", def: 0 }, { name: "mode", def: 1, int: true }, { name: "zoom", def: 2.5 }, { name: "invert", def: 0, int: true }],
     verified: true, priority: 0, flags: ["hide"], types: ["2D","BASE_SHAPE","SIMULATION"],
     funcNames: ["smoothstepc","atan2j"],
     funcs: `fn smoothstepc(a: f32, b: f32, x: f32) -> f32 { if (a == b) { return step(a, x); } let t = clamp((x - a) / (b - a), 0.0, 1.0); return t * t * (3.0 - 2.0 * t); }
@@ -35404,7 +35404,7 @@ v.y = (${w} * (y - py_center));
 }`,
   },
   "cut_wood": {
-    params: [{ name: "shiftX", def: 0 }, { name: "shiftY", def: 0 }, { name: "freq", def: 1.8 }, { name: "smooth", def: 1 }, { name: "LineCount", def: 20 }, { name: "LineWidth", def: 0.2 }, { name: "mode", def: 1 }, { name: "zoom", def: 2.5 }, { name: "invert", def: 0 }],
+    params: [{ name: "shiftX", def: 0 }, { name: "shiftY", def: 0 }, { name: "freq", def: 1.8 }, { name: "smooth", def: 1 }, { name: "LineCount", def: 20 }, { name: "LineWidth", def: 0.2 }, { name: "mode", def: 1, int: true }, { name: "zoom", def: 2.5 }, { name: "invert", def: 0, int: true }],
     verified: true, priority: 0, flags: ["hide"], types: ["2D","BASE_SHAPE","SIMULATION"],
     funcNames: ["Mat2","powc","atan2j","df_add","op_","df_qts","df_ts","df_mulf","hsin_","df_mul","df_sin","df_cos","smoothstepc","cut_wood_random","cut_wood_noise","Mat2_Init","cut_wood_rotate","times","cut_wood_twist","cut_wood_line"],
     funcs: `struct Mat2 {
@@ -35573,7 +35573,7 @@ v.y = (${w} * (y - py_center));
 }`,
   },
   "dc_booleans": {
-    params: [{ name: "randomize", def: 1000 }, { name: "type", def: 1 }, { name: "zoom", def: 1000 }, { name: "ColorOnly", def: 0 }, { name: "Gradient", def: 0 }, { name: "scale_z", def: 0 }, { name: "offset_z", def: 0 }, { name: "reset_z", def: 1 }],
+    params: [{ name: "randomize", def: 1000, int: true }, { name: "type", def: 1, int: true }, { name: "zoom", def: 1000 }, { name: "ColorOnly", def: 0, int: true }, { name: "Gradient", def: 0, int: true }, { name: "scale_z", def: 0 }, { name: "offset_z", def: 0 }, { name: "reset_z", def: 1, int: true }],
     verified: true, priority: 0, flags: ["dc","rgb","z"], types: ["SIMULATION","DC","BASE_SHAPE"],
     funcNames: ["read_imageStepMode","atan2j","hsv2rgb","dc_booleans_getRGBColor","dbl2int","greyscale","distance_color"],
     funcs: `fn read_imageStepMode(base: u32, n: i32, t: f32) -> vec4f { return pal[base + u32(clamp(t, 0.0, 0.99999) * f32(max(n, 1)))]; }
@@ -35685,7 +35685,7 @@ if ((${p[7]} == 1)) {
 }`,
   },
   "dc_spacefold": {
-    params: [{ name: "randomize", def: 1000 }, { name: "time", def: 0 }, { name: "zoom", def: 2.5 }, { name: "ColorOnly", def: 0 }, { name: "Gradient", def: 0 }, { name: "scale_z", def: 0 }, { name: "offset_z", def: 0 }, { name: "reset_z", def: 1 }],
+    params: [{ name: "randomize", def: 1000, int: true }, { name: "time", def: 0 }, { name: "zoom", def: 2.5 }, { name: "ColorOnly", def: 0, int: true }, { name: "Gradient", def: 0, int: true }, { name: "scale_z", def: 0 }, { name: "offset_z", def: 0 }, { name: "reset_z", def: 1, int: true }],
     verified: true, priority: 0, flags: ["dc","rgb","z"], types: ["SIMULATION","DC","BASE_SHAPE"],
     funcNames: ["Mat2","read_imageStepMode","atan2j","Mat2_Init","dc_spacefold_rot","times","dc_spacefold_palette","dc_spacefold_getRGBColor","dbl2int","greyscale","distance_color"],
     funcs: `struct Mat2 {
@@ -35823,7 +35823,7 @@ if ((${p[7]} == 1)) {
 }`,
   },
   "dc_butterflies": {
-    params: [{ name: "seed", def: 1000 }, { name: "time", def: 0 }, { name: "zoom", def: 1 }, { name: "red", def: 1 }, { name: "green", def: 1 }, { name: "blue", def: 1 }, { name: "ColorOnly", def: 0 }, { name: "Gradient", def: 0 }, { name: "scale_z", def: 0 }, { name: "offset_z", def: 0 }, { name: "reset_z", def: 1 }],
+    params: [{ name: "seed", def: 1000, int: true }, { name: "time", def: 0 }, { name: "zoom", def: 1 }, { name: "red", def: 1 }, { name: "green", def: 1 }, { name: "blue", def: 1 }, { name: "ColorOnly", def: 0, int: true }, { name: "Gradient", def: 0, int: true }, { name: "scale_z", def: 0 }, { name: "offset_z", def: 0 }, { name: "reset_z", def: 1, int: true }],
     verified: true, priority: 0, flags: ["dc","rgb","z"], types: ["SIMULATION","DC","BASE_SHAPE"],
     funcNames: ["read_imageStepMode","atan2j","powc","dc_butterflies_cpow","dc_butterflies_csin","dc_butterflies_func","dc_butterflies_getRGBColor","dbl2int","greyscale","distance_color"],
     funcs: `fn read_imageStepMode(base: u32, n: i32, t: f32) -> vec4f { return pal[base + u32(clamp(t, 0.0, 0.99999) * f32(max(n, 1)))]; }
@@ -35967,7 +35967,7 @@ if ((min(max(${p[10]}, 0.0), 1.0) == 1)) {
 }`,
   },
   "cut_tileillusion": {
-    params: [{ name: "time", def: 0 }, { name: "mode", def: 1 }, { name: "zoom", def: 15 }, { name: "invert", def: 0 }],
+    params: [{ name: "time", def: 0 }, { name: "mode", def: 1, int: true }, { name: "zoom", def: 15 }, { name: "invert", def: 0, int: true }],
     verified: true, priority: 0, flags: ["hide"], types: ["2D","BASE_SHAPE","SIMULATION"],
     funcNames: ["atan2j","cut_tileillusion_f","cut_tileillusion_solve"],
     funcs: `fn atan2j(y: f32, x: f32) -> f32 { if (x == 0.0 && y == 0.0) { return select(0.0, PI, (bitcast<u32>(x) >> 31u) == 1u) * select(1.0, -1.0, (bitcast<u32>(y) >> 31u) == 1u); } return atan2(y, x); }
@@ -36045,7 +36045,7 @@ v.y = (${w} * y);
 }`,
   },
   "dc_fractcolor": {
-    params: [{ name: "randomize", def: 0 }, { name: "time", def: 0 }, { name: "xpar", def: 0.5 }, { name: "ypar", def: 0.5 }, { name: "iters", def: 88 }, { name: "zoom", def: 1 }, { name: "ColorOnly", def: 0 }, { name: "Gradient", def: 0 }, { name: "scale_z", def: 0 }, { name: "offset_z", def: 0 }, { name: "reset_z", def: 1 }],
+    params: [{ name: "randomize", def: 0, int: true }, { name: "time", def: 0 }, { name: "xpar", def: 0.5 }, { name: "ypar", def: 0.5 }, { name: "iters", def: 88, int: true }, { name: "zoom", def: 1 }, { name: "ColorOnly", def: 0, int: true }, { name: "Gradient", def: 0, int: true }, { name: "scale_z", def: 0 }, { name: "offset_z", def: 0 }, { name: "reset_z", def: 1, int: true }],
     verified: true, priority: 0, flags: ["dc","rgb","z"], types: ["SIMULATION","DC","BASE_SHAPE"],
     funcNames: ["read_imageStepMode","atan2j","dc_fractcolor_getRGBColor","dbl2int","greyscale","distance_color"],
     funcs: `fn read_imageStepMode(base: u32, n: i32, t: f32) -> vec4f { return pal[base + u32(clamp(t, 0.0, 0.99999) * f32(max(n, 1)))]; }
@@ -36150,7 +36150,7 @@ if ((${p[10]} == 1)) {
 }`,
   },
   "cut_fractal": {
-    params: [{ name: "seed", def: 0 }, { name: "mode", def: 1 }, { name: "time", def: 0 }, { name: "iters", def: 30 }, { name: "zoom", def: 1 }, { name: "invert", def: 0 }],
+    params: [{ name: "seed", def: 0, int: true }, { name: "mode", def: 1, int: true }, { name: "time", def: 0 }, { name: "iters", def: 30, int: true }, { name: "zoom", def: 1 }, { name: "invert", def: 0, int: true }],
     verified: true, priority: 0, flags: ["hide"], types: ["2D","BASE_SHAPE","SIMULATION"],
     funcNames: ["atan2j"],
     funcs: `fn atan2j(y: f32, x: f32) -> f32 { if (x == 0.0 && y == 0.0) { return select(0.0, PI, (bitcast<u32>(x) >> 31u) == 1u) * select(1.0, -1.0, (bitcast<u32>(y) >> 31u) == 1u); } return atan2(y, x); }`,
@@ -36190,7 +36190,7 @@ v.y = (${w} * y);
 }`,
   },
   "cut_zigzag": {
-    params: [{ name: "mode", def: 1 }, { name: "xpar", def: 1 }, { name: "ypar", def: 2 }, { name: "zoom", def: 2 }, { name: "invert", def: 0 }],
+    params: [{ name: "mode", def: 1, int: true }, { name: "xpar", def: 1 }, { name: "ypar", def: 2 }, { name: "zoom", def: 2 }, { name: "invert", def: 0, int: true }],
     verified: true, priority: 0, flags: ["hide"], types: ["2D","BASE_SHAPE"],
     funcNames: ["atan2j","smoothstepc","cut_zigzag_mirrorTile","cut_zigzag_fillY"],
     funcs: `fn atan2j(y: f32, x: f32) -> f32 { if (x == 0.0 && y == 0.0) { return select(0.0, PI, (bitcast<u32>(x) >> 31u) == 1u) * select(1.0, -1.0, (bitcast<u32>(y) >> 31u) == 1u); } return atan2(y, x); }
@@ -36247,7 +36247,7 @@ v.y = (${w} * yp);
 }`,
   },
   "cut_x": {
-    params: [{ name: "mode", def: 1 }, { name: "zoom", def: 1 }, { name: "invert", def: 0 }, { name: "size", def: 0.1 }],
+    params: [{ name: "mode", def: 1, int: true }, { name: "zoom", def: 1 }, { name: "invert", def: 0, int: true }, { name: "size", def: 0.1 }],
     verified: true, priority: 0, flags: ["hide"], types: ["2D","BASE_SHAPE","SIMULATION"],
     funcNames: ["Mat2","smoothstepc","atan2j","Mat2_Init","cut_x_rot","times"],
     funcs: `struct Mat2 {
@@ -36320,7 +36320,7 @@ v.y = (${w} * y);
 }`,
   },
   "cut_spiral": {
-    params: [{ name: "time", def: 0 }, { name: "mode", def: 1 }, { name: "zoom", def: 2.5 }, { name: "invert", def: 0 }],
+    params: [{ name: "time", def: 0 }, { name: "mode", def: 1, int: true }, { name: "zoom", def: 2.5 }, { name: "invert", def: 0, int: true }],
     verified: true, priority: 0, flags: ["hide"], types: ["2D","BASE_SHAPE","SIMULATION"],
     funcNames: ["Mat2","atan2j","Mat2_Init","cut_spiral_rot2","times"],
     funcs: `struct Mat2 {
@@ -36388,7 +36388,7 @@ v.y = (${w} * y);
 }`,
   },
   "cut_spiralcb": {
-    params: [{ name: "time", def: 0 }, { name: "mode", def: 1 }, { name: "zoom", def: 1 }, { name: "invert", def: 0 }],
+    params: [{ name: "time", def: 0 }, { name: "mode", def: 1, int: true }, { name: "zoom", def: 1 }, { name: "invert", def: 0, int: true }],
     verified: true, priority: 0, flags: ["hide"], types: ["2D","BASE_SHAPE","SIMULATION"],
     funcNames: ["Mat2","atan2j","Mat2_Init","cut_spiralcb_rotate","times","cut_spiralcb_hill","cut_spiralcb_compute_spiral"],
     funcs: `struct Mat2 {
@@ -36466,7 +36466,7 @@ v.y = (${w} * y);
 }`,
   },
   "joukowski": {
-    params: [{ name: "P1", def: 2.5 }, { name: "P2", def: 0 }, { name: "inverse", def: 0 }],
+    params: [{ name: "P1", def: 2.5 }, { name: "P2", def: 0 }, { name: "inverse", def: 0, int: true }],
     verified: true, priority: 0, flags: [], types: ["2D"],
     funcNames: ["atan2j","joukowski_cexp","joukowski_cdiv","joukowski_cmul","joukowski_Jouk","joukowski_csqrt","joukowski_cnorm","joukowski_invJouk"],
     funcs: `fn atan2j(y: f32, x: f32) -> f32 { if (x == 0.0 && y == 0.0) { return select(0.0, PI, (bitcast<u32>(x) >> 31u) == 1u) * select(1.0, -1.0, (bitcast<u32>(y) >> 31u) == 1u); } return atan2(y, x); }
@@ -36655,7 +36655,7 @@ v.y = (${w} * uv.y);
 }`,
   },
   "cut_celtic": {
-    params: [{ name: "mode", def: 1 }, { name: "zoom", def: 5 }, { name: "invert", def: 0 }],
+    params: [{ name: "mode", def: 1, int: true }, { name: "zoom", def: 5 }, { name: "invert", def: 0, int: true }],
     verified: true, priority: 0, flags: ["hide"], types: ["2D","BASE_SHAPE","SIMULATION"],
     funcNames: ["atan2j","smoothstepc","cut_celtic_circ","cut_celtic_celticShit"],
     funcs: `fn atan2j(y: f32, x: f32) -> f32 { if (x == 0.0 && y == 0.0) { return select(0.0, PI, (bitcast<u32>(x) >> 31u) == 1u) * select(1.0, -1.0, (bitcast<u32>(y) >> 31u) == 1u); } return atan2(y, x); }
@@ -36749,7 +36749,7 @@ v.y = (${w} * (y - py_center));
 }`,
   },
   "cut_triskel": {
-    params: [{ name: "mode", def: 1 }, { name: "zoom", def: 1 }, { name: "invert", def: 0 }],
+    params: [{ name: "mode", def: 1, int: true }, { name: "zoom", def: 1 }, { name: "invert", def: 0, int: true }],
     verified: true, priority: 0, flags: ["hide","z"], types: ["BASE_SHAPE","SIMULATION"],
     funcNames: ["atan2j","smoothstepc"],
     funcs: `fn atan2j(y: f32, x: f32) -> f32 { if (x == 0.0 && y == 0.0) { return select(0.0, PI, (bitcast<u32>(x) >> 31u) == 1u) * select(1.0, -1.0, (bitcast<u32>(y) >> 31u) == 1u); } return atan2(y, x); }
@@ -36802,7 +36802,7 @@ if (false) {
 }`,
   },
   "cut_vasarely": {
-    params: [{ name: "mode", def: 1 }, { name: "zoom", def: 1 }, { name: "invert", def: 0 }, { name: "size", def: 0.5 }],
+    params: [{ name: "mode", def: 1, int: true }, { name: "zoom", def: 1 }, { name: "invert", def: 0, int: true }, { name: "size", def: 0.5 }],
     verified: true, priority: 0, flags: ["hide"], types: ["2D","BASE_SHAPE","SIMULATION"],
     funcNames: ["atan2j"],
     funcs: `fn atan2j(y: f32, x: f32) -> f32 { if (x == 0.0 && y == 0.0) { return select(0.0, PI, (bitcast<u32>(x) >> 31u) == 1u) * select(1.0, -1.0, (bitcast<u32>(y) >> 31u) == 1u); } return atan2(y, x); }`,
@@ -36842,7 +36842,7 @@ v.y = (${w} * y);
 }`,
   },
   "cut_web": {
-    params: [{ name: "seed", def: 1000 }, { name: "time", def: 0 }, { name: "mode", def: 1 }, { name: "thick", def: 0.05 }, { name: "invert", def: 1 }],
+    params: [{ name: "seed", def: 1000, int: true }, { name: "time", def: 0 }, { name: "mode", def: 1, int: true }, { name: "thick", def: 0.05 }, { name: "invert", def: 1, int: true }],
     verified: true, priority: 0, flags: ["hide"], types: ["2D","BASE_SHAPE","SIMULATION"],
     funcNames: ["atan2j","mmod2","cut_web_eval","cut_web_getColour"],
     funcs: `fn atan2j(y: f32, x: f32) -> f32 { if (x == 0.0 && y == 0.0) { return select(0.0, PI, (bitcast<u32>(x) >> 31u) == 1u) * select(1.0, -1.0, (bitcast<u32>(y) >> 31u) == 1u); } return atan2(y, x); }
@@ -36896,7 +36896,7 @@ v.y = (${w} * y);
 }`,
   },
   "cut_spots": {
-    params: [{ name: "mode", def: 1 }, { name: "seed", def: 0 }, { name: "zoom", def: 0.3 }, { name: "invert", def: 0 }],
+    params: [{ name: "mode", def: 1, int: true }, { name: "seed", def: 0, int: true }, { name: "zoom", def: 0.3 }, { name: "invert", def: 0, int: true }],
     verified: true, priority: 0, flags: ["hide"], types: ["2D","BASE_SHAPE","SIMULATION"],
     funcNames: ["atan2j","cut_spots_random","cut_spots_noise","cut_spots_fbm","cut_spots_remap"],
     funcs: `fn atan2j(y: f32, x: f32) -> f32 { if (x == 0.0 && y == 0.0) { return select(0.0, PI, (bitcast<u32>(x) >> 31u) == 1u) * select(1.0, -1.0, (bitcast<u32>(y) >> 31u) == 1u); } return atan2(y, x); }
@@ -36975,7 +36975,7 @@ v.y = (${w} * y);
 }`,
   },
   "cut_btruchet": {
-    params: [{ name: "mode", def: 1 }, { name: "width", def: 2 }, { name: "seed", def: 1000 }, { name: "zoom", def: 10 }, { name: "invert", def: 0 }],
+    params: [{ name: "mode", def: 1, int: true }, { name: "width", def: 2 }, { name: "seed", def: 1000, int: true }, { name: "zoom", def: 10 }, { name: "invert", def: 0, int: true }],
     verified: true, priority: 0, flags: ["hide","z"], types: ["BASE_SHAPE","SIMULATION"],
     funcNames: ["jrand_","smoothstepc","atan2j","rndi","jrand_make","jrand_next","jrand_nextDouble","cut_btruchet_hash1","cut_btruchet_tile1","cut_btruchet_tile2","cut_btruchet_tile3"],
     funcs: `struct jrand_ {
@@ -37109,7 +37109,7 @@ if (false) {
 }`,
   },
   "cut_magfield": {
-    params: [{ name: "randomize", def: 0 }, { name: "time", def: 0 }, { name: "density", def: 3 }, { name: "zoom", def: 3 }, { name: "mode", def: 1 }, { name: "invert", def: 0 }],
+    params: [{ name: "randomize", def: 0, int: true }, { name: "time", def: 0 }, { name: "density", def: 3 }, { name: "zoom", def: 3 }, { name: "mode", def: 1, int: true }, { name: "invert", def: 0, int: true }],
     verified: true, priority: 0, flags: ["hide"], types: ["2D","BASE_SHAPE","SIMULATION"],
     funcNames: ["atan2j","powc","cut_magfield_rand","cut_magfield_force","cut_magfield_calcVelocity","cut_magfield_calcDerivative","cut_magfield_saturate"],
     funcs: `fn atan2j(y: f32, x: f32) -> f32 { if (x == 0.0 && y == 0.0) { return select(0.0, PI, (bitcast<u32>(x) >> 31u) == 1u) * select(1.0, -1.0, (bitcast<u32>(y) >> 31u) == 1u); } return atan2(y, x); }
@@ -37206,7 +37206,7 @@ v.y = (${w} * y);
 }`,
   },
   "cut_btree": {
-    params: [{ name: "randomize", def: 0 }, { name: "time", def: 1 }, { name: "thickness", def: 5 }, { name: "zoom", def: 1 }, { name: "mode", def: 1 }, { name: "invert", def: 1 }],
+    params: [{ name: "randomize", def: 0, int: true }, { name: "time", def: 1 }, { name: "thickness", def: 5 }, { name: "zoom", def: 1 }, { name: "mode", def: 1, int: true }, { name: "invert", def: 1, int: true }],
     verified: true, priority: 0, flags: ["hide"], types: ["2D","BASE_SHAPE","SIMULATION"],
     funcNames: ["atan2j"],
     funcs: `fn atan2j(y: f32, x: f32) -> f32 { if (x == 0.0 && y == 0.0) { return select(0.0, PI, (bitcast<u32>(x) >> 31u) == 1u) * select(1.0, -1.0, (bitcast<u32>(y) >> 31u) == 1u); } return atan2(y, x); }`,
@@ -37432,7 +37432,7 @@ pz_ += (${w} * z);
 }`,
   },
   "post_crosscrop": {
-    params: [{ name: "x", def: 1 }, { name: "y", def: 1 }, { name: "z", def: 1 }, { name: "rotation", def: 0 }, { name: "reverse", def: 0 }],
+    params: [{ name: "x", def: 1 }, { name: "y", def: 1 }, { name: "z", def: 1 }, { name: "rotation", def: 0 }, { name: "reverse", def: 0, int: true }],
     verified: true, priority: 1, flags: ["3d","hide","z"], types: ["3D","CROP","POST"],
     funcNames: ["atan2j"],
     funcs: `fn atan2j(y: f32, x: f32) -> f32 { if (x == 0.0 && y == 0.0) { return select(0.0, PI, (bitcast<u32>(x) >> 31u) == 1u) * select(1.0, -1.0, (bitcast<u32>(y) >> 31u) == 1u); } return atan2(y, x); }`,
@@ -37606,7 +37606,7 @@ if ((rnd(rs) < (${p[4]} / 2))) {
 }`,
   },
   "gumowski_mira": {
-    params: [{ name: "random", def: 1 }, { name: "step", def: 0.001 }, { name: "a", def: 0.000001 }, { name: "b", def: 0.05 }],
+    params: [{ name: "random", def: 1, int: true }, { name: "step", def: 0.001 }, { name: "a", def: 0.000001 }, { name: "b", def: 0.05 }],
     verified: true, priority: 0, flags: ["state","z"], types: ["2D"],
     funcNames: ["jwx_gumowski_mira_inited_","jwx_gumowski_mira_x0","jwx_gumowski_mira_y0","jwx_gumowski_mira_m","atan2j","rndi","gumowski_mira_mira"],
     funcs: `fn atan2j(y: f32, x: f32) -> f32 { if (x == 0.0 && y == 0.0) { return select(0.0, PI, (bitcast<u32>(x) >> 31u) == 1u) * select(1.0, -1.0, (bitcast<u32>(y) >> 31u) == 1u); } return atan2(y, x); }
@@ -37666,7 +37666,7 @@ jwx_gumowski_mira_y0 = yn;
 }`,
   },
   "hopalong": {
-    params: [{ name: "random", def: 1 }, { name: "a", def: 0.75 }, { name: "b", def: 0.5 }, { name: "c", def: 0.25 }, { name: "startx", def: 0 }, { name: "starty", def: 0 }],
+    params: [{ name: "random", def: 1, int: true }, { name: "a", def: 0.75 }, { name: "b", def: 0.5 }, { name: "c", def: 0.25 }, { name: "startx", def: 0 }, { name: "starty", def: 0 }],
     verified: true, priority: 0, flags: ["state"], types: ["2D","SIMULATION","BASE_SHAPE"],
     funcNames: ["jwx_hopalong_inited_","jwx_hopalong_x0","jwx_hopalong_y0","jrand_","atan2j","rndi","jrand_make"],
     funcs: `struct jrand_ {
@@ -37854,7 +37854,7 @@ v.y = (${w} * y);
 }`,
   },
   "crop_polygon": {
-    params: [{ name: "type", def: 4 }, { name: "radius", def: 0.35 }, { name: "invert", def: 0 }],
+    params: [{ name: "type", def: 4, int: true }, { name: "radius", def: 0.35 }, { name: "invert", def: 0, int: true }],
     verified: true, priority: 0, flags: ["hide","z"], types: ["CROP"],
     funcNames: ["atan2j","crop_polygon_sdHexagram","crop_polygon_sdOctogon","crop_polygon_sdHexagon","crop_polygon_sdPentagon","crop_polygon_sdCircle"],
     funcs: `fn atan2j(y: f32, x: f32) -> f32 { if (x == 0.0 && y == 0.0) { return select(0.0, PI, (bitcast<u32>(x) >> 31u) == 1u) * select(1.0, -1.0, (bitcast<u32>(y) >> 31u) == 1u); } return atan2(y, x); }
@@ -37946,7 +37946,7 @@ if (false) {
 }`,
   },
   "post_crop_polygon": {
-    params: [{ name: "type", def: 4 }, { name: "radius", def: 0.35 }, { name: "invert", def: 0 }],
+    params: [{ name: "type", def: 4, int: true }, { name: "radius", def: 0.35 }, { name: "invert", def: 0, int: true }],
     verified: true, priority: 1, flags: ["hide"], types: ["CROP","POST"],
     funcNames: ["atan2j","post_crop_polygon_sdHexagram","post_crop_polygon_sdOctogon","post_crop_polygon_sdHexagon","post_crop_polygon_sdPentagon","post_crop_polygon_sdCircle"],
     funcs: `fn atan2j(y: f32, x: f32) -> f32 { if (x == 0.0 && y == 0.0) { return select(0.0, PI, (bitcast<u32>(x) >> 31u) == 1u) * select(1.0, -1.0, (bitcast<u32>(y) >> 31u) == 1u); } return atan2(y, x); }
@@ -38035,7 +38035,7 @@ v.y = (${w} * y);
 }`,
   },
   "crop_rhombus": {
-    params: [{ name: "width", def: 0.5 }, { name: "height", def: 0.5 }, { name: "invert", def: 0 }],
+    params: [{ name: "width", def: 0.5 }, { name: "height", def: 0.5 }, { name: "invert", def: 0, int: true }],
     verified: true, priority: 0, flags: ["hide","z"], types: ["CROP"],
     funcNames: ["atan2j","crop_rhombus_ndot","crop_rhombus_sdRhombus"],
     funcs: `fn atan2j(y: f32, x: f32) -> f32 { if (x == 0.0 && y == 0.0) { return select(0.0, PI, (bitcast<u32>(x) >> 31u) == 1u) * select(1.0, -1.0, (bitcast<u32>(y) >> 31u) == 1u); } return atan2(y, x); }
@@ -38085,7 +38085,7 @@ if (false) {
 }`,
   },
   "post_crop_rhombus": {
-    params: [{ name: "width", def: 0.5 }, { name: "height", def: 0.5 }, { name: "invert", def: 0 }],
+    params: [{ name: "width", def: 0.5 }, { name: "height", def: 0.5 }, { name: "invert", def: 0, int: true }],
     verified: true, priority: 1, flags: ["hide"], types: ["CROP","POST"],
     funcNames: ["atan2j","post_crop_rhombus_ndot","post_crop_rhombus_sdRhombus"],
     funcs: `fn atan2j(y: f32, x: f32) -> f32 { if (x == 0.0 && y == 0.0) { return select(0.0, PI, (bitcast<u32>(x) >> 31u) == 1u) * select(1.0, -1.0, (bitcast<u32>(y) >> 31u) == 1u); } return atan2(y, x); }
@@ -38129,7 +38129,7 @@ v.y = (${w} * y);
 }`,
   },
   "crop_stars": {
-    params: [{ name: "radius", def: 0.35 }, { name: "n", def: 3 }, { name: "r2", def: 0.333 }, { name: "invert", def: 0 }],
+    params: [{ name: "radius", def: 0.35 }, { name: "n", def: 3, int: true }, { name: "r2", def: 0.333 }, { name: "invert", def: 0, int: true }],
     verified: true, priority: 0, flags: ["hide","z"], types: ["CROP"],
     funcNames: ["atan2j","crop_stars_sdStar"],
     funcs: `fn atan2j(y: f32, x: f32) -> f32 { if (x == 0.0 && y == 0.0) { return select(0.0, PI, (bitcast<u32>(x) >> 31u) == 1u) * select(1.0, -1.0, (bitcast<u32>(y) >> 31u) == 1u); } return atan2(y, x); }
@@ -38181,7 +38181,7 @@ if (false) {
 }`,
   },
   "post_crop_stars": {
-    params: [{ name: "radius", def: 0.35 }, { name: "n", def: 3 }, { name: "r2", def: 0.333 }, { name: "invert", def: 0 }],
+    params: [{ name: "radius", def: 0.35 }, { name: "n", def: 3, int: true }, { name: "r2", def: 0.333 }, { name: "invert", def: 0, int: true }],
     verified: true, priority: 1, flags: ["hide"], types: ["CROP","POST"],
     funcNames: ["atan2j","post_crop_stars_sdStar"],
     funcs: `fn atan2j(y: f32, x: f32) -> f32 { if (x == 0.0 && y == 0.0) { return select(0.0, PI, (bitcast<u32>(x) >> 31u) == 1u) * select(1.0, -1.0, (bitcast<u32>(y) >> 31u) == 1u); } return atan2(y, x); }
@@ -38229,7 +38229,7 @@ v.y = (${w} * y);
 }`,
   },
   "crop_trapezoid": {
-    params: [{ name: "Base Sup.", def: 0.5 }, { name: "Base Inf.", def: 0.2 }, { name: "height", def: 0.5 }, { name: "invert", def: 0 }],
+    params: [{ name: "Base Sup.", def: 0.5 }, { name: "Base Inf.", def: 0.2 }, { name: "height", def: 0.5 }, { name: "invert", def: 0, int: true }],
     verified: true, priority: 0, flags: ["hide","z"], types: ["CROP"],
     funcNames: ["atan2j","crop_trapezoid_dot2","crop_trapezoid_sdTrapezoid"],
     funcs: `fn atan2j(y: f32, x: f32) -> f32 { if (x == 0.0 && y == 0.0) { return select(0.0, PI, (bitcast<u32>(x) >> 31u) == 1u) * select(1.0, -1.0, (bitcast<u32>(y) >> 31u) == 1u); } return atan2(y, x); }
@@ -38284,7 +38284,7 @@ if (false) {
 }`,
   },
   "post_crop_trapezoid": {
-    params: [{ name: "LMay", def: 0.5 }, { name: "LMin", def: 0.2 }, { name: "height", def: 0.5 }, { name: "invert", def: 0 }],
+    params: [{ name: "LMay", def: 0.5 }, { name: "LMin", def: 0.2 }, { name: "height", def: 0.5 }, { name: "invert", def: 0, int: true }],
     verified: true, priority: 1, flags: ["hide"], types: ["CROP","POST"],
     funcNames: ["atan2j","post_crop_trapezoid_dot2","post_crop_trapezoid_sdTrapezoid"],
     funcs: `fn atan2j(y: f32, x: f32) -> f32 { if (x == 0.0 && y == 0.0) { return select(0.0, PI, (bitcast<u32>(x) >> 31u) == 1u) * select(1.0, -1.0, (bitcast<u32>(y) >> 31u) == 1u); } return atan2(y, x); }
@@ -38332,7 +38332,7 @@ v.y = (${w} * y);
 }`,
   },
   "crop_cross": {
-    params: [{ name: "width", def: 0.5 }, { name: "Size", def: 0.5 }, { name: "round", def: 0.001 }, { name: "invert", def: 0 }],
+    params: [{ name: "width", def: 0.5 }, { name: "Size", def: 0.5 }, { name: "round", def: 0.001 }, { name: "invert", def: 0, int: true }],
     verified: true, priority: 0, flags: ["hide","z"], types: ["CROP"],
     funcNames: ["atan2j","crop_cross_sdCross"],
     funcs: `fn atan2j(y: f32, x: f32) -> f32 { if (x == 0.0 && y == 0.0) { return select(0.0, PI, (bitcast<u32>(x) >> 31u) == 1u) * select(1.0, -1.0, (bitcast<u32>(y) >> 31u) == 1u); } return atan2(y, x); }
@@ -38383,7 +38383,7 @@ if (false) {
 }`,
   },
   "post_crop_cross": {
-    params: [{ name: "width", def: 0.5 }, { name: "Size", def: 0.5 }, { name: "round", def: 0.001 }, { name: "invert", def: 0 }],
+    params: [{ name: "width", def: 0.5 }, { name: "Size", def: 0.5 }, { name: "round", def: 0.001 }, { name: "invert", def: 0, int: true }],
     verified: true, priority: 1, flags: ["hide"], types: ["CROP","POST"],
     funcNames: ["atan2j","post_crop_cross_sdCross"],
     funcs: `fn atan2j(y: f32, x: f32) -> f32 { if (x == 0.0 && y == 0.0) { return select(0.0, PI, (bitcast<u32>(x) >> 31u) == 1u) * select(1.0, -1.0, (bitcast<u32>(y) >> 31u) == 1u); } return atan2(y, x); }
@@ -38431,7 +38431,7 @@ v.y = (${w} * y);
 }`,
   },
   "crop_box": {
-    params: [{ name: "width", def: 0.5 }, { name: "height", def: 0.5 }, { name: "invert", def: 0 }],
+    params: [{ name: "width", def: 0.5 }, { name: "height", def: 0.5 }, { name: "invert", def: 0, int: true }],
     verified: true, priority: 0, flags: ["hide","z"], types: ["CROP"],
     funcNames: ["atan2j","crop_box_sdBox"],
     funcs: `fn atan2j(y: f32, x: f32) -> f32 { if (x == 0.0 && y == 0.0) { return select(0.0, PI, (bitcast<u32>(x) >> 31u) == 1u) * select(1.0, -1.0, (bitcast<u32>(y) >> 31u) == 1u); } return atan2(y, x); }
@@ -38472,7 +38472,7 @@ if (false) {
 }`,
   },
   "post_crop_box": {
-    params: [{ name: "width", def: 0.5 }, { name: "height", def: 0.5 }, { name: "invert", def: 0 }],
+    params: [{ name: "width", def: 0.5 }, { name: "height", def: 0.5 }, { name: "invert", def: 0, int: true }],
     verified: true, priority: 1, flags: ["hide"], types: ["CROP","POST"],
     funcNames: ["atan2j","post_crop_box_sdBox"],
     funcs: `fn atan2j(y: f32, x: f32) -> f32 { if (x == 0.0 && y == 0.0) { return select(0.0, PI, (bitcast<u32>(x) >> 31u) == 1u) * select(1.0, -1.0, (bitcast<u32>(y) >> 31u) == 1u); } return atan2(y, x); }
@@ -38509,7 +38509,7 @@ v.y = (${w} * y);
 }`,
   },
   "crop_vesica": {
-    params: [{ name: "width", def: 0.2 }, { name: "height", def: 0.1 }, { name: "invert", def: 0 }],
+    params: [{ name: "width", def: 0.2 }, { name: "height", def: 0.1 }, { name: "invert", def: 0, int: true }],
     verified: true, priority: 0, flags: ["hide","z"], types: ["CROP"],
     funcNames: ["atan2j","crop_vesica_sdVesica"],
     funcs: `fn atan2j(y: f32, x: f32) -> f32 { if (x == 0.0 && y == 0.0) { return select(0.0, PI, (bitcast<u32>(x) >> 31u) == 1u) * select(1.0, -1.0, (bitcast<u32>(y) >> 31u) == 1u); } return atan2(y, x); }
@@ -38552,7 +38552,7 @@ if (false) {
 }`,
   },
   "post_crop_vesica": {
-    params: [{ name: "width", def: 0.2 }, { name: "height", def: 0.1 }, { name: "invert", def: 0 }],
+    params: [{ name: "width", def: 0.2 }, { name: "height", def: 0.1 }, { name: "invert", def: 0, int: true }],
     verified: true, priority: 1, flags: ["hide"], types: ["CROP","POST"],
     funcNames: ["atan2j","post_crop_vesica_sdVesica"],
     funcs: `fn atan2j(y: f32, x: f32) -> f32 { if (x == 0.0 && y == 0.0) { return select(0.0, PI, (bitcast<u32>(x) >> 31u) == 1u) * select(1.0, -1.0, (bitcast<u32>(y) >> 31u) == 1u); } return atan2(y, x); }
@@ -38590,7 +38590,7 @@ v.y = (${w} * y);
 }`,
   },
   "crop_x": {
-    params: [{ name: "radius", def: 0.1 }, { name: "w", def: 0.5 }, { name: "invert", def: 0 }],
+    params: [{ name: "radius", def: 0.1 }, { name: "w", def: 0.5 }, { name: "invert", def: 0, int: true }],
     verified: true, priority: 0, flags: ["hide","z"], types: ["CROP"],
     funcNames: ["atan2j","crop_x_sdRoundedX"],
     funcs: `fn atan2j(y: f32, x: f32) -> f32 { if (x == 0.0 && y == 0.0) { return select(0.0, PI, (bitcast<u32>(x) >> 31u) == 1u) * select(1.0, -1.0, (bitcast<u32>(y) >> 31u) == 1u); } return atan2(y, x); }
@@ -38626,7 +38626,7 @@ if (false) {
 }`,
   },
   "post_crop_x": {
-    params: [{ name: "radius", def: 0.1 }, { name: "width", def: 0.5 }, { name: "invert", def: 0 }],
+    params: [{ name: "radius", def: 0.1 }, { name: "width", def: 0.5 }, { name: "invert", def: 0, int: true }],
     verified: true, priority: 1, flags: ["hide"], types: ["CROP","POST"],
     funcNames: ["atan2j","post_crop_x_sdRoundedX"],
     funcs: `fn atan2j(y: f32, x: f32) -> f32 { if (x == 0.0 && y == 0.0) { return select(0.0, PI, (bitcast<u32>(x) >> 31u) == 1u) * select(1.0, -1.0, (bitcast<u32>(y) >> 31u) == 1u); } return atan2(y, x); }
@@ -38721,7 +38721,7 @@ if (false) {
 }`,
   },
   "pixel_flow": {
-    params: [{ name: "angle", def: 90 }, { name: "len", def: 0.1 }, { name: "width", def: 200 }, { name: "seed", def: 42 }, { name: "enable_dc", def: 0 }],
+    params: [{ name: "angle", def: 90 }, { name: "len", def: 0.1 }, { name: "width", def: 200 }, { name: "seed", def: 42, int: true }, { name: "enable_dc", def: 0, int: true }],
     verified: true, priority: 0, flags: ["dc"], types: ["2D","DC"],
     funcNames: ["atan2j","pixel_flow_hash"],
     funcs: `fn atan2j(y: f32, x: f32) -> f32 { if (x == 0.0 && y == 0.0) { return select(0.0, PI, (bitcast<u32>(x) >> 31u) == 1u) * select(1.0, -1.0, (bitcast<u32>(y) >> 31u) == 1u); } return atan2(y, x); }
@@ -38754,7 +38754,7 @@ if ((min(max(${p[4]}, 0.0), 1.0) == 1)) {
 }`,
   },
   "glitchy1": {
-    params: [{ name: "scale_x", def: 1 }, { name: "shift_x", def: 0 }, { name: "n_x", def: 2 }, { name: "scale_y", def: 1 }, { name: "shift_y", def: 0 }, { name: "n_y", def: 2 }, { name: "scale_z", def: 0 }, { name: "shift_z", def: 0 }, { name: "n_z", def: 2 }, { name: "width", def: 1 }, { name: "seed", def: 42 }, { name: "angle", def: 30 }, { name: "u", def: 1 }, { name: "v", def: 1 }, { name: "w", def: 1 }],
+    params: [{ name: "scale_x", def: 1 }, { name: "shift_x", def: 0 }, { name: "n_x", def: 2, int: true }, { name: "scale_y", def: 1 }, { name: "shift_y", def: 0 }, { name: "n_y", def: 2, int: true }, { name: "scale_z", def: 0 }, { name: "shift_z", def: 0 }, { name: "n_z", def: 2, int: true }, { name: "width", def: 1 }, { name: "seed", def: 42, int: true }, { name: "angle", def: 30 }, { name: "u", def: 1 }, { name: "v", def: 1 }, { name: "w", def: 1 }],
     verified: true, priority: 0, flags: ["3d","z"], types: ["3D"],
     funcNames: ["roundc","atan2j","glitchy1_hash"],
     funcs: `fn roundc(x: f32) -> f32 { return sign(x) * floor(abs(x) + 0.5); }
@@ -38832,7 +38832,7 @@ pz_ += ((${w} * z) * fLen);
 }`,
   },
   "dc_warping": {
-    params: [{ name: "randomize", def: 0 }, { name: "zoom", def: 1 }, { name: "x0", def: 0 }, { name: "ColorOnly", def: 0 }, { name: "Gradient", def: 0 }, { name: "scale_z", def: 0 }, { name: "offset_z", def: 0 }, { name: "reset_z", def: 1 }],
+    params: [{ name: "randomize", def: 0, int: true }, { name: "zoom", def: 1 }, { name: "x0", def: 0 }, { name: "ColorOnly", def: 0, int: true }, { name: "Gradient", def: 0, int: true }, { name: "scale_z", def: 0 }, { name: "offset_z", def: 0 }, { name: "reset_z", def: 1, int: true }],
     verified: true, priority: 0, flags: ["dc","rgb","z"], types: ["SIMULATION","DC","BASE_SHAPE"],
     funcNames: ["Mat2","read_imageStepMode","atan2j","smoothstepc","powc","Mat2_Init","dc_warping_hash","dc_warping_noise","times","dc_warping_fbm","dc_warping_fbm2","dc_warping_map","dc_warping_getRGBColor","dbl2int","greyscale","distance_color"],
     funcs: `struct Mat2 {
@@ -39018,7 +39018,7 @@ if ((${p[7]} == 1)) {
 }`,
   },
   "dc_vortex": {
-    params: [{ name: "randomize", def: 0 }, { name: "time", def: 0 }, { name: "flowStrength", def: 10 }, { name: "Blending", def: 5 }, { name: "zoom", def: 1 }, { name: "ColorOnly", def: 0 }, { name: "Gradient", def: 0 }, { name: "scale_z", def: 0 }, { name: "offset_z", def: 0 }, { name: "reset_z", def: 1 }],
+    params: [{ name: "randomize", def: 0, int: true }, { name: "time", def: 0 }, { name: "flowStrength", def: 10, int: true }, { name: "Blending", def: 5 }, { name: "zoom", def: 1 }, { name: "ColorOnly", def: 0, int: true }, { name: "Gradient", def: 0, int: true }, { name: "scale_z", def: 0 }, { name: "offset_z", def: 0 }, { name: "reset_z", def: 1, int: true }],
     verified: true, priority: 0, flags: ["dc","rgb","z"], types: ["SIMULATION","DC","BASE_SHAPE"],
     funcNames: ["read_imageStepMode","atan2j","dc_vortex_VortF","dc_vortex_FlowField","dc_vortex_Hashv4f","dc_vortex_Noisefv2","dc_vortex_Fbm2","dc_vortex_getRGBColor","dbl2int","greyscale","distance_color"],
     funcs: `fn read_imageStepMode(base: u32, n: i32, t: f32) -> vec4f { return pal[base + u32(clamp(t, 0.0, 0.99999) * f32(max(n, 1)))]; }
@@ -39166,7 +39166,7 @@ if ((${p[9]} == 1)) {
 }`,
   },
   "vortex": {
-    params: [{ name: "randomize", def: 0 }, { name: "time", def: 0 }, { name: "flowVel", def: 20 }, { name: "zoom", def: 4 }, { name: "UpDown", def: 0 }, { name: "vSep", def: 0.6 }, { name: "v_viDistance", def: 4 }, { name: "vDiameter", def: 1 }],
+    params: [{ name: "randomize", def: 0, int: true }, { name: "time", def: 0 }, { name: "flowVel", def: 20, int: true }, { name: "zoom", def: 4 }, { name: "UpDown", def: 0 }, { name: "vSep", def: 0.6 }, { name: "v_viDistance", def: 4 }, { name: "vDiameter", def: 1 }],
     verified: true, priority: 0, flags: [], types: ["2D"],
     funcNames: ["atan2j","vortex_VortF","vortex_FlowField"],
     funcs: `fn atan2j(y: f32, x: f32) -> f32 { if (x == 0.0 && y == 0.0) { return select(0.0, PI, (bitcast<u32>(x) >> 31u) == 1u) * select(1.0, -1.0, (bitcast<u32>(y) >> 31u) == 1u); } return atan2(y, x); }
@@ -40349,7 +40349,7 @@ pz_ = (${w} * (pz_ + (spreadz * roundc(log(rnd(rs))))));
 }`,
   },
   "glitchy2": {
-    params: [{ name: "mode", def: 0 }, { name: "lr_spin", def: 1 }, { name: "lr_x", def: 0 }, { name: "lr_shiftx", def: 0 }, { name: "lr_y", def: 0 }, { name: "lr_shifty", def: 0 }, { name: "lr_re_a", def: 0 }, { name: "lr_re_b", def: 0 }, { name: "lr_re_c", def: 0 }, { name: "lr_re_d", def: 1 }, { name: "lr_im_a", def: 0 }, { name: "lr_im_b", def: 0 }, { name: "lr_im_c", def: 0 }, { name: "lr_im_d", def: 0 }, { name: "ur_spin", def: -1 }, { name: "ur_x", def: 0 }, { name: "ur_shiftx", def: 0 }, { name: "ur_y", def: 0 }, { name: "ur_shifty", def: 0 }, { name: "ur_re_a", def: 0 }, { name: "ur_re_b", def: 0 }, { name: "ur_re_c", def: 0 }, { name: "ur_re_d", def: 1 }, { name: "ur_im_a", def: 0 }, { name: "ur_im_b", def: 0 }, { name: "ur_im_c", def: 0 }, { name: "ur_im_d", def: 0 }, { name: "ll_spin", def: -1 }, { name: "ll_x", def: 0 }, { name: "ll_shiftx", def: 0 }, { name: "ll_y", def: 0 }, { name: "ll_shifty", def: 0 }, { name: "ll_re_a", def: 0 }, { name: "ll_re_b", def: 0 }, { name: "ll_re_c", def: 0 }, { name: "ll_re_d", def: 1 }, { name: "ll_im_a", def: 0 }, { name: "ll_im_b", def: 0 }, { name: "ll_im_c", def: 0 }, { name: "ll_im_d", def: 0 }, { name: "ul_spin", def: 1 }, { name: "ul_x", def: 0 }, { name: "ul_shiftx", def: 0 }, { name: "ul_y", def: 0 }, { name: "ul_shifty", def: 0 }, { name: "ul_re_a", def: 0 }, { name: "ul_re_b", def: 0 }, { name: "ul_re_c", def: 0 }, { name: "ul_re_d", def: 1 }, { name: "ul_im_a", def: 0 }, { name: "ul_im_b", def: 0 }, { name: "ul_im_c", def: 0 }, { name: "ul_im_d", def: 0 }],
+    params: [{ name: "mode", def: 0, int: true }, { name: "lr_spin", def: 1 }, { name: "lr_x", def: 0 }, { name: "lr_shiftx", def: 0 }, { name: "lr_y", def: 0 }, { name: "lr_shifty", def: 0 }, { name: "lr_re_a", def: 0 }, { name: "lr_re_b", def: 0 }, { name: "lr_re_c", def: 0 }, { name: "lr_re_d", def: 1 }, { name: "lr_im_a", def: 0 }, { name: "lr_im_b", def: 0 }, { name: "lr_im_c", def: 0 }, { name: "lr_im_d", def: 0 }, { name: "ur_spin", def: -1 }, { name: "ur_x", def: 0 }, { name: "ur_shiftx", def: 0 }, { name: "ur_y", def: 0 }, { name: "ur_shifty", def: 0 }, { name: "ur_re_a", def: 0 }, { name: "ur_re_b", def: 0 }, { name: "ur_re_c", def: 0 }, { name: "ur_re_d", def: 1 }, { name: "ur_im_a", def: 0 }, { name: "ur_im_b", def: 0 }, { name: "ur_im_c", def: 0 }, { name: "ur_im_d", def: 0 }, { name: "ll_spin", def: -1 }, { name: "ll_x", def: 0 }, { name: "ll_shiftx", def: 0 }, { name: "ll_y", def: 0 }, { name: "ll_shifty", def: 0 }, { name: "ll_re_a", def: 0 }, { name: "ll_re_b", def: 0 }, { name: "ll_re_c", def: 0 }, { name: "ll_re_d", def: 1 }, { name: "ll_im_a", def: 0 }, { name: "ll_im_b", def: 0 }, { name: "ll_im_c", def: 0 }, { name: "ll_im_d", def: 0 }, { name: "ul_spin", def: 1 }, { name: "ul_x", def: 0 }, { name: "ul_shiftx", def: 0 }, { name: "ul_y", def: 0 }, { name: "ul_shifty", def: 0 }, { name: "ul_re_a", def: 0 }, { name: "ul_re_b", def: 0 }, { name: "ul_re_c", def: 0 }, { name: "ul_re_d", def: 1 }, { name: "ul_im_a", def: 0 }, { name: "ul_im_b", def: 0 }, { name: "ul_im_c", def: 0 }, { name: "ul_im_d", def: 0 }],
     verified: true, priority: 0, flags: ["z"], types: ["2D"],
     funcNames: ["atan2j"],
     funcs: `fn atan2j(y: f32, x: f32) -> f32 { if (x == 0.0 && y == 0.0) { return select(0.0, PI, (bitcast<u32>(x) >> 31u) == 1u) * select(1.0, -1.0, (bitcast<u32>(y) >> 31u) == 1u); } return atan2(y, x); }`,
@@ -40453,7 +40453,7 @@ break;
 }`,
   },
   "hypertile3Db": {
-    params: [{ name: "p", def: 3 }, { name: "q", def: 7 }, { name: "n", def: 0 }, { name: "b", def: 2 }, { name: "c", def: 2 }, { name: "d", def: 1 }, { name: "e", def: 1 }, { name: "f", def: 1 }, { name: "g", def: 2 }, { name: "h", def: 2 }, { name: "i", def: 1 }, { name: "j", def: 1 }, { name: "k", def: 1 }],
+    params: [{ name: "p", def: 3, int: true }, { name: "q", def: 7, int: true }, { name: "n", def: 0, int: true }, { name: "b", def: 2 }, { name: "c", def: 2 }, { name: "d", def: 1 }, { name: "e", def: 1 }, { name: "f", def: 1 }, { name: "g", def: 2 }, { name: "h", def: 2 }, { name: "i", def: 1 }, { name: "j", def: 1 }, { name: "k", def: 1 }],
     verified: true, priority: 0, flags: ["3d","z"], types: ["3D"],
     funcNames: ["roundc","atan2j"],
     funcs: `fn roundc(x: f32) -> f32 { return sign(x) * floor(abs(x) + 0.5); }
@@ -40495,7 +40495,7 @@ pz_ += (d * (z_ * s2z));
 }`,
   },
   "hypertile3D2b": {
-    params: [{ name: "p", def: 3 }, { name: "q", def: 7 }, { name: "b", def: 2 }, { name: "c", def: 2 }, { name: "d", def: 1 }, { name: "e", def: 1 }, { name: "f", def: 1 }, { name: "g", def: 2 }, { name: "h", def: 1 }, { name: "i", def: 1 }, { name: "j", def: 1 }, { name: "k", def: 1 }],
+    params: [{ name: "p", def: 3, int: true }, { name: "q", def: 7, int: true }, { name: "b", def: 2 }, { name: "c", def: 2 }, { name: "d", def: 1 }, { name: "e", def: 1 }, { name: "f", def: 1 }, { name: "g", def: 2 }, { name: "h", def: 1 }, { name: "i", def: 1 }, { name: "j", def: 1 }, { name: "k", def: 1 }],
     verified: true, priority: 0, flags: ["3d","z"], types: ["3D"],
     funcNames: ["roundc","atan2j"],
     funcs: `fn roundc(x: f32) -> f32 { return sign(x) * floor(abs(x) + 0.5); }
@@ -40549,7 +40549,7 @@ pz_ += (((${w} * (sin((${p[4]} * t.y)) - cos((${p[5]} * z_)))) * cos((${p[6]} * 
 }`,
   },
   "petal3D": {
-    params: [{ name: "mode", def: 1 }, { name: "x1", def: 0 }, { name: "x2", def: 0 }, { name: "x3", def: 0 }, { name: "x4", def: 0 }, { name: "x5", def: 0 }, { name: "x6", def: 0 }, { name: "y1", def: 0 }, { name: "y2", def: 0 }, { name: "y3", def: 0 }, { name: "y4", def: 0 }, { name: "y5", def: 0 }, { name: "y6", def: 0 }, { name: "z1", def: 0 }, { name: "z2", def: 0 }, { name: "z3", def: 0 }, { name: "z4", def: 0 }, { name: "z5", def: 0 }, { name: "z6", def: 0 }, { name: "warp", def: 1 }],
+    params: [{ name: "mode", def: 1, int: true }, { name: "x1", def: 0 }, { name: "x2", def: 0 }, { name: "x3", def: 0 }, { name: "x4", def: 0 }, { name: "x5", def: 0 }, { name: "x6", def: 0 }, { name: "y1", def: 0 }, { name: "y2", def: 0 }, { name: "y3", def: 0 }, { name: "y4", def: 0 }, { name: "y5", def: 0 }, { name: "y6", def: 0 }, { name: "z1", def: 0 }, { name: "z2", def: 0 }, { name: "z3", def: 0 }, { name: "z4", def: 0 }, { name: "z5", def: 0 }, { name: "z6", def: 0 }, { name: "warp", def: 1 }],
     verified: true, priority: 0, flags: ["3d","z"], types: ["3D"],
     funcNames: ["roundc","atan2j"],
     funcs: `fn roundc(x: f32) -> f32 { return sign(x) * floor(abs(x) + 0.5); }
@@ -40628,7 +40628,7 @@ pz_ += ((${w} * tmpPZ) * ${p[1]});
 }`,
   },
   "cut_kleinian": {
-    params: [{ name: "mode", def: 1 }, { name: "zoom", def: 2 }, { name: "boxSize", def: 1 }, { name: "time", def: 0 }, { name: "NIters", def: 150 }, { name: "Dx", def: 0 }, { name: "Dy", def: -0.955 }, { name: "invert", def: 0 }],
+    params: [{ name: "mode", def: 1, int: true }, { name: "zoom", def: 2 }, { name: "boxSize", def: 1 }, { name: "time", def: 0 }, { name: "NIters", def: 150, int: true }, { name: "Dx", def: 0 }, { name: "Dy", def: -0.955 }, { name: "invert", def: 0, int: true }],
     verified: true, priority: 0, flags: ["hide"], types: ["2D","BASE_SHAPE","SIMULATION"],
     funcNames: ["atan2j","cut_kleinian_wrap","cut_kleinian_TransA","cut_kleinian_JosKleinian"],
     funcs: `fn atan2j(y: f32, x: f32) -> f32 { if (x == 0.0 && y == 0.0) { return select(0.0, PI, (bitcast<u32>(x) >> 31u) == 1u) * select(1.0, -1.0, (bitcast<u32>(y) >> 31u) == 1u); } return atan2(y, x); }
@@ -40709,7 +40709,7 @@ v.y = (${w} * y);
 }`,
   },
   "cut_mandala": {
-    params: [{ name: "seed", def: 1000 }, { name: "mode", def: 1 }, { name: "time", def: 0 }, { name: "zoom", def: 2 }, { name: "invert", def: 1 }],
+    params: [{ name: "seed", def: 1000, int: true }, { name: "mode", def: 1, int: true }, { name: "time", def: 0 }, { name: "zoom", def: 2 }, { name: "invert", def: 1, int: true }],
     verified: true, priority: 0, flags: ["hide"], types: ["2D","BASE_SHAPE","SIMULATION"],
     funcNames: ["atan2j","mmod2","smoothstepc","cut_mandala_spiral","cut_mandala_rose","rose2","cut_mandala_circle"],
     funcs: `fn atan2j(y: f32, x: f32) -> f32 { if (x == 0.0 && y == 0.0) { return select(0.0, PI, (bitcast<u32>(x) >> 31u) == 1u) * select(1.0, -1.0, (bitcast<u32>(y) >> 31u) == 1u); } return atan2(y, x); }
@@ -40842,7 +40842,7 @@ v.y = (${w} * y);
 }`,
   },
   "dc_portal": {
-    params: [{ name: "seed", def: 1000 }, { name: "time", def: 0 }, { name: "waves", def: 5 }, { name: "zoom", def: 15 }, { name: "ColorOnly", def: 0 }, { name: "Gradient", def: 0 }, { name: "scale_z", def: 0 }, { name: "offset_z", def: 0 }, { name: "reset_z", def: 1 }],
+    params: [{ name: "seed", def: 1000, int: true }, { name: "time", def: 0 }, { name: "waves", def: 5 }, { name: "zoom", def: 15 }, { name: "ColorOnly", def: 0, int: true }, { name: "Gradient", def: 0, int: true }, { name: "scale_z", def: 0 }, { name: "offset_z", def: 0 }, { name: "reset_z", def: 1, int: true }],
     verified: true, priority: 0, flags: ["dc","rgb","z"], types: ["SIMULATION","DC","BASE_SHAPE"],
     funcNames: ["read_imageStepMode","atan2j","dc_portal_getRGBColor","dbl2int","greyscale","distance_color"],
     funcs: `fn read_imageStepMode(base: u32, n: i32, t: f32) -> vec4f { return pal[base + u32(clamp(t, 0.0, 0.99999) * f32(max(n, 1)))]; }
@@ -40956,7 +40956,7 @@ if ((${p[8]} == 1)) {
 }`,
   },
   "kaplan": {
-    params: [{ name: "seed", def: 1000 }, { name: "N", def: 800 }, { name: "time", def: 10 }, { name: "invert", def: 0 }],
+    params: [{ name: "seed", def: 1000, int: true }, { name: "N", def: 800, int: true }, { name: "time", def: 10 }, { name: "invert", def: 0, int: true }],
     verified: true, priority: 0, flags: ["hide"], types: ["2D","SIMULATION","BASE_SHAPE"],
     funcNames: ["Mat2","atan2j","powc","Mat2_Init","times"],
     funcs: `struct Mat2 {
@@ -41020,7 +41020,7 @@ v.y = (${w} * ((f32(y) / min(max(${p[1]}, 50.0), 1500.0)) - 0.5));
 }`,
   },
   "post_mandelbulb3d_crop": {
-    params: [{ name: "power", def: 9 }, { name: "xz", def: 0 }, { name: "iterations", def: 12 }, { name: "bailout", def: 2 }, { name: "filled", def: 0 }],
+    params: [{ name: "power", def: 9 }, { name: "xz", def: 0 }, { name: "iterations", def: 12, int: true }, { name: "bailout", def: 2 }, { name: "filled", def: 0, int: true }],
     verified: true, priority: 1, flags: ["3d","dc","hide","z"], types: ["3D","CROP","ESCAPE_TIME_FRACTAL"],
     funcNames: ["powc","atan2j"],
     funcs: `fn powc(x: f32, y: f32) -> f32 {
@@ -41090,7 +41090,7 @@ for (var i: i32 = 0; (f32(i) < min(max(${p[2]}, 0.0), 250.0)); i++) {
 }`,
   },
   "post_mandelbox3d_crop": {
-    params: [{ name: "scale", def: 2 }, { name: "radius", def: 0.5 }, { name: "f", def: 1 }, { name: "iterations", def: 12 }, { name: "bailout", def: 16 }],
+    params: [{ name: "scale", def: 2 }, { name: "radius", def: 0.5 }, { name: "f", def: 1 }, { name: "iterations", def: 12, int: true }, { name: "bailout", def: 16 }],
     verified: true, priority: 1, flags: ["3d","hide","z"], types: ["3D","CROP","ESCAPE_TIME_FRACTAL"],
     funcNames: ["atan2j"],
     funcs: `fn atan2j(y: f32, x: f32) -> f32 { if (x == 0.0 && y == 0.0) { return select(0.0, PI, (bitcast<u32>(x) >> 31u) == 1u) * select(1.0, -1.0, (bitcast<u32>(y) >> 31u) == 1u); } return atan2(y, x); }`,
@@ -41219,7 +41219,7 @@ v.y += (${w} * ((rn * t.y) / r_));
 }`,
   },
   "post_aexion_crop": {
-    params: [{ name: "Iters", def: 100 }, { name: "cadd", def: -0.8 }, { name: "bailout", def: 10 }, { name: "scaleX", def: 1 }, { name: "scaleY", def: 1 }, { name: "ScaleZ", def: 1 }, { name: "color", def: 1 }],
+    params: [{ name: "Iters", def: 100, int: true }, { name: "cadd", def: -0.8 }, { name: "bailout", def: 10 }, { name: "scaleX", def: 1 }, { name: "scaleY", def: 1 }, { name: "ScaleZ", def: 1 }, { name: "color", def: 1 }],
     verified: true, priority: 1, flags: ["3d","dc","z"], types: ["3D","CROP","POST","ESCAPE_TIME_FRACTAL","DC"],
     funcNames: ["atan2j"],
     funcs: `fn atan2j(y: f32, x: f32) -> f32 { if (x == 0.0 && y == 0.0) { return select(0.0, PI, (bitcast<u32>(x) >> 31u) == 1u) * select(1.0, -1.0, (bitcast<u32>(y) >> 31u) == 1u); } return atan2(y, x); }`,
@@ -41268,7 +41268,7 @@ for (var i: i32 = 0; (f32(i) < min(max(${p[0]}, 1.0), 250.0)); i++) {
 }`,
   },
   "post_bulbtorus_crop": {
-    params: [{ name: "power1", def: 9 }, { name: "power2", def: 9 }, { name: "iterations", def: 12 }, { name: "bailout", def: 16 }, { name: "scaleX", def: 1 }, { name: "scaleY", def: 1 }, { name: "ScaleZ", def: 1 }, { name: "color", def: 1 }],
+    params: [{ name: "power1", def: 9 }, { name: "power2", def: 9 }, { name: "iterations", def: 12, int: true }, { name: "bailout", def: 16 }, { name: "scaleX", def: 1 }, { name: "scaleY", def: 1 }, { name: "ScaleZ", def: 1 }, { name: "color", def: 1 }],
     verified: true, priority: 0, flags: ["3d","dc","z"], types: ["3D","CROP","ESCAPE_TIME_FRACTAL","DC"],
     funcNames: ["atan2j","powc"],
     funcs: `fn atan2j(y: f32, x: f32) -> f32 { if (x == 0.0 && y == 0.0) { return select(0.0, PI, (bitcast<u32>(x) >> 31u) == 1u) * select(1.0, -1.0, (bitcast<u32>(y) >> 31u) == 1u); } return atan2(y, x); }
@@ -41321,7 +41321,7 @@ for (var i: i32 = 0; (f32(i) < min(max(${p[2]}, 0.0), 250.0)); i++) {
 }`,
   },
   "post_bristorbrot_crop": {
-    params: [{ name: "iterations", def: 12 }, { name: "bailout", def: 16 }, { name: "scaleX", def: 1 }, { name: "scaleY", def: 1 }, { name: "ScaleZ", def: 1 }, { name: "color", def: 1 }],
+    params: [{ name: "iterations", def: 12, int: true }, { name: "bailout", def: 16 }, { name: "scaleX", def: 1 }, { name: "scaleY", def: 1 }, { name: "ScaleZ", def: 1 }, { name: "color", def: 1 }],
     verified: true, priority: 1, flags: ["3d","dc","z"], types: ["3D","CROP","POST","ESCAPE_TIME_FRACTAL","DC"],
     funcNames: ["atan2j"],
     funcs: `fn atan2j(y: f32, x: f32) -> f32 { if (x == 0.0 && y == 0.0) { return select(0.0, PI, (bitcast<u32>(x) >> 31u) == 1u) * select(1.0, -1.0, (bitcast<u32>(y) >> 31u) == 1u); } return atan2(y, x); }`,
@@ -41357,7 +41357,7 @@ for (var i: i32 = 0; (f32(i) < min(max(${p[0]}, 0.0), 250.0)); i++) {
 }`,
   },
   "post_benesi_crop": {
-    params: [{ name: "iterations", def: 12 }, { name: "bailout", def: 16 }, { name: "scaleX", def: 1 }, { name: "scaleY", def: 1 }, { name: "ScaleZ", def: 1 }, { name: "color", def: 1 }],
+    params: [{ name: "iterations", def: 12, int: true }, { name: "bailout", def: 16 }, { name: "scaleX", def: 1 }, { name: "scaleY", def: 1 }, { name: "ScaleZ", def: 1 }, { name: "color", def: 1 }],
     verified: true, priority: 1, flags: ["3d","dc","z"], types: ["3D","CROP","POST","ESCAPE_TIME_FRACTAL","DC"],
     funcNames: ["atan2j"],
     funcs: `fn atan2j(y: f32, x: f32) -> f32 { if (x == 0.0 && y == 0.0) { return select(0.0, PI, (bitcast<u32>(x) >> 31u) == 1u) * select(1.0, -1.0, (bitcast<u32>(y) >> 31u) == 1u); } return atan2(y, x); }`,
@@ -41400,7 +41400,7 @@ for (var i: i32 = 0; (f32(i) < min(max(${p[0]}, 0.0), 250.0)); i++) {
 }`,
   },
   "post_coastalbrot_crop": {
-    params: [{ name: "iterations", def: 12 }, { name: "bailout", def: 16 }, { name: "scaleX", def: 1 }, { name: "scaleY", def: 1 }, { name: "ScaleZ", def: 1 }, { name: "color", def: 1 }, { name: "alpha", def: 0 }, { name: "beta", def: 0 }, { name: "gamma", def: 0 }],
+    params: [{ name: "iterations", def: 12, int: true }, { name: "bailout", def: 16 }, { name: "scaleX", def: 1 }, { name: "scaleY", def: 1 }, { name: "ScaleZ", def: 1 }, { name: "color", def: 1 }, { name: "alpha", def: 0 }, { name: "beta", def: 0 }, { name: "gamma", def: 0 }],
     verified: true, priority: 1, flags: ["3d","dc","z"], types: ["3D","CROP","POST","ESCAPE_TIME_FRACTAL","DC"],
     funcNames: ["mat3_","powc","atan2j","post_coastalbrot_crop_radians","mat3_make","post_coastalbrot_crop_multiply","post_coastalbrot_crop_euler_rotation"],
     funcs: `struct mat3_ {
@@ -41504,7 +41504,7 @@ for (var i: i32 = 0; (f32(i) < min(max(${p[0]}, 0.0), 250.0)); i++) {
 }`,
   },
   "post_asurf_crop": {
-    params: [{ name: "iterations", def: 12 }, { name: "bailout", def: 16 }, { name: "scaleX", def: 1 }, { name: "scaleY", def: 1 }, { name: "scaleZ", def: 1 }, { name: "color", def: 1 }, { name: "mode", def: 1 }, { name: "angle", def: 0 }, { name: "rot_x", def: 0 }, { name: "rot_y", def: 0 }, { name: "rot_z", def: 1 }, { name: "minR", def: 0.25 }, { name: "maxR", def: 1 }],
+    params: [{ name: "iterations", def: 12, int: true }, { name: "bailout", def: 16 }, { name: "scaleX", def: 1 }, { name: "scaleY", def: 1 }, { name: "scaleZ", def: 1 }, { name: "color", def: 1 }, { name: "mode", def: 1, int: true }, { name: "angle", def: 0 }, { name: "rot_x", def: 0 }, { name: "rot_y", def: 0 }, { name: "rot_z", def: 1 }, { name: "minR", def: 0.25 }, { name: "maxR", def: 1 }],
     verified: true, priority: 1, flags: ["3d","dc","z"], types: ["3D","CROP","POST","ESCAPE_TIME_FRACTAL","DC"],
     funcNames: ["mat3_","atan2j","post_asurf_crop_radians_ov1","mat3_make","post_asurf_crop_rotationMatrix3"],
     funcs: `struct mat3_ {
@@ -41585,7 +41585,7 @@ for (var i: i32 = 0; (f32(i) < min(max(${p[0]}, 0.0), 250.0)); i++) {
 }`,
   },
   "dc_gmandelbroot": {
-    params: [{ name: "randomize", def: 10000 }, { name: "colormode", def: 0 }, { name: "iters", def: 128 }, { name: "exp_re", def: 2 }, { name: "exp_im", def: 0 }, { name: "n", def: 0 }, { name: "m", def: 0 }, { name: "burnigship", def: 0 }, { name: "conjugate", def: 0 }, { name: "julia", def: 0 }, { name: "jre", def: 0 }, { name: "jim", def: 0 }, { name: "panX", def: 0.5 }, { name: "panY", def: 0 }, { name: "zoom", def: 4 }, { name: "ColorOnly", def: 0 }, { name: "Gradient", def: 0 }, { name: "scale_z", def: 0 }, { name: "offset_z", def: 0 }, { name: "reset_z", def: 1 }],
+    params: [{ name: "randomize", def: 10000, int: true }, { name: "colormode", def: 0, int: true }, { name: "iters", def: 128, int: true }, { name: "exp_re", def: 2 }, { name: "exp_im", def: 0 }, { name: "n", def: 0 }, { name: "m", def: 0 }, { name: "burnigship", def: 0, int: true }, { name: "conjugate", def: 0, int: true }, { name: "julia", def: 0, int: true }, { name: "jre", def: 0 }, { name: "jim", def: 0 }, { name: "panX", def: 0.5 }, { name: "panY", def: 0 }, { name: "zoom", def: 4 }, { name: "ColorOnly", def: 0, int: true }, { name: "Gradient", def: 0, int: true }, { name: "scale_z", def: 0 }, { name: "offset_z", def: 0 }, { name: "reset_z", def: 1, int: true }],
     verified: true, priority: 0, flags: ["dc","hide","rgb","z"], types: ["SIMULATION","DC","BASE_SHAPE","ESCAPE_TIME_FRACTAL"],
     funcNames: ["read_imageStepMode","atan2j","powc","roundc","dc_gmandelbroot_hsv","dc_gmandelbroot_gen_mandelbroot","dc_gmandelbroot_getRGBColor","dbl2int","greyscale","distance_color"],
     funcs: `fn read_imageStepMode(base: u32, n: i32, t: f32) -> vec4f { return pal[base + u32(clamp(t, 0.0, 0.99999) * f32(max(n, 1)))]; }
@@ -42900,7 +42900,7 @@ v.y += ((t.y * r_) * ${p[1]});
 }`,
   },
   "post_point_crop": {
-    params: [{ name: "x_offset", def: 0 }, { name: "y_offset", def: 0 }, { name: "z_offset", def: 0 }, { name: "point_hide_enable", def: 1 }, { name: "point_crop_enable", def: 1 }, { name: "x_width", def: 0 }, { name: "y_width", def: 0 }, { name: "z_width", def: 0 }],
+    params: [{ name: "x_offset", def: 0 }, { name: "y_offset", def: 0 }, { name: "z_offset", def: 0 }, { name: "point_hide_enable", def: 1, int: true }, { name: "point_crop_enable", def: 1, int: true }, { name: "x_width", def: 0 }, { name: "y_width", def: 0 }, { name: "z_width", def: 0 }],
     verified: true, priority: 1, flags: ["dc","hide","stateful","z"], types: ["2D","CROP","POST"],
     funcNames: ["atan2j","jw_jwf0_post_scrop_x","jw_jwf0_post_scrop_y","jw_jwf0_post_scrop_z","jw_jwf0_post_scrop_c"],
     funcs: `fn atan2j(y: f32, x: f32) -> f32 { if (x == 0.0 && y == 0.0) { return select(0.0, PI, (bitcast<u32>(x) >> 31u) == 1u) * select(1.0, -1.0, (bitcast<u32>(y) >> 31u) == 1u); } return atan2(y, x); }
@@ -42947,7 +42947,7 @@ if ((boundaries != 0)) {
 }`,
   },
   "hole": {
-    params: [{ name: "a", def: 1 }, { name: "inside", def: 0 }],
+    params: [{ name: "a", def: 1 }, { name: "inside", def: 0, int: true }],
     verified: true, priority: 0, flags: [], types: ["2D"],
     funcNames: ["atan2j","powc"],
     funcs: `fn atan2j(y: f32, x: f32) -> f32 { if (x == 0.0 && y == 0.0) { return select(0.0, PI, (bitcast<u32>(x) >> 31u) == 1u) * select(1.0, -1.0, (bitcast<u32>(y) >> 31u) == 1u); } return atan2(y, x); }
@@ -43127,7 +43127,7 @@ v.y += (r_ * ly);
 }`,
   },
   "cell2": {
-    params: [{ name: "size", def: 0.6 }, { name: "mirror_x", def: 0 }, { name: "mirror_y", def: 0 }, { name: "a", def: 1 }, { name: "space_ya", def: 2 }, { name: "space_xa", def: 2 }, { name: "space_yb", def: 2 }, { name: "space_xb", def: 2 }, { name: "move_xa", def: 1 }, { name: "space_yc", def: 2 }, { name: "move_ya", def: 1 }, { name: "space_xc", def: 2 }, { name: "space_yd", def: 2 }, { name: "move_yb", def: 1 }, { name: "space_xd", def: 2 }, { name: "move_xb", def: 1 }],
+    params: [{ name: "size", def: 0.6 }, { name: "mirror_x", def: 0, int: true }, { name: "mirror_y", def: 0, int: true }, { name: "a", def: 1 }, { name: "space_ya", def: 2 }, { name: "space_xa", def: 2 }, { name: "space_yb", def: 2 }, { name: "space_xb", def: 2 }, { name: "move_xa", def: 1 }, { name: "space_yc", def: 2 }, { name: "move_ya", def: 1 }, { name: "space_xc", def: 2 }, { name: "space_yd", def: 2 }, { name: "move_yb", def: 1 }, { name: "space_xd", def: 2 }, { name: "move_xb", def: 1 }],
     verified: true, priority: 0, flags: ["z"], types: ["2D"],
     funcNames: ["atan2j"],
     funcs: `fn atan2j(y: f32, x: f32) -> f32 { if (x == 0.0 && y == 0.0) { return select(0.0, PI, (bitcast<u32>(x) >> 31u) == 1u) * select(1.0, -1.0, (bitcast<u32>(y) >> 31u) == 1u); } return atan2(y, x); }`,
@@ -43168,7 +43168,7 @@ if (false) {
 }`,
   },
   "hourglass3D": {
-    params: [{ name: "kx", def: 1 }, { name: "ky", def: 1 }, { name: "kz", def: 1 }, { name: "maxheight", def: 5.570303708569531 }, { name: "limit", def: 1 }, { name: "zero", def: 0 }],
+    params: [{ name: "kx", def: 1 }, { name: "ky", def: 1 }, { name: "kz", def: 1 }, { name: "maxheight", def: 5.570303708569531 }, { name: "limit", def: 1, int: true }, { name: "zero", def: 0, int: true }],
     verified: true, priority: 0, flags: ["3d","z"], types: ["3D"],
     funcNames: ["sqr","atan2j"],
     funcs: `fn sqr(x: f32) -> f32 { return x * x; }
@@ -43324,7 +43324,7 @@ var _hasShear: bool = (0 != 0);
 }`,
   },
   "mobius_dragon_3D": {
-    params: [{ name: "re", def: 1 }, { name: "im", def: 0 }, { name: "x_spread", def: 1 }, { name: "y_spread", def: 0 }, { name: "z_spread", def: 0 }, { name: "x_add", def: 0 }, { name: "y_add", def: 0 }, { name: "log_spread", def: 2.71828 }, { name: "line_enable", def: 1 }, { name: "line_weight", def: 0.125 }, { name: "line_color_shift", def: 0.1 }, { name: "mag_color", def: 1 }, { name: "mag_color_scale", def: 0.5 }, { name: "iterations", def: 1 }],
+    params: [{ name: "re", def: 1 }, { name: "im", def: 0 }, { name: "x_spread", def: 1 }, { name: "y_spread", def: 0 }, { name: "z_spread", def: 0 }, { name: "x_add", def: 0 }, { name: "y_add", def: 0 }, { name: "log_spread", def: 2.71828 }, { name: "line_enable", def: 1, int: true }, { name: "line_weight", def: 0.125 }, { name: "line_color_shift", def: 0.1 }, { name: "mag_color", def: 1, int: true }, { name: "mag_color_scale", def: 0.5 }, { name: "iterations", def: 1, int: true }],
     verified: true, priority: 0, flags: ["3d","dc","z"], types: ["3D","SIMULATION"],
     funcNames: ["Complex","roundc","atan2j","Complex_Init","Complex_Mag2","Complex_MagInv","Complex_Div","Complex_Scale"],
     funcs: `struct Complex {
@@ -43429,7 +43429,7 @@ v.y = z.im;
 }`,
   },
   "whirligig": {
-    params: [{ name: "Mode", def: 0 }],
+    params: [{ name: "Mode", def: 0, int: true }],
     verified: true, priority: 0, flags: ["3d","z"], types: ["3D"],
     funcNames: ["atan2j"],
     funcs: `fn atan2j(y: f32, x: f32) -> f32 { if (x == 0.0 && y == 0.0) { return select(0.0, PI, (bitcast<u32>(x) >> 31u) == 1u) * select(1.0, -1.0, (bitcast<u32>(y) >> 31u) == 1u); } return atan2(y, x); }`,
@@ -43512,7 +43512,7 @@ switch i32(min(max(${p[0]}, 0.0), 15.0)) {
 }`,
   },
   "tess_shape": {
-    params: [{ name: "strength", def: 1 }, { name: "shapeSize", def: 0.8 }, { name: "shapeType", def: 0 }, { name: "shapeAspectRatio", def: 1 }, { name: "lrRadialAmp", def: 0.2 }, { name: "lrRadialWidthFreq", def: 0.6 }, { name: "tbAmp", def: 0.2 }, { name: "tbWidthFreq", def: 0.6 }, { name: "lrRadialPosPhaseDuty", def: 0 }, { name: "tbPosPhaseDuty", def: 0 }, { name: "lrRadialProfileType", def: 0 }, { name: "tbProfileType", def: 0 }, { name: "operationMode", def: 0 }],
+    params: [{ name: "strength", def: 1 }, { name: "shapeSize", def: 0.8 }, { name: "shapeType", def: 0, int: true }, { name: "shapeAspectRatio", def: 1 }, { name: "lrRadialAmp", def: 0.2 }, { name: "lrRadialWidthFreq", def: 0.6 }, { name: "tbAmp", def: 0.2 }, { name: "tbWidthFreq", def: 0.6 }, { name: "lrRadialPosPhaseDuty", def: 0 }, { name: "tbPosPhaseDuty", def: 0 }, { name: "lrRadialProfileType", def: 0, int: true }, { name: "tbProfileType", def: 0, int: true }, { name: "operationMode", def: 0, int: true }],
     verified: true, priority: 0, flags: ["hide","z"], types: ["2D","BASE_SHAPE"],
     funcNames: ["atan2j","tess_shape_isPointInTriangle","tess_shape_calculate_profile_offset"],
     funcs: `fn atan2j(y: f32, x: f32) -> f32 { if (x == 0.0 && y == 0.0) { return select(0.0, PI, (bitcast<u32>(x) >> 31u) == 1u) * select(1.0, -1.0, (bitcast<u32>(y) >> 31u) == 1u); } return atan2(y, x); }
@@ -43908,7 +43908,7 @@ if ((min(max(${p[12]}, 0.0), 1.0) == 1)) {
 }`,
   },
   "kifs3d": {
-    params: [{ name: "max_iter", def: 7 }, { name: "bailout_radius", def: 1.1 }, { name: "kifs_scale_x", def: 1.4 }, { name: "kifs_scale_y", def: 1.4 }, { name: "kifs_scale_z", def: -1 }, { name: "scale_pivot", def: 0 }, { name: "center_x", def: 0 }, { name: "center_y", def: 0 }, { name: "center_z", def: 0 }, { name: "offset_x", def: -1 }, { name: "offset_y", def: -1 }, { name: "offset_z", def: 1 }, { name: "mirror_fold", def: 0 }, { name: "fold_type", def: 1 }, { name: "fold_plane1_nx", def: 1 }, { name: "fold_plane1_ny", def: 0 }, { name: "fold_plane1_nz", def: 0 }, { name: "fold_plane1_dist", def: 0 }, { name: "fold_plane1_intensity", def: 1 }, { name: "edge_x", def: 0 }, { name: "edge_y", def: 0 }, { name: "edge_z", def: 0 }, { name: "rot_x", def: 5 }, { name: "rot_y", def: 5 }, { name: "rot_z", def: 5 }, { name: "rot_order", def: 0 }, { name: "rot_pivot", def: 0 }, { name: "transform_order", def: 0 }, { name: "post_symmetry", def: 7 }, { name: "color_mode", def: 0 }, { name: "color_scale", def: 1 }],
+    params: [{ name: "max_iter", def: 7, int: true }, { name: "bailout_radius", def: 1.1 }, { name: "kifs_scale_x", def: 1.4 }, { name: "kifs_scale_y", def: 1.4 }, { name: "kifs_scale_z", def: -1 }, { name: "scale_pivot", def: 0, int: true }, { name: "center_x", def: 0 }, { name: "center_y", def: 0 }, { name: "center_z", def: 0 }, { name: "offset_x", def: -1 }, { name: "offset_y", def: -1 }, { name: "offset_z", def: 1 }, { name: "mirror_fold", def: 0, int: true }, { name: "fold_type", def: 1, int: true }, { name: "fold_plane1_nx", def: 1 }, { name: "fold_plane1_ny", def: 0 }, { name: "fold_plane1_nz", def: 0 }, { name: "fold_plane1_dist", def: 0 }, { name: "fold_plane1_intensity", def: 1 }, { name: "edge_x", def: 0 }, { name: "edge_y", def: 0 }, { name: "edge_z", def: 0 }, { name: "rot_x", def: 5 }, { name: "rot_y", def: 5 }, { name: "rot_z", def: 5 }, { name: "rot_order", def: 0, int: true }, { name: "rot_pivot", def: 0, int: true }, { name: "transform_order", def: 0, int: true }, { name: "post_symmetry", def: 7, int: true }, { name: "color_mode", def: 0, int: true }, { name: "color_scale", def: 1 }],
     verified: true, priority: 0, flags: ["3d","dc","state","z"], types: ["3D","SIMULATION"],
     funcNames: ["jwx_kifs3d_mirror_fold_c","jwx_kifs3d_fold_type_c","jwx_kifs3d_fold_plane1_nx_c","jwx_kifs3d_fold_plane1_ny_c","jwx_kifs3d_fold_plane1_nz_c","jwx_kifs3d_fold_plane1_dist_c","jwx_kifs3d_fold_plane1_intensity_c","jwx_kifs3d_edge_x_c","jwx_kifs3d_edge_y_c","jwx_kifs3d_edge_z_c","jwx_kifs3d_rot_order_c","jwx_kifs3d_center_x_c","jwx_kifs3d_center_y_c","jwx_kifs3d_center_z_c","jwx_kifs3d_scale_pivot_c","jwx_kifs3d_offset_x_c","jwx_kifs3d_offset_y_c","jwx_kifs3d_offset_z_c","jwx_kifs3d_kifs_scale_x_c","jwx_kifs3d_kifs_scale_y_c","jwx_kifs3d_kifs_scale_z_c","jwx_kifs3d_inited_","jwx_kifs3d_fold_norm1_len_sq","jwx_kifs3d_rot_x_rad","jwx_kifs3d_rot_y_rad","jwx_kifs3d_rot_z_rad","kifs3d_Point3D","atan2j","kifs3d_Point3D_make","kifs3d_applyFolding","kifs3d_applyRotation","kifs3d_applyScaleTranslate"],
     funcs: `struct kifs3d_Point3D {
@@ -44437,7 +44437,7 @@ if ((i32(${p[22]}) == 0)) {
 }`,
   },
   "conicalSpiral": {
-    params: [{ name: "turns", def: 8 }, { name: "radius", def: 1.2 }, { name: "height", def: 1 }, { name: "mode", def: 0 }, { name: "z_wave_freq", def: 0 }, { name: "z_wave_amp", def: 0 }, { name: "twist", def: 0 }, { name: "thickness", def: 0 }, { name: "solid", def: 0 }, { name: "colorize", def: 0 }, { name: "colorMode", def: 0 }, { name: "colorSpeed", def: 1 }, { name: "colorOffset", def: 0 }],
+    params: [{ name: "turns", def: 8 }, { name: "radius", def: 1.2 }, { name: "height", def: 1 }, { name: "mode", def: 0, int: true }, { name: "z_wave_freq", def: 0 }, { name: "z_wave_amp", def: 0 }, { name: "twist", def: 0 }, { name: "thickness", def: 0 }, { name: "solid", def: 0, int: true }, { name: "colorize", def: 0, int: true }, { name: "colorMode", def: 0, int: true }, { name: "colorSpeed", def: 1 }, { name: "colorOffset", def: 0 }],
     verified: true, priority: 0, flags: ["3d","dc","z"], types: ["3D","BASE_SHAPE","DC"],
     funcNames: ["atan2j"],
     funcs: `fn atan2j(y: f32, x: f32) -> f32 { if (x == 0.0 && y == 0.0) { return select(0.0, PI, (bitcast<u32>(x) >> 31u) == 1u) * select(1.0, -1.0, (bitcast<u32>(y) >> 31u) == 1u); } return atan2(y, x); }`,
@@ -44497,7 +44497,7 @@ if ((min(max(${p[9]}, 0.0), 1.0) > 0)) {
 }`,
   },
   "cell3D": {
-    params: [{ name: "size", def: 0.6 }, { name: "a", def: 1 }, { name: "grid_rot_x", def: 0 }, { name: "grid_rot_y", def: 0 }, { name: "grid_rot_z", def: 0 }, { name: "cell_idx_power_x", def: 1 }, { name: "cell_idx_power_y", def: 1 }, { name: "cell_idx_power_z", def: 1 }, { name: "dxdydz_mode", def: 0 }, { name: "cell_scale_x", def: 1 }, { name: "cell_scale_y", def: 1 }, { name: "cell_scale_z", def: 1 }, { name: "cell_power_x", def: 1 }, { name: "cell_power_y", def: 1 }, { name: "cell_power_z", def: 1 }, { name: "cell_rot_x", def: 0 }, { name: "cell_rot_y", def: 0 }, { name: "cell_rot_z", def: 0 }, { name: "space_xa", def: 2 }, { name: "space_ya", def: 2 }, { name: "space_xb", def: 2 }, { name: "space_yb", def: 2 }, { name: "move_xa", def: 1 }, { name: "space_xc", def: 2 }, { name: "space_yc", def: 2 }, { name: "move_ya", def: 1 }, { name: "space_xd", def: 2 }, { name: "space_yd", def: 2 }, { name: "move_xb", def: 1 }, { name: "move_yb", def: 1 }, { name: "move_tr_x", def: 0 }, { name: "move_tr_y", def: 0 }, { name: "move_br_x", def: 0 }, { name: "space_z", def: 1 }, { name: "move_z", def: 0 }, { name: "checker_mode", def: 0 }, { name: "checker_invert", def: 0 }, { name: "space_xa2", def: 2 }, { name: "space_ya2", def: 2 }, { name: "space_xb2", def: 2 }, { name: "space_yb2", def: 2 }, { name: "move_xa2", def: 1 }, { name: "space_xc2", def: 2 }, { name: "space_yc2", def: 2 }, { name: "move_ya2", def: 1 }, { name: "space_xd2", def: 2 }, { name: "space_yd2", def: 2 }, { name: "move_xb2", def: 1 }, { name: "move_yb2", def: 1 }, { name: "move_tr_x2", def: 0 }, { name: "move_tr_y2", def: 0 }, { name: "move_br_x2", def: 0 }, { name: "space_z2", def: 1 }, { name: "move_z2", def: 0 }, { name: "mirror_x", def: 0 }, { name: "mirror_y", def: 0 }, { name: "mirror_z", def: 0 }, { name: "invert_y", def: 1 }, { name: "invert_z", def: 0 }, { name: "offset_x", def: 0 }, { name: "offset_y", def: 0 }, { name: "offset_z", def: 0 }, { name: "color_mode", def: 0 }, { name: "cidx_scale_x", def: 0.05 }, { name: "cidx_scale_y", def: 0.05 }, { name: "cidx_scale_z", def: 0.05 }, { name: "cidx_offset", def: 0 }, { name: "cdist_scale", def: 1 }, { name: "color_q1", def: 0 }, { name: "color_q2", def: 0.25 }, { name: "color_q3", def: 0.5 }, { name: "color_q4", def: 0.75 }, { name: "color_use_z_sign", def: 0 }, { name: "color_z_neg_offset", def: 0.1 }, { name: "cz_scale", def: 0.05 }, { name: "cz_offset", def: 0 }],
+    params: [{ name: "size", def: 0.6 }, { name: "a", def: 1 }, { name: "grid_rot_x", def: 0 }, { name: "grid_rot_y", def: 0 }, { name: "grid_rot_z", def: 0 }, { name: "cell_idx_power_x", def: 1 }, { name: "cell_idx_power_y", def: 1 }, { name: "cell_idx_power_z", def: 1 }, { name: "dxdydz_mode", def: 0, int: true }, { name: "cell_scale_x", def: 1 }, { name: "cell_scale_y", def: 1 }, { name: "cell_scale_z", def: 1 }, { name: "cell_power_x", def: 1 }, { name: "cell_power_y", def: 1 }, { name: "cell_power_z", def: 1 }, { name: "cell_rot_x", def: 0 }, { name: "cell_rot_y", def: 0 }, { name: "cell_rot_z", def: 0 }, { name: "space_xa", def: 2 }, { name: "space_ya", def: 2 }, { name: "space_xb", def: 2 }, { name: "space_yb", def: 2 }, { name: "move_xa", def: 1 }, { name: "space_xc", def: 2 }, { name: "space_yc", def: 2 }, { name: "move_ya", def: 1 }, { name: "space_xd", def: 2 }, { name: "space_yd", def: 2 }, { name: "move_xb", def: 1 }, { name: "move_yb", def: 1 }, { name: "move_tr_x", def: 0 }, { name: "move_tr_y", def: 0 }, { name: "move_br_x", def: 0 }, { name: "space_z", def: 1 }, { name: "move_z", def: 0 }, { name: "checker_mode", def: 0, int: true }, { name: "checker_invert", def: 0, int: true }, { name: "space_xa2", def: 2 }, { name: "space_ya2", def: 2 }, { name: "space_xb2", def: 2 }, { name: "space_yb2", def: 2 }, { name: "move_xa2", def: 1 }, { name: "space_xc2", def: 2 }, { name: "space_yc2", def: 2 }, { name: "move_ya2", def: 1 }, { name: "space_xd2", def: 2 }, { name: "space_yd2", def: 2 }, { name: "move_xb2", def: 1 }, { name: "move_yb2", def: 1 }, { name: "move_tr_x2", def: 0 }, { name: "move_tr_y2", def: 0 }, { name: "move_br_x2", def: 0 }, { name: "space_z2", def: 1 }, { name: "move_z2", def: 0 }, { name: "mirror_x", def: 0, int: true }, { name: "mirror_y", def: 0, int: true }, { name: "mirror_z", def: 0, int: true }, { name: "invert_y", def: 1, int: true }, { name: "invert_z", def: 0, int: true }, { name: "offset_x", def: 0 }, { name: "offset_y", def: 0 }, { name: "offset_z", def: 0 }, { name: "color_mode", def: 0, int: true }, { name: "cidx_scale_x", def: 0.05 }, { name: "cidx_scale_y", def: 0.05 }, { name: "cidx_scale_z", def: 0.05 }, { name: "cidx_offset", def: 0 }, { name: "cdist_scale", def: 1 }, { name: "color_q1", def: 0 }, { name: "color_q2", def: 0.25 }, { name: "color_q3", def: 0.5 }, { name: "color_q4", def: 0.75 }, { name: "color_use_z_sign", def: 0, int: true }, { name: "color_z_neg_offset", def: 0.1 }, { name: "cz_scale", def: 0.05 }, { name: "cz_offset", def: 0 }],
     verified: true, priority: 0, flags: ["3d","dc","z"], types: ["3D","DC"],
     funcNames: ["powc","atan2j","cell3D_rotatePoint3D","cell3D_normalizeColor"],
     funcs: `fn powc(x: f32, y: f32) -> f32 {
@@ -44728,7 +44728,7 @@ break;
 }`,
   },
   "juliascopePlus": {
-    params: [{ name: "power", def: 3 }, { name: "dist", def: 1 }, { name: "cx", def: 0 }, { name: "cy", def: 0 }, { name: "mixPowerSign", def: 0 }, { name: "colorMode", def: 0 }, { name: "colorSpeed", def: 1 }, { name: "thetaSignMode", def: 0 }, { name: "angularOffset", def: 0 }, { name: "swirlFactor", def: 0 }, { name: "fixedBranch", def: -1 }, { name: "radialOffset", def: 0 }, { name: "altPowerScale", def: 1 }, { name: "altPowerRotate", def: 0 }, { name: "rndTermMode", def: 0 }, { name: "mandelbrotLike", def: 0 }],
+    params: [{ name: "power", def: 3, int: true }, { name: "dist", def: 1 }, { name: "cx", def: 0 }, { name: "cy", def: 0 }, { name: "mixPowerSign", def: 0 }, { name: "colorMode", def: 0, int: true }, { name: "colorSpeed", def: 1 }, { name: "thetaSignMode", def: 0, int: true }, { name: "angularOffset", def: 0 }, { name: "swirlFactor", def: 0 }, { name: "fixedBranch", def: -1 }, { name: "radialOffset", def: 0 }, { name: "altPowerScale", def: 1 }, { name: "altPowerRotate", def: 0 }, { name: "rndTermMode", def: 0, int: true }, { name: "mandelbrotLike", def: 0, int: true }],
     verified: true, priority: 0, flags: ["dc","z"], types: ["2D","DC"],
     funcNames: ["roundc","atan2j","sqr","powc","fracf"],
     funcs: `fn roundc(x: f32) -> f32 { return sign(x) * floor(abs(x) + 0.5); }
@@ -44896,7 +44896,7 @@ break;
 }`,
   },
   "romanesco": {
-    params: [{ name: "size", def: 0.5 }, { name: "recursion_depth", def: 7 }, { name: "num_arms", def: 1 }, { name: "arm_spread", def: 1 }, { name: "arm_elevation", def: 45 }, { name: "arm_twist", def: 0 }, { name: "floret_count", def: 100 }, { name: "floret_scale", def: 0.28 }, { name: "pattern_spread", def: 0.4 }, { name: "spiral_twist", def: 1 }, { name: "cone_steepness", def: 1 }, { name: "floret_detail_size", def: 0.1 }, { name: "floret_shape", def: 0 }, { name: "pitch", def: 180 }, { name: "yaw", def: 0 }, { name: "roll", def: 0 }, { name: "color_mode", def: 0 }, { name: "solid_color_idx", def: 0.5 }, { name: "color_range_min", def: 0 }, { name: "color_range_max", def: 9 }],
+    params: [{ name: "size", def: 0.5 }, { name: "recursion_depth", def: 7, int: true }, { name: "num_arms", def: 1, int: true }, { name: "arm_spread", def: 1 }, { name: "arm_elevation", def: 45 }, { name: "arm_twist", def: 0 }, { name: "floret_count", def: 100, int: true }, { name: "floret_scale", def: 0.28 }, { name: "pattern_spread", def: 0.4 }, { name: "spiral_twist", def: 1 }, { name: "cone_steepness", def: 1 }, { name: "floret_detail_size", def: 0.1 }, { name: "floret_shape", def: 0, int: true }, { name: "pitch", def: 180 }, { name: "yaw", def: 0 }, { name: "roll", def: 0 }, { name: "color_mode", def: 0, int: true }, { name: "solid_color_idx", def: 0.5 }, { name: "color_range_min", def: 0 }, { name: "color_range_max", def: 9 }],
     verified: true, priority: 0, flags: ["3d","dc","z"], types: ["3D","BASE_SHAPE","DC"],
     funcNames: ["jxyz_","powc","atan2j","jxyz__zero","romanesco_cross","romanesco_normalize"],
     funcs: `struct jxyz_ {
@@ -45086,7 +45086,7 @@ pz_ += (final_z * ${w});
 }`,
   },
   "de_stijl": {
-    params: [{ name: "max_size", def: 0.5 }, { name: "min_size", def: 0.1 }, { name: "chaos", def: 5 }, { name: "line_thickness", def: 0.02 }, { name: "seed", def: 12345 }],
+    params: [{ name: "max_size", def: 0.5 }, { name: "min_size", def: 0.1 }, { name: "chaos", def: 5 }, { name: "line_thickness", def: 0.02 }, { name: "seed", def: 12345, int: true }],
     verified: true, priority: 0, flags: ["dc","state","z"], types: ["2D","DC"],
     funcNames: ["jwx_de_stijl_seed_c","jmrg_","roundc","atan2j","de_stijl_hash","jmrg_randomize","jmrg_random"],
     funcs: `struct jmrg_ {
@@ -45171,7 +45171,7 @@ if (((dist_to_line_x < half_thickness) || (dist_to_line_y < half_thickness))) {
 }`,
   },
   "flora": {
-    params: [{ name: "leafType", def: 0 }, { name: "filled", def: 1 }, { name: "scale", def: 1 }, { name: "distort", def: 0.1 }, { name: "shapeMod", def: 0.5 }],
+    params: [{ name: "leafType", def: 0, int: true }, { name: "filled", def: 1 }, { name: "scale", def: 1 }, { name: "distort", def: 0.1 }, { name: "shapeMod", def: 0.5 }],
     verified: true, priority: 0, flags: ["z"], types: ["2D","BASE_SHAPE"],
     funcNames: ["powc","atan2j"],
     funcs: `fn powc(x: f32, y: f32) -> f32 {
@@ -45400,7 +45400,7 @@ if (false) {
 }`,
   },
   "chaosCubes": {
-    params: [{ name: "mode", def: 0 }, { name: "mode7_A", def: 0 }, { name: "mode7_B", def: 1 }, { name: "depth", def: 5 }, { name: "twistX", def: 0 }, { name: "twistY", def: 0 }, { name: "twistZ", def: 0 }, { name: "scaleX", def: 0.3333333 }, { name: "scaleY", def: 0.3333333 }, { name: "scaleZ", def: 0.3333333 }, { name: "offset", def: 1 }, { name: "rotX", def: 0 }, { name: "rotY", def: 0 }, { name: "rotZ", def: 0 }, { name: "invert", def: 0 }, { name: "julia", def: 0 }, { name: "colorMode", def: 0 }, { name: "colorSpeed", def: 1 }, { name: "sphereInvert", def: 0 }, { name: "sphereRadius", def: 1 }],
+    params: [{ name: "mode", def: 0, int: true }, { name: "mode7_A", def: 0, int: true }, { name: "mode7_B", def: 1, int: true }, { name: "depth", def: 5, int: true }, { name: "twistX", def: 0 }, { name: "twistY", def: 0 }, { name: "twistZ", def: 0 }, { name: "scaleX", def: 0.3333333 }, { name: "scaleY", def: 0.3333333 }, { name: "scaleZ", def: 0.3333333 }, { name: "offset", def: 1 }, { name: "rotX", def: 0 }, { name: "rotY", def: 0 }, { name: "rotZ", def: 0 }, { name: "invert", def: 0, int: true }, { name: "julia", def: 0, int: true }, { name: "colorMode", def: 0, int: true }, { name: "colorSpeed", def: 1 }, { name: "sphereInvert", def: 0, int: true }, { name: "sphereRadius", def: 1 }],
     verified: true, priority: 0, flags: ["3d","dc","z"], types: ["3D","DC"],
     funcNames: ["jxyz_","atan2j","jxyz__zero","chaosCubes_rotateX","chaosCubes_rotateY","chaosCubes_rotateZ"],
     funcs: `struct jxyz_ {
@@ -45608,7 +45608,7 @@ if ((${p[16]} > 0)) {
 }`,
   },
   "camouflage": {
-    params: [{ name: "seed", def: 1000 }, { name: "scale", def: 2 }, { name: "noiseType", def: 0 }, { name: "levels", def: 4 }, { name: "octaves", def: 5 }, { name: "persistence", def: 0.5 }, { name: "lacunarity", def: 2 }, { name: "stretch", def: 1 }, { name: "rotation", def: 0.5 }, { name: "displacement", def: 0.1 }, { name: "zOffset", def: 0.1 }, { name: "colorize", def: 1 }],
+    params: [{ name: "seed", def: 1000 }, { name: "scale", def: 2 }, { name: "noiseType", def: 0, int: true }, { name: "levels", def: 4, int: true }, { name: "octaves", def: 5, int: true }, { name: "persistence", def: 0.5 }, { name: "lacunarity", def: 2 }, { name: "stretch", def: 1 }, { name: "rotation", def: 0.5 }, { name: "displacement", def: 0.1 }, { name: "zOffset", def: 0.1 }, { name: "colorize", def: 1, int: true }],
     verified: true, priority: 0, flags: ["3d","dc","state","z"], types: ["3D"],
     funcNames: ["jwx_camouflage_inited_","jwx_camouflage_i","atan2j","camouflage_fade","camouflage_permutation","camouflage_grad","camouflage_lerp","camouflage_perlinNoise","camouflage_hash","camouflage_cellularNoise","camouflage_smoothstep","camouflage_valueNoise"],
     funcs: `fn atan2j(y: f32, x: f32) -> f32 { if (x == 0.0 && y == 0.0) { return select(0.0, PI, (bitcast<u32>(x) >> 31u) == 1u) * select(1.0, -1.0, (bitcast<u32>(y) >> 31u) == 1u); } return atan2(y, x); }
@@ -45764,7 +45764,7 @@ pz_ += ((z_new - z_) * ${w});
 }`,
   },
   "mandelbox2D": {
-    params: [{ name: "mandelboxMode", def: 0 }, { name: "iterations", def: 10 }, { name: "scale", def: -1.5 }, { name: "foldLimit", def: 1 }, { name: "minRadius", def: 0.5 }, { name: "fixedRadius", def: 1 }, { name: "rotation", def: 0 }, { name: "juliaMode", def: 0 }, { name: "juliaX", def: 0.4 }, { name: "juliaY", def: 0.6 }, { name: "coloringMode", def: 0 }, { name: "colorSpeed", def: 0.5 }],
+    params: [{ name: "mandelboxMode", def: 0, int: true }, { name: "iterations", def: 10, int: true }, { name: "scale", def: -1.5 }, { name: "foldLimit", def: 1 }, { name: "minRadius", def: 0.5 }, { name: "fixedRadius", def: 1 }, { name: "rotation", def: 0 }, { name: "juliaMode", def: 0, int: true }, { name: "juliaX", def: 0.4 }, { name: "juliaY", def: 0.6 }, { name: "coloringMode", def: 0, int: true }, { name: "colorSpeed", def: 0.5 }],
     verified: true, priority: 0, flags: ["dc","z"], types: ["2D"],
     funcNames: ["atan2j"],
     funcs: `fn atan2j(y: f32, x: f32) -> f32 { if (x == 0.0 && y == 0.0) { return select(0.0, PI, (bitcast<u32>(x) >> 31u) == 1u) * select(1.0, -1.0, (bitcast<u32>(y) >> 31u) == 1u); } return atan2(y, x); }`,
@@ -45884,7 +45884,7 @@ if (false) {
 }`,
   },
   "multi_ifs": {
-    params: [{ name: "ifs_type", def: 0 }, { name: "coloring_mode", def: 0 }, { name: "color_speed", def: 0.5 }, { name: "color1", def: 0 }, { name: "color2", def: 0.25 }, { name: "color3", def: 0.5 }, { name: "color4", def: 0.75 }],
+    params: [{ name: "ifs_type", def: 0, int: true }, { name: "coloring_mode", def: 0, int: true }, { name: "color_speed", def: 0.5 }, { name: "color1", def: 0 }, { name: "color2", def: 0.25 }, { name: "color3", def: 0.5 }, { name: "color4", def: 0.75 }],
     verified: true, priority: 0, flags: ["dc","z"], types: ["2D"],
     funcNames: ["atan2j"],
     funcs: `fn atan2j(y: f32, x: f32) -> f32 { if (x == 0.0 && y == 0.0) { return select(0.0, PI, (bitcast<u32>(x) >> 31u) == 1u) * select(1.0, -1.0, (bitcast<u32>(y) >> 31u) == 1u); } return atan2(y, x); }`,
@@ -47320,7 +47320,7 @@ if (!false) {
 }`,
   },
   "polySurf": {
-    params: [{ name: "c", def: 0.3 }, { name: "mirrorX", def: 1 }, { name: "mirrorY", def: 1 }, { name: "mirrorZ", def: 0 }, { name: "julia", def: 0 }, { name: "juliaX", def: 0 }, { name: "juliaY", def: 0 }, { name: "juliaZ", def: 0 }, { name: "enableFold", def: 0 }, { name: "foldX", def: 1 }, { name: "foldY", def: 1 }, { name: "rotX", def: 0 }, { name: "rotY", def: 0 }, { name: "rotZ", def: 0 }, { name: "enableOffset", def: 1 }, { name: "offsetX", def: 1 }, { name: "offsetY", def: 1 }, { name: "offsetZ", def: 0 }, { name: "enableInvert", def: 0 }, { name: "invertRadius", def: 1 }, { name: "colorMode", def: 0 }, { name: "colorSpeed", def: 1 }],
+    params: [{ name: "c", def: 0.3 }, { name: "mirrorX", def: 1, int: true }, { name: "mirrorY", def: 1, int: true }, { name: "mirrorZ", def: 0, int: true }, { name: "julia", def: 0, int: true }, { name: "juliaX", def: 0 }, { name: "juliaY", def: 0 }, { name: "juliaZ", def: 0 }, { name: "enableFold", def: 0, int: true }, { name: "foldX", def: 1 }, { name: "foldY", def: 1 }, { name: "rotX", def: 0 }, { name: "rotY", def: 0 }, { name: "rotZ", def: 0 }, { name: "enableOffset", def: 1, int: true }, { name: "offsetX", def: 1 }, { name: "offsetY", def: 1 }, { name: "offsetZ", def: 0 }, { name: "enableInvert", def: 0, int: true }, { name: "invertRadius", def: 1 }, { name: "colorMode", def: 0, int: true }, { name: "colorSpeed", def: 1 }],
     verified: true, priority: 0, flags: ["3d","dc","z"], types: ["3D"],
     funcNames: ["atan2j","polySurf_sqr"],
     funcs: `fn atan2j(y: f32, x: f32) -> f32 { if (x == 0.0 && y == 0.0) { return select(0.0, PI, (bitcast<u32>(x) >> 31u) == 1u) * select(1.0, -1.0, (bitcast<u32>(y) >> 31u) == 1u); } return atan2(y, x); }
@@ -47420,7 +47420,7 @@ if ((min(max(${p[20]}, 0.0), 2.0) > 0)) {
 }`,
   },
   "mobiqN": {
-    params: [{ name: "qat", def: 1 }, { name: "qax", def: 0 }, { name: "qay", def: 0 }, { name: "qaz", def: 0 }, { name: "qbt", def: 0 }, { name: "qbx", def: 0 }, { name: "qby", def: 0 }, { name: "qbz", def: 0 }, { name: "qct", def: 0 }, { name: "qcx", def: 0 }, { name: "qcy", def: 0 }, { name: "qcz", def: 1 }, { name: "qdt", def: 1 }, { name: "qdx", def: 0 }, { name: "qdy", def: 0 }, { name: "qdz", def: 0 }, { name: "power", def: 2 }, { name: "dist", def: 1 }, { name: "colorMode", def: 0 }, { name: "iterations", def: 1 }, { name: "spaceType", def: 0 }],
+    params: [{ name: "qat", def: 1 }, { name: "qax", def: 0 }, { name: "qay", def: 0 }, { name: "qaz", def: 0 }, { name: "qbt", def: 0 }, { name: "qbx", def: 0 }, { name: "qby", def: 0 }, { name: "qbz", def: 0 }, { name: "qct", def: 0 }, { name: "qcx", def: 0 }, { name: "qcy", def: 0 }, { name: "qcz", def: 1 }, { name: "qdt", def: 1 }, { name: "qdx", def: 0 }, { name: "qdy", def: 0 }, { name: "qdz", def: 0 }, { name: "power", def: 2 }, { name: "dist", def: 1 }, { name: "colorMode", def: 0, int: true }, { name: "iterations", def: 1, int: true }, { name: "spaceType", def: 0, int: true }],
     verified: true, priority: 0, flags: ["3d","dc","z"], types: ["3D"],
     funcNames: ["sqr","atan2j","powc","mobiqN_sinh","mobiqN_asinh"],
     funcs: `fn sqr(x: f32) -> f32 { return x * x; }
@@ -47573,7 +47573,7 @@ pz_ += (${w} * final_z);
 }`,
   },
   "flame_bulb": {
-    params: [{ name: "root_power", def: 8 }, { name: "radius_pow", def: 1 }, { name: "add C", def: 1 }, { name: "color mode 1-4", def: 1 }, { name: "color scale", def: 1 }],
+    params: [{ name: "root_power", def: 8 }, { name: "radius_pow", def: 1 }, { name: "add C", def: 1 }, { name: "color mode 1-4", def: 1, int: true }, { name: "color scale", def: 1 }],
     verified: true, priority: 0, flags: ["3d","dc","z"], types: ["3D"],
     funcNames: ["jrand_","powc","atan2j","rndi","jrand_make","jrand__zero","jrand_next","jrand_nextInt"],
     funcs: `struct jrand_ {
@@ -47700,7 +47700,7 @@ if (false) {
 }`,
   },
   "attractor_flow": {
-    params: [{ name: "preset", def: 0 }, { name: "attractorMode", def: 0 }, { name: "waveMode", def: 0 }, { name: "zMode", def: 0 }, { name: "yScale", def: -1.7 }, { name: "xScale", def: 1.8 }, { name: "zScale", def: 1.5 }, { name: "xAmplitude", def: -0.5 }, { name: "yAmplitude", def: -1.9 }, { name: "zAmplitude", def: 1.2 }, { name: "freqX", def: 1 }, { name: "freqY", def: 1 }, { name: "phaseX", def: 0 }, { name: "phaseY", def: 0 }],
+    params: [{ name: "preset", def: 0, int: true }, { name: "attractorMode", def: 0, int: true }, { name: "waveMode", def: 0, int: true }, { name: "zMode", def: 0, int: true }, { name: "yScale", def: -1.7 }, { name: "xScale", def: 1.8 }, { name: "zScale", def: 1.5 }, { name: "xAmplitude", def: -0.5 }, { name: "yAmplitude", def: -1.9 }, { name: "zAmplitude", def: 1.2 }, { name: "freqX", def: 1 }, { name: "freqY", def: 1 }, { name: "phaseX", def: 0 }, { name: "phaseY", def: 0 }],
     verified: true, priority: 0, flags: ["3d","state","z"], types: ["3D"],
     funcNames: ["jwx_attractor_flow_preset_c","jwx_attractor_flow_attractorMode_c","jwx_attractor_flow_waveMode_c","jwx_attractor_flow_zMode_c","jwx_attractor_flow_yScale_c","jwx_attractor_flow_xScale_c","jwx_attractor_flow_xAmplitude_c","jwx_attractor_flow_yAmplitude_c","jwx_attractor_flow_freqX_c","jwx_attractor_flow_freqY_c","jwx_attractor_flow_phaseX_c","jwx_attractor_flow_phaseY_c","jwx_attractor_flow_zScale_c","jwx_attractor_flow_zAmplitude_c","atan2j","attractor_flow_selectWave","attractor_flow_selectCosWave"],
     funcs: `fn atan2j(y: f32, x: f32) -> f32 { if (x == 0.0 && y == 0.0) { return select(0.0, PI, (bitcast<u32>(x) >> 31u) == 1u) * select(1.0, -1.0, (bitcast<u32>(y) >> 31u) == 1u); } return atan2(y, x); }
@@ -47807,7 +47807,7 @@ if (false) {
 }`,
   },
   "busybrad": {
-    params: [{ name: "mode", def: 2 }, { name: "gridSize", def: 1 }, { name: "xOffset", def: 0 }, { name: "yOffset", def: 0 }, { name: "spin", def: 0.1 }, { name: "twist", def: 0.2 }, { name: "space", def: 0.4 }, { name: "n", def: 4 }, { name: "corner", def: 1 }, { name: "mod_spin_strength", def: 0 }, { name: "mod_twist_strength", def: 0 }, { name: "sensen_post_effect", def: 0 }, { name: "sensen_fold", def: 1 }],
+    params: [{ name: "mode", def: 2, int: true }, { name: "gridSize", def: 1 }, { name: "xOffset", def: 0 }, { name: "yOffset", def: 0 }, { name: "spin", def: 0.1 }, { name: "twist", def: 0.2 }, { name: "space", def: 0.4 }, { name: "n", def: 4, int: true }, { name: "corner", def: 1, int: true }, { name: "mod_spin_strength", def: 0 }, { name: "mod_twist_strength", def: 0 }, { name: "sensen_post_effect", def: 0, int: true }, { name: "sensen_fold", def: 1 }],
     verified: true, priority: 0, flags: ["z"], types: ["2D"],
     funcNames: ["roundc","atan2j"],
     funcs: `fn roundc(x: f32) -> f32 { return sign(x) * floor(abs(x) + 0.5); }
@@ -47904,7 +47904,7 @@ if (false) {
 }`,
   },
   "greebles": {
-    params: [{ name: "mode", def: 0 }, { name: "base_shape", def: 1 }, { name: "size", def: 2 }, { name: "subdivisions", def: 10 }, { name: "greeble_shape", def: 0 }, { name: "greeble_height", def: 0.2 }, { name: "seed", def: 12345 }],
+    params: [{ name: "mode", def: 0, int: true }, { name: "base_shape", def: 1, int: true }, { name: "size", def: 2 }, { name: "subdivisions", def: 10, int: true }, { name: "greeble_shape", def: 0, int: true }, { name: "greeble_height", def: 0.2 }, { name: "seed", def: 12345, int: true }],
     verified: true, priority: 0, flags: ["3d","dc","hide","z"], types: ["3D","BASE_SHAPE"],
     funcNames: ["jmrg_","jxyz_","atan2j","powc","jxyz__zero","jxyz_assign","greebles_normalize","jmrg_randomize","jmrg_random","greebles_cross","greebles_frac"],
     funcs: `struct jmrg_ {
@@ -48515,7 +48515,7 @@ v.y += ((${w} * (cm_ly * cm_s)) / ${p[0]});
 }`,
   },
   "diatom": {
-    params: [{ name: "spokes", def: 8 }, { name: "amplitude", def: 0.3 }],
+    params: [{ name: "spokes", def: 8, int: true }, { name: "amplitude", def: 0.3 }],
     verified: true, priority: 0, flags: [], types: ["2D"],
     funcNames: ["atan2j"],
     funcs: `fn atan2j(y: f32, x: f32) -> f32 { if (x == 0.0 && y == 0.0) { return select(0.0, PI, (bitcast<u32>(x) >> 31u) == 1u) * select(1.0, -1.0, (bitcast<u32>(y) >> 31u) == 1u); } return atan2(y, x); }`,
@@ -48548,7 +48548,7 @@ v.y += (${w} * (t.y + lg_py));
 }`,
   },
   "sph_harmonic": {
-    params: [{ name: "l", def: 2 }, { name: "m", def: 1 }, { name: "strength", def: 0.3 }],
+    params: [{ name: "l", def: 2, int: true }, { name: "m", def: 1, int: true }, { name: "strength", def: 0.3 }],
     verified: true, priority: 0, flags: [], types: ["2D"],
     funcNames: ["atan2j"],
     funcs: `fn atan2j(y: f32, x: f32) -> f32 { if (x == 0.0 && y == 0.0) { return select(0.0, PI, (bitcast<u32>(x) >> 31u) == 1u) * select(1.0, -1.0, (bitcast<u32>(y) >> 31u) == 1u); } return atan2(y, x); }`,
@@ -49625,7 +49625,7 @@ v.y += (${w} * ((dp_r * dp_sa) + (dp_perp * dp_ca)));
 }`,
   },
   "faraday": {
-    params: [{ name: "freq", def: 4 }, { name: "modes", def: 4 }, { name: "amp", def: 0.2 }],
+    params: [{ name: "freq", def: 4 }, { name: "modes", def: 4, int: true }, { name: "amp", def: 0.2 }],
     verified: true, priority: 0, flags: [], types: ["2D"],
     funcNames: ["atan2j"],
     funcs: `fn atan2j(y: f32, x: f32) -> f32 { if (x == 0.0 && y == 0.0) { return select(0.0, PI, (bitcast<u32>(x) >> 31u) == 1u) * select(1.0, -1.0, (bitcast<u32>(y) >> 31u) == 1u); } return atan2(y, x); }`,
@@ -49945,7 +49945,7 @@ v.y += (${w} * (t.y + (ds_bump * ds_dy)));
 }`,
   },
   "fractal_zoom": {
-    params: [{ name: "zoom", def: 2 }, { name: "angle", def: 0.5 }, { name: "iters", def: 3 }],
+    params: [{ name: "zoom", def: 2 }, { name: "angle", def: 0.5 }, { name: "iters", def: 3, int: true }],
     verified: true, priority: 0, flags: [], types: ["2D"],
     funcNames: ["atan2j"],
     funcs: `fn atan2j(y: f32, x: f32) -> f32 { if (x == 0.0 && y == 0.0) { return select(0.0, PI, (bitcast<u32>(x) >> 31u) == 1u) * select(1.0, -1.0, (bitcast<u32>(y) >> 31u) == 1u); } return atan2(y, x); }`,

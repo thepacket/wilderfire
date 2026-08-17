@@ -43,7 +43,8 @@ in the stack.
   CPU-built point sets, …); the importer names the reason when a flame uses one.
   Parametric controls for every one, JWildfire-style **pre / normal / post
   priority** (per-instance overrides and the *prepost* inverse pairs), several
-  chained final transforms per layer, per-transform colour modifiers, and **direct-colour `dc_*` variations** — both the flam3 kind
+  chained final transforms per layer, per-transform colour modifiers, weighting
+  fields (noise-modulated amounts / params / colour / jitter), and **direct-colour `dc_*` variations** — both the flam3 kind
   that steer the palette coordinate and JWildfire's shader-art kind
   (`dc_hexagons`, `dc_menger`, `dc_voronoise`, …) that paint RGB directly
 - **Variation picker** — searchable popover with type chips (2D, 3D, blur,

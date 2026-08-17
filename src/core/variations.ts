@@ -15,7 +15,7 @@
 import { JWF_VARIATIONS, type JwfVariationDef } from './variations.jwf.ts';
 
 export interface VariationDef {
-  params?: { name: string; def: number }[];
+  params?: { name: string; def: number; int?: boolean }[];
   code: (w: string, p: string[], A: (i: number) => string) => string;
   /** JWildfire "prepost" pair: runs first in the stage (priority -2) on the input point (the inverse), while `code` runs last (priority 2) on the output. */
   preCode?: (w: string, p: string[], A: (i: number) => string) => string;

@@ -6,7 +6,7 @@ import type { JwfVariationDef } from './variations.jwf';
 
 export const JWF_VARIATIONS_UNVERIFIED: Record<string, JwfVariationDef> = {
   "dc_gnarly": {
-    params: [{ name: "mode", def: 1 }, { name: "scalex", def: 0.05 }, { name: "scaley", def: 0.05 }, { name: "freqx1", def: 3.5 }, { name: "freqy1", def: 3.5 }, { name: "freqx2", def: 2 }, { name: "freqy2", def: 2 }, { name: "freqx3", def: 5 }, { name: "freqy3", def: 5 }, { name: "dc", def: 1 }, { name: "color1", def: 5 }, { name: "color2", def: 5 }, { name: "fmag", def: 1 }, { name: "distort", def: 0 }, { name: "blur", def: 5 }, { name: "scale_z", def: 0 }, { name: "offset_z", def: 0 }, { name: "reset_z", def: 0 }],
+    params: [{ name: "mode", def: 1, int: true }, { name: "scalex", def: 0.05 }, { name: "scaley", def: 0.05 }, { name: "freqx1", def: 3.5 }, { name: "freqy1", def: 3.5 }, { name: "freqx2", def: 2 }, { name: "freqy2", def: 2 }, { name: "freqx3", def: 5 }, { name: "freqy3", def: 5 }, { name: "dc", def: 1, int: true }, { name: "color1", def: 5 }, { name: "color2", def: 5 }, { name: "fmag", def: 1 }, { name: "distort", def: 0 }, { name: "blur", def: 5 }, { name: "scale_z", def: 0 }, { name: "offset_z", def: 0 }, { name: "reset_z", def: 0, int: true }],
     verified: false, priority: 0, flags: ["dc","z"], types: ["2D","DC"],
     funcNames: ["roundc","atan2j","sqrf"],
     funcs: `fn roundc(x: f32) -> f32 { return sign(x) * floor(abs(x) + 0.5); }
@@ -85,7 +85,7 @@ if ((i32(roundc(min(max(${p[17]}, 0.0), 1.0))) > 0)) {
 }`,
   },
   "dc_circuits": {
-    params: [{ name: "Seed", def: 1000000 }, { name: "time", def: 0 }, { name: "rate", def: 0.8 }, { name: "intensity", def: 0.9 }, { name: "focus", def: 1.5 }, { name: "pulse", def: 10 }, { name: "glow", def: 2 }, { name: "loops", def: 15 }, { name: "zoom", def: 1 }, { name: "ColorOnly", def: 0 }, { name: "Gradient", def: 0 }, { name: "scale_z", def: 0 }, { name: "offset_z", def: 0 }, { name: "reset_z", def: 1 }],
+    params: [{ name: "Seed", def: 1000000, int: true }, { name: "time", def: 0 }, { name: "rate", def: 0.8 }, { name: "intensity", def: 0.9 }, { name: "focus", def: 1.5 }, { name: "pulse", def: 10 }, { name: "glow", def: 2 }, { name: "loops", def: 15 }, { name: "zoom", def: 1 }, { name: "ColorOnly", def: 0, int: true }, { name: "Gradient", def: 0, int: true }, { name: "scale_z", def: 0 }, { name: "offset_z", def: 0 }, { name: "reset_z", def: 1, int: true }],
     verified: false, priority: 0, flags: ["dc","rgb","z"], types: ["SIMULATION","DC","BASE_SHAPE"],
     funcNames: ["Mat2","read_imageStepMode","atan2j","powc","Mat2_Init","times","dc_circuits_formula","dc_circuits_getRGBColor","dbl2int","greyscale","distance_color"],
     funcs: `struct Mat2 {

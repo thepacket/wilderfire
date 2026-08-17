@@ -11,8 +11,8 @@
 //  - palettes come in three flavors: <palette count format>hex</palette>,
 //    <colors count data="…"/>, or 256 × <color index rgb="r g b"/>.
 
-import type { Flame, XForm, Layer, Affine, RGB } from './flame';
-import { defaultXForm, defaultFlame, normalizeFlame, MAX_LAYERS, MAX_XFORMS } from './flame';
+import type { Flame, XForm, Layer, Affine, RGB, WeightingField } from './flame';
+import { defaultXForm, defaultFlame, normalizeFlame, MAX_LAYERS, MAX_XFORMS, WFIELD_TYPES, defaultWeightingField } from './flame';
 import { VARIATIONS } from './variations';
 import type { MotionCurve, CurvePoint, CurveInterp } from './motion';
 
@@ -157,6 +157,25 @@ function parseXFormEl(elm: Element, ctx?: CurveCtx): XForm {
   const mods = ['mod_gamma', 'mod_gamma_speed', 'mod_contrast', 'mod_contrast_speed', 'mod_saturation', 'mod_saturation_speed', 'mod_hue', 'mod_hue_speed']
     .map((a) => { const v = parseFloat(elm.getAttribute(a) ?? ''); return isFinite(v) ? v : 0; });
   if (mods.some((v) => v !== 0)) x.colorMods = mods;
+  // JWildfire weighting field (wfield_* attributes; enum names as written by JWildfire)
+  const wft = (elm.getAttribute('wfield_type') ?? 'NONE').toUpperCase();
+  if (WFIELD_TYPES.includes(wft)) {
+    const numA = (a: string, d: number) => { const v = parseFloat(elm.getAttribute(a) ?? ''); return isFinite(v) ? v : d; };
+    const strA = (a: string, d: string) => (elm.getAttribute(a) ?? d).toUpperCase();
+    const wf = defaultWeightingField(wft);
+    wf.input = strA('wfield_input', 'AFFINE') === 'POSITION' ? 'POSITION' : 'AFFINE';
+    wf.varAmount = numA('wfield_var_amount_intensity', 0); wf.color = numA('wfield_color_intensity', 0); wf.jitter = numA('wfield_jitter_intensity', 0);
+    wf.seed = Math.round(numA('wfield_noise_seed', 1337)); wf.frequency = numA('wfield_noise_frequency', 1);
+    wf.fractalType = strA('wfield_fract_noise_fract_type', 'FBM') as WeightingField['fractalType'];
+    wf.octaves = Math.round(numA('wfield_fract_noise_octaves', 3)); wf.gain = numA('wfield_fract_noise_gain', 0.5); wf.lacunarity = numA('wfield_fract_noise_lacunarity', 2);
+    wf.cellReturn = strA('wfield_cell_noise_return_type', 'DISTANCE2') as WeightingField['cellReturn'];
+    wf.cellDistance = strA('wfield_cell_noise_dist_function', 'EUCLIDIAN') as WeightingField['cellDistance'];
+    for (let i = 1; i <= 3; i++) {
+      const it = numA(`wfield_var_param${i}_intensity`, 0), vn = elm.getAttribute(`wfield_var_param${i}_var_name`) ?? '', pn = elm.getAttribute(`wfield_var_param${i}_param_name`) ?? '';
+      if (Math.abs(it) > 1e-9 && vn) wf.params.push({ varName: vn, paramName: pn, intensity: it });
+    }
+    x.wfield = wf;
+  }
 
   // Variation weights + params from remaining attributes. Names prefixed
   // pre_/post_ (flam3/JWildfire pre_blur, post_curl, …) route to the stages.
@@ -569,6 +588,14 @@ function xformToXML(x: XForm, tag: string, nXForms: number, extraAttrs: string[]
   attrs.push(`color_speed="${fmt(x.colorSpeed)}"`);
   attrs.push(`symmetry="${fmt(1 - 2 * x.colorSpeed)}"`);
   if (tag === 'finalxform' && x.colorSpeed > 0) attrs.push('color_type="DIFFUSION"'); // JWildfire finals default to NONE (no recolouring)
+  if (x.wfield) {
+    const w = x.wfield;
+    attrs.push(`wfield_type="${w.type}"`, `wfield_input="${w.input}"`, `wfield_color_intensity="${fmt(w.color)}"`, `wfield_var_amount_intensity="${fmt(w.varAmount)}"`,
+      `wfield_jitter_intensity="${fmt(w.jitter)}"`, `wfield_noise_seed="${w.seed}"`, `wfield_noise_frequency="${fmt(w.frequency)}"`,
+      `wfield_fract_noise_fract_type="${w.fractalType}"`, `wfield_fract_noise_octaves="${w.octaves}"`, `wfield_fract_noise_gain="${fmt(w.gain)}"`, `wfield_fract_noise_lacunarity="${fmt(w.lacunarity)}"`,
+      `wfield_cell_noise_return_type="${w.cellReturn}"`, `wfield_cell_noise_dist_function="${w.cellDistance}"`);
+    w.params.forEach((pp, i) => attrs.push(`wfield_var_param${i + 1}_intensity="${fmt(pp.intensity)}"`, `wfield_var_param${i + 1}_var_name="${pp.varName}"`, `wfield_var_param${i + 1}_param_name="${pp.paramName}"`));
+  }
   if (x.colorMods?.some((v) => v !== 0)) {
     ['mod_gamma', 'mod_gamma_speed', 'mod_contrast', 'mod_contrast_speed', 'mod_saturation', 'mod_saturation_speed', 'mod_hue', 'mod_hue_speed']
       .forEach((a, i) => attrs.push(`${a}="${fmt(x.colorMods![i] ?? 0)}"`));

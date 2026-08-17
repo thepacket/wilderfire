@@ -29,6 +29,7 @@ JWildfire source ──Oracle.java─▶ oracle-out.jsonl ◀── oracle-spec.
 | `data/jwf-variations.jsonl` | Metadata + GPU code for all 1026 JWildfire variations (name, params/defaults/int-ness, priority, types, GPU code, helper functions). Produced by `Dump.java`; checked in so regeneration does not need Java. |
 | `data/kernel-lib.cu` | Helper library extracted from JWildfire's `Flam4_3dKernal_TemplateJWF.cu` (Complex/Mat2/Jacobi/noise/misc); transpiled on demand. |
 | `java2cu.ts`, `data/jwf-java-ports.jsonl` | Java → CUDA-dialect pre-processor for the variations that have *no* GPU snippet in JWildfire: extracts fields, params (from `setParameter`), `init()`, helper methods and `transform()` from the Java class, rewrites the Java idioms (`pAffineTP.x`→`__x`, `pVarTP.x`→`__px`, `pAmount`→`__amount_`, `pContext.random()`, `Math.*`/MathLib statics, `sinAndCos`, `this.` fields, locals shadowing fields, `random(Integer.MAX_VALUE)`→31-bit `RANDINT`), replays setParameter-derived fields, turns per-instance state (attractors) into per-thread `varpar->` state initialised on the first call, and copies helper-used params/fields into state. GLSL-style Java (js.glsl `vec2`/`vec3`/`vec4` objects, `G.*` statics, `new mat2(…)` in `.times()`) goes through a small expression parser that turns method chains into vector arithmetic (`crop_*`, `glsl_*`, `truchetflow`); the abstract `GLSLFunc` parent's fields/params are merged in. Plain-data inner classes (`Point`, `Double2`, `RandXYData`, `SinCosPair`, …) become WGSL structs with maker/setter functions; JWildfire's `XYZPoint`, `DoubleWrapperWF`, `MarsagliaRandomGenerator` and `java.util.Random` are built-in structs (`jxyz_`, `jdw_`, `jmrg_`, `jrand_` — the last two are exact 32-bit / 48-bit-LCG ports so per-cell seeded randoms match the Java); js.glsl `mat2`/`mat3` travel as `float4` / a `mat3_` struct (`.times()` resolves matrix·vector by tracked operand kinds); helpers taking `pAffineTP`/`pVarTP` are inlined at their call sites; array/object helper params become pointers; `pXForm.getXYCoeff*()` reads the affine; static-final constants are inlined and constant tables hoisted to module scope; `long` maps to `int` (seeds/hashes); pre-priority ports refresh `__r2/__r/__phi/__theta` after rewriting the input like JWildfire's own pre snippets. JWildfire *prepost* variations (`prepost_blob`/`mobius`/`circlize`/`affine`: `invtransform()` runs as a pre step on the affine point, `transform()` as a post step on the output) get two snippets — `preCode` (the inverse + precalc refresh) and `gpuCode` — that the codegen runs at priority −2 and 2 of the same stage; the oracle tests the inverse as its own `name~inv` entry (Oracle.java calls `invtransform`) and `gen.ts` requires both verdicts. Output feeds `gen.ts` exactly like a dump entry. Needs the JWildfire source tree (`--jwf`). |
+| `data/fastnoise.cu` | FastNoise (JWildfire's Flam4 template CUDA port of Auburn's FastNoise_Java; all noise types) + `wfieldValue()` for weighting fields; `gen.ts` transpiles it to `src/gpu/wfield.wgsl.ts`. |
 | `data/unportable.json` | The JWildfire variations WilderFire deliberately does not implement, by category (see *What is not ported*); `gen.ts` checks it against the registry and emits `src/core/variations.unportable.ts` for the importer. |
 | `Dump.java` | Dumps the catalogue by reflection against a compiled JWildfire tree. |
 | `Oracle.java` | Headless JWildfire oracle: evaluates each variation's Java `transform()` on the spec grid; deterministic → exact values, random → per-point mean/std/hide-fraction over 256 samples. |
@@ -62,6 +63,7 @@ javac -nowarn -encoding ISO-8859-1 -source 8 -target 8 -proc:none -d out -cp "$(
 CP="out:src:resources:$(ls lib/*.jar | tr '\n' ':')"
 javac -d tools/out -cp "$CP" /path/to/wilderfire/scripts/jwf-port/Dump.java /path/to/wilderfire/scripts/jwf-port/Oracle.java
 java -Djava.awt.headless=true -cp "tools/out:$CP" Dump   /path/to/wilderfire/scripts/jwf-port/data/jwf-variations.jsonl
+# (put JWildfire's `resources` dir on $CP too — Compare/Oracle need variation_costs.txt for weighting-field param modulations)
 cd /path/to/wilderfire
 node scripts/jwf-port/gen.ts            # transpile
 node scripts/jwf-port/oracle-spec.ts    # spec for everything we know
@@ -219,6 +221,24 @@ until one attribute explained the difference, then ported from the JWildfire sou
 | **Layer weight** multiplies the plotted colour; every layer iterates equally often | Bokeh_1 | equal thread split, colour × weight (`xd[8+li]`), colour accumulation dithered so small weights/opacities stay unbiased |
 | **Per-instance priority** `<var>_fx_priority`: a normal variation forced to pre runs as input ← input + w·f(input), forced to post as output ← output + w·f(output) (`EnforcedPre/PostVariationTransformationStep`) | Ghosts_1, Brokat_0 (+ Bubbles, Layers, Spirals, Painterly, Bokeh) | `VarInstance.priority`, imported/exported, emitted by codegen with borrowed t/v |
 | `crackle` jitters its cells with `NoiseTools.simplexNoise3D` on the CPU but FastNoise `singleSimplex` in its own GPU code | Bokeh_1 | the table simplex from `dc_perlin` (hoisted once, shared) replaces `singleSimplex` |
+
+### Weighting fields (2026-08-17)
+
+JWildfire's per-transform **weighting fields** (`wfield_*` attributes) are supported: a FastNoise value
+(cellular / cubic / perlin / simplex / value, plain or fractal FBM/Billow/RigidMulti, white noise) at the
+affine result or the incoming position, which scales every variation amount of the transform
+(`wfield_var_amount_intensity`), up to three named variation params or amounts
+(`wfield_var_paramN_*`; int params rounded like `Tools.FTOI`), the colour (×0.1) and jitters the output
+(×0.1, x/y/z each from a permuted lookup) — exactly `TransformationInitWeightingFieldStep`,
+`Variation.transform/executeTransform`, `TransformationApplyWeightMapJitter/ToColorStep`. The noise is the
+Flam4 template's own CUDA port of FastNoise (`data/fastnoise.cu`, extracted with every noise type enabled,
+enums as `#define`s, plus `wfieldValue()`), transpiled by `gen.ts` into `src/gpu/wfield.wgsl.ts` and
+included in the kernel only when a flame uses a field. `IMAGE_MAP` fields need an image and are ignored.
+Verified against headless JWildfire on the `wfield_*` fixtures (all match to ≤1.01 / corr 1.00) —
+**note: `Compare.java` must run with JWildfire's `resources` dir on the classpath**, otherwise
+`variation_costs.txt` is missing and JWildfire silently drops the param modulations
+(`isValidVariationForWeightingFields`). Model: `XForm.wfield` (`WeightingField`); the transform editor
+has a collapsible "Weighting field" section; keyframe morphs interpolate the numeric knobs of same-type fields.
 
 ## Semantics worth knowing
 

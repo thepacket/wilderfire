@@ -102,6 +102,18 @@ function lerpXForm(a: XForm, b: XForm, t: number, n: number): XForm {
     out.xaos = Array.from({ length: n }, (_, j) =>
       lerp(a.xaos?.[j] ?? 1, b.xaos?.[j] ?? 1, t));
   }
+  // JWildfire extras: colour modifiers interpolate; the weighting field's numeric knobs interpolate when both sides
+  // have one of the same type, otherwise the nearer keyframe's field is used as-is
+  if (a.colorMods || b.colorMods) out.colorMods = Array.from({ length: 8 }, (_, i) => lerp(a.colorMods?.[i] ?? 0, b.colorMods?.[i] ?? 0, t));
+  if (a.wfield && b.wfield && a.wfield.type === b.wfield.type) {
+    const wa = a.wfield, wb = b.wfield;
+    out.wfield = { ...structuredClone(t < 0.5 ? wa : wb), varAmount: lerp(wa.varAmount, wb.varAmount, t), color: lerp(wa.color, wb.color, t), jitter: lerp(wa.jitter, wb.jitter, t),
+      frequency: lerp(wa.frequency, wb.frequency, t), gain: lerp(wa.gain, wb.gain, t), lacunarity: lerp(wa.lacunarity, wb.lacunarity, t),
+      params: (t < 0.5 ? wa : wb).params.map((pp, i) => ({ ...pp, intensity: lerp(wa.params[i]?.intensity ?? pp.intensity, wb.params[i]?.intensity ?? pp.intensity, t) })) };
+  } else if (a.wfield || b.wfield) {
+    const src = t < 0.5 ? a.wfield ?? b.wfield : b.wfield ?? a.wfield;
+    if (src) out.wfield = structuredClone(src);
+  }
   return out;
 }
 

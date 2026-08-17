@@ -4,7 +4,7 @@ import { App, el, slider, numberInput, formatNum, XFORM_COLORS } from './common'
 import type { XForm } from '../core/flame';
 import {
   defaultXForm, defaultLayer, cloneXForm, cloneLayer,
-  rotateAffine, scaleAffine, IDENTITY, MAX_LAYERS, MAX_XFORMS,
+  rotateAffine, scaleAffine, IDENTITY, MAX_LAYERS, MAX_XFORMS, WFIELD_TYPES, defaultWeightingField,
 } from '../core/flame';
 import { randomPalette } from '../core/palette';
 import { VARIATIONS, defaultParams } from '../core/variations';
@@ -445,6 +445,78 @@ export function buildTransformsPanel(app: App, root: HTMLElement) {
       box3d.append(cap, g);
     }
     editorSec.append(box3d);
+
+    // Weighting field (JWildfire): noise that scales this transform's variation amounts / params / colour and jitters its output
+    {
+      const wfHead = el('h3', '', `Weighting field ${x.wfield ? '(' + x.wfield.type.toLowerCase().replace(/_/g, ' ') + ')' : '(none)'}`);
+      wfHead.style.cursor = 'pointer';
+      wfHead.title = 'JWildfire weighting field: a noise value at each point scales the variation amounts, chosen variation params, the colour and jitters the output';
+      editorSec.append(wfHead);
+      const wfBox = el('div');
+      wfBox.style.display = x.wfield ? 'block' : 'none';
+      wfHead.onclick = () => { wfBox.style.display = wfBox.style.display === 'none' ? 'block' : 'none'; };
+      const selRow = (label: string, opts: string[], value: string, on: (v: string) => void) => {
+        const row = el('div', 'row');
+        row.append(el('label', '', label));
+        const sel = el('select') as HTMLSelectElement;
+        for (const o of opts) { const op = el('option', '', o.toLowerCase().replace(/_/g, ' ')) as HTMLOptionElement; op.value = o; sel.append(op); }
+        sel.value = value;
+        sel.onchange = () => on(sel.value);
+        row.append(sel);
+        return row;
+      };
+      wfBox.append(selRow('Type', ['NONE', ...WFIELD_TYPES], x.wfield?.type ?? 'NONE', (v) => {
+        if (v === 'NONE') delete x.wfield; else x.wfield = { ...(x.wfield ?? defaultWeightingField(v)), type: v };
+        app.commit(); rebuildEditor();
+      }));
+      const wf = x.wfield;
+      if (wf) {
+        const num = (label: string, key: keyof typeof wf, min: number, max: number, step: number) =>
+          wfBox.append(slider({ label, min, max, step, value: wf[key] as number, onInput: (v) => { (wf as unknown as Record<string, number>)[key] = v; app.commit(SRC); } }).root);
+        wfBox.append(selRow('Input', ['AFFINE', 'POSITION'], wf.input, (v) => { wf.input = v as typeof wf.input; app.commit(); }));
+        num('Var amount', 'varAmount', -5, 5, 0.05);
+        num('Colour', 'color', -10, 10, 0.1);
+        num('Jitter', 'jitter', -10, 10, 0.1);
+        num('Seed', 'seed', 0, 10000, 1);
+        num('Frequency', 'frequency', 0, 10, 0.05);
+        if (/FRACTAL/.test(wf.type)) {
+          wfBox.append(selRow('Fractal', ['FBM', 'BILLOW', 'RIGID_MULTI'], wf.fractalType, (v) => { wf.fractalType = v as typeof wf.fractalType; app.commit(); }));
+          num('Octaves', 'octaves', 1, 8, 1);
+          num('Gain', 'gain', 0, 1, 0.01);
+          num('Lacunarity', 'lacunarity', 0.5, 4, 0.05);
+        }
+        if (wf.type === 'CELLULAR_NOISE') {
+          wfBox.append(selRow('Cell return', ['CELL_VALUE', 'DISTANCE', 'DISTANCE2', 'DISTANCE_ADD', 'DISTANCE_SUB', 'DISTANCE_MUL', 'DISTANCE_DIV'], wf.cellReturn, (v) => { wf.cellReturn = v as typeof wf.cellReturn; app.commit(); }));
+          wfBox.append(selRow('Cell distance', ['EUCLIDIAN', 'MANHATTAN', 'NATURAL'], wf.cellDistance, (v) => { wf.cellDistance = v as typeof wf.cellDistance; app.commit(); }));
+        }
+        // up to three variation-param modulations
+        const allVars = [...(x.preVariations ?? []), ...x.variations, ...(x.postVariations ?? [])].map((v) => v.name);
+        wf.params.forEach((pp, k) => {
+          const row = el('div', 'row');
+          row.append(el('label', '', `Param ${k + 1}`));
+          const vsel = el('select') as HTMLSelectElement;
+          for (const n of [...new Set(allVars)]) { const op = el('option', '', n) as HTMLOptionElement; op.value = n; vsel.append(op); }
+          vsel.value = pp.varName;
+          const psel = el('select') as HTMLSelectElement;
+          const fillP = () => { psel.textContent = ''; for (const n of ['amount', ...(VARIATIONS[vsel.value]?.params ?? []).map((d) => d.name)]) { const op = el('option', '', n) as HTMLOptionElement; op.value = n; psel.append(op); } psel.value = pp.paramName; if (!psel.value) psel.value = 'amount'; };
+          fillP();
+          vsel.onchange = () => { pp.varName = vsel.value; fillP(); pp.paramName = psel.value; app.commit(); };
+          psel.onchange = () => { pp.paramName = psel.value; app.commit(); };
+          const inp = numberInput(pp.intensity, 0.05, (nv) => { pp.intensity = nv; app.commit(SRC); });
+          inp.title = 'intensity';
+          const rm = el('button', 'icon danger', '✕');
+          rm.onclick = () => { wf.params.splice(k, 1); app.commit(); rebuildEditor(); };
+          row.append(vsel, psel, inp, rm);
+          wfBox.append(row);
+        });
+        if (wf.params.length < 3 && allVars.length) {
+          const add = el('button', 'small', '+ param modulation');
+          add.onclick = () => { wf.params.push({ varName: allVars[0], paramName: 'amount', intensity: 1 }); app.commit(); rebuildEditor(); };
+          wfBox.append(add);
+        }
+      }
+      editorSec.append(wfBox);
+    }
 
     // Variations (pre stage / main / post stage)
     const renderVarGroup = (title: string, arr: () => XForm['variations'], removable: boolean) => {
