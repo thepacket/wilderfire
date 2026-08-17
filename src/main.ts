@@ -14,6 +14,7 @@ import { buildAnimPanel, type AnimState } from './ui/animPanel';
 import { buildLibrary, loadAutosave, restoreFlame } from './ui/library';
 import { buildMutate } from './ui/mutate';
 import { buildOverlay } from './ui/overlay';
+import { loadJwfVariations } from './core/variations';
 
 const LS_THEME = 'wilderfire.theme';
 
@@ -36,6 +37,9 @@ function fatal(msg: string) {
 
 async function boot() {
   initTheme();
+  // The JWildfire variation ports (~2 MB, their own cached chunk) download while the
+  // shell is built and WebGPU initialises; the first render waits for both below.
+  const variationsReady = loadJwfVariations();
   const app = new App();
   const root = document.getElementById('app')!;
 
@@ -238,6 +242,14 @@ async function boot() {
   } catch (e) {
     fatal((e as Error).message);
     return;
+  }
+  try {
+    status.textContent = 'loading variations…';
+    await variationsReady;
+    status.textContent = '—';
+  } catch (e) {
+    status.textContent = '⚠ variation registry failed to load — reload the page';
+    console.error('Variation registry failed to load:', e);
   }
   // first visit (no autosave): start on the first sample flame; the built-in fallback stays if the fetch fails
   if (!saved) loadSample(JWF_SAMPLES[0]).then(() => { presetSel.value = 'j:0'; }).catch((e) => console.warn('Sample load failed:', e));

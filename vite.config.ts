@@ -59,6 +59,10 @@ function compareSink(): Plugin {
 
 export default defineConfig({
   plugins: [jwfReportSink(), compareSink()],
+  build: {
+    // the JWildfire variation registry (variations.jwf.ts) is loaded lazily and is ~1.9 MB on purpose
+    chunkSizeWarningLimit: 2100,
+  },
   server: {
     port: Number(process.env.PORT) || 5173,
     strictPort: false,

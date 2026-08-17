@@ -12,7 +12,7 @@
 // ports take precedence so behaviour matches JWildfire; hand-written entries
 // remain as fallbacks for anything the port pipeline does not cover.
 
-import { JWF_VARIATIONS, type JwfVariationDef } from './variations.jwf.ts';
+import type { JwfVariationDef } from './variations.jwf.ts';
 
 export interface VariationDef {
   params?: { name: string; def: number; int?: boolean }[];
@@ -422,20 +422,35 @@ export const PREFER_HAND: Record<string, string> = {
   rings: 'JWildfire ignores the weight; flam3/Apophysis apply it',
 };
 
-/** Hand-written entries first (fallbacks), then verified JWildfire ports override
- *  (except PREFER_HAND). */
-export const VARIATIONS: Record<string, VariationDef> = (() => {
-  const out: Record<string, VariationDef> = { ...HAND_VARIATIONS };
-  for (const [name, def] of Object.entries(JWF_VARIATIONS) as [string, JwfVariationDef][]) {
-    if (def.verified && !(name in PREFER_HAND && name in HAND_VARIATIONS)) out[name] = def;
+/** The registry. Hand-written entries are present from the start (fallbacks); the
+ *  verified JWildfire ports (variations.jwf.ts, ~2 MB, its own cached chunk) are merged
+ *  in by `loadJwfVariations()` — main.ts awaits it alongside WebGPU init before the
+ *  first render, so by the time anything compiles a flame the registry is complete
+ *  (except PREFER_HAND). The object and the name arrays below are mutated in place so
+ *  every importer keeps working with the same references. */
+export const VARIATIONS: Record<string, VariationDef> = { ...HAND_VARIATIONS };
+
+/** Sorted names of everything in VARIATIONS (kept in place, refreshed after the ports load). */
+export const VARIATION_NAMES: string[] = Object.keys(VARIATIONS).sort((a, b) => a.localeCompare(b));
+
+let jwfLoad: Promise<void> | null = null;
+/** Load and merge the JWildfire ports (idempotent; resolves immediately once done). */
+export function loadJwfVariations(): Promise<void> {
+  if (!jwfLoad) {
+    jwfLoad = import('./variations.jwf.ts').then(({ JWF_VARIATIONS }) => {
+      for (const [name, def] of Object.entries(JWF_VARIATIONS) as [string, JwfVariationDef][]) {
+        if (def.verified && !(name in PREFER_HAND && name in HAND_VARIATIONS)) VARIATIONS[name] = def;
+      }
+      VARIATION_NAMES.splice(0, VARIATION_NAMES.length, ...Object.keys(VARIATIONS).sort((a, b) => a.localeCompare(b)));
+    });
   }
-  return out;
-})();
+  return jwfLoad;
+}
+/** True once loadJwfVariations() has merged the ports. */
+export function jwfVariationsLoaded(): boolean { return VARIATION_NAMES.length > Object.keys(HAND_VARIATIONS).length; }
 
 /** The hand-written subset (exposed for the oracle harness). */
 export { HAND_VARIATIONS };
-
-export const VARIATION_NAMES = Object.keys(VARIATIONS).sort((a, b) => a.localeCompare(b));
 
 /** The flam3 core set — what most flames are built from; pinned first in the picker. */
 export const CLASSIC_VARIATIONS = [
@@ -448,7 +463,7 @@ export const CLASSIC_VARIATIONS = [
   'popcorn2', 'scry', 'separation', 'split', 'splits', 'stripes', 'wedge', 'whorl', 'waves2', 'exp', 'log',
   'sin', 'cos', 'tan', 'sec', 'csc', 'cot', 'sinh', 'cosh', 'tanh', 'auger', 'flux', 'mobius', 'bwraps',
   'hemisphere', 'dc_linear', 'crop', 'post_curl',
-].filter((n) => n in VARIATIONS);
+]; // all present once the ports are loaded (the picker filters by VARIATION_NAMES)
 
 /** Type tags for a variation (JWildfire's where known, inferred for hand-written entries). */
 export function variationTypes(name: string): string[] {

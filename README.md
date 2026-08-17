@@ -163,7 +163,8 @@ nginx on Fly.io with `fly deploy`.
 ```
 src/
   core/       flame model (flame.ts), variation registry (variations.ts:
-              hand-written WGSL + generated variations.jwf.ts ports),
+              hand-written WGSL + generated variations.jwf.ts ports, the
+              latter a lazily loaded, separately cached ~300 KB gz chunk),
               palettes, presets, randomizer, .flame XML I/O (flameXML.ts),
               keyframe morphing (animate.ts), motion curves (motion.ts)
   gpu/        codegen.ts  — flame → WGSL compute kernel + data layout
