@@ -13,15 +13,20 @@
   "type": "module",
   "scripts": {
     "dev": "vite",
-    "build": "tsc --noEmit && vite build",
+    "build": "tsc --noEmit && vitest run && vite build",
     "preview": "vite preview",
     "jwf:gen": "node scripts/jwf-port/gen.ts",
-    "jwf:spec": "node scripts/jwf-port/oracle-spec.ts"
+    "jwf:spec": "node scripts/jwf-port/oracle-spec.ts",
+    "test": "vitest run",
+    "test:watch": "vitest"
   },
   "devDependencies": {
+    "@types/node": "^26.2.0",
     "@webgpu/types": "^0.1.44",
+    "happy-dom": "^20.11.2",
     "typescript": "^5.6.0",
-    "vite": "^6.0.0"
+    "vite": "^6.0.0",
+    "vitest": "^4.1.10"
   },
   "dependencies": {
     "mp4-muxer": "^5.2.2",

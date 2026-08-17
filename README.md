@@ -133,7 +133,8 @@ in the stack.
 ```bash
 npm install
 npm run dev      # dev server
-npm run build    # typecheck + production build in dist/
+npm test         # vitest: motion curves, flame model, .flame round-trips, AI edits, tonemap constants
+npm run build    # typecheck + tests + production build in dist/
 ```
 
 Requires a browser with WebGPU (Chrome/Edge 113+, Safari 18+, Firefox behind
@@ -156,6 +157,7 @@ src/
               overlay, variation + model pickers, library, mutation grid
   ai/         OpenRouter streaming chat client + model catalogue
   dev/        browser harnesses (variation oracle diff, fixture-flame compile)
+tests/        vitest unit tests (run in CI on every push)
 scripts/
   jwf-port/   CUDA→WGSL transpiler, JWildfire oracle, generator (README inside)
 ```

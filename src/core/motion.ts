@@ -37,10 +37,25 @@ export function evalCurve(c: MotionCurve, t: number): number | undefined {
     case 'step': return a.v;
     case 'smooth': { const s = u * u * (3 - 2 * u); return a.v + (b.v - a.v) * s; }
     case 'spline': {
-      // Catmull-Rom on values with clamped end tangents (JWildfire's default feel)
-      const p0 = P[Math.max(0, i - 1)].v, p1 = a.v, p2 = b.v, p3 = P[Math.min(n - 1, i + 2)].v;
-      const u2 = u * u, u3 = u2 * u;
-      return 0.5 * ((2 * p1) + (-p0 + p2) * u + (2 * p0 - 5 * p1 + 4 * p2 - p3) * u2 + (-p0 + 3 * p1 - 3 * p2 + p3) * u3);
+      // JWildfire Envelope SPLINE: with 2 points it is linear; with ≥ 3 a
+      // Catmull-Rom (B = 0.5) applied *parametrically* to both time and value
+      // (end points duplicated), then evaluated at the parameter where the time
+      // spline equals t — so uneven key spacing curves the time axis as well.
+      if (n < 3) return a.v + (b.v - a.v) * u;
+      const cr = (xa: number, xb: number, xc: number, xd: number, s: number) => {
+        const B = 0.5, s2 = s * s, s3 = s2 * s;
+        return s3 * (-B * xa + (2 - B) * xb + (B - 2) * xc + B * xd)
+          + s2 * (2 * B * xa + (B - 3) * xb + (3 - 2 * B) * xc - B * xd)
+          + s * (-B * xa + B * xc) + xb;
+      };
+      const q0 = P[Math.max(0, i - 1)], q1 = a, q2 = b, q3 = P[Math.min(n - 1, i + 2)];
+      // invert the (monotone for sorted keys) time spline by bisection
+      let lo = 0, hi = 1;
+      for (let k = 0; k < 40; k++) {
+        const mid = (lo + hi) / 2;
+        if (cr(q0.t, q1.t, q2.t, q3.t, mid) < t) lo = mid; else hi = mid;
+      }
+      return cr(q0.v, q1.v, q2.v, q3.v, (lo + hi) / 2);
     }
     default: return a.v + (b.v - a.v) * u;
   }

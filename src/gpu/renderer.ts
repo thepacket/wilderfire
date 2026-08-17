@@ -5,9 +5,9 @@
 import type { Flame } from '../core/flame';
 import { flameSignature, visibleLayers, MAX_LAYERS } from '../core/flame';
 import { compileFlame, TONEMAP_WGSL, type CompiledFlame } from './codegen';
+import { buildSpatialFilters, FILT_FLOATS } from './filters';
 
 const XD_FLOATS = 8192;
-const FILT_FLOATS = 256; // spatial filter weights (N ≤ 15)
 
 export interface RenderStats {
   spp: number;           // samples per pixel accumulated
@@ -394,48 +394,13 @@ export class FlameRenderer {
     rpB.end();
   }
 
-  /** JWildfire spatial filters. FilterHolder builds an N×N kernel from a radius
-   *  (N = int(2·support·r)+1, odd) with the Mitchell-smooth (b=.42 c=.29, support 2)
-   *  or flam3 gaussian (support 1.5) coefficient. For "sharpening" kernels
-   *  (Mitchell) LogDensityFilter filters colours with the primary kernel and the
-   *  intensity with a gaussian of radius 0.75. Returns [Ncolour, Nintensity]. */
+  /** Upload the JWildfire spatial-filter kernels for the flame's settings; returns [Ncolour, Nintensity]. */
   private uploadFilters(radius: number, kernel: 'mitchell' | 'gaussian'): [number, number] {
-    if (radius < 1e-6) return [0, 0];
-    const key = `${kernel}:${radius.toFixed(4)}`;
-    const w = new Float32Array(FILT_FLOATS);
-    const build = (r: number, k: 'mitchell' | 'gaussian', at: number): number => {
-      const support = k === 'gaussian' ? 1.5 : 2.0;
-      const fw = Math.floor(2 * support * r);
-      if (fw <= 0) return 0;
-      let N = fw + 1;
-      if (N % 2 === 0) N++;
-      N = Math.min(N, 11);
-      const adjust = (support * N) / fw;
-      const coeff = (t: number): number => {
-        if (k === 'gaussian') return Math.exp(-2 * t * t) * Math.sqrt(2 / Math.PI);
-        const b = 0.42, c = 0.29, tt = t * t;
-        if (t < 1) return (((12 - 9 * b - 6 * c) * (t * tt)) + ((-18 + 12 * b + 6 * c) * tt) + (6 - 2 * b)) / 6;
-        if (t < 2) return (((-b - 6 * c) * (t * tt)) + ((6 * b + 30 * c) * tt) + ((-12 * b - 48 * c) * t) + (8 * b + 24 * c)) / 6;
-        return 0;
-      };
-      let sum = 0;
-      for (let j = 0; j < N; j++) {
-        for (let i = 0; i < N; i++) {
-          const ii = ((2 * i + 1) / N - 1) * adjust;
-          const jj = ((2 * j + 1) / N - 1) * adjust;
-          const v = coeff(Math.sqrt(ii * ii + jj * jj));
-          w[at + j * N + i] = v;
-          sum += v;
-        }
-      }
-      if (sum > 0) for (let q = 0; q < N * N; q++) w[at + q] /= sum;
-      return N;
-    };
-    const nc = build(radius, kernel, 0);
-    const ni = kernel === 'mitchell' ? build(0.75, 'gaussian', 128) : build(radius, kernel, 128);
+    const { weights, nc, ni, key } = buildSpatialFilters(radius, kernel);
+    if (nc === 0 && ni === 0) return [0, 0];
     if (key !== this.filtKey) {
       this.filtKey = key;
-      this.device.queue.writeBuffer(this.filtBuf, 0, w);
+      this.device.queue.writeBuffer(this.filtBuf, 0, weights);
     }
     return [nc, ni];
   }
