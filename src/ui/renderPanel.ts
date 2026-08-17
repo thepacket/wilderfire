@@ -271,8 +271,11 @@ export function buildRenderPanel(app: App, root: HTMLElement) {
         console.info(`File contained ${count} flames — loaded the first ("${flame.name}").`);
       }
       if (unknown.length) {
+        // deliberately unported JWildfire variations carry a reason (src/core/variations.unportable.ts)
+        const { UNPORTABLE } = await import('../core/variations.unportable');
+        const lines = unknown.map((n) => (UNPORTABLE[n] ? `${n} — ${UNPORTABLE[n]}` : n));
         console.warn(`Unsupported variations skipped: ${unknown.join(', ')}`);
-        alert(`Loaded, but ${unknown.length} variation${unknown.length > 1 ? 's are' : ' is'} not supported and ${unknown.length > 1 ? 'were' : 'was'} skipped:\n${unknown.join(', ')}`);
+        alert(`Loaded, but ${unknown.length} variation${unknown.length > 1 ? 's are' : ' is'} not supported and ${unknown.length > 1 ? 'were' : 'was'} skipped:\n${lines.join('\n')}`);
       }
     } catch (e) {
       alert('Could not import flame: ' + (e as Error).message);

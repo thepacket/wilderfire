@@ -2,7 +2,7 @@
 // Variations ported from JWildfire (https://github.com/thargor6/JWildfire, LGPL-2.1,
 // (c) Andreas Maschke and contributors) by transpiling each variation's CUDA GPU
 // snippet to WGSL and verifying it against JWildfire's Java implementation.
-// 869 verified of 871 transpiled (1026 in JWildfire).
+// 926 verified of 928 transpiled (1026 in JWildfire).
 //
 // Snippet scope: t (input point, var), z_ (input z), r2, r, th = atan2(x,y), ph = atan2(y,x),
 // v (output accumulator), pz_ (output z), rs (rng), cp (palette coord ptr), hd (hide-flag ptr).
@@ -651,6 +651,128 @@ var r_: f32 = (${w} * ((2.0 - (_dx * (((k * 2.0) / l) + 1.0))) - ((${p[1]} * ((k
 v.x += (r_ * t.x);
 v.y += (r_ * t.y);
 break;
+}
+}`,
+  },
+  "ringer": {
+    params: [{ name: "hide_inner", def: 0 }, { name: "innerradius", def: 0.5 }, { name: "outerradius", def: 1 }, { name: "thickness", def: 0 }, { name: "contrast", def: 0 }, { name: "pow", def: 1 }, { name: "scatter_area", def: 0 }, { name: "hide_outer", def: 1 }],
+    verified: true, priority: 0, flags: ["hide","state"], types: ["2D"],
+    funcNames: ["jwx_ringer_inited_","jwx_ringer_oldx","jwx_ringer_oldy","jwx_ringer__radius1","jwx_ringer__radius2","jwx_ringer__gamma","ringer_Point","sqr","powc","atan2j","ringer_circle2"],
+    funcs: `struct ringer_Point {
+  x: f32,
+  y: f32,
+}
+
+fn sqr(x: f32) -> f32 { return x * x; }
+
+fn powc(x: f32, y: f32) -> f32 {
+  if (x >= 0.0) { return pow(x, y); }
+  let yi = round(y);
+  if (abs(y - yi) > 1e-6) { return pow(x, y); }
+  let m = pow(-x, y);
+  return select(m, -m, (i32(yi) & 1) != 0);
+}
+
+fn atan2j(y: f32, x: f32) -> f32 { if (x == 0.0 && y == 0.0) { return select(0.0, PI, (bitcast<u32>(x) >> 31u) == 1u) * select(1.0, -1.0, (bitcast<u32>(y) >> 31u) == 1u); } return atan2(y, x); }
+
+fn ringer_circle2(p_: ptr<function, ringer_Point>, rs: ptr<function, u32>) {
+  var phi: f32 = ((2.0 * PI) * rnd(rs));
+  var sinPhi: f32 = sin(phi);
+  var cosPhi: f32 = cos(phi);
+  var r_: f32;
+  if ((rnd(rs) < jwx_ringer__gamma)) {
+    r_ = jwx_ringer__radius1;
+  } else {
+    r_ = jwx_ringer__radius2;
+  }
+  (*p_).x = (r_ * cosPhi);
+  (*p_).y = (r_ * sinPhi);
+}
+
+var<private> jwx_ringer_inited_: f32 = 0.0;
+
+var<private> jwx_ringer_oldx: f32 = 0.0;
+
+var<private> jwx_ringer_oldy: f32 = 0.0;
+
+var<private> jwx_ringer__radius1: f32 = 0.0;
+
+var<private> jwx_ringer__radius2: f32 = 0.0;
+
+var<private> jwx_ringer__gamma: f32 = 0.0;`,
+    code: (w, p) => `{
+var cA: f32 = 0;
+var toolPoint: ringer_Point;
+var _absPow: f32 = 0;
+if ((jwx_ringer_inited_ == 0.0)) {
+  jwx_ringer_inited_ = 1.0;
+  jwx_ringer_oldx = 0;
+  jwx_ringer_oldy = 0;
+  jwx_ringer__radius1 = 0;
+  jwx_ringer__radius2 = 0;
+  jwx_ringer__gamma = 0;
+  jwx_ringer_oldx += ((rnd(rs) - 0.5) * 0.0001);
+  jwx_ringer_oldy += ((rnd(rs) - 0.5) * 0.0001);
+}
+{
+  jwx_ringer__radius1 = (${p[1]} + min(max(${p[3]}, 0.0), 1.0));
+  jwx_ringer__radius2 = (sqr(${p[1]}) / jwx_ringer__radius1);
+  jwx_ringer__gamma = (jwx_ringer__radius1 / (jwx_ringer__radius1 + jwx_ringer__radius2));
+  _absPow = abs(${p[5]});
+  cA = max(-1.0, min(${p[6]}, 1.0));
+}
+var r_: f32;
+var Alpha: f32;
+r_ = sqrt(((t.x * t.x) + (t.y * t.y)));
+Alpha = (${p[1]} / r_);
+if ((r_ < jwx_ringer__radius1)) {
+  if ((min(max(${p[0]}, 0.0), 1.0) == 0)) {
+    ringer_circle2(&(toolPoint), rs);
+    v.x += (${w} * toolPoint.x);
+    v.y += (${w} * toolPoint.y);
+  } else {
+    v.x = jwx_ringer_oldx;
+    v.y = jwx_ringer_oldy;
+  }
+} else {
+  if ((rnd(rs) > (min(max(${p[4]}, 0.0), 1.0) * powc(Alpha, _absPow)))) {
+    v.x += (${w} * t.x);
+    v.y += (${w} * t.y);
+  } else {
+    v.x += (((${w} * Alpha) * Alpha) * t.x);
+    v.y += (((${w} * Alpha) * Alpha) * t.y);
+  }
+}
+jwx_ringer_oldx = v.x;
+jwx_ringer_oldy = v.y;
+var x0: f32 = 0.0;
+var y0: f32 = 0.0;
+var cr: f32 = ${p[2]};
+var ca: f32 = cA;
+var vv: f32 = ${w};
+v.x -= x0;
+v.y -= y0;
+var rad: f32 = sqrt(((v.x * v.x) + (v.y * v.y)));
+var ang: f32 = atan2j(v.y, v.x);
+var rdc: f32 = (cr + ((rnd(rs) * 0.5) * ca));
+var esc: bool = (rad > cr);
+var cr0: bool = (min(max(${p[7]}, 0.0), 1.0) == 1);
+var s: f32 = sin(ang);
+var c: f32 = cos(ang);
+(*hd) = false;
+if ((cr0 && esc)) {
+  v.y = 0;
+  v.x = v.y;
+  (*hd) = true;
+} else if ((cr0 && !esc)) {
+  v.x = ((vv * v.x) + x0);
+  v.y = ((vv * v.y) + y0);
+} else if ((!cr0 && esc)) {
+  v.x = (((vv * rdc) * c) + x0);
+  v.y = (((vv * rdc) * s) + y0);
+} else if ((!cr0 && !esc)) {
+  v.x = ((vv * v.x) + x0);
+  v.y = ((vv * v.y) + y0);
 }
 }`,
   },
@@ -1790,6 +1912,20 @@ v.x += ((${w} * r) * cos(a));
 v.y += ((${w} * r) * sin(a));
 }`,
   },
+  "auger": {
+    params: [{ name: "freq", def: 1 }, { name: "weight", def: 0.5 }, { name: "sym", def: 0.1 }, { name: "scale", def: 0.9 }],
+    verified: true, priority: 0, flags: [], types: ["2D"],
+    funcNames: ["atan2j"],
+    funcs: `fn atan2j(y: f32, x: f32) -> f32 { if (x == 0.0 && y == 0.0) { return select(0.0, PI, (bitcast<u32>(x) >> 31u) == 1u) * select(1.0, -1.0, (bitcast<u32>(y) >> 31u) == 1u); } return atan2(y, x); }`,
+    code: (w, p) => `{
+var s: f32 = sin((${p[0]} * t.x));
+var t_: f32 = sin((${p[0]} * t.y));
+var dx: f32 = (t.x + (${p[1]} * (((${p[3]} * t_) / 2.0) + (abs(t.x) * t_))));
+var dy: f32 = (t.y + (${p[1]} * (((${p[3]} * s) / 2.0) + (abs(t.y) * s))));
+v.x += (${w} * (t.x + (${p[2]} * (dx - t.x))));
+v.y += (${w} * dy);
+}`,
+  },
   "flux": {
     params: [{ name: "spread", def: 0.3 }],
     verified: true, priority: 0, flags: [], types: ["2D"],
@@ -1975,6 +2111,33 @@ v.x += (${w} * nx);
 v.y += (${w} * ny);
 }`,
   },
+  "xheart": {
+    params: [{ name: "angle", def: 0 }, { name: "ratio", def: 0 }],
+    verified: true, priority: 0, flags: [], types: ["2D"],
+    funcNames: ["atan2j"],
+    funcs: `fn atan2j(y: f32, x: f32) -> f32 { if (x == 0.0 && y == 0.0) { return select(0.0, PI, (bitcast<u32>(x) >> 31u) == 1u) * select(1.0, -1.0, (bitcast<u32>(y) >> 31u) == 1u); } return atan2(y, x); }`,
+    code: (w, p) => `{
+var ang: f32 = ((PI * 0.25) + ((0.5 * (PI * 0.25)) * ${p[0]}));
+var cosa: f32;
+var sina: f32;
+sina = sin(ang);
+cosa = cos(ang);
+var r_: f32 = (6.0 + (2.0 * ${p[1]}));
+var r2_4: f32 = (((t.x * t.x) + (t.y * t.y)) + 4.0);
+r2_4 = select(r2_4, 1.0, (r2_4 == 0.0));
+var bx: f32 = (4.0 / r2_4);
+var by: f32 = (r_ / r2_4);
+var x: f32 = (((cosa * bx) * t.x) - ((sina * by) * t.y));
+var y: f32 = (((sina * bx) * t.x) + ((cosa * by) * t.y));
+if ((x > 0.0)) {
+  v.x += (${w} * x);
+  v.y += (${w} * y);
+} else {
+  v.x += (${w} * x);
+  v.y += (-(${w}) * y);
+}
+}`,
+  },
   "elliptic": {
     params: [{ name: "mode", def: 1 }],
     verified: true, priority: 0, flags: [], types: ["2D"],
@@ -2145,6 +2308,7 @@ if ((((((x < xmin) || (x > xmax)) || (y < ymin)) || (y > ymax)) && (min(max(${p[
     funcNames: ["atan2j"],
     funcs: `fn atan2j(y: f32, x: f32) -> f32 { if (x == 0.0 && y == 0.0) { return select(0.0, PI, (bitcast<u32>(x) >> 31u) == 1u) * select(1.0, -1.0, (bitcast<u32>(y) >> 31u) == 1u); } return atan2(y, x); }`,
     code: (w, p) => `{
+var rinv_: f32 = 1.0 / r;
 loop {
 var xmin: f32 = 0;
 var xmax: f32 = 0;
@@ -2182,6 +2346,14 @@ if ((((((x < xmin) || (x > xmax)) || (y < ymin)) || (y > ymax)) && (min(max(${p[
 }
 t.x = (${w} * x);
 t.y = (${w} * y);
+r2 = ((t.x * t.x) + (t.y * t.y));
+r = sqrt(r2);
+rinv_ = (1.0 / r);
+th = atan2j(t.x, t.y);
+ph = ((0.5 * PI) - th);
+if ((ph > PI)) {
+  ph -= (2.0 * PI);
+}
 break;
 }
 }`,
@@ -3327,6 +3499,416 @@ pz_ += ${w};
 pz_ = ((${w} * pz_) + ${p[0]});
 }`,
   },
+  "nBlur": {
+    params: [{ name: "numEdges", def: 3 }, { name: "numStripes", def: 0 }, { name: "ratioStripes", def: 1 }, { name: "ratioHole", def: 0 }, { name: "circumCircle", def: 0 }, { name: "adjustToLinear", def: 1 }, { name: "equalBlur", def: 1 }, { name: "exactCalc", def: 0 }, { name: "highlightEdges", def: 1 }],
+    verified: true, priority: 0, flags: ["state","z"], types: ["2D","BASE_SHAPE"],
+    funcNames: ["jwx_nBlur_exactCalc_c","jwx_nBlur_numEdges_c","jwx_nBlur_ratioStripes_c","jwx_nBlur_equalBlur_c","jwx_nBlur_circumCircle_c","jwx_nBlur_ratioHole_c","jwx_nBlur_inited_","jwx_nBlur__speedCalc1","jwx_nBlur__speedCalc2","jwx_nBlur__nb_ratioComplement","jwx_nBlur__midAngle","jwx_nBlur__angStripes","jwx_nBlur__angStart","jwx_nBlur__tan90_m_2","jwx_nBlur__hasStripes","jwx_nBlur__negStripes","jwx_nBlur__maxStripes","jwx_nBlur__arc_tan1","jwx_nBlur__arc_tan2","jwx_nBlur__sina","jwx_nBlur__cosa","nBlur_RandXYData","powc","atan2j","nBlur_rand","nBlur_randXY"],
+    funcs: `struct nBlur_RandXYData {
+  x: f32,
+  y: f32,
+  lenXY: f32,
+  lenOuterEdges: f32,
+  lenInnerEdges: f32,
+}
+
+fn powc(x: f32, y: f32) -> f32 {
+  if (x >= 0.0) { return pow(x, y); }
+  let yi = round(y);
+  if (abs(y - yi) > 1e-6) { return pow(x, y); }
+  let m = pow(-x, y);
+  return select(m, -m, (i32(yi) & 1) != 0);
+}
+
+fn atan2j(y: f32, x: f32) -> f32 { if (x == 0.0 && y == 0.0) { return select(0.0, PI, (bitcast<u32>(x) >> 31u) == 1u) * select(1.0, -1.0, (bitcast<u32>(y) >> 31u) == 1u); } return atan2(y, x); }
+
+fn nBlur_rand(rs: ptr<function, u32>) -> i32 {
+  return i32((rnd(rs) * 32767));
+}
+
+fn nBlur_randXY(data: ptr<function, nBlur_RandXYData>, rs: ptr<function, u32>) {
+  var x: f32;
+  var y: f32;
+  var xTmp: f32;
+  var yTmp: f32;
+  var lenOuterEdges: f32;
+  var lenInnerEdges: f32;
+  var angXY: f32;
+  var lenXY: f32;
+  var ranTmp: f32;
+  var angTmp: f32;
+  var angMem: f32;
+  var ratioTmp: f32;
+  var ratioTmpNum: f32;
+  var ratioTmpDen: f32;
+  var speedCalcTmp: f32;
+  var count: i32;
+  if ((jwx_nBlur_exactCalc_c == 1)) {
+    angXY = (rnd(rs) * (2.0 * PI));
+  } else {
+    angXY = ((((atan((jwx_nBlur__arc_tan1 * (rnd(rs) - 0.5))) / jwx_nBlur__arc_tan2) + 0.5) + (f32(nBlur_rand(rs)) % jwx_nBlur_numEdges_c)) * jwx_nBlur__midAngle);
+  }
+  x = sin(angXY);
+  y = cos(angXY);
+  angMem = angXY;
+  while ((angXY > jwx_nBlur__midAngle)) {
+    angXY -= jwx_nBlur__midAngle;
+  }
+  if ((jwx_nBlur__hasStripes == 1)) {
+    angTmp = jwx_nBlur__angStart;
+    count = 0;
+    while ((angXY > angTmp)) {
+      angTmp += jwx_nBlur__angStripes;
+      if ((angTmp > jwx_nBlur__midAngle)) {
+        angTmp = jwx_nBlur__midAngle;
+      }
+      count++;
+    }
+    if ((angTmp != jwx_nBlur__midAngle)) {
+      angTmp -= jwx_nBlur__angStart;
+    }
+    if ((jwx_nBlur__negStripes == 0)) {
+      if (((count % 2) != 0)) {
+        if ((angXY > angTmp)) {
+          angXY = (angXY + jwx_nBlur__angStart);
+          angMem = (angMem + jwx_nBlur__angStart);
+          x = sin(angMem);
+          y = cos(angMem);
+          angTmp += jwx_nBlur__angStripes;
+          count++;
+        } else {
+          angXY = (angXY - jwx_nBlur__angStart);
+          angMem = (angMem - jwx_nBlur__angStart);
+          x = sin(angMem);
+          y = cos(angMem);
+          angTmp -= jwx_nBlur__angStripes;
+          count--;
+        }
+      }
+      if ((((count % 2) == 0) && (jwx_nBlur_ratioStripes_c > 1.0))) {
+        if (((angXY > angTmp) && (f32(count) != jwx_nBlur__maxStripes))) {
+          angMem = (((angMem - angXY) + angTmp) + ((((angXY - angTmp) / jwx_nBlur__angStart) * jwx_nBlur_ratioStripes_c) * jwx_nBlur__angStart));
+          angXY = (angTmp + ((((angXY - angTmp) / jwx_nBlur__angStart) * jwx_nBlur_ratioStripes_c) * jwx_nBlur__angStart));
+          x = sin(angMem);
+          y = cos(angMem);
+        } else {
+          angMem = (((angMem - angXY) + angTmp) - ((((angTmp - angXY) / jwx_nBlur__angStart) * jwx_nBlur_ratioStripes_c) * jwx_nBlur__angStart));
+          angXY = (angTmp + ((((angXY - angTmp) / jwx_nBlur__angStart) * jwx_nBlur_ratioStripes_c) * jwx_nBlur__angStart));
+          x = sin(angMem);
+          y = cos(angMem);
+        }
+      }
+      if ((((count % 2) == 0) && (jwx_nBlur_ratioStripes_c < 1.0))) {
+        if (((abs((angXY - angTmp)) > jwx_nBlur__speedCalc2) && (f32(count) != jwx_nBlur__maxStripes))) {
+          if (((angXY - angTmp) > jwx_nBlur__speedCalc2)) {
+            ratioTmpNum = ((angXY - (angTmp + jwx_nBlur__speedCalc2)) * jwx_nBlur__speedCalc2);
+            ratioTmpDen = (jwx_nBlur__angStart - jwx_nBlur__speedCalc2);
+            ratioTmp = (ratioTmpNum / ratioTmpDen);
+            var a: f32 = (((angMem - angXY) + angTmp) + ratioTmp);
+            x = sin(a);
+            y = cos(a);
+            angXY = (angTmp + ratioTmp);
+          }
+          if (((angTmp - angXY) > jwx_nBlur__speedCalc2)) {
+            ratioTmpNum = (((angTmp - jwx_nBlur__speedCalc2) - angXY) * jwx_nBlur__speedCalc2);
+            ratioTmpDen = (jwx_nBlur__angStart - jwx_nBlur__speedCalc2);
+            ratioTmp = (ratioTmpNum / ratioTmpDen);
+            var a: f32 = (((angMem - angXY) + angTmp) - ratioTmp);
+            x = sin(a);
+            y = cos(a);
+            angXY = (angTmp - ratioTmp);
+          }
+        }
+        if ((f32(count) == jwx_nBlur__maxStripes)) {
+          if (((angTmp - angXY) > jwx_nBlur__speedCalc2)) {
+            ratioTmpNum = (((angTmp - jwx_nBlur__speedCalc2) - angXY) * jwx_nBlur__speedCalc2);
+            ratioTmpDen = (jwx_nBlur__angStart - jwx_nBlur__speedCalc2);
+            ratioTmp = (ratioTmpNum / ratioTmpDen);
+            var a: f32 = (((angMem - angXY) + angTmp) - ratioTmp);
+            x = sin(a);
+            y = cos(a);
+            angXY = (angTmp - ratioTmp);
+          }
+        }
+      }
+    } else {
+      ratioTmp = jwx_nBlur_ratioStripes_c;
+      jwx_nBlur_ratioStripes_c = jwx_nBlur__nb_ratioComplement;
+      jwx_nBlur__nb_ratioComplement = ratioTmp;
+      speedCalcTmp = jwx_nBlur__speedCalc1;
+      jwx_nBlur__speedCalc1 = jwx_nBlur__speedCalc2;
+      jwx_nBlur__speedCalc2 = speedCalcTmp;
+      if (((count % 2) == 0)) {
+        if (((angXY > angTmp) && (f32(count) != jwx_nBlur__maxStripes))) {
+          angXY = (angXY + jwx_nBlur__angStart);
+          angMem = (angMem + jwx_nBlur__angStart);
+          x = sin(angMem);
+          y = cos(angMem);
+          angTmp += jwx_nBlur__angStripes;
+          count++;
+        } else {
+          angXY = (angXY - jwx_nBlur__angStart);
+          angMem = (angMem - jwx_nBlur__angStart);
+          x = sin(angMem);
+          y = cos(angMem);
+          angTmp -= jwx_nBlur__angStripes;
+          count--;
+        }
+      }
+      if ((((count % 2) != 0) && (jwx_nBlur_ratioStripes_c > 1.0))) {
+        if (((angXY > angTmp) && (f32(count) != jwx_nBlur__maxStripes))) {
+          angMem = (((angMem - angXY) + angTmp) + ((((angXY - angTmp) / jwx_nBlur__angStart) * jwx_nBlur_ratioStripes_c) * jwx_nBlur__angStart));
+          angXY = (angTmp + ((((angXY - angTmp) / jwx_nBlur__angStart) * jwx_nBlur_ratioStripes_c) * jwx_nBlur__angStart));
+          x = sin(angMem);
+          y = cos(angMem);
+        } else {
+          angMem = (((angMem - angXY) + angTmp) - ((((angTmp - angXY) / jwx_nBlur__angStart) * jwx_nBlur_ratioStripes_c) * jwx_nBlur__angStart));
+          angXY = (angTmp + ((((angXY - angTmp) / jwx_nBlur__angStart) * jwx_nBlur_ratioStripes_c) * jwx_nBlur__angStart));
+          x = sin(angMem);
+          y = cos(angMem);
+        }
+      }
+      if ((((count % 2) != 0) && (jwx_nBlur_ratioStripes_c < 1.0))) {
+        if (((abs((angXY - angTmp)) > jwx_nBlur__speedCalc2) && (f32(count) != jwx_nBlur__maxStripes))) {
+          if (((angXY - angTmp) > jwx_nBlur__speedCalc2)) {
+            ratioTmpNum = ((angXY - (angTmp + jwx_nBlur__speedCalc2)) * jwx_nBlur__speedCalc2);
+            ratioTmpDen = (jwx_nBlur__angStart - jwx_nBlur__speedCalc2);
+            ratioTmp = (ratioTmpNum / ratioTmpDen);
+            var a: f32 = (((angMem - angXY) + angTmp) + ratioTmp);
+            x = sin(a);
+            y = cos(a);
+            angXY = (angTmp + ratioTmp);
+          }
+          if (((angTmp - angXY) > jwx_nBlur__speedCalc2)) {
+            ratioTmpNum = (((angTmp - jwx_nBlur__speedCalc2) - angXY) * jwx_nBlur__speedCalc2);
+            ratioTmpDen = (jwx_nBlur__angStart - jwx_nBlur__speedCalc2);
+            ratioTmp = (ratioTmpNum / ratioTmpDen);
+            var a: f32 = (((angMem - angXY) + angTmp) - ratioTmp);
+            x = sin(a);
+            y = cos(a);
+            angXY = (angTmp - ratioTmp);
+          }
+        }
+        if ((f32(count) == jwx_nBlur__maxStripes)) {
+          angTmp = jwx_nBlur__midAngle;
+          if (((angTmp - angXY) > jwx_nBlur__speedCalc2)) {
+            ratioTmpNum = (((angTmp - jwx_nBlur__speedCalc2) - angXY) * jwx_nBlur__speedCalc2);
+            ratioTmpDen = (jwx_nBlur__angStart - jwx_nBlur__speedCalc2);
+            ratioTmp = (ratioTmpNum / ratioTmpDen);
+            var a: f32 = (((angMem - angXY) + angTmp) - ratioTmp);
+            x = sin(a);
+            y = cos(a);
+            angXY = (angTmp - ratioTmp);
+          }
+        }
+      }
+      ratioTmp = jwx_nBlur_ratioStripes_c;
+      jwx_nBlur_ratioStripes_c = jwx_nBlur__nb_ratioComplement;
+      jwx_nBlur__nb_ratioComplement = ratioTmp;
+      speedCalcTmp = jwx_nBlur__speedCalc1;
+      jwx_nBlur__speedCalc1 = jwx_nBlur__speedCalc2;
+      jwx_nBlur__speedCalc2 = speedCalcTmp;
+    }
+  }
+  xTmp = (jwx_nBlur__tan90_m_2 / (jwx_nBlur__tan90_m_2 - tan(angXY)));
+  yTmp = (xTmp * tan(angXY));
+  lenOuterEdges = sqrt(((xTmp * xTmp) + (yTmp * yTmp)));
+  if ((jwx_nBlur_exactCalc_c == 1)) {
+    if ((jwx_nBlur_equalBlur_c == 1)) {
+      ranTmp = sqrt(rnd(rs));
+    } else {
+      ranTmp = rnd(rs);
+    }
+  } else {
+    if ((jwx_nBlur_circumCircle_c == 1)) {
+      if ((jwx_nBlur_equalBlur_c == 1)) {
+        ranTmp = sqrt(rnd(rs));
+      } else {
+        ranTmp = rnd(rs);
+      }
+    } else {
+      if ((jwx_nBlur_equalBlur_c == 1)) {
+        ranTmp = (sqrt(rnd(rs)) * lenOuterEdges);
+      } else {
+        ranTmp = (rnd(rs) * lenOuterEdges);
+      }
+    }
+  }
+  lenInnerEdges = (jwx_nBlur_ratioHole_c * lenOuterEdges);
+  if ((jwx_nBlur_exactCalc_c == 0)) {
+    if ((ranTmp < lenInnerEdges)) {
+      if ((jwx_nBlur_circumCircle_c == 1)) {
+        if ((jwx_nBlur_equalBlur_c == 1)) {
+          ranTmp = (lenInnerEdges + (sqrt(rnd(rs)) * ((1.0 - lenInnerEdges) + 1.0e-30)));
+        } else {
+          ranTmp = (lenInnerEdges + (rnd(rs) * ((1.0 - lenInnerEdges) + 1.0e-30)));
+        }
+      } else {
+        if ((jwx_nBlur_equalBlur_c == 1)) {
+          ranTmp = (lenInnerEdges + (sqrt(rnd(rs)) * (lenOuterEdges - lenInnerEdges)));
+        } else {
+          ranTmp = (lenInnerEdges + (rnd(rs) * (lenOuterEdges - lenInnerEdges)));
+        }
+      }
+    }
+  }
+  x *= ranTmp;
+  y *= ranTmp;
+  lenXY = sqrt(((x * x) + (y * y)));
+  (*data).x = x;
+  (*data).y = y;
+  (*data).lenXY = lenXY;
+  (*data).lenOuterEdges = lenOuterEdges;
+  (*data).lenInnerEdges = lenInnerEdges;
+}
+
+var<private> jwx_nBlur_exactCalc_c: f32 = 0.0;
+
+var<private> jwx_nBlur_numEdges_c: f32 = 0.0;
+
+var<private> jwx_nBlur_ratioStripes_c: f32 = 0.0;
+
+var<private> jwx_nBlur_equalBlur_c: f32 = 0.0;
+
+var<private> jwx_nBlur_circumCircle_c: f32 = 0.0;
+
+var<private> jwx_nBlur_ratioHole_c: f32 = 0.0;
+
+var<private> jwx_nBlur_inited_: f32 = 0.0;
+
+var<private> jwx_nBlur__speedCalc1: f32 = 0.0;
+
+var<private> jwx_nBlur__speedCalc2: f32 = 0.0;
+
+var<private> jwx_nBlur__nb_ratioComplement: f32 = 0.0;
+
+var<private> jwx_nBlur__midAngle: f32 = 0.0;
+
+var<private> jwx_nBlur__angStripes: f32 = 0.0;
+
+var<private> jwx_nBlur__angStart: f32 = 0.0;
+
+var<private> jwx_nBlur__tan90_m_2: f32 = 0.0;
+
+var<private> jwx_nBlur__hasStripes: i32 = 0;
+
+var<private> jwx_nBlur__negStripes: i32 = 0;
+
+var<private> jwx_nBlur__maxStripes: f32 = 0.0;
+
+var<private> jwx_nBlur__arc_tan1: f32 = 0.0;
+
+var<private> jwx_nBlur__arc_tan2: f32 = 0.0;
+
+var<private> jwx_nBlur__sina: f32 = 0.0;
+
+var<private> jwx_nBlur__cosa: f32 = 0.0;`,
+    code: (w, p) => `{
+var p7_: f32 = ${p[7]};
+var p0_: f32 = ${p[0]};
+var p3_: f32 = ${p[3]};
+var p1_: f32 = ${p[1]};
+var p8_: f32 = ${p[8]};
+var w_: f32 = ${w};
+jwx_nBlur_exactCalc_c = min(max(p7_, 0.0), 1.0);
+jwx_nBlur_numEdges_c = f32(i32(p0_));
+jwx_nBlur_ratioStripes_c = min(max(${p[2]}, 0.0), 2.0);
+jwx_nBlur_equalBlur_c = min(max(${p[6]}, 0.0), 1.0);
+jwx_nBlur_circumCircle_c = min(max(${p[4]}, 0.0), 1.0);
+jwx_nBlur_ratioHole_c = min(max(p3_, 0.0), 1.0);
+var _randXYData: nBlur_RandXYData;
+if ((jwx_nBlur_inited_ == 0.0)) {
+  jwx_nBlur_inited_ = 1.0;
+  jwx_nBlur__midAngle = 0;
+  jwx_nBlur__angStripes = 0;
+  jwx_nBlur__angStart = 0;
+  jwx_nBlur__tan90_m_2 = 0;
+  jwx_nBlur__sina = 0;
+  jwx_nBlur__cosa = 0;
+  jwx_nBlur__hasStripes = 0;
+  jwx_nBlur__negStripes = 0;
+  jwx_nBlur__speedCalc1 = 0;
+  jwx_nBlur__speedCalc2 = 0;
+  jwx_nBlur__maxStripes = 0;
+  jwx_nBlur__arc_tan1 = 0;
+  jwx_nBlur__arc_tan2 = 0;
+  jwx_nBlur__nb_ratioComplement = 0;
+  {
+    if ((i32(p0_) < 3)) {
+      p0_ = 3;
+    }
+    if ((i32(p1_) != 0)) {
+      jwx_nBlur__hasStripes = 1;
+      if ((i32(p1_) < 0)) {
+        jwx_nBlur__negStripes = 1;
+        p1_ *= -1;
+      } else {
+        jwx_nBlur__negStripes = 0;
+      }
+    } else {
+      jwx_nBlur__hasStripes = 0;
+      jwx_nBlur__negStripes = 0;
+    }
+    jwx_nBlur__midAngle = ((2.0 * PI) / f32(i32(p0_)));
+    if ((jwx_nBlur__hasStripes == 1)) {
+      jwx_nBlur__angStripes = (jwx_nBlur__midAngle / f32((2 * i32(p1_))));
+      jwx_nBlur__angStart = (jwx_nBlur__angStripes / 2.0);
+      jwx_nBlur__nb_ratioComplement = (2.0 - min(max(${p[2]}, 0.0), 2.0));
+    }
+    if ((((min(max(p3_, 0.0), 1.0) > 0.95) && (min(max(p7_, 0.0), 1.0) == 1)) && (min(max(${p[4]}, 0.0), 1.0) == 0))) {
+      p3_ = 0.95;
+    }
+    jwx_nBlur__tan90_m_2 = tan(((PI * 0.5) + (jwx_nBlur__midAngle / 2.0)));
+    var angle: f32 = (jwx_nBlur__midAngle / 2.0);
+    jwx_nBlur__sina = sin(angle);
+    jwx_nBlur__cosa = cos(angle);
+    if ((p8_ <= 0.1)) {
+      p8_ = 0.1;
+    }
+    if ((min(max(${p[4]}, 0.0), 1.0) == 1)) {
+      p7_ = 0;
+      p8_ = 0.1;
+    }
+    jwx_nBlur__speedCalc1 = (jwx_nBlur__nb_ratioComplement * jwx_nBlur__angStart);
+    jwx_nBlur__speedCalc2 = (min(max(${p[2]}, 0.0), 2.0) * jwx_nBlur__angStart);
+    jwx_nBlur__maxStripes = f32((2 * i32(p1_)));
+    if ((jwx_nBlur__negStripes == 0)) {
+      jwx_nBlur__arc_tan1 = ((13.0 / powc(f32(i32(p0_)), 1.3)) * p8_);
+      jwx_nBlur__arc_tan2 = (2.0 * atan((jwx_nBlur__arc_tan1 / -2.0)));
+    } else {
+      jwx_nBlur__arc_tan1 = ((7.5 / powc(f32(i32(p0_)), 1.3)) * p8_);
+      jwx_nBlur__arc_tan2 = (2.0 * atan((jwx_nBlur__arc_tan1 / -2.0)));
+    }
+  }
+}
+if ((min(max(${p[5]}, 0.0), 1.0) == 1)) {
+  if (((i32(p0_) % 4) == 0)) {
+    w_ /= (sqrt((2.0 - (2.0 * cos((jwx_nBlur__midAngle * ((f32(i32(p0_)) / 2.0) - 1.0)))))) / 2.0);
+  } else {
+    w_ /= (sqrt((2.0 - (2.0 * cos((jwx_nBlur__midAngle * floor((f32(i32(p0_)) / 2.0))))))) / 2.0);
+  }
+}
+nBlur_randXY(&(_randXYData), rs);
+if (((min(max(p7_, 0.0), 1.0) == 1) && (min(max(${p[4]}, 0.0), 1.0) == 0))) {
+  while (((_randXYData.lenXY < _randXYData.lenInnerEdges) || (_randXYData.lenXY > _randXYData.lenOuterEdges))) {
+    nBlur_randXY(&(_randXYData), rs);
+  }
+}
+if (((min(max(p7_, 0.0), 1.0) == 1) && (min(max(${p[4]}, 0.0), 1.0) == 1))) {
+  while ((_randXYData.lenXY < _randXYData.lenInnerEdges)) {
+    nBlur_randXY(&(_randXYData), rs);
+  }
+}
+var xTmp: f32 = _randXYData.x;
+var yTmp: f32 = _randXYData.y;
+var x: f32 = ((jwx_nBlur__cosa * xTmp) - (jwx_nBlur__sina * yTmp));
+var y: f32 = ((jwx_nBlur__sina * xTmp) + (jwx_nBlur__cosa * yTmp));
+v.x += (w_ * x);
+v.y += (w_ * y);
+if (false) {
+  pz_ += (w_ * z_);
+}
+}`,
+  },
   "linearT": {
     params: [{ name: "powX", def: 1.2 }, { name: "powY", def: 0.9 }],
     verified: true, priority: 0, flags: [], types: ["2D"],
@@ -3970,6 +4552,268 @@ v.x += (vr * ((x * cosa) + (y * sina)));
 v.y += (vr * ((y * cosa) - (x * sina)));
 }`,
   },
+  "dc_perlin": {
+    params: [{ name: "shape", def: 0 }, { name: "map", def: 0 }, { name: "select_centre", def: 0 }, { name: "select_range", def: 1 }, { name: "centre", def: 0.25 }, { name: "range", def: 0.25 }, { name: "edge", def: 0 }, { name: "scale", def: 1 }, { name: "octaves", def: 2 }, { name: "amps", def: 2 }, { name: "freqs", def: 2 }, { name: "z", def: 0 }, { name: "select_bailout", def: 10 }, { name: "color_only", def: 0 }],
+    verified: true, priority: 0, flags: ["dc"], types: ["SIMULATION","DC","BASE_SHAPE"],
+    funcNames: ["jpostinc","atan2j","dc_perlin_p","dc_perlin_grad3","dc_perlin_simplexNoise3D","dc_perlin_perlinNoise3D"],
+    funcs: `fn jpostinc(t: ptr<function, i32>) -> i32 { let v = *t; *t = v + 1; return v; }
+
+fn atan2j(y: f32, x: f32) -> f32 { if (x == 0.0 && y == 0.0) { return select(0.0, PI, (bitcast<u32>(x) >> 31u) == 1u) * select(1.0, -1.0, (bitcast<u32>(y) >> 31u) == 1u); } return atan2(y, x); }
+
+const dc_perlin_p: array<i32, 2050> = array<i32, 2050>(127, 71, 882, 898, 798, 463, 517, 451, 454, 634, 578, 695, 728, 742, 325, 350, 684, 153, 340, 311, 992, 706, 218, 285, 96, 486, 160, 98, 686, 288, 193, 119, 410, 246, 536, 415, 953, 417, 784, 573, 734, 1, 136, 381, 177, 678, 773, 22, 301, 51, 874, 844, 775, 744, 633, 468, 1019, 287, 475, 78, 294, 724, 519, 17, 323, 191, 187, 446, 262, 212, 170, 33, 7, 227, 566, 526, 264, 556, 717, 477, 815, 671, 225, 207, 692, 663, 969, 393, 658, 877, 353, 788, 128, 303, 614, 501, 490, 387, 53, 941, 951, 736, 539, 102, 163, 175, 584, 988, 35, 347, 442, 649, 642, 198, 727, 939, 913, 811, 894, 858, 181, 412, 307, 830, 154, 479, 704, 326, 681, 619, 698, 621, 552, 598, 74, 890, 299, 922, 701, 481, 867, 214, 817, 731, 768, 673, 315, 338, 576, 222, 484, 305, 623, 239, 269, 46, 748, 608, 546, 537, 125, 667, 998, 714, 529, 823, 247, 289, 771, 808, 973, 735, 516, 974, 702, 636, 357, 455, 600, 80, 336, 696, 963, 297, 92, 980, 670, 958, 625, 712, 406, 173, 19, 763, 470, 793, 283, 655, 59, 421, 1016, 219, 13, 105, 840, 111, 38, 408, 945, 242, 559, 206, 443, 331, 737, 580, 767, 1020, 220, 31, 968, 15, 527, 833, 139, 129, 859, 739, 418, 783, 933, 49, 789, 178, 124, 772, 627, 0, 23, 388, 950, 976, 940, 485, 685, 21, 523, 723, 244, 637, 488, 835, 379, 342, 452, 862, 295, 765, 897, 507, 370, 567, 416, 100, 914, 300, 120, 392, 694, 94, 265, 791, 171, 200, 787, 441, 868, 672, 769, 983, 911, 427, 82, 69, 224, 176, 920, 500, 462, 263, 513, 797, 293, 322, 645, 469, 635, 40, 215, 687, 960, 818, 826, 34, 603, 316, 994, 611, 511, 93, 899, 114, 73, 241, 585, 327, 674, 280, 957, 471, 24, 502, 355, 159, 1017, 855, 270, 538, 521, 162, 880, 334, 986, 740, 719, 266, 820, 97, 41, 52, 750, 893, 838, 616, 83, 896, 777, 464, 562, 183, 362, 411, 478, 398, 384, 912, 599, 587, 609, 822, 243, 504, 753, 857, 157, 964, 65, 261, 81, 371, 435, 924, 885, 884, 863, 613, 721, 669, 121, 639, 989, 487, 238, 448, 216, 852, 643, 713, 676, 277, 879, 133, 123, 304, 547, 396, 70, 141, 909, 848, 900, 318, 146, 356, 802, 4, 807, 558, 764, 545, 588, 872, 554, 467, 544, 505, 149, 62, 901, 64, 45, 813, 27, 109, 718, 803, 853, 996, 1014, 476, 575, 28, 199, 688, 6, 482, 703, 560, 395, 66, 341, 794, 422, 376, 601, 76, 14, 569, 480, 39, 1011, 1001, 854, 55, 89, 335, 761, 363, 419, 252, 799, 358, 324, 1012, 152, 312, 496, 235, 916, 582, 615, 979, 1005, 891, 1013, 641, 18, 148, 185, 512, 378, 58, 211, 495, 594, 87, 762, 366, 660, 449, 520, 424, 886, 819, 281, 147, 290, 390, 32, 572, 993, 720, 683, 309, 254, 607, 568, 256, 533, 394, 620, 429, 67, 831, 103, 423, 668, 693, 518, 551, 697, 253, 949, 54, 875, 116, 434, 743, 644, 590, 279, 843, 589, 11, 647, 586, 806, 549, 375, 226, 851, 499, 450, 978, 29, 982, 189, 107, 508, 373, 796, 20, 700, 110, 26, 461, 782, 591, 828, 57, 904, 847, 328, 122, 630, 711, 44, 397, 404, 209, 365, 84, 194, 1021, 675, 135, 965, 329, 557, 691, 79, 352, 498, 629, 869, 90, 921, 233, 622, 871, 755, 439, 955, 228, 63, 825, 43, 943, 438, 144, 961, 359, 330, 682, 626, 425, 259, 249, 801, 754, 1003, 230, 377, 217, 878, 1007, 313, 2, 915, 550, 271, 437, 846, 548, 145, 715, 346, 251, 372, 99, 543, 16, 47, 195, 679, 174, 905, 188, 804, 169, 785, 231, 726, 814, 339, 531, 420, 258, 1009, 134, 972, 458, 234, 690, 260, 666, 646, 142, 184, 91, 628, 987, 10, 210, 926, 348, 386, 161, 60, 409, 680, 204, 164, 444, 708, 276, 68, 383, 491, 382, 42, 816, 483, 699, 150, 9, 565, 555, 433, 593, 86, 952, 839, 618, 751, 889, 108, 361, 595, 677, 407, 856, 255, 604, 85, 648, 928, 824, 213, 192, 267, 902, 792, 656, 631, 403, 389, 493, 333, 756, 602, 925, 113, 632, 354, 37, 873, 577, 56, 278, 930, 367, 428, 332, 317, 530, 364, 800, 774, 497, 1023, 12, 137, 845, 653, 101, 888, 542, 167, 48, 158, 1002, 745, 292, 944, 456, 990, 574, 25, 1018, 937, 298, 966, 430, 400, 349, 860, 689, 320, 117, 778, 104, 314, 786, 205, 606, 440, 936, 457, 932, 934, 948, 168, 445, 931, 757, 291, 571, 919, 360, 284, 509, 296, 245, 836, 166, 3, 257, 50, 282, 151, 810, 344, 947, 236, 946, 865, 752, 77, 610, 967, 795, 131, 302, 760, 781, 190, 938, 61, 1022, 652, 138, 984, 832, 202, 140, 985, 5, 657, 997, 401, 319, 431, 662, 405, 275, 650, 651, 887, 310, 1004, 368, 208, 596, 248, 758, 8, 126, 730, 489, 343, 337, 506, 515, 432, 232, 250, 532, 954, 524, 115, 229, 522, 908, 729, 186, 561, 995, 156, 196, 118, 805, 399, 918, 991, 849, 273, 747, 640, 143, 321, 624, 268, 306, 30, 722, 540, 534, 710, 130, 155, 883, 716, 525, 426, 812, 345, 929, 975, 472, 837, 605, 664, 391, 581, 272, 746, 112, 659, 665, 780, 240, 841, 474, 563, 36, 579, 286, 436, 907, 369, 201, 402, 962, 106, 749, 172, 494, 88, 466, 473, 414, 597, 374, 942, 308, 766, 459, 821, 592, 881, 380, 759, 866, 779, 809, 876, 541, 829, 528, 999, 221, 661, 927, 413, 977, 182, 583, 733, 892, 741, 570, 351, 617, 956, 72, 709, 850, 732, 770, 870, 95, 935, 223, 179, 861, 917, 447, 385, 132, 827, 923, 75, 465, 612, 460, 725, 492, 553, 1008, 910, 981, 503, 165, 895, 834, 1000, 180, 638, 906, 510, 274, 776, 971, 564, 738, 903, 654, 864, 959, 1015, 453, 535, 237, 197, 1006, 790, 514, 842, 970, 705, 707, 1010, 203, 127, 71, 882, 898, 798, 463, 517, 451, 454, 634, 578, 695, 728, 742, 325, 350, 684, 153, 340, 311, 992, 706, 218, 285, 96, 486, 160, 98, 686, 288, 193, 119, 410, 246, 536, 415, 953, 417, 784, 573, 734, 1, 136, 381, 177, 678, 773, 22, 301, 51, 874, 844, 775, 744, 633, 468, 1019, 287, 475, 78, 294, 724, 519, 17, 323, 191, 187, 446, 262, 212, 170, 33, 7, 227, 566, 526, 264, 556, 717, 477, 815, 671, 225, 207, 692, 663, 969, 393, 658, 877, 353, 788, 128, 303, 614, 501, 490, 387, 53, 941, 951, 736, 539, 102, 163, 175, 584, 988, 35, 347, 442, 649, 642, 198, 727, 939, 913, 811, 894, 858, 181, 412, 307, 830, 154, 479, 704, 326, 681, 619, 698, 621, 552, 598, 74, 890, 299, 922, 701, 481, 867, 214, 817, 731, 768, 673, 315, 338, 576, 222, 484, 305, 623, 239, 269, 46, 748, 608, 546, 537, 125, 667, 998, 714, 529, 823, 247, 289, 771, 808, 973, 735, 516, 974, 702, 636, 357, 455, 600, 80, 336, 696, 963, 297, 92, 980, 670, 958, 625, 712, 406, 173, 19, 763, 470, 793, 283, 655, 59, 421, 1016, 219, 13, 105, 840, 111, 38, 408, 945, 242, 559, 206, 443, 331, 737, 580, 767, 1020, 220, 31, 968, 15, 527, 833, 139, 129, 859, 739, 418, 783, 933, 49, 789, 178, 124, 772, 627, 0, 23, 388, 950, 976, 940, 485, 685, 21, 523, 723, 244, 637, 488, 835, 379, 342, 452, 862, 295, 765, 897, 507, 370, 567, 416, 100, 914, 300, 120, 392, 694, 94, 265, 791, 171, 200, 787, 441, 868, 672, 769, 983, 911, 427, 82, 69, 224, 176, 920, 500, 462, 263, 513, 797, 293, 322, 645, 469, 635, 40, 215, 687, 960, 818, 826, 34, 603, 316, 994, 611, 511, 93, 899, 114, 73, 241, 585, 327, 674, 280, 957, 471, 24, 502, 355, 159, 1017, 855, 270, 538, 521, 162, 880, 334, 986, 740, 719, 266, 820, 97, 41, 52, 750, 893, 838, 616, 83, 896, 777, 464, 562, 183, 362, 411, 478, 398, 384, 912, 599, 587, 609, 822, 243, 504, 753, 857, 157, 964, 65, 261, 81, 371, 435, 924, 885, 884, 863, 613, 721, 669, 121, 639, 989, 487, 238, 448, 216, 852, 643, 713, 676, 277, 879, 133, 123, 304, 547, 396, 70, 141, 909, 848, 900, 318, 146, 356, 802, 4, 807, 558, 764, 545, 588, 872, 554, 467, 544, 505, 149, 62, 901, 64, 45, 813, 27, 109, 718, 803, 853, 996, 1014, 476, 575, 28, 199, 688, 6, 482, 703, 560, 395, 66, 341, 794, 422, 376, 601, 76, 14, 569, 480, 39, 1011, 1001, 854, 55, 89, 335, 761, 363, 419, 252, 799, 358, 324, 1012, 152, 312, 496, 235, 916, 582, 615, 979, 1005, 891, 1013, 641, 18, 148, 185, 512, 378, 58, 211, 495, 594, 87, 762, 366, 660, 449, 520, 424, 886, 819, 281, 147, 290, 390, 32, 572, 993, 720, 683, 309, 254, 607, 568, 256, 533, 394, 620, 429, 67, 831, 103, 423, 668, 693, 518, 551, 697, 253, 949, 54, 875, 116, 434, 743, 644, 590, 279, 843, 589, 11, 647, 586, 806, 549, 375, 226, 851, 499, 450, 978, 29, 982, 189, 107, 508, 373, 796, 20, 700, 110, 26, 461, 782, 591, 828, 57, 904, 847, 328, 122, 630, 711, 44, 397, 404, 209, 365, 84, 194, 1021, 675, 135, 965, 329, 557, 691, 79, 352, 498, 629, 869, 90, 921, 233, 622, 871, 755, 439, 955, 228, 63, 825, 43, 943, 438, 144, 961, 359, 330, 682, 626, 425, 259, 249, 801, 754, 1003, 230, 377, 217, 878, 1007, 313, 2, 915, 550, 271, 437, 846, 548, 145, 715, 346, 251, 372, 99, 543, 16, 47, 195, 679, 174, 905, 188, 804, 169, 785, 231, 726, 814, 339, 531, 420, 258, 1009, 134, 972, 458, 234, 690, 260, 666, 646, 142, 184, 91, 628, 987, 10, 210, 926, 348, 386, 161, 60, 409, 680, 204, 164, 444, 708, 276, 68, 383, 491, 382, 42, 816, 483, 699, 150, 9, 565, 555, 433, 593, 86, 952, 839, 618, 751, 889, 108, 361, 595, 677, 407, 856, 255, 604, 85, 648, 928, 824, 213, 192, 267, 902, 792, 656, 631, 403, 389, 493, 333, 756, 602, 925, 113, 632, 354, 37, 873, 577, 56, 278, 930, 367, 428, 332, 317, 530, 364, 800, 774, 497, 1023, 12, 137, 845, 653, 101, 888, 542, 167, 48, 158, 1002, 745, 292, 944, 456, 990, 574, 25, 1018, 937, 298, 966, 430, 400, 349, 860, 689, 320, 117, 778, 104, 314, 786, 205, 606, 440, 936, 457, 932, 934, 948, 168, 445, 931, 757, 291, 571, 919, 360, 284, 509, 296, 245, 836, 166, 3, 257, 50, 282, 151, 810, 344, 947, 236, 946, 865, 752, 77, 610, 967, 795, 131, 302, 760, 781, 190, 938, 61, 1022, 652, 138, 984, 832, 202, 140, 985, 5, 657, 997, 401, 319, 431, 662, 405, 275, 650, 651, 887, 310, 1004, 368, 208, 596, 248, 758, 8, 126, 730, 489, 343, 337, 506, 515, 432, 232, 250, 532, 954, 524, 115, 229, 522, 908, 729, 186, 561, 995, 156, 196, 118, 805, 399, 918, 991, 849, 273, 747, 640, 143, 321, 624, 268, 306, 30, 722, 540, 534, 710, 130, 155, 883, 716, 525, 426, 812, 345, 929, 975, 472, 837, 605, 664, 391, 581, 272, 746, 112, 659, 665, 780, 240, 841, 474, 563, 36, 579, 286, 436, 907, 369, 201, 402, 962, 106, 749, 172, 494, 88, 466, 473, 414, 597, 374, 942, 308, 766, 459, 821, 592, 881, 380, 759, 866, 779, 809, 876, 541, 829, 528, 999, 221, 661, 927, 413, 977, 182, 583, 733, 892, 741, 570, 351, 617, 956, 72, 709, 850, 732, 770, 870, 95, 935, 223, 179, 861, 917, 447, 385, 132, 827, 923, 75, 465, 612, 460, 725, 492, 553, 1008, 910, 981, 503, 165, 895, 834, 1000, 180, 638, 906, 510, 274, 776, 971, 564, 738, 903, 654, 864, 959, 1015, 453, 535, 237, 197, 1006, 790, 514, 842, 970, 705, 707, 1010, 203, 127, 71);
+
+const dc_perlin_grad3: array<array<f32, 3>, 1024> = array<array<f32, 3>, 1024>(array<f32, 3>(0.79148875, 0.11986299, -0.59931496), array<f32, 3>(0.51387411, -0.61170974, 0.60145208), array<f32, 3>(-0.95395128, -0.21599571, 0.20814132), array<f32, 3>(0.59830026, 0.67281067, 0.43515813), array<f32, 3>(-0.93971346, 0.16019818, -0.30211777), array<f32, 3>(-0.74549699, -0.35758846, 0.56246309), array<f32, 3>(-0.78850321, -0.29060783, 0.54204223), array<f32, 3>(0.61332339, 0.38915256, 0.68730976), array<f32, 3>(-0.64370632, -0.40843865, 0.64716307), array<f32, 3>(-0.23922684, 0.70399949, -0.66869667), array<f32, 3>(-0.82882802, -0.00130741, 0.55950192), array<f32, 3>(0.07987672, 0.6243935, -0.7770151), array<f32, 3>(-0.46863456, -0.57517073, 0.67049257), array<f32, 3>(0.3079287, 0.42464616, -0.85138449), array<f32, 3>(-0.06972001, 0.30439513, 0.94999091), array<f32, 3>(0.5879845, -0.00151777, 0.80887077), array<f32, 3>(-0.32757867, 0.51578941, 0.79161449), array<f32, 3>(-0.44745031, 0.86883688, 0.21192142), array<f32, 3>(-0.38042636, 0.71222019, 0.58993066), array<f32, 3>(-0.3261637, 0.61421101, -0.71858339), array<f32, 3>(0.4548334, 0.19928843, -0.86799234), array<f32, 3>(-0.81020233, -0.05930352, 0.58314259), array<f32, 3>(0.81994145, 0.39825895, 0.41120046), array<f32, 3>(0.49257662, 0.74240487, 0.45409612), array<f32, 3>(0.95124863, -0.26667257, -0.15495734), array<f32, 3>(-0.95745656, 0.0920309, -0.27350914), array<f32, 3>(0.20842499, -0.8248215, -0.52557446), array<f32, 3>(0.46829293, -0.47740985, -0.74349282), array<f32, 3>(-0.65000311, -0.74754355, 0.13665502), array<f32, 3>(0.83566743, 0.53294928, -0.13275921), array<f32, 3>(0.90454761, -0.35449497, -0.23691126), array<f32, 3>(-0.64270969, 0.21532175, 0.73522839), array<f32, 3>(-0.39693478, -0.17553935, -0.90090439), array<f32, 3>(0.45073049, 0.65155528, 0.61017845), array<f32, 3>(0.69618384, -0.07989842, 0.71340333), array<f32, 3>(0.09059934, 0.85274641, -0.51440773), array<f32, 3>(-0.00560267, 0.69197466, 0.72190005), array<f32, 3>(0.23586856, -0.95830502, 0.16129945), array<f32, 3>(0.2035434, -0.9692543, -0.13826128), array<f32, 3>(-0.45516395, 0.63885905, 0.6202297), array<f32, 3>(0.80792021, 0.47917579, 0.34300946), array<f32, 3>(0.4088667, -0.32579857, -0.85245722), array<f32, 3>(-0.83819701, -0.3091081, 0.44930831), array<f32, 3>(-0.57602641, -0.758012, 0.30595978), array<f32, 3>(-0.16591524, -0.96579983, -0.19925569), array<f32, 3>(0.27174061, 0.93638167, -0.22214053), array<f32, 3>(-0.45758922, 0.73185326, -0.50497812), array<f32, 3>(-0.18029934, -0.7806711, -0.59836843), array<f32, 3>(0.14087163, -0.39189764, -0.90915974), array<f32, 3>(-0.03534787, -0.02750024, 0.99899663), array<f32, 3>(0.91016878, 0.0677257, 0.4086637), array<f32, 3>(0.70142578, 0.70903193, 0.07263332), array<f32, 3>(-0.49486157, -0.54111502, -0.67993129), array<f32, 3>(-0.26972486, -0.84418773, -0.46324462), array<f32, 3>(0.91931005, 0.03121901, 0.39229378), array<f32, 3>(-0.1533207, -0.87495538, 0.45928842), array<f32, 3>(-0.59010107, -0.66883868, 0.45214549), array<f32, 3>(0.51964273, -0.78565398, -0.33573688), array<f32, 3>(-0.25845001, 0.87348329, -0.41259003), array<f32, 3>(-0.64741807, -0.59846669, 0.47189773), array<f32, 3>(-0.79348688, -0.32782128, -0.51274923), array<f32, 3>(-0.86280237, -0.14342378, -0.48476972), array<f32, 3>(0.19469709, -0.76349966, 0.61576076), array<f32, 3>(0.39371236, -0.70742193, -0.58697938), array<f32, 3>(0.62103834, -0.50000004, -0.60358209), array<f32, 3>(-0.19652824, -0.51508695, 0.83430335), array<f32, 3>(-0.96016549, -0.2682663, -0.07820118), array<f32, 3>(0.52655683, 0.84118729, 0.12305219), array<f32, 3>(0.56222101, 0.70557745, -0.43135599), array<f32, 3>(0.06395307, 0.99025162, -0.12374061), array<f32, 3>(-0.65379289, 0.52521996, 0.5447007), array<f32, 3>(0.8120659, -0.38643765, 0.43728128), array<f32, 3>(-0.69449067, -0.71926243, -0.01855435), array<f32, 3>(0.33968533, 0.75504287, 0.56082452), array<f32, 3>(-0.52402654, -0.7053787, -0.47732282), array<f32, 3>(-0.65379327, -0.46369816, 0.59794512), array<f32, 3>(-0.08582021, -0.01217948, 0.99623619), array<f32, 3>(-0.66287577, 0.49604924, 0.56083051), array<f32, 3>(0.70911302, 0.68748287, -0.15660789), array<f32, 3>(-0.58662137, -0.46475685, 0.66323181), array<f32, 3>(-0.76681755, 0.6331095, -0.10565607), array<f32, 3>(0.68601816, -0.59353001, 0.42083395), array<f32, 3>(0.64792478, -0.72668696, 0.22829704), array<f32, 3>(0.68756542, -0.69062543, 0.22425499), array<f32, 3>(-0.46901797, -0.72307343, -0.50713604), array<f32, 3>(-0.71418521, -0.11738817, 0.69004312), array<f32, 3>(0.50880449, -0.80611081, 0.30216445), array<f32, 3>(0.27793962, -0.58372922, -0.76289565), array<f32, 3>(-0.39417207, 0.9157506, -0.077648), array<f32, 3>(-0.84724113, -0.47860304, 0.23048124), array<f32, 3>(0.67628991, 0.54362408, -0.49709638), array<f32, 3>(0.65073821, -0.0942063, 0.75343544), array<f32, 3>(0.66910202, 0.73566783, -0.10533437), array<f32, 3>(0.72191995, -0.00305613, 0.69196983), array<f32, 3>(-0.00313125, 0.06634333, 0.99779194), array<f32, 3>(-0.06908811, 0.28990653, -0.95455803), array<f32, 3>(0.17507626, 0.73870621, 0.6508928), array<f32, 3>(-0.57470594, 0.75735703, 0.31003777), array<f32, 3>(-0.91870733, 0.08883536, 0.3848183), array<f32, 3>(-0.27399536, 0.39846316, 0.87530203), array<f32, 3>(0.99772699, -0.05473919, 0.03929993), array<f32, 3>(0.22663907, 0.97393801, -0.00891541), array<f32, 3>(0.62338001, 0.59656797, -0.50547405), array<f32, 3>(0.59177247, 0.49473684, -0.63642816), array<f32, 3>(-0.24457664, -0.31345545, 0.91756632), array<f32, 3>(-0.44691491, -0.89198404, -0.06805539), array<f32, 3>(-0.83115967, -0.44685014, 0.33090566), array<f32, 3>(-0.39940345, 0.67719937, -0.6179627), array<f32, 3>(0.55460272, -0.63265953, -0.54051619), array<f32, 3>(0.82284412, 0.14794174, -0.54867185), array<f32, 3>(-0.39887172, -0.82890906, -0.39218761), array<f32, 3>(0.28591109, 0.71270085, 0.64055628), array<f32, 3>(-0.15438831, 0.66966606, 0.72643762), array<f32, 3>(-0.75134796, 0.54289699, 0.37515211), array<f32, 3>(0.32016243, 0.77691605, -0.54212311), array<f32, 3>(0.50884942, 0.15171482, -0.84738119), array<f32, 3>(0.08945627, 0.73684807, 0.67011379), array<f32, 3>(-0.68792851, -0.7188527, -0.1000258), array<f32, 3>(0.02292266, -0.07249674, 0.9971052), array<f32, 3>(0.94083723, -0.10191422, 0.32316993), array<f32, 3>(-0.81053204, 0.43703808, 0.38991733), array<f32, 3>(-0.19558496, -0.07485841, 0.97782552), array<f32, 3>(0.68911052, -0.49915226, -0.525332), array<f32, 3>(0.19796974, 0.93342057, 0.29922235), array<f32, 3>(-0.79540501, -0.26473293, 0.54520395), array<f32, 3>(-0.27945416, -0.9128836, 0.29757168), array<f32, 3>(0.82074194, 0.43648314, 0.36859889), array<f32, 3>(-0.20594999, -0.70696486, -0.67659832), array<f32, 3>(-0.05687654, -0.70968577, 0.70221874), array<f32, 3>(-0.26280466, 0.69993747, -0.6640943), array<f32, 3>(-0.54551347, -0.78469719, 0.29438983), array<f32, 3>(0.90609571, 0.39319111, 0.15617717), array<f32, 3>(0.69129692, 0.67317351, 0.26257571), array<f32, 3>(0.98391565, -0.0520616, 0.17087883), array<f32, 3>(0.63806303, 0.67740288, -0.36606134), array<f32, 3>(-0.50096077, 0.83542684, -0.22605378), array<f32, 3>(0.65237128, 0.35509583, 0.66956603), array<f32, 3>(-0.85711882, -0.19885856, 0.47518691), array<f32, 3>(0.79383271, -0.12451513, 0.59525256), array<f32, 3>(-0.63301076, 0.07907192, 0.77009416), array<f32, 3>(0.57925311, -0.49077742, 0.65084818), array<f32, 3>(0.14070842, 0.97298117, 0.18305403), array<f32, 3>(-0.59601232, 0.69646383, -0.39963413), array<f32, 3>(-0.68205637, -0.47455943, 0.55641033), array<f32, 3>(0.47997775, -0.84805982, -0.22453484), array<f32, 3>(0.83562547, -0.48273957, 0.2620927), array<f32, 3>(0.5918083, 0.36411758, 0.7191532), array<f32, 3>(0.66057023, -0.66033264, 0.35722231), array<f32, 3>(0.5331913, 0.75511965, 0.38144639), array<f32, 3>(-0.21631797, -0.12712992, 0.9680106), array<f32, 3>(-0.23971441, 0.89928294, -0.365824), array<f32, 3>(-0.72825564, 0.27377922, -0.62824252), array<f32, 3>(0.0213557, 0.73882696, 0.67355672), array<f32, 3>(0.48112026, 0.78759215, 0.38499597), array<f32, 3>(-0.58250985, -0.09956878, 0.80670213), array<f32, 3>(0.21323385, 0.36856735, 0.90481459), array<f32, 3>(-0.3645996, -0.93062781, -0.03160697), array<f32, 3>(-0.68684541, 0.17314748, -0.70587771), array<f32, 3>(0.68032531, -0.07909205, -0.72863017), array<f32, 3>(0.25007484, -0.61882132, 0.74466284), array<f32, 3>(0.77055613, 0.59380162, 0.23160935), array<f32, 3>(0.67996118, -0.0383597, 0.73224403), array<f32, 3>(0.43079959, 0.38901749, -0.81429547), array<f32, 3>(0.76815116, -0.63831184, 0.05001794), array<f32, 3>(-0.13601015, 0.75596033, -0.64033211), array<f32, 3>(0.36884321, -0.45188838, -0.81225093), array<f32, 3>(0.79562623, -0.43647179, 0.42008485), array<f32, 3>(-0.65875496, 0.39126701, -0.64261344), array<f32, 3>(-0.68899899, 0.44217527, 0.57424858), array<f32, 3>(0.25292617, 0.96620732, -0.04971687), array<f32, 3>(-0.68558843, -0.70460233, 0.18304118), array<f32, 3>(0.86382379, 0.29507865, 0.40833448), array<f32, 3>(0.13627838, 0.31500179, 0.93925613), array<f32, 3>(0.6718794, 0.64336667, 0.36695693), array<f32, 3>(0.37977583, 0.31123423, 0.87115072), array<f32, 3>(-0.0332605, -0.99451574, -0.09915731), array<f32, 3>(-0.66427749, -0.01424397, -0.74735033), array<f32, 3>(0.68859558, 0.44744486, -0.57063931), array<f32, 3>(-0.56738045, 0.30154774, -0.76625608), array<f32, 3>(-0.58488004, 0.63357146, 0.5064608), array<f32, 3>(0.38842469, 0.92016339, 0.04925032), array<f32, 3>(0.15316057, -0.97495961, -0.16123153), array<f32, 3>(0.57623375, 0.51659393, 0.63331301), array<f32, 3>(0.32392581, -0.79816566, -0.50794059), array<f32, 3>(0.7313644, -0.54179646, 0.41420129), array<f32, 3>(-0.58929886, -0.58690534, -0.55521975), array<f32, 3>(0.64030162, 0.32487137, -0.69604054), array<f32, 3>(0.80502987, -0.00635101, 0.59320028), array<f32, 3>(0.46595373, 0.6200571, -0.63120227), array<f32, 3>(0.83612498, 0.53677947, 0.11297261), array<f32, 3>(-0.60753284, -0.29028728, -0.73934913), array<f32, 3>(-0.45583848, 0.84488003, 0.27998037), array<f32, 3>(-0.27320563, -0.39709327, 0.876171), array<f32, 3>(0.84893256, -0.09000823, 0.52078021), array<f32, 3>(-0.35708766, -0.73203774, 0.58018027), array<f32, 3>(0.10507148, -0.71032871, 0.69598355), array<f32, 3>(0.68468508, 0.26788814, -0.67782172), array<f32, 3>(-0.94602428, -0.13594737, -0.29420466), array<f32, 3>(0.27104088, 0.95431757, 0.12575696), array<f32, 3>(-0.55840113, 0.1490931, 0.81606337), array<f32, 3>(0.47553129, 0.8072973, 0.34948685), array<f32, 3>(-0.01891509, -0.9752622, 0.22024047), array<f32, 3>(-0.65760518, -0.4592425, -0.59720327), array<f32, 3>(-0.70549425, 0.70862555, 0.01129989), array<f32, 3>(-0.88864223, 0.43707946, -0.13883994), array<f32, 3>(0.49252849, -0.43814774, 0.75195894), array<f32, 3>(-0.01398277, 0.69598571, 0.71791947), array<f32, 3>(-0.67265622, 0.27228276, -0.68803758), array<f32, 3>(-0.91724038, -0.01083918, -0.39818663), array<f32, 3>(-0.24468025, 0.75690032, 0.60599792), array<f32, 3>(-0.49070434, -0.48530058, 0.72366608), array<f32, 3>(0.67110346, -0.5545376, -0.49204492), array<f32, 3>(-0.95532877, -0.26328211, -0.13427388), array<f32, 3>(-0.66012945, 0.41730904, 0.62456567), array<f32, 3>(0.96822786, -0.03273592, 0.24791766), array<f32, 3>(0.91952853, 0.23575545, -0.31446248), array<f32, 3>(0.63712542, 0.06762652, 0.76778763), array<f32, 3>(-0.21680947, 0.65843559, 0.72073312), array<f32, 3>(0.06143588, 0.47272235, -0.87906724), array<f32, 3>(0.70541616, -0.21884659, 0.67416186), array<f32, 3>(-0.04396589, -0.67487644, -0.73661984), array<f32, 3>(-0.65032618, 0.75012744, 0.11993615), array<f32, 3>(-0.78840054, 0.58187068, -0.19962741), array<f32, 3>(0.99318416, 0.11467779, 0.02083796), array<f32, 3>(0.7677582, 0.46845611, -0.43714554), array<f32, 3>(-0.70891635, -0.54302381, -0.45006972), array<f32, 3>(0.55548849, -0.71825576, -0.41897638), array<f32, 3>(-0.621676, 0.77500231, 0.11353575), array<f32, 3>(0.38413022, -0.79687865, 0.46629218), array<f32, 3>(-0.56271512, 0.54186596, -0.62428597), array<f32, 3>(0.62019121, -0.70563211, -0.34270424), array<f32, 3>(0.85913131, 0.50529005, 0.08108862), array<f32, 3>(0.54973106, -0.66129569, -0.51037612), array<f32, 3>(-0.74254469, -0.49670185, -0.44934914), array<f32, 3>(-0.75780366, 0.59195518, -0.27444976), array<f32, 3>(-0.40050287, 0.04302113, -0.915285), array<f32, 3>(-0.60859484, 0.35063171, 0.71180736), array<f32, 3>(-0.57297537, 0.81938865, -0.01736289), array<f32, 3>(0.98721933, 0.09373543, -0.12888621), array<f32, 3>(0.30397213, 0.87942861, 0.36634172), array<f32, 3>(0.32615126, -0.64515144, -0.69094498), array<f32, 3>(0.83015604, 0.30783918, 0.46483974), array<f32, 3>(0.42822875, -0.04288671, -0.90265213), array<f32, 3>(0.16585965, 0.53714643, 0.82702133), array<f32, 3>(-0.37193298, 0.88497229, 0.28016051), array<f32, 3>(0.73544877, 0.67744273, 0.01365471), array<f32, 3>(-0.66150496, 0.09327263, -0.74411787), array<f32, 3>(0.41664753, -0.23786298, -0.87739731), array<f32, 3>(-0.78513086, -0.42653313, 0.44904233), array<f32, 3>(0.08029855, 0.84803303, 0.52382451), array<f32, 3>(-0.09507221, 0.50524394, -0.85772364), array<f32, 3>(0.66939507, -0.17805679, 0.72125309), array<f32, 3>(-0.76923153, 0.41652205, -0.48455364), array<f32, 3>(0.51989556, 0.79632686, 0.30914743), array<f32, 3>(0.85617969, -0.51024476, 0.08128121), array<f32, 3>(0.71830013, 0.03208003, 0.69499337), array<f32, 3>(-0.96000528, -0.11640072, -0.25463844), array<f32, 3>(0.66084196, -0.19355993, 0.72513617), array<f32, 3>(-0.57661819, -0.54757438, 0.60636109), array<f32, 3>(0.65123443, -0.64818909, -0.39464494), array<f32, 3>(0.36952748, -0.22540306, -0.90146708), array<f32, 3>(0.34048182, -0.33515083, 0.87849078), array<f32, 3>(0.11132435, -0.75280467, 0.64876191), array<f32, 3>(0.6756352, 0.64934616, -0.34909404), array<f32, 3>(0.23316576, 0.69276343, -0.68243135), array<f32, 3>(0.30368064, -0.87532007, 0.37628825), array<f32, 3>(-0.27080673, -0.74246398, 0.61270789), array<f32, 3>(-0.21655683, -0.49565083, -0.8410906), array<f32, 3>(-0.98776592, -0.14473189, 0.05806181), array<f32, 3>(0.6456272, 0.3859886, 0.65892209), array<f32, 3>(-0.63746045, -0.57205546, 0.51613635), array<f32, 3>(0.06117405, -0.78423981, -0.61743474), array<f32, 3>(0.74829362, 0.59119862, 0.30090006), array<f32, 3>(-0.42571462, 0.51302568, -0.74536683), array<f32, 3>(-0.56331794, 0.48608227, -0.66812943), array<f32, 3>(-0.75919788, -0.64885422, 0.05105673), array<f32, 3>(0.14385006, -0.53933953, 0.82971081), array<f32, 3>(-0.77031548, -0.2834483, 0.57120148), array<f32, 3>(-0.98358057, 0.17900745, 0.02292584), array<f32, 3>(-0.25051205, 0.10358351, 0.96255606), array<f32, 3>(-0.32867861, -0.83176115, -0.4473743), array<f32, 3>(-0.36281449, -0.92995082, -0.05964161), array<f32, 3>(-0.53796595, -0.03614791, 0.84219117), array<f32, 3>(0.92960703, 0.10461247, 0.35339354), array<f32, 3>(0.6402185, 0.61360003, 0.46218532), array<f32, 3>(0.22343529, 0.69409296, 0.68433299), array<f32, 3>(0.01781074, 0.89088149, 0.45388648), array<f32, 3>(-0.63004672, -0.26934609, 0.72835007), array<f32, 3>(0.48560056, -0.35192051, -0.800215), array<f32, 3>(0.62050161, 0.57366872, 0.53467931), array<f32, 3>(0.00265452, 0.71539198, -0.6987183), array<f32, 3>(0.64229521, 0.41380752, 0.6451513), array<f32, 3>(0.23080049, -0.43573115, 0.86998247), array<f32, 3>(0.14620517, 0.61171896, -0.77744708), array<f32, 3>(-0.27436021, -0.61900378, 0.73590814), array<f32, 3>(0.69959023, 0.71050058, 0.07591065), array<f32, 3>(0.70362024, 0.62044755, -0.34635731), array<f32, 3>(-0.29622242, -0.71700405, -0.63099721), array<f32, 3>(0.3109434, -0.84299864, -0.43893905), array<f32, 3>(0.07704196, -0.46344069, -0.88277248), array<f32, 3>(-0.94533514, -0.0441857, 0.32309301), array<f32, 3>(0.65845027, -0.36172634, -0.65999795), array<f32, 3>(0.760693, -0.18013255, 0.62361721), array<f32, 3>(0.18607691, -0.45751624, -0.86951382), array<f32, 3>(-0.67626808, -0.39178398, -0.62383235), array<f32, 3>(-0.58782719, 0.55645189, -0.58721418), array<f32, 3>(0.37531624, 0.80640206, 0.45700485), array<f32, 3>(0.3261079, -0.50457786, 0.79940905), array<f32, 3>(0.62915643, 0.76094546, -0.15850616), array<f32, 3>(0.62803678, -0.75273385, -0.19738681), array<f32, 3>(0.42539119, -0.8909442, 0.15893638), array<f32, 3>(0.17668676, -0.40626331, 0.89651096), array<f32, 3>(0.02778178, -0.78957083, -0.61303024), array<f32, 3>(-0.25950053, -0.16244258, 0.95198313), array<f32, 3>(-0.44117714, 0.73727502, -0.51165249), array<f32, 3>(-0.30827444, 0.94136275, 0.1371242), array<f32, 3>(0.97572111, -0.04258044, -0.21483768), array<f32, 3>(0.55607688, 0.60474525, -0.57014181), array<f32, 3>(-0.67430479, 0.12532345, 0.72774109), array<f32, 3>(-0.31325824, -0.81393777, -0.48925921), array<f32, 3>(-0.34811982, -0.70956566, 0.61264114), array<f32, 3>(0.22583632, 0.72502572, -0.6506425), array<f32, 3>(0.76936493, 0.63742123, -0.04209247), array<f32, 3>(-0.55303394, -0.38417341, -0.73929984), array<f32, 3>(-0.20953448, -0.92686077, -0.31148742), array<f32, 3>(-0.18786352, 0.39920999, 0.89740664), array<f32, 3>(0.46307517, -0.88470611, 0.05344618), array<f32, 3>(-0.70328479, 0.30353783, 0.64284935), array<f32, 3>(0.85916171, 0.15710234, 0.48699077), array<f32, 3>(-0.26398391, 0.42122173, 0.86768932), array<f32, 3>(0.82468427, 0.55134621, 0.12614757), array<f32, 3>(0.05993298, 0.63414584, 0.77088721), array<f32, 3>(-0.57291678, 0.81909656, -0.02910645), array<f32, 3>(0.64075141, 0.74416542, -0.18882655), array<f32, 3>(0.6711266, -0.55747979, -0.48867716), array<f32, 3>(0.89932863, 0.23426637, -0.36922525), array<f32, 3>(0.5914634, -0.44386974, 0.67316469), array<f32, 3>(0.46684506, 0.1978157, -0.86193076), array<f32, 3>(0.18536399, 0.76259887, 0.61974443), array<f32, 3>(0.84144446, -0.53500771, -0.0757494), array<f32, 3>(0.312128, 0.82898453, -0.46406977), array<f32, 3>(-0.88440729, -0.27020677, -0.38054178), array<f32, 3>(0.20051055, 0.77523319, 0.5990067), array<f32, 3>(0.48749115, 0.44082691, -0.75367368), array<f32, 3>(0.24971103, -0.88242146, 0.39871892), array<f32, 3>(-0.29777449, -0.95158243, -0.07629705), array<f32, 3>(-0.37776905, -0.58777023, 0.71541366), array<f32, 3>(0.22179317, 0.14730715, -0.96390269), array<f32, 3>(0.58348153, 0.68630504, 0.43420582), array<f32, 3>(-0.96759942, 0.14572096, 0.20619593), array<f32, 3>(-0.15181654, 0.47495708, 0.86681458), array<f32, 3>(0.26580537, 0.74350537, -0.61363447), array<f32, 3>(-0.39189499, 0.72950601, 0.56057051), array<f32, 3>(-0.01888074, 0.73557245, -0.6771829), array<f32, 3>(0.73486517, 0.20569655, -0.64626783), array<f32, 3>(-0.26354754, -0.23595215, -0.93534447), array<f32, 3>(-0.62584298, -0.65116585, 0.42930594), array<f32, 3>(-0.66666701, 0.61406968, 0.42246127), array<f32, 3>(0.71799877, 0.67101619, 0.18497305), array<f32, 3>(0.80098282, -0.45681211, -0.38697444), array<f32, 3>(0.13205975, 0.91574792, -0.37942847), array<f32, 3>(0.68891728, 0.72389791, -0.03694308), array<f32, 3>(0.50346408, 0.46323331, -0.72934136), array<f32, 3>(0.84557323, 0.53378861, -0.00869685), array<f32, 3>(0.08666773, -0.81879883, 0.56750082), array<f32, 3>(-0.50044423, 0.6585846, -0.56198033), array<f32, 3>(0.35669785, 0.32248792, -0.87679427), array<f32, 3>(-0.97346629, -0.22237373, -0.05397509), array<f32, 3>(-0.53358835, -0.29312069, -0.79332448), array<f32, 3>(0.12615748, 0.4708323, 0.87315591), array<f32, 3>(-0.9702257, 0.1906535, 0.14937651), array<f32, 3>(-0.57777643, 0.36008023, 0.73247295), array<f32, 3>(0.60132454, 0.72398065, 0.33802488), array<f32, 3>(0.19047827, -0.94729649, -0.25757988), array<f32, 3>(-0.45904437, 0.69100108, 0.55838676), array<f32, 3>(0.39148612, -0.51878308, 0.7600018), array<f32, 3>(0.04137949, -0.75662546, -0.65253786), array<f32, 3>(0.20020542, -0.76439245, -0.61288006), array<f32, 3>(0.07933739, -0.2107441, 0.97431643), array<f32, 3>(-0.40807425, 0.80614533, 0.42849166), array<f32, 3>(-0.95397962, -0.0934204, -0.28494828), array<f32, 3>(-0.31365384, 0.14377778, -0.93858895), array<f32, 3>(0.84618575, -0.39191761, 0.36106822), array<f32, 3>(-0.90177404, 0.07825801, -0.42506385), array<f32, 3>(-0.19689944, -0.97296956, 0.12066831), array<f32, 3>(0.6114537, 0.51715369, -0.59889601), array<f32, 3>(-0.5732905, -0.80450317, -0.15528251), array<f32, 3>(-0.2774915, -0.76245284, 0.58452044), array<f32, 3>(-0.74877628, 0.66124357, 0.04572758), array<f32, 3>(0.60284514, 0.58208119, 0.54567318), array<f32, 3>(0.17695878, -0.67360184, 0.71759748), array<f32, 3>(-0.83953853, 0.41240184, 0.35369447), array<f32, 3>(0.37802442, -0.60322405, 0.70229501), array<f32, 3>(0.5105045, -0.42970396, 0.74480847), array<f32, 3>(-0.48366785, -0.2090273, -0.84992529), array<f32, 3>(-0.87971286, -0.1482069, -0.45181855), array<f32, 3>(-0.11520437, -0.59044778, -0.79881123), array<f32, 3>(0.38877393, 0.92116844, -0.0174224), array<f32, 3>(0.94330646, -0.27385756, -0.18754989), array<f32, 3>(-0.66585548, 0.4692868, -0.5800055), array<f32, 3>(0.2065939, -0.97226278, -0.10965425), array<f32, 3>(0.70114934, 0.70875543, -0.07781609), array<f32, 3>(0.50683262, 0.81003447, 0.29489803), array<f32, 3>(-0.75501572, 0.56485827, -0.3329961), array<f32, 3>(-0.43930454, -0.48824131, 0.75407688), array<f32, 3>(-0.43442626, 0.51174617, 0.74120826), array<f32, 3>(-0.97139119, -0.22722375, 0.06905442), array<f32, 3>(-0.2718967, 0.51890879, -0.81043559), array<f32, 3>(0.34109465, 0.91412005, -0.21917797), array<f32, 3>(0.23216825, -0.66497033, 0.70986785), array<f32, 3>(0.87281521, 0.48669099, 0.03640737), array<f32, 3>(-0.60266004, -0.34235001, -0.72083101), array<f32, 3>(-0.01994494, -0.52747354, 0.84933731), array<f32, 3>(-0.27000504, -0.77679344, -0.56893693), array<f32, 3>(-0.12330809, 0.85744248, -0.49958734), array<f32, 3>(-0.69270982, 0.61145042, -0.38246763), array<f32, 3>(-0.60277814, 0.55015465, 0.57791727), array<f32, 3>(0.64946165, -0.22132925, -0.72747023), array<f32, 3>(0.24257305, 0.26557728, 0.93307397), array<f32, 3>(-0.66814908, 0.64881591, -0.36416303), array<f32, 3>(-0.74538727, -0.44634982, -0.49514609), array<f32, 3>(0.25115903, 0.38535072, -0.88793241), array<f32, 3>(-0.61584597, -0.69782826, -0.36574509), array<f32, 3>(0.13745929, 0.92666227, 0.34985995), array<f32, 3>(-0.50342245, -0.82980249, -0.24081874), array<f32, 3>(0.11249648, 0.99333196, -0.0252223), array<f32, 3>(0.83241096, 0.21922825, -0.50895085), array<f32, 3>(0.5017559, 0.86108612, 0.08229039), array<f32, 3>(-0.35527286, -0.56925625, -0.74143679), array<f32, 3>(0.31441654, -0.91653449, 0.24719782), array<f32, 3>(0.62936968, 0.7022261, 0.33282475), array<f32, 3>(0.77755375, -0.56236234, -0.28135169), array<f32, 3>(-0.80098254, -0.37712493, 0.46497715), array<f32, 3>(0.5931019, -0.68181911, -0.4281972), array<f32, 3>(0.15392285, -0.98282954, 0.1017539), array<f32, 3>(-0.96618662, 0.25781497, 0.00385483), array<f32, 3>(0.3375094, -0.86020836, 0.3822682), array<f32, 3>(-0.09597976, -0.40348179, -0.90993974), array<f32, 3>(-0.70910783, 0.60681107, -0.35909108), array<f32, 3>(0.41726791, -0.90380775, 0.0949686), array<f32, 3>(-0.03646, 0.99581799, -0.08376873), array<f32, 3>(0.35348135, -0.70899268, 0.61022972), array<f32, 3>(0.66002017, 0.7411574, -0.12271547), array<f32, 3>(0.18515044, 0.96534454, -0.18392727), array<f32, 3>(-0.29364182, -0.88826809, -0.35320572), array<f32, 3>(0.9969233, 0.02436644, -0.07449968), array<f32, 3>(-0.1352957, 0.35908874, 0.92344483), array<f32, 3>(-0.76888326, -0.29702475, 0.56621095), array<f32, 3>(-0.31931644, 0.72859881, 0.60595444), array<f32, 3>(0.52827199, -0.82385659, 0.20539968), array<f32, 3>(-0.83281688, -0.27413556, 0.48090097), array<f32, 3>(-0.76899198, 0.23377782, 0.59497837), array<f32, 3>(-0.60599231, 0.54438401, -0.5800167), array<f32, 3>(-0.59616975, -0.18605791, 0.78100198), array<f32, 3>(-0.83753036, 0.32458912, -0.43952794), array<f32, 3>(0.62016934, 0.71285793, 0.32745011), array<f32, 3>(-0.62489231, 0.01790151, 0.7805057), array<f32, 3>(-0.44050813, -0.31396367, 0.8410585), array<f32, 3>(0.82831903, 0.51349534, 0.22407615), array<f32, 3>(-0.54638365, -0.42878084, -0.7194525), array<f32, 3>(-0.30690837, -0.54588407, -0.77962673), array<f32, 3>(-0.51419246, 0.49668914, 0.69921814), array<f32, 3>(0.12759508, 0.79794754, 0.5890664), array<f32, 3>(0.59812622, 0.53597438, 0.59579904), array<f32, 3>(0.75450428, 0.31026344, 0.57832507), array<f32, 3>(-0.34806954, -0.09710281, 0.93242621), array<f32, 3>(-0.40140375, -0.8528739, 0.33388792), array<f32, 3>(0.57290191, 0.32347021, -0.7530939), array<f32, 3>(-0.53362688, -0.81285892, 0.23345818), array<f32, 3>(-0.74679447, 0.64927639, 0.14400758), array<f32, 3>(-0.8025138, -0.59638095, 0.01736004), array<f32, 3>(-0.56868668, 0.61763086, -0.54325646), array<f32, 3>(-0.72976559, 0.04179896, -0.68241852), array<f32, 3>(0.57244144, -0.09255805, -0.81470474), array<f32, 3>(0.97741613, 0.07186077, -0.19873032), array<f32, 3>(0.72298477, 0.06613486, 0.68769121), array<f32, 3>(-0.42596585, -0.65375247, -0.6254285), array<f32, 3>(0.64840687, 0.16136696, -0.74399545), array<f32, 3>(0.3435205, -0.92950264, 0.13423304), array<f32, 3>(0.74687236, 0.45351768, -0.48631613), array<f32, 3>(-0.51873425, -0.73762481, -0.43223191), array<f32, 3>(0.29790392, 0.44209023, 0.84605525), array<f32, 3>(-0.67740274, 0.4671743, -0.56821977), array<f32, 3>(-0.36224935, -0.42773177, 0.82814307), array<f32, 3>(-0.44192484, 0.7391998, 0.50821855), array<f32, 3>(-0.92680658, -0.18163204, -0.32869343), array<f32, 3>(-0.71384582, -0.70014113, 0.01505111), array<f32, 3>(0.70600729, -0.70152253, 0.09705589), array<f32, 3>(0.90031692, -0.36943663, 0.23010002), array<f32, 3>(0.25264659, -0.65121757, -0.71560141), array<f32, 3>(0.96727807, 0.19056552, 0.16750499), array<f32, 3>(-0.65770755, -0.65887301, 0.36511251), array<f32, 3>(0.05208955, -0.1041791, 0.99319353), array<f32, 3>(-0.65282932, -0.4083232, 0.63803294), array<f32, 3>(-0.00628739, -0.99502463, -0.09943061), array<f32, 3>(-0.51900794, -0.62993523, 0.57776497), array<f32, 3>(0.83046729, -0.1652706, 0.53198657), array<f32, 3>(0.66869945, -0.56606479, -0.48209097), array<f32, 3>(-0.54299772, -0.48639669, -0.684523), array<f32, 3>(0.52407156, -0.42268239, 0.73938393), array<f32, 3>(0.71446999, -0.30844019, -0.62801057), array<f32, 3>(-0.67320882, 0.39978543, 0.62206228), array<f32, 3>(-0.53289859, -0.0507967, -0.84465306), array<f32, 3>(0.67708925, -0.71979254, 0.15313018), array<f32, 3>(-0.61369683, 0.65230332, 0.44483321), array<f32, 3>(-0.26453665, -0.69129417, -0.67240816), array<f32, 3>(0.85045794, 0.0307514, 0.52514345), array<f32, 3>(-0.76757885, -0.10940324, 0.63154861), array<f32, 3>(0.72754104, -0.17450402, -0.66350011), array<f32, 3>(-0.34075755, -0.67303082, 0.65644026), array<f32, 3>(0.70044829, 0.13095479, -0.70158609), array<f32, 3>(0.4395004, -0.88211196, 0.16946353), array<f32, 3>(-0.35706397, 0.48041126, 0.80106825), array<f32, 3>(-0.77687193, 0.33320308, -0.5342712), array<f32, 3>(0.51274543, 0.77662232, 0.36599165), array<f32, 3>(0.33380578, 0.79591657, 0.50506486), array<f32, 3>(-0.76587225, -0.03670574, 0.64194422), array<f32, 3>(-0.23491078, 0.43695339, -0.86826762), array<f32, 3>(0.25698923, -0.62346599, 0.73840822), array<f32, 3>(0.13009757, -0.93331414, -0.33466303), array<f32, 3>(-0.5484195, 0.64297666, -0.53461861), array<f32, 3>(0.69823865, 0.51710521, -0.49504039), array<f32, 3>(-0.64058874, -0.76638614, -0.04794108), array<f32, 3>(-0.99383538, 0.10829476, 0.0237376), array<f32, 3>(0.53702674, -0.26620457, -0.80046075), array<f32, 3>(0.95618706, 0.14762618, 0.25280983), array<f32, 3>(0.46882627, -0.32353926, -0.82190284), array<f32, 3>(0.37771393, -0.17580406, -0.90907927), array<f32, 3>(-0.38046162, 0.14393199, -0.91352752), array<f32, 3>(0.99319923, -0.09757638, -0.06351493), array<f32, 3>(0.50851715, 0.83898531, 0.19368521), array<f32, 3>(0.32506349, -0.66811447, 0.66929574), array<f32, 3>(-0.48035988, -0.63636898, -0.60356351), array<f32, 3>(-0.06435942, 0.26733173, 0.96145286), array<f32, 3>(0.60598929, -0.04278909, 0.79432114), array<f32, 3>(-0.24869997, 0.88809619, -0.38656626), array<f32, 3>(0.37370464, 0.04464997, -0.92647246), array<f32, 3>(-0.48971589, -0.59472073, 0.63756224), array<f32, 3>(0.69752714, 0.12358938, 0.70581978), array<f32, 3>(0.5278718, 0.64468756, -0.55292794), array<f32, 3>(-0.10489693, 0.16880171, -0.98005235), array<f32, 3>(-0.63336451, -0.45121552, -0.62869226), array<f32, 3>(0.54866356, 0.65678858, 0.51729785), array<f32, 3>(-0.85968969, 0.49557488, -0.12385145), array<f32, 3>(-0.47320716, -0.15150042, 0.86782637), array<f32, 3>(0.19900943, -0.10259966, 0.974612), array<f32, 3>(-0.52893938, 0.84740153, 0.04619294), array<f32, 3>(0.65121421, -0.49243156, -0.57743503), array<f32, 3>(0.45693424, 0.73751862, 0.49726994), array<f32, 3>(-0.47661222, -0.77374319, -0.41732752), array<f32, 3>(-0.0480854, 0.90050093, 0.4321873), array<f32, 3>(0.91129978, -0.31013948, 0.27082507), array<f32, 3>(0.58778939, -0.42668247, -0.68734686), array<f32, 3>(0.82297839, -0.34772114, -0.44921773), array<f32, 3>(0.29494223, -0.86544442, -0.40498769), array<f32, 3>(-0.39161493, 0.79055212, 0.47081322), array<f32, 3>(0.79434783, -0.59398096, -0.12727195), array<f32, 3>(0.77174313, 0.29796481, 0.56180915), array<f32, 3>(0.78482345, -0.44974833, 0.426355), array<f32, 3>(-0.58988658, -0.54565594, 0.59522551), array<f32, 3>(-0.97115669, 0.13450224, 0.19688532), array<f32, 3>(0.42988246, 0.15513097, -0.88945796), array<f32, 3>(-0.30013401, -0.45617888, 0.83774722), array<f32, 3>(0.50990724, -0.38026491, -0.77161727), array<f32, 3>(-0.68923129, 0.29274099, -0.66276914), array<f32, 3>(-0.81531731, -0.42344291, -0.39490984), array<f32, 3>(0.26048163, -0.96468719, -0.03908901), array<f32, 3>(0.32147033, 0.32614689, -0.88897977), array<f32, 3>(0.70055924, -0.70700997, 0.09671429), array<f32, 3>(-0.5889014, -0.17999683, 0.78790626), array<f32, 3>(0.70222863, 0.69308083, -0.16283095), array<f32, 3>(-0.75366081, -0.65098223, -0.09065052), array<f32, 3>(-0.19053922, -0.78772343, -0.5858213), array<f32, 3>(-0.58846812, 0.3495522, 0.72905317), array<f32, 3>(-0.60563594, -0.40529546, -0.68479244), array<f32, 3>(-0.71315551, 0.69904447, 0.05240265), array<f32, 3>(-0.45479055, 0.81186703, -0.36611129), array<f32, 3>(-0.29059626, 0.05377439, 0.95533352), array<f32, 3>(0.56290473, 0.78501299, 0.25863657), array<f32, 3>(-0.43010366, -0.47609705, 0.76703484), array<f32, 3>(0.63372606, -0.0621427, -0.77105744), array<f32, 3>(0.28788198, -0.78226752, -0.55243234), array<f32, 3>(-0.55506056, 0.67832002, -0.48144545), array<f32, 3>(-0.47229498, 0.84794057, -0.24069533), array<f32, 3>(-0.27628326, 0.87423025, -0.39923556), array<f32, 3>(0.97754921, -0.01429369, -0.21022189), array<f32, 3>(-0.78483628, 0.30941478, -0.53693064), array<f32, 3>(-0.3576915, -0.53057471, 0.76847073), array<f32, 3>(0.5680456, 0.59946775, -0.56388173), array<f32, 3>(0.80328735, -0.57298006, -0.16255243), array<f32, 3>(-0.34327107, -0.35133498, -0.87105034), array<f32, 3>(0.80357102, -0.01979284, -0.5948797), array<f32, 3>(-0.87804782, 0.46346126, 0.11931336), array<f32, 3>(-0.11872912, -0.93845057, 0.32436695), array<f32, 3>(0.68065237, 0.69467363, 0.23268195), array<f32, 3>(-0.71974506, -0.36713686, 0.58921776), array<f32, 3>(0.52822234, 0.82314813, -0.20834663), array<f32, 3>(-0.67654042, -0.73158271, 0.08414148), array<f32, 3>(-0.39062516, 0.89358947, -0.22115571), array<f32, 3>(-0.62142505, 0.43386674, -0.65237302), array<f32, 3>(-0.48099381, -0.18611372, -0.85674188), array<f32, 3>(0.05036514, -0.74987003, 0.65966528), array<f32, 3>(-0.49984895, -0.8092039, -0.30877188), array<f32, 3>(0.50496868, 0.85618105, 0.10936472), array<f32, 3>(-0.54084761, 0.24485715, 0.80469176), array<f32, 3>(-0.81973873, -0.50777759, 0.26493457), array<f32, 3>(0.72082268, -0.43713926, -0.53788839), array<f32, 3>(0.91725234, -0.15187152, 0.36821621), array<f32, 3>(-0.17151325, 0.57985483, 0.79646192), array<f32, 3>(-0.74076471, 0.06061813, -0.66902398), array<f32, 3>(0.32541463, -0.08200506, 0.94200875), array<f32, 3>(-0.10818362, 0.99402161, -0.0147426), array<f32, 3>(-0.6171038, -0.78296663, 0.07839742), array<f32, 3>(-0.38878719, -0.57916742, 0.71652608), array<f32, 3>(0.37911419, 0.92170992, 0.08199541), array<f32, 3>(-0.60810067, -0.43108035, 0.66662082), array<f32, 3>(-0.11745691, 0.38395577, 0.91585034), array<f32, 3>(0.4769447, -0.8105076, 0.34000174), array<f32, 3>(0.40287244, 0.888948, 0.21786522), array<f32, 3>(0.46780815, -0.54966937, 0.69211207), array<f32, 3>(0.07109649, 0.79259959, -0.60558333), array<f32, 3>(-0.52073054, -0.06778631, 0.85102569), array<f32, 3>(-0.368667, 0.77676019, -0.51061556), array<f32, 3>(-0.717021, -0.35727116, 0.59853004), array<f32, 3>(-0.59010862, -0.73536014, -0.33319257), array<f32, 3>(-0.66875911, 0.5859766, 0.45759445), array<f32, 3>(-0.59798034, -0.69169805, 0.40493619), array<f32, 3>(-0.2049006, 0.79048994, 0.57718402), array<f32, 3>(0.48765302, 0.85851673, 0.15856717), array<f32, 3>(0.88918101, 0.10371433, 0.44564612), array<f32, 3>(0.48664272, 0.83596, 0.25367252), array<f32, 3>(-0.24554119, 0.50230038, -0.82909822), array<f32, 3>(0.03554055, -0.41884154, -0.90736356), array<f32, 3>(-0.037011, -0.61772404, 0.78552352), array<f32, 3>(0.42824046, 0.20582938, -0.87991158), array<f32, 3>(-0.06839464, -0.43555129, -0.89756183), array<f32, 3>(-0.40866952, -0.70331213, -0.58167111), array<f32, 3>(-0.74822692, 0.38256599, 0.54203297), array<f32, 3>(0.71541445, 0.51615594, 0.47091953), array<f32, 3>(0.60759905, -0.70288934, -0.36982423), array<f32, 3>(-0.01648745, -0.13394229, -0.99085197), array<f32, 3>(-0.64568452, -0.13342451, 0.7518573), array<f32, 3>(-0.42008783, 0.33302268, 0.84416948), array<f32, 3>(-0.6355718, -0.46817632, 0.61388877), array<f32, 3>(-0.82478405, -0.45636029, 0.33386606), array<f32, 3>(-0.66628051, 0.2405884, 0.70582399), array<f32, 3>(-0.60499178, -0.78374178, -0.14047697), array<f32, 3>(0.6304186, -0.60894989, -0.48140672), array<f32, 3>(-0.0794515, -0.91288865, -0.40040202), array<f32, 3>(-0.66942344, 0.1852393, 0.7194155), array<f32, 3>(-0.00849762, -0.47038898, 0.88241827), array<f32, 3>(0.66223413, -0.33585751, 0.66981019), array<f32, 3>(0.82512667, -0.23099667, -0.51556427), array<f32, 3>(-0.75186864, 0.65450118, -0.0795094), array<f32, 3>(0.8738391, 0.08193441, 0.47926192), array<f32, 3>(-0.26554211, 0.78650504, 0.55758158), array<f32, 3>(-0.49574252, 0.70523568, 0.50683527), array<f32, 3>(-0.49212635, -0.64694353, 0.58247381), array<f32, 3>(0.32264136, 0.7815951, -0.53386482), array<f32, 3>(0.71510371, -0.22498049, 0.66182359), array<f32, 3>(0.61434883, -0.51790453, 0.5952734), array<f32, 3>(-0.8255167, -0.14228251, -0.54614821), array<f32, 3>(-0.46251954, 0.64306734, -0.6103606), array<f32, 3>(-0.52117891, -0.69061769, 0.50141773), array<f32, 3>(0.27468699, -0.88951139, -0.36512537), array<f32, 3>(0.65713642, -0.75365863, -0.01305358), array<f32, 3>(0.9413622, -0.2196014, -0.25614924), array<f32, 3>(-0.8555446, 0.30842011, -0.41583708), array<f32, 3>(-0.35233681, -0.15379949, 0.92314922), array<f32, 3>(-0.74432132, 0.44164975, -0.5009304), array<f32, 3>(0.53994954, -0.79953954, -0.26304184), array<f32, 3>(0.42964607, 0.118806, 0.89514769), array<f32, 3>(-0.87921789, 0.18018271, 0.44103298), array<f32, 3>(-0.80353079, 0.36514238, 0.47011628), array<f32, 3>(0.50404538, 0.65465655, -0.56334986), array<f32, 3>(-0.92083981, -0.3038136, -0.24444087), array<f32, 3>(0.13956423, -0.96009192, -0.24237437), array<f32, 3>(-0.71698508, 0.68682212, 0.11919639), array<f32, 3>(-0.76698836, 0.61675487, -0.17703754), array<f32, 3>(-0.21874818, -0.57847904, -0.78581883), array<f32, 3>(0.55494484, -0.79971185, 0.22912262), array<f32, 3>(0.79660662, -0.41090893, 0.44336412), array<f32, 3>(0.66489466, 0.00947646, -0.74687703), array<f32, 3>(-0.59920476, 0.36935905, 0.71030103), array<f32, 3>(-0.57524868, -0.5140238, -0.63629277), array<f32, 3>(0.20536135, -0.6929694, 0.69110066), array<f32, 3>(-0.05544564, -0.99802158, 0.02964287), array<f32, 3>(0.13201661, 0.16519726, -0.97738502), array<f32, 3>(0.46510187, 0.64584669, -0.6054439), array<f32, 3>(-0.80108393, -0.59762086, 0.03337417), array<f32, 3>(-0.39806873, -0.44410006, -0.80269323), array<f32, 3>(0.95136791, -0.21916666, -0.21648342), array<f32, 3>(-0.82086395, 0.17982074, 0.54207645), array<f32, 3>(0.79513089, 0.37056075, 0.48005374), array<f32, 3>(0.77112323, 0.56616567, 0.291248), array<f32, 3>(0.81176337, -0.24837815, 0.52853432), array<f32, 3>(-0.81842091, 0.50060656, 0.28209979), array<f32, 3>(-0.38248924, -0.72602893, 0.57147525), array<f32, 3>(0.46198573, 0.37950267, 0.80159024), array<f32, 3>(-0.59524911, 0.04222053, 0.80243126), array<f32, 3>(-0.52273882, 0.79497643, -0.30782561), array<f32, 3>(-0.79922245, 0.45390541, 0.39397125), array<f32, 3>(0.38051244, -0.76512679, 0.51941436), array<f32, 3>(0.8381859, 0.2260542, 0.49633043), array<f32, 3>(0.63218067, 0.48127057, 0.60722832), array<f32, 3>(0.59242495, 0.18424992, -0.78427333), array<f32, 3>(0.85249021, -0.48552132, 0.19372531), array<f32, 3>(-0.43548364, -0.58439144, 0.68471939), array<f32, 3>(0.73179011, 0.29594379, -0.61392223), array<f32, 3>(-0.45280534, -0.80755156, 0.37792566), array<f32, 3>(0.55557939, 0.3009287, -0.77509578), array<f32, 3>(0.42575514, 0.70893498, 0.56226662), array<f32, 3>(0.60528173, -0.51550786, 0.6065358), array<f32, 3>(-0.5107667, 0.84729685, -0.14562083), array<f32, 3>(-0.33474095, 0.6971342, -0.63399716), array<f32, 3>(-0.48650711, 0.74561924, 0.45537104), array<f32, 3>(-0.41670009, -0.87381546, -0.2506144), array<f32, 3>(0.92586094, -0.34254116, -0.1595214), array<f32, 3>(-0.10682502, 0.59910669, 0.79351092), array<f32, 3>(-0.44718479, -0.59299328, 0.66961536), array<f32, 3>(0.69862855, -0.48858264, 0.52269031), array<f32, 3>(-0.74718902, 0.5193377, -0.41472512), array<f32, 3>(-0.56931667, 0.42835158, 0.70170753), array<f32, 3>(0.05154068, 0.16647211, 0.98469823), array<f32, 3>(0.7456836, -0.66371406, 0.05864824), array<f32, 3>(0.64686641, 0.41668704, 0.63869849), array<f32, 3>(0.27796256, -0.73021674, 0.62411563), array<f32, 3>(0.77079499, -0.62615383, 0.11750087), array<f32, 3>(-0.06833979, 0.9016069, 0.42712371), array<f32, 3>(-0.98003087, -0.09480635, 0.17478914), array<f32, 3>(-0.85191651, 0.47279136, 0.22518122), array<f32, 3>(0.52473004, -0.19693989, -0.82817454), array<f32, 3>(0.16081399, 0.75081437, -0.64063768), array<f32, 3>(0.71441816, 0.52488995, -0.46270642), array<f32, 3>(-0.23333515, -0.88652173, 0.39954216), array<f32, 3>(0.54760612, -0.74897952, -0.37303782), array<f32, 3>(0.48186221, -0.57810371, 0.65848683), array<f32, 3>(-0.21255857, -0.53489421, -0.81774509), array<f32, 3>(0.77930308, 0.57549405, -0.24797842), array<f32, 3>(0.60279872, -0.76604104, -0.22319235), array<f32, 3>(0.37230136, -0.52720909, 0.76383393), array<f32, 3>(-0.13321231, -0.92277683, 0.36157627), array<f32, 3>(-0.4783307, -0.49076061, -0.72825392), array<f32, 3>(0.28828612, -0.93601402, 0.20191301), array<f32, 3>(-0.6646036, -0.65589055, 0.35792406), array<f32, 3>(0.90686144, 0.30403802, 0.29182738), array<f32, 3>(-0.00682204, 0.42199214, 0.90657382), array<f32, 3>(-0.3322152, 0.2658483, -0.90496284), array<f32, 3>(-0.59515132, 0.55081686, 0.58514588), array<f32, 3>(0.77123373, 0.59869357, -0.21625109), array<f32, 3>(-0.69765329, -0.61042387, 0.37505011), array<f32, 3>(0.02426772, -0.5565686, -0.83044715), array<f32, 3>(0.65180023, 0.75814507, 0.01930051), array<f32, 3>(-0.01531784, -0.78276243, 0.62213209), array<f32, 3>(0.63847163, 0.0393637, 0.76863807), array<f32, 3>(0.407036, -0.09783879, -0.90815707), array<f32, 3>(-0.46223121, -0.6478355, -0.60551753), array<f32, 3>(0.82788442, -0.46539053, 0.31307993), array<f32, 3>(-0.75467147, 0.24001984, 0.61062382), array<f32, 3>(-0.70062375, -0.69087941, 0.17835919), array<f32, 3>(0.35457466, 0.88605939, -0.29862279), array<f32, 3>(0.20159504, -0.88658663, -0.4163215), array<f32, 3>(-0.32096612, 0.72494426, -0.60945597), array<f32, 3>(0.14147986, 0.53949815, -0.83001518), array<f32, 3>(0.28297638, 0.93772862, 0.20146813), array<f32, 3>(0.67192636, 0.43759891, -0.59751332), array<f32, 3>(0.98497844, 0.01967209, 0.17155312), array<f32, 3>(0.60388215, -0.68969665, 0.39955586), array<f32, 3>(0.41200242, 0.8500296, 0.3281824), array<f32, 3>(-0.83375884, 0.39266173, -0.38815328), array<f32, 3>(-0.70938505, -0.58502714, -0.39308535), array<f32, 3>(-0.63048972, 0.77513872, 0.04053013), array<f32, 3>(0.10261233, -0.6935548, -0.71305852), array<f32, 3>(0.65702752, -0.38976767, -0.64528753), array<f32, 3>(-0.4138826, 0.33890875, 0.84489174), array<f32, 3>(0.030284, -0.46424256, -0.88519022), array<f32, 3>(0.45068344, -0.52775066, -0.71997478), array<f32, 3>(0.48930093, 0.41323002, -0.76800101), array<f32, 3>(0.2835007, 0.66390322, 0.69199701), array<f32, 3>(0.42450922, -0.609169, 0.6698545), array<f32, 3>(0.67306932, 0.51724488, -0.52861652), array<f32, 3>(0.31095891, 0.94487804, -0.10251852), array<f32, 3>(-0.25569777, 0.90632689, -0.33643754), array<f32, 3>(-0.21431592, 0.0777898, -0.97366187), array<f32, 3>(0.27676605, -0.87464593, 0.39798876), array<f32, 3>(0.00288072, -0.8872614, -0.46125796), array<f32, 3>(0.51138622, 0.12353356, 0.85042554), array<f32, 3>(0.59734197, 0.76052363, 0.25453168), array<f32, 3>(-0.4333673, -0.76588813, 0.47498227), array<f32, 3>(0.34180565, -0.68750195, -0.64071052), array<f32, 3>(-0.6507828, 0.51803512, 0.55508681), array<f32, 3>(-0.89824124, 0.40466264, -0.17149586), array<f32, 3>(0.54253116, 0.81082175, -0.21960883), array<f32, 3>(-0.53994336, 0.5483663, 0.63855741), array<f32, 3>(0.68778819, 0.33483595, -0.64407475), array<f32, 3>(-0.63530446, -0.39864092, 0.66141792), array<f32, 3>(0.80728009, -0.58358794, -0.08788616), array<f32, 3>(0.94835277, 0.2641932, 0.17558181), array<f32, 3>(-0.15823843, -0.51165316, 0.8444949), array<f32, 3>(0.17510951, -0.22389002, 0.95875436), array<f32, 3>(0.13697442, -0.88598087, 0.44303037), array<f32, 3>(-0.73457485, -0.23332652, -0.63714874), array<f32, 3>(0.95521505, -0.1180176, 0.27135964), array<f32, 3>(-0.40184319, -0.90170455, -0.15953355), array<f32, 3>(0.16857866, -0.70975159, -0.68398386), array<f32, 3>(-0.55230772, 0.37144476, 0.74631426), array<f32, 3>(0.29875717, -0.61848962, -0.72678383), array<f32, 3>(0.62465217, -0.76131685, 0.17379963), array<f32, 3>(0.75759704, 0.19352541, 0.6233736), array<f32, 3>(-0.10375594, 0.61563856, 0.78116827), array<f32, 3>(0.52725731, 0.25296549, 0.81117704), array<f32, 3>(-0.71292545, -0.53989924, -0.44748867), array<f32, 3>(0.78246146, 0.54867457, 0.29446609), array<f32, 3>(0.31458005, 0.63401883, -0.70644145), array<f32, 3>(-0.09360697, -0.99481997, -0.03963538), array<f32, 3>(-0.59000956, 0.10880136, -0.80003186), array<f32, 3>(0.49713243, 0.77379744, -0.39255173), array<f32, 3>(-0.92985377, 0.17383167, 0.32427537), array<f32, 3>(0.73574353, -0.63730495, -0.22918086), array<f32, 3>(-0.04383386, -0.8027391, -0.59471719), array<f32, 3>(0.68411849, 0.52929683, -0.50182344), array<f32, 3>(-0.19561815, -0.57428906, -0.79493749), array<f32, 3>(0.90257811, -0.06366895, -0.42579222), array<f32, 3>(0.62294256, 0.39027502, -0.67795868), array<f32, 3>(-0.39046281, -0.7039895, 0.59324327), array<f32, 3>(0.7099002, 0.624334, -0.32595821), array<f32, 3>(-0.99157404, 0.0130069, 0.12888658), array<f32, 3>(-0.55765988, -0.46179257, 0.68975581), array<f32, 3>(-0.5373628, -0.34635255, -0.76894807), array<f32, 3>(0.25083685, 0.44726649, -0.85850659), array<f32, 3>(0.45758528, 0.86982087, -0.18446507), array<f32, 3>(-0.18615519, 0.23441065, -0.95414773), array<f32, 3>(0.56359579, -0.41325118, -0.71525048), array<f32, 3>(-0.48542469, 0.59678985, -0.63890903), array<f32, 3>(-0.72243931, -0.4081593, 0.55811059), array<f32, 3>(-0.23748605, 0.68466361, -0.68908354), array<f32, 3>(-0.69257361, 0.27959985, -0.66495543), array<f32, 3>(-0.10352601, -0.17369566, -0.97934273), array<f32, 3>(0.0019248, -0.09194122, 0.99576258), array<f32, 3>(0.36297645, 0.86362173, 0.34986513), array<f32, 3>(-0.71118388, -0.1024299, 0.69550385), array<f32, 3>(0.45146824, 0.430803, 0.78139952), array<f32, 3>(-0.13265094, -0.68773403, -0.71374059), array<f32, 3>(0.56016516, -0.56270148, -0.60793259), array<f32, 3>(-0.95871022, -0.27465634, -0.07374694), array<f32, 3>(-0.84169709, 0.06533746, -0.5359823), array<f32, 3>(0.69711911, -0.61618111, -0.36653212), array<f32, 3>(-0.01620384, 0.59778204, -0.8014949), array<f32, 3>(-0.34911215, 0.65899531, -0.6662176), array<f32, 3>(-0.19279427, -0.50540811, -0.84106659), array<f32, 3>(-0.60506152, 0.72292944, 0.33357695), array<f32, 3>(0.79789244, -0.59553505, 0.09330415), array<f32, 3>(-0.4817368, -0.74189415, 0.46639331), array<f32, 3>(0.84140763, 0.31839867, 0.43664115), array<f32, 3>(0.79614481, 0.60391839, -0.03789486), array<f32, 3>(0.19384456, 0.57096572, 0.79776089), array<f32, 3>(0.83441754, -0.25078854, -0.49076723), array<f32, 3>(-0.62605441, 0.72550166, 0.28583776), array<f32, 3>(0.55337866, -0.75558589, 0.35051679), array<f32, 3>(0.80543476, -0.01571309, 0.59247611), array<f32, 3>(-0.00851542, 0.98991715, 0.14139139), array<f32, 3>(-0.94076275, -0.29730096, -0.16302633), array<f32, 3>(-0.75465549, -0.41353736, -0.50939371), array<f32, 3>(0.37739255, -0.63080384, 0.67798332), array<f32, 3>(0.47325376, -0.73145333, -0.49092453), array<f32, 3>(0.12930721, -0.49066326, -0.86170135), array<f32, 3>(0.71173142, -0.11663112, 0.69270165), array<f32, 3>(0.41952295, -0.63051086, -0.65303641), array<f32, 3>(0.85916103, 0.42641569, 0.2828639), array<f32, 3>(0.54792224, -0.6641874, 0.50856299), array<f32, 3>(0.28479416, 0.43856869, 0.8523789), array<f32, 3>(-0.59050384, -0.68486024, -0.42693285), array<f32, 3>(0.54884141, 0.60847988, 0.5731713), array<f32, 3>(0.87567478, 0.2564907, -0.40915304), array<f32, 3>(0.02961573, 0.33496172, 0.94176619), array<f32, 3>(0.67428181, 0.70665199, 0.2144458), array<f32, 3>(0.23609059, -0.51982231, 0.82100305), array<f32, 3>(0.93726653, 0.00671493, 0.34854893), array<f32, 3>(-0.3989159, -0.91536143, -0.05458531), array<f32, 3>(0.93359117, -0.35793085, 0.01711843), array<f32, 3>(0.53572079, -0.56879583, 0.62407896), array<f32, 3>(-0.61516933, -0.36856434, -0.69694119), array<f32, 3>(0.74630703, -0.65946218, -0.09019675), array<f32, 3>(0.50607373, -0.59204544, -0.62719342), array<f32, 3>(-0.89793356, 0.43675114, 0.0544405), array<f32, 3>(-0.91682171, 0.07126199, 0.39288634), array<f32, 3>(-0.61178292, -0.15203616, -0.77627744), array<f32, 3>(-0.14028895, 0.63023583, 0.76362413), array<f32, 3>(0.71475895, -0.54060748, 0.44369268), array<f32, 3>(-0.31764961, 0.9263079, -0.20261391), array<f32, 3>(0.59833443, -0.58864018, -0.54359788), array<f32, 3>(-0.81450219, 0.22699691, -0.53390879), array<f32, 3>(0.00452737, -0.06652318, 0.99777461), array<f32, 3>(0.59311614, 0.19797584, -0.78039657), array<f32, 3>(-0.71375488, -0.02586188, 0.69991795), array<f32, 3>(-0.75600145, -0.26384588, -0.59903853), array<f32, 3>(0.25716644, 0.77480857, -0.57752671), array<f32, 3>(0.71712423, 0.61984999, -0.31862018), array<f32, 3>(-0.28194922, -0.55108799, 0.7853704), array<f32, 3>(0.57068285, -0.6706616, 0.4738503), array<f32, 3>(0.48969101, -0.22604767, -0.84208382), array<f32, 3>(-0.93763991, -0.34062289, 0.06933579), array<f32, 3>(-0.67376035, 0.15110895, -0.72333469), array<f32, 3>(-0.72414406, -0.65877431, -0.20403872), array<f32, 3>(-0.71204285, 0.41163046, -0.56881926), array<f32, 3>(0.23641604, -0.8628049, 0.44685026), array<f32, 3>(0.84208951, 0.19949878, -0.50108432), array<f32, 3>(-0.6748186, 0.67904385, -0.28899707), array<f32, 3>(0.52167146, 0.66360202, 0.53618211), array<f32, 3>(-0.4933039, -0.48590434, 0.72149029), array<f32, 3>(-0.1824072, 0.04137646, -0.98235208), array<f32, 3>(0.30714395, 0.55170433, 0.77542564), array<f32, 3>(-0.14577549, 0.95376355, -0.26283949), array<f32, 3>(-0.5437326, -0.69781662, -0.46626905), array<f32, 3>(0.01799205, -0.81833182, 0.57446437), array<f32, 3>(0.51019037, -0.566152, -0.64743934), array<f32, 3>(0.48463473, 0.59436639, 0.64176146), array<f32, 3>(0.09115853, -0.52830175, -0.84414891), array<f32, 3>(-0.62962436, -0.3840803, -0.6753188), array<f32, 3>(0.50864721, -0.48401592, -0.71204396), array<f32, 3>(-0.69669235, -0.63427804, -0.33512853), array<f32, 3>(0.60735178, -0.18339351, 0.77297518), array<f32, 3>(0.74102699, 0.67064566, 0.03336744), array<f32, 3>(-0.47352242, -0.76145583, -0.44267543), array<f32, 3>(0.47751531, -0.79737827, -0.36900816), array<f32, 3>(0.74175025, -0.64892413, 0.16942269), array<f32, 3>(0.65484829, -0.70924167, -0.26105549), array<f32, 3>(0.60455058, -0.64392987, -0.46890608), array<f32, 3>(-0.61878613, -0.77223405, 0.14407742), array<f32, 3>(-0.72376655, -0.65562529, 0.21521492), array<f32, 3>(0.2442091, -0.52118606, -0.81775731), array<f32, 3>(0.61291622, 0.39870471, -0.68217906), array<f32, 3>(0.67751893, 0.65970488, 0.32520389), array<f32, 3>(-0.04366879, -0.96113671, 0.27259726), array<f32, 3>(0.36541094, 0.62808212, 0.68701361), array<f32, 3>(-0.92572867, 0.10611717, -0.36299528), array<f32, 3>(0.80766374, -0.02031352, -0.58929335), array<f32, 3>(-0.82117076, 0.53034081, 0.2107539), array<f32, 3>(-0.62778197, -0.51872129, 0.58036025), array<f32, 3>(0.37696186, 0.57743439, -0.72420251), array<f32, 3>(-0.56818895, -0.47089866, -0.674845), array<f32, 3>(-0.61126182, -0.69853192, 0.37203783), array<f32, 3>(0.57901952, 0.81284241, -0.06343191), array<f32, 3>(-0.53287943, 0.70445351, 0.46881208), array<f32, 3>(0.22300157, -0.93258969, 0.28380764), array<f32, 3>(-0.63832115, -0.40157013, -0.65672486), array<f32, 3>(-0.2207478, 0.5099938, 0.8313704), array<f32, 3>(-0.5908105, -0.13684815, -0.79511982), array<f32, 3>(-0.79824305, 0.52060475, -0.30295004), array<f32, 3>(-0.5687117, 0.76435226, 0.30386284), array<f32, 3>(0.12786983, -0.64236825, -0.75565358), array<f32, 3>(-0.17631562, -0.76167939, -0.62350405), array<f32, 3>(0.34713709, 0.61125835, -0.7112377), array<f32, 3>(-0.39238887, -0.52886732, 0.75254922), array<f32, 3>(0.38116332, 0.71358998, -0.58779577), array<f32, 3>(-0.72949527, -0.67040404, 0.13562844), array<f32, 3>(-0.62057913, 0.45165344, -0.64100757), array<f32, 3>(-0.10668918, -0.98309252, -0.14881706), array<f32, 3>(0.594904, -0.46196716, -0.65778079), array<f32, 3>(0.22433782, 0.49054463, 0.84204424), array<f32, 3>(0.77498791, -0.57220981, 0.26827165), array<f32, 3>(0.26474565, 0.93986866, -0.21576987), array<f32, 3>(-0.01328623, 0.99975439, 0.0177378), array<f32, 3>(0.53097408, 0.47771884, 0.69989373), array<f32, 3>(0.24635212, -0.37499947, -0.89369236), array<f32, 3>(0.31300988, -0.54171955, 0.7801056), array<f32, 3>(0.7749465, -0.5263498, 0.34987684), array<f32, 3>(0.65518408, 0.51410661, -0.55355958), array<f32, 3>(0.78000762, -0.61855443, -0.09475515), array<f32, 3>(0.58176976, 0.62638121, 0.51883574), array<f32, 3>(-0.62371886, -0.59433046, 0.50768699), array<f32, 3>(0.85206333, 0.17478222, -0.49339564), array<f32, 3>(0.6997417, -0.42963013, 0.57077098), array<f32, 3>(-0.44953934, 0.62956163, -0.63369277), array<f32, 3>(0.63562255, 0.51965998, -0.57090935), array<f32, 3>(-0.02766532, -0.52812789, -0.84871406), array<f32, 3>(0.78698609, 0.04742916, -0.615145), array<f32, 3>(0.37827449, 0.78614098, 0.48876454), array<f32, 3>(0.90534508, -0.25600916, -0.33883565), array<f32, 3>(-0.37701605, 0.47347359, -0.79604124), array<f32, 3>(-0.43802429, 0.40756165, -0.80126664), array<f32, 3>(-0.87945568, -0.47372426, -0.046293), array<f32, 3>(-0.22787901, -0.8224267, 0.52123457), array<f32, 3>(0.48721529, 0.74652617, -0.45312243), array<f32, 3>(-0.6847399, -0.68222429, 0.25632263), array<f32, 3>(-0.33289944, 0.62102263, -0.70958358), array<f32, 3>(-0.0783879, -0.85438083, -0.51370101), array<f32, 3>(0.18575601, 0.96209034, 0.19969195), array<f32, 3>(0.09048656, -0.68256793, -0.72519874), array<f32, 3>(0.29506068, -0.68306389, -0.66810397), array<f32, 3>(-0.94937153, -0.17748927, 0.25921277), array<f32, 3>(-0.38725072, 0.16372291, 0.90732116), array<f32, 3>(-0.02691563, 0.81898594, 0.57318198), array<f32, 3>(-0.65244629, -0.52276924, -0.54865851), array<f32, 3>(0.15270967, -0.00097578, 0.98827061), array<f32, 3>(0.39108739, 0.55471383, -0.7343999), array<f32, 3>(0.85379797, -0.05140234, 0.51806064), array<f32, 3>(0.31443713, 0.14998906, -0.93735403), array<f32, 3>(-0.44277186, -0.56474741, -0.69642907), array<f32, 3>(-0.31521736, 0.37268196, 0.87278071), array<f32, 3>(0.97997903, -0.16829529, 0.10638514), array<f32, 3>(-0.25174419, -0.84939324, 0.4638491), array<f32, 3>(0.0386774, -0.72044135, 0.69243651), array<f32, 3>(-0.80207202, 0.48047131, 0.35472214), array<f32, 3>(0.48200634, -0.48413492, 0.73026246), array<f32, 3>(-0.41800015, 0.44068588, -0.79440029), array<f32, 3>(0.58661859, -0.43233611, 0.68480955), array<f32, 3>(0.40830998, -0.53710845, 0.73810397), array<f32, 3>(0.61242611, -0.72220206, -0.32149407), array<f32, 3>(-0.34159283, -0.62199145, -0.70458567), array<f32, 3>(-0.29885191, 0.58492128, -0.75402562), array<f32, 3>(-0.6292406, 0.77130626, -0.09561862), array<f32, 3>(0.91118189, 0.27762192, 0.30442344), array<f32, 3>(0.08064464, -0.99213777, -0.09570315), array<f32, 3>(0.93083382, -0.34928416, -0.10746612), array<f32, 3>(0.66101659, -0.67569323, 0.32633681), array<f32, 3>(0.07148482, -0.97619739, -0.20476469), array<f32, 3>(0.30440743, -0.78193565, -0.54397863), array<f32, 3>(-0.35656518, -0.19962907, 0.91269355), array<f32, 3>(0.8215165, -0.31061678, 0.47815045), array<f32, 3>(-0.69709423, -0.71173375, -0.08657198), array<f32, 3>(-0.4604417, -0.78565215, -0.41321197), array<f32, 3>(-0.70275364, -0.21121895, 0.67935548), array<f32, 3>(0.38087769, 0.63933041, 0.66797366));
+
+fn dc_perlin_simplexNoise3D(V: ptr<function, array<f32, 3>>) -> f32 {
+  var _x_: i32 = 0;
+  var _y_: i32 = 1;
+  var _z_: i32 = 2;
+  var skewF3: f32 = (1.0 / 3.0);
+  var skewG3: f32 = (1.0 / 6.0);
+  var C: array<array<f32, 3>, 4>;
+  var n: f32 = 0.0;
+  var gi: array<i32, 4>;
+  var corner: i32;
+  var t_: f32;
+  var skewIn: f32 = ((((*V)[_x_] + (*V)[_y_]) + (*V)[_z_]) * skewF3);
+  var i: i32 = i32(floor(((*V)[_x_] + skewIn)));
+  var j: i32 = i32(floor(((*V)[_y_] + skewIn)));
+  var k: i32 = i32(floor(((*V)[_z_] + skewIn)));
+  t_ = (f32(((i + j) + k)) * skewG3);
+  var X0: f32 = (f32(i) - t_);
+  var Y0: f32 = (f32(j) - t_);
+  var Z0: f32 = (f32(k) - t_);
+  C[0][_x_] = ((*V)[_x_] - X0);
+  C[0][_y_] = ((*V)[_y_] - Y0);
+  C[0][_z_] = ((*V)[_z_] - Z0);
+  var i1: i32;
+  var j1: i32;
+  var k1: i32;
+  var i2: i32;
+  var j2: i32;
+  var k2: i32;
+  if ((C[0][_x_] >= C[0][_y_])) {
+    if ((C[0][_y_] >= C[0][_z_])) {
+      i1 = 1;
+      j1 = 0;
+      k1 = 0;
+      i2 = 1;
+      j2 = 1;
+      k2 = 0;
+    } else {
+      if ((C[0][_x_] >= C[0][_z_])) {
+        i1 = 1;
+        j1 = 0;
+        k1 = 0;
+        i2 = 1;
+        j2 = 0;
+        k2 = 1;
+      } else {
+        i1 = 0;
+        j1 = 0;
+        k1 = 1;
+        i2 = 1;
+        j2 = 0;
+        k2 = 1;
+      }
+    }
+  } else {
+    if ((C[0][_y_] < C[0][_z_])) {
+      i1 = 0;
+      j1 = 0;
+      k1 = 1;
+      i2 = 0;
+      j2 = 1;
+      k2 = 1;
+    } else {
+      if ((C[0][_x_] < C[0][_z_])) {
+        i1 = 0;
+        j1 = 1;
+        k1 = 0;
+        i2 = 0;
+        j2 = 1;
+        k2 = 1;
+      } else {
+        i1 = 0;
+        j1 = 1;
+        k1 = 0;
+        i2 = 1;
+        j2 = 1;
+        k2 = 0;
+      }
+    }
+  }
+  C[1][_x_] = ((C[0][_x_] - f32(i1)) + skewG3);
+  C[1][_y_] = ((C[0][_y_] - f32(j1)) + skewG3);
+  C[1][_z_] = ((C[0][_z_] - f32(k1)) + skewG3);
+  C[2][_x_] = ((C[0][_x_] - f32(i2)) + (2.0 * skewG3));
+  C[2][_y_] = ((C[0][_y_] - f32(j2)) + (2.0 * skewG3));
+  C[2][_z_] = ((C[0][_z_] - f32(k2)) + (2.0 * skewG3));
+  C[3][_x_] = ((C[0][_x_] - 1.0) + (3.0 * skewG3));
+  C[3][_y_] = ((C[0][_y_] - 1.0) + (3.0 * skewG3));
+  C[3][_z_] = ((C[0][_z_] - 1.0) + (3.0 * skewG3));
+  var ii: i32 = (i & 1023);
+  var jj: i32 = (j & 1023);
+  var kk: i32 = (k & 1023);
+  gi[0] = dc_perlin_p[(ii + dc_perlin_p[(jj + dc_perlin_p[kk])])];
+  gi[1] = dc_perlin_p[((ii + i1) + dc_perlin_p[((jj + j1) + dc_perlin_p[(kk + k1)])])];
+  gi[2] = dc_perlin_p[((ii + i2) + dc_perlin_p[((jj + j2) + dc_perlin_p[(kk + k2)])])];
+  gi[3] = dc_perlin_p[((ii + 1) + dc_perlin_p[((jj + 1) + dc_perlin_p[(kk + 1)])])];
+  for (corner = 0; (corner < 4); corner++) {
+    t_ = (((0.6 - (C[corner][_x_] * C[corner][_x_])) - (C[corner][_y_] * C[corner][_y_])) - (C[corner][_z_] * C[corner][_z_]));
+    if ((t_ > 0.0)) {
+      t_ *= t_;
+      n += ((t_ * t_) * (((dc_perlin_grad3[gi[corner]][_x_] * C[corner][_x_]) + (dc_perlin_grad3[gi[corner]][_y_] * C[corner][_y_])) + (dc_perlin_grad3[gi[corner]][_z_] * C[corner][_z_])));
+    }
+  }
+  return (32.0 * n);
+}
+
+fn dc_perlin_perlinNoise3D(V: ptr<function, array<f32, 3>>, aScale: f32, fScale: f32, octaves: i32) -> f32 {
+  var _x_: i32 = 0;
+  var _y_: i32 = 1;
+  var _z_: i32 = 2;
+  var n: f32 = 0.0;
+  var U: array<f32, 3>;
+  var a: f32 = 1.0;
+  U[_x_] = (*V)[_x_];
+  U[_y_] = (*V)[_y_];
+  U[_z_] = (*V)[_z_];
+  for (var i: i32 = 0; (i < octaves); i++) {
+    n += (dc_perlin_simplexNoise3D(&(U)) / a);
+    a *= aScale;
+    U[_x_] *= fScale;
+    U[_y_] *= fScale;
+    U[_z_] *= fScale;
+  }
+  return n;
+}`,
+    code: (w, p) => `{
+var _notch_bottom: f32;
+var _notch_top: f32;
+_notch_bottom = (min(max(${p[2]}, -1.0), 1.0) - min(max(${p[3]}, 0.1), 2.0));
+_notch_bottom = select(_notch_bottom, 0.75, (_notch_bottom > 0.75));
+_notch_bottom = select(_notch_bottom, -3.0, (_notch_bottom < -2.0));
+_notch_top = (min(max(${p[2]}, -1.0), 1.0) + min(max(${p[3]}, 0.1), 2.0));
+_notch_top = select(_notch_top, -0.75, (_notch_top < -0.75));
+_notch_top = select(_notch_top, 3.0, (_notch_top > 3.0));
+var V: array<f32, 3>;
+var Vx: f32 = 0.0;
+var Vy: f32 = 0.0;
+var Col: f32;
+var r_: f32;
+var theta: f32;
+var s: f32;
+var c: f32;
+var p_: f32 = 1.0;
+var e: f32;
+var t_: i32;
+t_ = 0;
+loop {
+  e = 0.0;
+  if ((${w} == 0)) {
+    Vx = t.x;
+    Vy = t.y;
+  } else {
+    switch i32(min(max(${p[0]}, 0.0), 2.0)) {
+      case 0: {
+        Vx = ((1.0 + ${p[6]}) * (rnd(rs) - 0.5));
+        Vy = ((1.0 + ${p[6]}) * (rnd(rs) - 0.5));
+        r_ = select(Vy, Vx, ((Vx * Vx) > (Vy * Vy)));
+        if ((r_ > (1.0 - ${p[6]}))) {
+          e = ((0.5 * ((r_ - 1.0) + ${p[6]})) / ${p[6]});
+        }
+      }
+      case 1: {
+        r_ = (rnd(rs) + rnd(rs));
+        r_ = select(r_, (2.0 - r_), (r_ > 1.0));
+        r_ *= (1.0 + ${p[6]});
+        if ((r_ > (1.0 - ${p[6]}))) {
+          e = ((0.5 * ((r_ - 1.0) + ${p[6]})) / ${p[6]});
+        }
+        theta = (rnd(rs) * (2.0 * PI));
+        s = sin(theta);
+        c = cos(theta);
+        Vx = ((0.5 * r_) * s);
+        Vy = ((0.5 * r_) * c);
+      }
+      case 2: {
+        r_ = ((1.0 + ${p[6]}) * rnd(rs));
+        if ((r_ > (1.0 - ${p[6]}))) {
+          e = ((0.5 * ((r_ - 1.0) + ${p[6]})) / ${p[6]});
+        }
+        theta = (rnd(rs) * (2.0 * PI));
+        s = sin(theta);
+        c = cos(theta);
+        Vx = ((0.5 * r_) * s);
+        Vy = ((0.5 * r_) * c);
+      }
+      case default: {
+      }
+    }
+  }
+  switch i32(min(max(${p[1]}, 0.0), 5.0)) {
+    case 0: {
+      V[0] = (${p[7]} * Vx);
+      V[1] = (${p[7]} * Vy);
+      V[2] = (${p[7]} * ${p[11]});
+    }
+    case 1: {
+      r_ = (1.0 / (((Vx * Vx) + (Vy * Vy)) + 0.000001));
+      V[0] = ((${p[7]} * Vx) * r_);
+      V[1] = ((${p[7]} * Vy) * r_);
+      V[2] = (${p[7]} * ${p[11]});
+    }
+    case 2: {
+      r_ = (1.0 / (((Vx * Vx) + (Vy * Vy)) + 0.5));
+      V[0] = ((${p[7]} * Vx) * r_);
+      V[1] = ((${p[7]} * Vy) * r_);
+      V[2] = (${p[7]} * ${p[11]});
+    }
+    case 3: {
+      r_ = (1.0 / (((Vx * Vx) + (Vy * Vy)) + 0.25));
+      V[0] = ((${p[7]} * Vx) * r_);
+      V[1] = ((${p[7]} * Vy) * r_);
+      V[2] = (${p[7]} * ${p[11]});
+    }
+    case 4: {
+      r_ = (0.25 - ((Vx * Vx) + (Vy * Vy)));
+      if ((r_ < 0.0)) {
+        r_ = sqrt(-r_);
+      } else {
+        r_ = sqrt(r_);
+      }
+      V[0] = (${p[7]} * Vx);
+      V[1] = (${p[7]} * Vy);
+      V[2] = (${p[7]} * (r_ + ${p[11]}));
+    }
+    case 5: {
+      r_ = (0.25 - ((Vx * Vx) + (Vy * Vy)));
+      if ((r_ < 0.0)) {
+        r_ = sqrt(-r_);
+      } else {
+        r_ = sqrt(r_);
+      }
+      V[0] = (${p[7]} * Vx);
+      V[1] = (${p[7]} * Vy);
+      V[2] = (${p[7]} * ((2 * r_) + ${p[11]}));
+    }
+    default: {}
+  }
+  p_ = dc_perlin_perlinNoise3D(&(V), ${p[9]}, ${p[10]}, i32(min(max(${p[8]}, 1.0), 5.0)));
+  if ((p_ > 0.0)) {
+    e = ((p_ * (1.0 + ((e * e) * 20.0))) + (2.0 * e));
+  } else {
+    e = ((p_ * (1.0 + ((e * e) * 20.0))) - (2.0 * e));
+  }
+  if (!(((e < _notch_bottom) || (e > _notch_top)) && (f32(jpostinc(&(t_))) < min(max(${p[12]}, 2.0), 1000.0)))) { break; }
+}
+Col = (${p[4]} + (${p[5]} * p_));
+(*cp) = (Col - floor(Col));
+v.x += (${w} * Vx);
+v.y += (${w} * Vy);
+}`,
+  },
   "sphericalN": {
     params: [{ name: "power", def: 3 }, { name: "dist", def: 1 }],
     verified: true, priority: 0, flags: [], types: ["2D"],
@@ -4164,6 +5008,7 @@ if ((r2_ < 0.000001)) {
     funcNames: ["atan2j"],
     funcs: `fn atan2j(y: f32, x: f32) -> f32 { if (x == 0.0 && y == 0.0) { return select(0.0, PI, (bitcast<u32>(x) >> 31u) == 1u) * select(1.0, -1.0, (bitcast<u32>(y) >> 31u) == 1u); } return atan2(y, x); }`,
     code: (w, _p) => `{
+var rinv_: f32 = 1.0 / r;
 var _rz_sin: f32 = 0;
 var _rz_cos: f32 = 0;
 {
@@ -4173,6 +5018,14 @@ var _rz_cos: f32 = 0;
 var y: f32 = ((_rz_cos * t.y) - (_rz_sin * t.x));
 t.x = ((_rz_sin * t.y) + (_rz_cos * t.x));
 t.y = y;
+r2 = ((t.x * t.x) + (t.y * t.y));
+r = sqrt(r2);
+rinv_ = (1.0 / r);
+th = atan2j(t.x, t.y);
+ph = ((0.5 * PI) - th);
+if ((ph > PI)) {
+  ph -= (2.0 * PI);
+}
 }`,
   },
   "post_spin_z": {
@@ -4220,6 +5073,90 @@ v.y += (${w} * (((${w} / d) * t.y) / e));
 pz_ = (tempPZ + (${w} * (((${w} / d) * tempTZ) / e)));
 }`,
   },
+  "cubic3D": {
+    params: [{ name: "xpand", def: 0.25 }, { name: "style", def: 1 }],
+    verified: true, priority: 0, flags: ["3d","z"], types: ["3D"],
+    funcNames: ["atan2j"],
+    funcs: `fn atan2j(y: f32, x: f32) -> f32 { if (x == 0.0 && y == 0.0) { return select(0.0, PI, (bitcast<u32>(x) >> 31u) == 1u) * select(1.0, -1.0, (bitcast<u32>(y) >> 31u) == 1u); } return atan2(y, x); }`,
+    code: (w, p) => `{
+var fill: f32;
+var exnze: f32;
+var wynze: f32;
+var znxy: f32;
+var smooth_: f32 = 1.0;
+var smoothStyle: f32 = 1.0;
+var useNode: i32 = 0;
+var rchoice: i32 = i32(trunc((rnd(rs) * 8.0)));
+var lattd: f32 = (${w} * 0.5);
+if ((abs(${p[0]}) <= 1.0)) {
+  fill = (${p[0]} * 0.5);
+} else {
+  fill = (sqrt(${p[0]}) * 0.5);
+}
+if ((abs(${w}) <= 0.5)) {
+  smooth_ = (${w} * 2.0);
+} else {
+  smooth_ = 1.0;
+}
+if ((abs(${p[1]}) <= 1.0)) {
+  smoothStyle = ${p[1]};
+} else {
+  if ((${p[1]} > 1.0)) {
+    smoothStyle = (1.0 + ((${p[1]} - 1.0) * 0.25));
+  } else {
+    smoothStyle = (((${p[1]} + 1.0) * 0.25) - 1.0);
+  }
+}
+exnze = (1.0 - (smoothStyle * (1.0 - cos(atan2j(t.x, z_)))));
+wynze = (1.0 - (smoothStyle * (1.0 - sin(atan2j(t.y, z_)))));
+if ((smoothStyle > 1.0)) {
+  znxy = (1.0 - (smoothStyle * (1.0 - (((exnze + wynze) / 2.0) * smoothStyle))));
+} else {
+  znxy = (1.0 - (smoothStyle * (1.0 - ((exnze + wynze) / 2.0))));
+}
+useNode = rchoice;
+if ((useNode == 0)) {
+  v.x = (((v.x - (((smooth_ * (1.0 - fill)) * v.x) * exnze)) + (((t.x * smooth_) * fill) * exnze)) + lattd);
+  v.y = (((v.y - (((smooth_ * (1.0 - fill)) * v.y) * wynze)) + (((t.y * smooth_) * fill) * wynze)) + lattd);
+  pz_ = (((pz_ - (((smooth_ * (1.0 - fill)) * pz_) * znxy)) + (((z_ * smooth_) * fill) * znxy)) + lattd);
+}
+if ((useNode == 1)) {
+  v.x = (((v.x - (((smooth_ * (1.0 - fill)) * v.x) * exnze)) + (((t.x * smooth_) * fill) * exnze)) + lattd);
+  v.y = (((v.y - (((smooth_ * (1.0 - fill)) * v.y) * wynze)) + (((t.y * smooth_) * fill) * wynze)) - lattd);
+  pz_ = (((pz_ - (((smooth_ * (1.0 - fill)) * pz_) * znxy)) + (((z_ * smooth_) * fill) * znxy)) + lattd);
+}
+if ((useNode == 2)) {
+  v.x = (((v.x - (((smooth_ * (1.0 - fill)) * v.x) * exnze)) + (((t.x * smooth_) * fill) * exnze)) + lattd);
+  v.y = (((v.y - (((smooth_ * (1.0 - fill)) * v.y) * wynze)) + (((t.y * smooth_) * fill) * wynze)) + lattd);
+  pz_ = (((pz_ - (((smooth_ * (1.0 - fill)) * pz_) * znxy)) + (((z_ * smooth_) * fill) * znxy)) - lattd);
+}
+if ((useNode == 3)) {
+  v.x = (((v.x - (((smooth_ * (1.0 - fill)) * v.x) * exnze)) + (((t.x * smooth_) * fill) * exnze)) + lattd);
+  v.y = (((v.y - (((smooth_ * (1.0 - fill)) * v.y) * wynze)) + (((t.y * smooth_) * fill) * wynze)) - lattd);
+  pz_ = (((pz_ - (((smooth_ * (1.0 - fill)) * pz_) * znxy)) + (((z_ * smooth_) * fill) * znxy)) - lattd);
+}
+if ((useNode == 4)) {
+  v.x = (((v.x - (((smooth_ * (1.0 - fill)) * v.x) * exnze)) + (((t.x * smooth_) * fill) * exnze)) - lattd);
+  v.y = (((v.y - (((smooth_ * (1.0 - fill)) * v.y) * wynze)) + (((t.y * smooth_) * fill) * wynze)) + lattd);
+  pz_ = (((pz_ - (((smooth_ * (1.0 - fill)) * pz_) * znxy)) + (((z_ * smooth_) * fill) * znxy)) + lattd);
+}
+if ((useNode == 5)) {
+  v.x = (((v.x - (((smooth_ * (1.0 - fill)) * v.x) * exnze)) + (((t.x * smooth_) * fill) * exnze)) - lattd);
+  v.y = (((v.y - (((smooth_ * (1.0 - fill)) * v.y) * wynze)) + (((t.y * smooth_) * fill) * wynze)) - lattd);
+  pz_ = (((pz_ - (((smooth_ * (1.0 - fill)) * pz_) * znxy)) + (((z_ * smooth_) * fill) * znxy)) + lattd);
+}
+if ((useNode == 6)) {
+  v.x = (((v.x - (((smooth_ * (1.0 - fill)) * v.x) * exnze)) + (((t.x * smooth_) * fill) * exnze)) - lattd);
+  v.y = (((v.y - (((smooth_ * (1.0 - fill)) * v.y) * wynze)) + (((t.y * smooth_) * fill) * wynze)) + lattd);
+  pz_ = (((pz_ - (((smooth_ * (1.0 - fill)) * pz_) * znxy)) + (((z_ * smooth_) * fill) * znxy)) - lattd);
+}
+if ((useNode == 7)) {
+  v.x = (((v.x - (((smooth_ * (1.0 - fill)) * v.x) * exnze)) + (((t.x * smooth_) * fill) * exnze)) - lattd);
+  v.y = (((v.y - (((smooth_ * (1.0 - fill)) * v.y) * wynze)) + (((t.y * smooth_) * fill) * wynze)) - lattd);
+  pz_ = (((pz_ - (((smooth_ * (1.0 - fill)) * pz_) * znxy)) + (((z_ * smooth_) * fill) * znxy)) - lattd);
+}
+}`,
+  },
   "disc3d": {
     params: [{ name: "pi", def: 3.141592653589793 }],
     verified: true, priority: 0, flags: ["3d","z"], types: ["3D"],
@@ -4234,6 +5171,75 @@ var vv: f32 = ((${w} * atan2j(t.x, t.y)) / (${p[0]} + 0.000001));
 v.x += (vv * sr);
 v.y += (vv * cr);
 pz_ += (vv * (r_ * cos(z_)));
+}`,
+  },
+  "cubicLattice_3D": {
+    params: [{ name: "xpand", def: 0.2 }, { name: "style", def: 1 }],
+    verified: true, priority: 0, flags: ["3d","z"], types: ["3D"],
+    funcNames: ["atan2j"],
+    funcs: `fn atan2j(y: f32, x: f32) -> f32 { if (x == 0.0 && y == 0.0) { return select(0.0, PI, (bitcast<u32>(x) >> 31u) == 1u) * select(1.0, -1.0, (bitcast<u32>(y) >> 31u) == 1u); } return atan2(y, x); }`,
+    code: (w, p) => `{
+var _iStyle: i32;
+if ((abs(${p[1]}) >= 2.0)) {
+  _iStyle = 2;
+} else {
+  _iStyle = 1;
+}
+var fill: f32;
+var exnze: f32;
+var wynze: f32;
+var znxy: f32;
+if ((abs(${p[0]}) <= 1.0)) {
+  fill = (${p[0]} * 0.5);
+} else {
+  fill = (sqrt(${p[0]}) * 0.5);
+}
+if ((_iStyle == 2)) {
+  exnze = cos(atan2j(t.x, z_));
+  wynze = sin(atan2j(t.y, z_));
+  znxy = ((exnze + wynze) / 2.0);
+} else {
+  exnze = 1.0;
+  wynze = 1.0;
+  znxy = 1.0;
+}
+var lattd: f32 = ${w};
+var useNode: i32 = 0;
+var rchoice: i32 = i32(trunc((rnd(rs) * 8.0)));
+useNode = rchoice;
+if ((useNode == 0)) {
+  v.x = ((((v.x + t.x) * fill) * exnze) + lattd);
+  v.y = ((((v.y + t.y) * fill) * wynze) + lattd);
+  pz_ = ((((pz_ + z_) * fill) * znxy) + lattd);
+} else if ((useNode == 1)) {
+  v.x = ((((v.x + t.x) * fill) * exnze) + lattd);
+  v.y = ((((v.y + t.y) * fill) * wynze) - lattd);
+  pz_ = ((((pz_ + z_) * fill) * znxy) + lattd);
+} else if ((useNode == 2)) {
+  v.x = ((((v.x + t.x) * fill) * exnze) + lattd);
+  v.y = ((((v.y + t.y) * fill) * wynze) + lattd);
+  pz_ = ((((pz_ + z_) * fill) * znxy) - lattd);
+} else if ((useNode == 3)) {
+  v.x = ((((v.x + t.x) * fill) * exnze) + lattd);
+  v.y = ((((v.y + t.y) * fill) * wynze) - lattd);
+  pz_ = ((((pz_ + z_) * fill) * znxy) - lattd);
+} else if ((useNode == 4)) {
+  v.x = ((((v.x + t.x) * fill) * exnze) - lattd);
+  v.y = ((((v.y + t.y) * fill) * wynze) + lattd);
+  pz_ = ((((pz_ + z_) * fill) * znxy) + lattd);
+} else if ((useNode == 5)) {
+  v.x = ((((v.x + t.x) * fill) * exnze) - lattd);
+  v.y = ((((v.y + t.y) * fill) * wynze) - lattd);
+  pz_ = ((((pz_ + z_) * fill) * znxy) + lattd);
+} else if ((useNode == 6)) {
+  v.x = ((((v.x + t.x) * fill) * exnze) - lattd);
+  v.y = ((((v.y + t.y) * fill) * wynze) + lattd);
+  pz_ = ((((pz_ + z_) * fill) * znxy) - lattd);
+} else if ((useNode == 7)) {
+  v.x = ((((v.x + t.x) * fill) * exnze) - lattd);
+  v.y = ((((v.y + t.y) * fill) * wynze) - lattd);
+  pz_ = ((((pz_ + z_) * fill) * znxy) - lattd);
+}
 }`,
   },
   "popcorn2_3D": {
@@ -4267,6 +5273,194 @@ if ((inZ == 0.0)) {
 v.x += ((${w} * 0.5) * (t.x + (${p[0]} * sin(tan((${p[3]} * t.y))))));
 v.y += ((${w} * 0.5) * (t.y + (${p[1]} * sin(tan((${p[3]} * t.x))))));
 pz_ = (tempPZ + (tmpVV * ((${p[2]} * sin(tan(${p[3]}))) * tempTZ)));
+}`,
+  },
+  "hexaplay3D": {
+    params: [{ name: "majp", def: 1 }, { name: "scale", def: 0.25 }, { name: "zlift", def: 0.25 }],
+    verified: true, priority: 0, flags: ["3d","z"], types: ["3D"],
+    funcNames: ["atan2j"],
+    funcs: `fn atan2j(y: f32, x: f32) -> f32 { if (x == 0.0 && y == 0.0) { return select(0.0, PI, (bitcast<u32>(x) >> 31u) == 1u) * select(1.0, -1.0, (bitcast<u32>(y) >> 31u) == 1u); } return atan2(y, x); }`,
+    code: (w, p) => `{
+var _seg60x: array<f32, 6>;
+var _seg60y: array<f32, 6>;
+var _seg120x: array<f32, 3>;
+var _seg120y: array<f32, 3>;
+var _rswtch: i32;
+var _fcycle: i32;
+var _bcycle: i32;
+_rswtch = i32(trunc((rnd(rs) * 3.0)));
+var hlift: f32 = sin((PI / 3.0));
+_fcycle = i32(trunc((rnd(rs) * 6.0)));
+_bcycle = i32(trunc((rnd(rs) * 3.0)));
+_seg60x[0] = 1.0;
+_seg60x[1] = 0.5;
+_seg60x[2] = -0.5;
+_seg60x[3] = -1.0;
+_seg60x[4] = -0.5;
+_seg60x[5] = 0.5;
+_seg60y[0] = 0.0;
+_seg60y[1] = hlift;
+_seg60y[2] = hlift;
+_seg60y[3] = 0.0;
+_seg60y[4] = -hlift;
+_seg60y[5] = -hlift;
+_seg120x[0] = 1.0;
+_seg120x[1] = -0.5;
+_seg120x[2] = -0.5;
+_seg120y[0] = 0.0;
+_seg120y[1] = hlift;
+_seg120y[2] = -hlift;
+var lrmaj: f32 = ${w};
+var boost: f32 = 0;
+var posNeg: i32 = 1;
+var loc60: i32;
+var loc120: i32;
+var scale: f32 = (${p[1]} * 0.5);
+if ((rnd(rs) < 0.5)) {
+  posNeg = -1;
+}
+var majplane: i32 = 1;
+var abmajp: f32 = abs(${p[0]});
+if ((abmajp <= 1.0)) {
+  majplane = 1;
+} else {
+  majplane = 2;
+  boost = ((abmajp - 1.0) * 0.5);
+}
+if ((majplane == 2)) {
+  pz_ += (((z_ * 0.5) * ${p[2]}) + (f32(posNeg) * boost));
+} else {
+  pz_ += ((z_ * 0.5) * ${p[2]});
+}
+if ((_rswtch <= 1)) {
+  loc60 = _fcycle;
+  v.x = (((v.x + t.x) * scale) + (lrmaj * _seg60x[loc60]));
+  v.y = (((v.y + t.y) * scale) + (lrmaj * _seg60y[loc60]));
+} else {
+  loc120 = _bcycle;
+  v.x = (((v.x + t.x) * scale) + (lrmaj * _seg120x[loc120]));
+  v.y = (((v.y + t.y) * scale) + (lrmaj * _seg120y[loc120]));
+}
+}`,
+  },
+  "hexnix3D": {
+    params: [{ name: "majp", def: 1 }, { name: "scale", def: 0.25 }, { name: "zlift", def: 0 }, { name: "3side", def: 0.67 }],
+    verified: true, priority: 0, flags: ["3d","state","z"], types: ["3D"],
+    funcNames: ["jwx_hexnix3D_fcycle","jwx_hexnix3D_bcycle","jwx_hexnix3D_rswtch","roundc","atan2j"],
+    funcs: `fn roundc(x: f32) -> f32 { return sign(x) * floor(abs(x) + 0.5); }
+
+fn atan2j(y: f32, x: f32) -> f32 { if (x == 0.0 && y == 0.0) { return select(0.0, PI, (bitcast<u32>(x) >> 31u) == 1u) * select(1.0, -1.0, (bitcast<u32>(y) >> 31u) == 1u); } return atan2(y, x); }
+
+var<private> jwx_hexnix3D_fcycle: f32 = 0.0;
+
+var<private> jwx_hexnix3D_bcycle: f32 = 0.0;
+
+var<private> jwx_hexnix3D_rswtch: f32 = 0.0;`,
+    code: (w, p) => `{
+var _seg60x: array<f32, 6>;
+var _seg60y: array<f32, 6>;
+var _seg120x: array<f32, 3>;
+var _seg120y: array<f32, 3>;
+var hlift: f32 = sin((PI / 3.0));
+_seg60x[0] = 1.0;
+_seg60x[1] = 0.5;
+_seg60x[2] = -0.5;
+_seg60x[3] = -1.0;
+_seg60x[4] = -0.5;
+_seg60x[5] = 0.5;
+_seg60y[0] = 0.0;
+_seg60y[1] = -hlift;
+_seg60y[2] = -hlift;
+_seg60y[3] = 0.0;
+_seg60y[4] = hlift;
+_seg60y[5] = hlift;
+_seg120x[0] = 0.0;
+_seg120x[1] = cos(((7.0 * PI) / 6.0));
+_seg120x[2] = cos(((11.0 * PI) / 6.0));
+_seg120y[0] = -1.0;
+_seg120y[1] = 0.5;
+_seg120y[2] = 0.5;
+if ((i32(roundc(jwx_hexnix3D_fcycle)) > 5)) {
+  (*&(jwx_hexnix3D_fcycle)) = 0;
+  (*&(jwx_hexnix3D_rswtch)) = f32(i32(trunc((rnd(rs) * 3.0))));
+}
+if ((i32(roundc(jwx_hexnix3D_bcycle)) > 2)) {
+  (*&(jwx_hexnix3D_bcycle)) = 0;
+  (*&(jwx_hexnix3D_rswtch)) = f32(i32(trunc((rnd(rs) * 3.0))));
+}
+var lrmaj: f32 = ${w};
+var smooth_: f32 = 1.0;
+var smRotxTP: f32 = 0.0;
+var smRotyTP: f32 = 0.0;
+var smRotxFT: f32 = 0.0;
+var smRotyFT: f32 = 0.0;
+var gentleZ: f32 = 0.0;
+if ((abs(${w}) <= 0.5)) {
+  smooth_ = (${w} * 2.0);
+} else {
+  smooth_ = 1.0;
+}
+var boost: f32 = 0.0;
+var posNeg: i32 = 1;
+var loc60: i32;
+var loc120: i32;
+var scale: f32 = ${p[1]};
+var scale3: f32 = ${p[3]};
+if ((rnd(rs) < 0.5)) {
+  posNeg = -1;
+}
+var majplane: i32 = 0;
+var abmajp: f32 = abs(${p[0]});
+if ((abmajp <= 1.0)) {
+  majplane = 0;
+  boost = 0.0;
+} else if (((abmajp > 1.0) && (abmajp < 2.0))) {
+  majplane = 1;
+  boost = 0.0;
+} else {
+  majplane = 2;
+  boost = ((abmajp - 2.0) * 0.5);
+}
+if ((majplane == 0)) {
+  pz_ += (((smooth_ * z_) * scale) * ${p[2]});
+} else if (((majplane == 1) && (${p[0]} < 0.0))) {
+  if (((${p[0]} < -1.0) && (${p[0]} >= -2.0))) {
+    gentleZ = (abmajp - 1.0);
+  } else {
+    gentleZ = 1.0;
+  }
+  if ((posNeg < 0)) {
+    pz_ += (-2.0 * (pz_ * gentleZ));
+  }
+}
+if (((majplane == 2) && (${p[0]} < 0.0))) {
+  if ((posNeg > 0)) {
+    pz_ += (smooth_ * (((z_ * scale) * ${p[2]}) + boost));
+  } else {
+    pz_ = ((pz_ - ((2.0 * smooth_) * pz_)) + ((smooth_ * f32(posNeg)) * (((z_ * scale) * ${p[2]}) + boost)));
+  }
+} else {
+  pz_ += (smooth_ * (((z_ * scale) * ${p[2]}) + (f32(posNeg) * boost)));
+}
+if ((i32(roundc(jwx_hexnix3D_rswtch)) <= 1)) {
+  loc60 = i32(trunc((rnd(rs) * 6.0)));
+  smRotxTP = ((((smooth_ * scale) * v.x) * _seg60x[loc60]) - (((smooth_ * scale) * v.y) * _seg60y[loc60]));
+  smRotyTP = ((((smooth_ * scale) * v.y) * _seg60x[loc60]) + (((smooth_ * scale) * v.x) * _seg60y[loc60]));
+  smRotxFT = ((((t.x * smooth_) * scale) * _seg60x[loc60]) - (((t.y * smooth_) * scale) * _seg60y[loc60]));
+  smRotyFT = ((((t.y * smooth_) * scale) * _seg60x[loc60]) + (((t.x * smooth_) * scale) * _seg60y[loc60]));
+  v.x = ((((v.x * (1.0 - smooth_)) + smRotxTP) + smRotxFT) + ((smooth_ * lrmaj) * _seg60x[loc60]));
+  v.y = ((((v.y * (1.0 - smooth_)) + smRotyTP) + smRotyFT) + ((smooth_ * lrmaj) * _seg60y[loc60]));
+  (*&(jwx_hexnix3D_fcycle)) = (jwx_hexnix3D_fcycle + 1);
+} else {
+  loc120 = i32(trunc((rnd(rs) * 3.0)));
+  smRotxTP = ((((smooth_ * scale) * v.x) * _seg120x[loc120]) - (((smooth_ * scale) * v.y) * _seg120y[loc120]));
+  smRotyTP = ((((smooth_ * scale) * v.y) * _seg120x[loc120]) + (((smooth_ * scale) * v.x) * _seg120y[loc120]));
+  smRotxFT = ((((t.x * smooth_) * scale) * _seg120x[loc120]) - (((t.y * smooth_) * scale) * _seg120y[loc120]));
+  smRotyFT = ((((t.y * smooth_) * scale) * _seg120x[loc120]) + (((t.x * smooth_) * scale) * _seg120y[loc120]));
+  v.x = ((((v.x * (1.0 - smooth_)) + smRotxTP) + smRotxFT) + (((smooth_ * lrmaj) * scale3) * _seg120x[loc120]));
+  v.y = ((((v.y * (1.0 - smooth_)) + smRotyTP) + smRotyFT) + (((smooth_ * lrmaj) * scale3) * _seg120y[loc120]));
+  (*&(jwx_hexnix3D_bcycle)) = (jwx_hexnix3D_bcycle + 1);
+}
 }`,
   },
   "phoenix_julia": {
@@ -4349,6 +5543,7 @@ if ((rnd(rs) >= _cr)) {
     funcNames: ["atan2j"],
     funcs: `fn atan2j(y: f32, x: f32) -> f32 { if (x == 0.0 && y == 0.0) { return select(0.0, PI, (bitcast<u32>(x) >> 31u) == 1u) * select(1.0, -1.0, (bitcast<u32>(y) >> 31u) == 1u); } return atan2(y, x); }`,
     code: (w, p) => `{
+var rinv_: f32 = 1.0 / r;
 var _c: f32 = 0;
 var _cl: f32 = 0;
 var _cr: f32 = 0;
@@ -4387,6 +5582,14 @@ if ((rnd(rs) >= _cr)) {
       t.x = (${w} * (((offsetX * _c) + roundX) - ((offsetX / offsetY) * _cl)));
     }
   }
+}
+r2 = ((t.x * t.x) + (t.y * t.y));
+r = sqrt(r2);
+rinv_ = (1.0 / r);
+th = atan2j(t.x, t.y);
+ph = ((0.5 * PI) - th);
+if ((ph > PI)) {
+  ph -= (2.0 * PI);
 }
 }`,
   },
@@ -5184,6 +6387,7 @@ if ((abs(${p[0]}) < 0.000001)) {
     funcNames: ["atan2j"],
     funcs: `fn atan2j(y: f32, x: f32) -> f32 { if (x == 0.0 && y == 0.0) { return select(0.0, PI, (bitcast<u32>(x) >> 31u) == 1u) * select(1.0, -1.0, (bitcast<u32>(y) >> 31u) == 1u); } return atan2(y, x); }`,
     code: (w, p) => `{
+var rinv_: f32 = 1.0 / r;
 loop {
 var _g2: f32 = 0;
 var _r2: f32 = 0;
@@ -5239,6 +6443,14 @@ Vx = ((Cx + (c * Lx)) + (s * Ly));
 Vy = ((Cy - (s * Lx)) + (c * Ly));
 t.x = (${w} * Vx);
 t.y = (${w} * Vy);
+r2 = ((t.x * t.x) + (t.y * t.y));
+r = sqrt(r2);
+rinv_ = (1.0 / r);
+th = atan2j(t.x, t.y);
+ph = ((0.5 * PI) - th);
+if ((ph > PI)) {
+  ph -= (2.0 * PI);
+}
 break;
 }
 }`,
@@ -7743,6 +8955,26 @@ v.x += (v_ * t.x);
 v.y += (v_ * t.y);
 }`,
   },
+  "barycentroid": {
+    params: [{ name: "a", def: 1 }, { name: "b", def: 0 }, { name: "c", def: 0 }, { name: "d", def: 1 }],
+    verified: true, priority: 0, flags: [], types: ["2D"],
+    funcNames: ["atan2j"],
+    funcs: `fn atan2j(y: f32, x: f32) -> f32 { if (x == 0.0 && y == 0.0) { return select(0.0, PI, (bitcast<u32>(x) >> 31u) == 1u) * select(1.0, -1.0, (bitcast<u32>(y) >> 31u) == 1u); } return atan2(y, x); }`,
+    code: (w, p) => `{
+var dot00: f32 = ((${p[0]} * ${p[0]}) + (${p[1]} * ${p[1]}));
+var dot01: f32 = ((${p[0]} * ${p[2]}) + (${p[1]} * ${p[3]}));
+var dot02: f32 = ((${p[0]} * t.x) + (${p[1]} * t.y));
+var dot11: f32 = ((${p[2]} * ${p[2]}) + (${p[3]} * ${p[3]}));
+var dot12: f32 = ((${p[2]} * t.x) + (${p[3]} * t.y));
+var invDenom: f32 = (1.0 / ((dot00 * dot11) - (dot01 * dot01)));
+var u: f32 = (((dot11 * dot02) - (dot01 * dot12)) * invDenom);
+var v_: f32 = (((dot00 * dot12) - (dot01 * dot02)) * invDenom);
+var um: f32 = (sqrt(((u * u) + (t.x * t.x))) * f32(select(select(0, 1, (u > 0.0)), -1, (u < 0.0))));
+var vm: f32 = (sqrt(((v_ * v_) + (t.y * t.y))) * f32(select(select(0, 1, (v_ > 0.0)), -1, (v_ < 0.0))));
+v.x += (${w} * um);
+v.y += (${w} * vm);
+}`,
+  },
   "juliac": {
     params: [{ name: "re", def: 3 }, { name: "im", def: 0 }, { name: "dist", def: 1 }],
     verified: true, priority: 0, flags: [], types: ["2D"],
@@ -7898,6 +9130,152 @@ pz_ = (r_ * z);
 r_ *= sqrt(r2d);
 v.x = (r_ * cosa);
 v.y = (r_ * sina);
+}`,
+  },
+  "post_smartcrop": {
+    params: [{ name: "power", def: 4 }, { name: "radius", def: 1 }, { name: "roundstr", def: 0 }, { name: "roundwidth", def: 1 }, { name: "distortion", def: 1 }, { name: "edge", def: 0 }, { name: "scatter", def: 0 }, { name: "offset", def: 0 }, { name: "cropmode", def: 1 }, { name: "static", def: 2 }],
+    verified: true, priority: 1, flags: ["dc","z"], types: ["2D","CROP","POST"],
+    funcNames: ["roundc","atan2j"],
+    funcs: `fn roundc(x: f32) -> f32 { return sign(x) * floor(abs(x) + 0.5); }
+
+fn atan2j(y: f32, x: f32) -> f32 { if (x == 0.0 && y == 0.0) { return select(0.0, PI, (bitcast<u32>(x) >> 31u) == 1u) * select(1.0, -1.0, (bitcast<u32>(y) >> 31u) == 1u); } return atan2(y, x); }`,
+    code: (w, p) => `{
+var cropmode: i32 = i32(roundc(min(max(${p[8]}, 0.0), 2.0)));
+var _static: i32 = i32(roundc(min(max(${p[9]}, -1.0), 2.0)));
+var post_scrop_mode: i32;
+var post_scrop_radial: i32;
+var post_scrop_workradius: f32;
+var post_scrop_workpower: f32;
+var post_scrop_alpha: f32;
+var post_scrop_roundcoeff: f32;
+var post_scrop_x: f32;
+var post_scrop_y: f32;
+var post_scrop_z: f32;
+var post_scrop_c: f32;
+post_scrop_mode = select(0, 1, ((${p[0]} > 0) == (${p[1]} > 0)));
+post_scrop_workradius = abs(${p[1]});
+post_scrop_workpower = abs(${p[0]});
+if ((post_scrop_workpower < 2)) {
+  post_scrop_workpower = (post_scrop_workpower * PI);
+  post_scrop_radial = 1;
+} else {
+  post_scrop_radial = 0;
+  post_scrop_alpha = ((2.0 * PI) / post_scrop_workpower);
+  post_scrop_roundcoeff = (((${p[2]} / sin((post_scrop_alpha / 2.0))) / post_scrop_workpower) * 2.0);
+}
+post_scrop_c = 0.0;
+post_scrop_z = post_scrop_c;
+post_scrop_y = post_scrop_z;
+post_scrop_x = post_scrop_y;
+var xi: f32;
+var yi: f32;
+var zi: f32;
+if ((_static == 2)) {
+  xi = v.x;
+  yi = v.y;
+  zi = pz_;
+} else {
+  xi = t.x;
+  yi = t.y;
+  zi = z_;
+}
+var ang: f32 = atan2j(yi, xi);
+var rad: f32 = sqrt(((xi * xi) + (yi * yi)));
+if ((post_scrop_radial != 0)) {
+  var edge: f32 = (${p[5]} * (rnd(rs) - 0.5));
+  var xang: f32 = (((ang / (2.0 * PI)) + 1) + edge);
+  xang = ((xang - f32(i32(xang))) * (2.0 * PI));
+  if (((xang > post_scrop_workpower) == (post_scrop_mode != 0))) {
+    if ((cropmode == 2)) {
+      if (((_static == 2) || (_static == -1))) {
+        v.x = post_scrop_x;
+        v.y = post_scrop_y;
+        pz_ = post_scrop_z;
+        (*cp) = post_scrop_c;
+      } else {
+        v.x += post_scrop_x;
+        v.y += post_scrop_y;
+        pz_ += post_scrop_z;
+        (*cp) = post_scrop_c;
+      }
+    } else {
+      var a: f32 = select((-(((rnd(rs) * ${p[6]}) + ${p[7]}) + edge) * PI), (post_scrop_workpower + ((((rnd(rs) * ${p[6]}) + ${p[7]}) + edge) * PI)), (i32((rnd(rs) * 2.0)) > 0));
+      var s: f32 = sin(a);
+      var c: f32 = cos(a);
+      if (((_static == 2) || (_static == -1))) {
+        v.x = ((${w} * rad) * c);
+        v.y = ((${w} * rad) * s);
+        pz_ = (${w} * zi);
+      } else {
+        v.x += ((${w} * rad) * c);
+        v.y += ((${w} * rad) * s);
+        pz_ += (${w} * zi);
+      }
+    }
+  }
+} else {
+  var coeff: f32;
+  if ((${p[4]} == 0.0)) {
+    coeff = 1;
+  } else {
+    var xang: f32 = ((ang + PI) / post_scrop_alpha);
+    xang = (xang - f32(i32(xang)));
+    xang = select((1 - xang), xang, (xang < 0.5));
+    coeff = (1 / cos((xang * post_scrop_alpha)));
+    if ((${p[2]} != 0.0)) {
+      var wwidth: f32 = (select((xang * 2), exp((log((xang * 2)) * ${p[3]})), (${p[3]} != 1.0)) * post_scrop_roundcoeff);
+      coeff = abs((((1 - wwidth) * coeff) + wwidth));
+    }
+    if ((${p[4]} != 1.0)) {
+      coeff = exp((log(coeff) * ${p[4]}));
+    }
+  }
+  var xr: f32 = (coeff * select(post_scrop_workradius, (post_scrop_workradius + (${p[5]} * (rnd(rs) - 0.5))), (${p[5]} != 0.0)));
+  if (((rad > xr) == (post_scrop_mode != 0))) {
+    if ((cropmode == 2)) {
+      if (((_static == 2) || (_static == -1))) {
+        v.x = post_scrop_x;
+        v.y = post_scrop_y;
+        pz_ = post_scrop_z;
+        (*cp) = post_scrop_c;
+      } else {
+        v.x += post_scrop_x;
+        v.y += post_scrop_y;
+        pz_ += post_scrop_z;
+        (*cp) = post_scrop_c;
+      }
+    } else {
+      var rdc: f32 = ((f32(select(0, 1, (cropmode > 0))) * xr) + (coeff * ((rnd(rs) * ${p[6]}) + ${p[7]})));
+      var s: f32 = sin(ang);
+      var c: f32 = cos(ang);
+      if (((_static == 2) || (_static == -1))) {
+        v.x = ((${w} * rdc) * c);
+        v.y = ((${w} * rdc) * s);
+        pz_ = (${w} * zi);
+      } else {
+        v.x += ((${w} * rdc) * c);
+        v.y += ((${w} * rdc) * s);
+        pz_ += (${w} * zi);
+      }
+    }
+  } else {
+    post_scrop_x = (${w} * xi);
+    post_scrop_y = (${w} * yi);
+    post_scrop_z = (${w} * zi);
+    if ((cropmode == 2)) {
+      post_scrop_c = (*cp);
+    }
+    if ((_static > 0)) {
+      v.x = post_scrop_x;
+      v.y = post_scrop_y;
+      pz_ = post_scrop_z;
+    } else {
+      v.x += post_scrop_x;
+      v.y += post_scrop_y;
+      pz_ += post_scrop_z;
+    }
+  }
+}
 }`,
   },
   "circleblur": {
@@ -8474,6 +9852,826 @@ if ((r_ < 1.0)) {
     v.x -= ((${w} * r_) * tc);
     v.y += ((${w} * r_) * ts);
   }
+}
+}`,
+  },
+  "synth": {
+    params: [{ name: "a", def: 1 }, { name: "mode", def: 3 }, { name: "power", def: -2 }, { name: "mix", def: 1 }, { name: "smooth", def: 0 }, { name: "b", def: 0 }, { name: "b_type", def: 0 }, { name: "b_skew", def: 0 }, { name: "b_frq", def: 1 }, { name: "b_phs", def: 0 }, { name: "b_layer", def: 0 }, { name: "c", def: 0 }, { name: "c_type", def: 0 }, { name: "c_skew", def: 0 }, { name: "c_frq", def: 1 }, { name: "c_phs", def: 0 }, { name: "c_layer", def: 0 }, { name: "d", def: 0 }, { name: "d_type", def: 0 }, { name: "d_skew", def: 0 }, { name: "d_frq", def: 1 }, { name: "d_phs", def: 0 }, { name: "d_layer", def: 0 }, { name: "e", def: 0 }, { name: "e_type", def: 0 }, { name: "e_skew", def: 0 }, { name: "e_frq", def: 1 }, { name: "e_phs", def: 0 }, { name: "e_layer", def: 0 }, { name: "f", def: 0 }, { name: "f_type", def: 0 }, { name: "f_skew", def: 0 }, { name: "f_frq", def: 1 }, { name: "f_phs", def: 0 }, { name: "f_layer", def: 0 }],
+    verified: true, priority: 0, flags: ["state","z"], types: ["2D","SIMULATION"],
+    funcNames: ["jwx_synth_a_c","jwx_synth_b_c","jwx_synth_b_phs_c","jwx_synth_b_frq_c","jwx_synth_b_skew_c","jwx_synth_b_type_c","jwx_synth_b_layer_c","jwx_synth_c_c","jwx_synth_c_phs_c","jwx_synth_c_frq_c","jwx_synth_c_skew_c","jwx_synth_c_type_c","jwx_synth_c_layer_c","jwx_synth_d_c","jwx_synth_d_phs_c","jwx_synth_d_frq_c","jwx_synth_d_skew_c","jwx_synth_d_type_c","jwx_synth_d_layer_c","jwx_synth_e_c","jwx_synth_e_phs_c","jwx_synth_e_frq_c","jwx_synth_e_skew_c","jwx_synth_e_type_c","jwx_synth_e_layer_c","jwx_synth_f_c","jwx_synth_f_phs_c","jwx_synth_f_frq_c","jwx_synth_f_skew_c","jwx_synth_f_type_c","jwx_synth_f_layer_c","jwx_synth_mix_c","synth_SinCosPair","atan2j","powc","synth_SinCosPair_zero","synth_synth_value","synth_bezier_quad_map","synth_interpolate","synth_synthsincos"],
+    funcs: `struct synth_SinCosPair {
+  s: f32,
+  c: f32,
+}
+
+fn atan2j(y: f32, x: f32) -> f32 { if (x == 0.0 && y == 0.0) { return select(0.0, PI, (bitcast<u32>(x) >> 31u) == 1u) * select(1.0, -1.0, (bitcast<u32>(y) >> 31u) == 1u); } return atan2(y, x); }
+
+fn powc(x: f32, y: f32) -> f32 {
+  if (x >= 0.0) { return pow(x, y); }
+  let yi = round(y);
+  if (abs(y - yi) > 1e-6) { return pow(x, y); }
+  let m = pow(-x, y);
+  return select(m, -m, (i32(yi) & 1) != 0);
+}
+
+fn synth_SinCosPair_zero() -> synth_SinCosPair {
+  var r_: synth_SinCosPair;
+  return r_;
+}
+
+fn synth_synth_value(theta: f32) -> f32 {
+  var theta_factor: f32 = jwx_synth_a_c;
+  var x: f32 = 0;
+  var y: f32;
+  var z: f32;
+  if ((jwx_synth_b_c != 0.0)) {
+    z = (jwx_synth_b_phs_c + (theta * jwx_synth_b_frq_c));
+    y = (z / (2 * PI));
+    y -= floor(y);
+    if ((jwx_synth_b_skew_c != 0.0)) {
+      z = (0.5 + (0.5 * jwx_synth_b_skew_c));
+      if ((y > z)) {
+        y = (0.5 + ((0.5 * (y - z)) / ((1.0 - z) + 1.0e-30)));
+      } else {
+        y = (0.5 - ((0.5 * (z - y)) / (z + 1.0e-30)));
+      }
+    }
+    switch i32(jwx_synth_b_type_c) {
+      case 0: {
+        x = sin(((y * 2) * PI));
+      }
+      case 1: {
+        x = cos(((y * 2) * PI));
+      }
+      case 2: {
+        x = select(-1.0, 1.0, (y > 0.5));
+      }
+      case 3: {
+        x = (1.0 - (2.0 * y));
+      }
+      case 4: {
+        x = select(((2.0 * y) - 1.0), (3.0 - (4.0 * y)), (y > 0.5));
+      }
+      case 5: {
+        x = (((8.0 * (y - 0.5)) * (y - 0.5)) - 1.0);
+      }
+      case 6: {
+        x = ((2.0 * sqrt(y)) - 1.0);
+      }
+      case 7: {
+        y -= 0.5;
+        y *= ((2.0 * PI) / jwx_synth_b_frq_c);
+        x = ((1.0 / (cos(y) + 1.0e-30)) - 1.0);
+      }
+      case 8: {
+        y -= 0.5;
+        y *= ((2.0 * PI) / jwx_synth_b_frq_c);
+        z = cos(y);
+        x = (z / ((1.0 + 1.0e-30) - z));
+      }
+      case default: {
+      }
+    }
+    switch i32(jwx_synth_b_layer_c) {
+      case 0: {
+        theta_factor += (jwx_synth_b_c * x);
+      }
+      case 1: {
+        theta_factor *= (1.0 + (jwx_synth_b_c * x));
+      }
+      case 2: {
+        z = (jwx_synth_a_c + (jwx_synth_b_c * x));
+        theta_factor = select(z, theta_factor, (theta_factor > z));
+      }
+      case 3: {
+        z = (jwx_synth_a_c + (jwx_synth_b_c * x));
+        theta_factor = select(z, theta_factor, (theta_factor < z));
+      }
+      case default: {
+      }
+    }
+  }
+  if ((jwx_synth_c_c != 0.0)) {
+    z = (jwx_synth_c_phs_c + (theta * jwx_synth_c_frq_c));
+    y = (z / (2 * PI));
+    y -= floor(y);
+    if ((jwx_synth_c_skew_c != 0.0)) {
+      z = (0.5 + (0.5 * jwx_synth_c_skew_c));
+      if ((y > z)) {
+        y = (0.5 + ((0.5 * (y - z)) / ((1.0 - z) + 1.0e-30)));
+      } else {
+        y = (0.5 - ((0.5 * (z - y)) / (z + 1.0e-30)));
+      }
+    }
+    switch i32(jwx_synth_c_type_c) {
+      case 0: {
+        x = sin(((y * 2) * PI));
+      }
+      case 1: {
+        x = cos(((y * 2) * PI));
+      }
+      case 2: {
+        x = select(-1.0, 1.0, (y > 0.5));
+      }
+      case 3: {
+        x = (1.0 - (2.0 * y));
+      }
+      case 4: {
+        x = select(((2.0 * y) - 1.0), (3.0 - (4.0 * y)), (y > 0.5));
+      }
+      case 5: {
+        x = (((8.0 * (y - 0.5)) * (y - 0.5)) - 1.0);
+      }
+      case 6: {
+        x = ((2.0 * sqrt(y)) - 1.0);
+      }
+      case 7: {
+        y -= 0.5;
+        y *= ((2.0 * PI) / jwx_synth_c_frq_c);
+        x = ((1.0 / (cos(y) + 1.0e-30)) - 1.0);
+      }
+      case 8: {
+        y -= 0.5;
+        y *= ((2.0 * PI) / jwx_synth_c_frq_c);
+        z = cos(y);
+        x = (z / ((1.0 + 1.0e-30) - z));
+      }
+      case default: {
+      }
+    }
+    switch i32(jwx_synth_c_layer_c) {
+      case 0: {
+        theta_factor += (jwx_synth_c_c * x);
+      }
+      case 1: {
+        theta_factor *= (1.0 + (jwx_synth_c_c * x));
+      }
+      case 2: {
+        z = (jwx_synth_a_c + (jwx_synth_c_c * x));
+        theta_factor = select(z, theta_factor, (theta_factor > z));
+      }
+      case 3: {
+        z = (jwx_synth_a_c + (jwx_synth_c_c * x));
+        theta_factor = select(z, theta_factor, (theta_factor < z));
+      }
+      case default: {
+      }
+    }
+  }
+  if ((jwx_synth_d_c != 0.0)) {
+    z = (jwx_synth_d_phs_c + (theta * jwx_synth_d_frq_c));
+    y = (z / (2 * PI));
+    y -= floor(y);
+    if ((jwx_synth_d_skew_c != 0.0)) {
+      z = (0.5 + (0.5 * jwx_synth_d_skew_c));
+      if ((y > z)) {
+        y = (0.5 + ((0.5 * (y - z)) / ((1.0 - z) + 1.0e-30)));
+      } else {
+        y = (0.5 - ((0.5 * (z - y)) / (z + 1.0e-30)));
+      }
+    }
+    switch i32(jwx_synth_d_type_c) {
+      case 0: {
+        x = sin(((y * 2) * PI));
+      }
+      case 1: {
+        x = cos(((y * 2) * PI));
+      }
+      case 2: {
+        x = select(-1.0, 1.0, (y > 0.5));
+      }
+      case 3: {
+        x = (1.0 - (2.0 * y));
+      }
+      case 4: {
+        x = select(((2.0 * y) - 1.0), (3.0 - (4.0 * y)), (y > 0.5));
+      }
+      case 5: {
+        x = (((8.0 * (y - 0.5)) * (y - 0.5)) - 1.0);
+      }
+      case 6: {
+        x = ((2.0 * sqrt(y)) - 1.0);
+      }
+      case 7: {
+        y -= 0.5;
+        y *= ((2.0 * PI) / jwx_synth_d_frq_c);
+        x = ((1.0 / (cos(y) + 1.0e-30)) - 1.0);
+      }
+      case 8: {
+        y -= 0.5;
+        y *= ((2.0 * PI) / jwx_synth_d_frq_c);
+        z = cos(y);
+        x = (z / ((1.0 + 1.0e-30) - z));
+      }
+      case default: {
+      }
+    }
+    switch i32(jwx_synth_d_layer_c) {
+      case 0: {
+        theta_factor += (jwx_synth_d_c * x);
+      }
+      case 1: {
+        theta_factor *= (1.0 + (jwx_synth_d_c * x));
+      }
+      case 2: {
+        z = (jwx_synth_a_c + (jwx_synth_d_c * x));
+        theta_factor = select(z, theta_factor, (theta_factor > z));
+      }
+      case 3: {
+        z = (jwx_synth_a_c + (jwx_synth_d_c * x));
+        theta_factor = select(z, theta_factor, (theta_factor < z));
+      }
+      case default: {
+      }
+    }
+  }
+  if ((jwx_synth_e_c != 0.0)) {
+    z = (jwx_synth_e_phs_c + (theta * jwx_synth_e_frq_c));
+    y = (z / (2 * PI));
+    y -= floor(y);
+    if ((jwx_synth_e_skew_c != 0.0)) {
+      z = (0.5 + (0.5 * jwx_synth_e_skew_c));
+      if ((y > z)) {
+        y = (0.5 + ((0.5 * (y - z)) / ((1.0 - z) + 1.0e-30)));
+      } else {
+        y = (0.5 - ((0.5 * (z - y)) / (z + 1.0e-30)));
+      }
+    }
+    switch i32(jwx_synth_e_type_c) {
+      case 0: {
+        x = sin(((y * 2) * PI));
+      }
+      case 1: {
+        x = cos(((y * 2) * PI));
+      }
+      case 2: {
+        x = select(-1.0, 1.0, (y > 0.5));
+      }
+      case 3: {
+        x = (1.0 - (2.0 * y));
+      }
+      case 4: {
+        x = select(((2.0 * y) - 1.0), (3.0 - (4.0 * y)), (y > 0.5));
+      }
+      case 5: {
+        x = (((8.0 * (y - 0.5)) * (y - 0.5)) - 1.0);
+      }
+      case 6: {
+        x = ((2.0 * sqrt(y)) - 1.0);
+      }
+      case 7: {
+        y -= 0.5;
+        y *= ((2.0 * PI) / jwx_synth_e_frq_c);
+        x = ((1.0 / (cos(y) + 1.0e-30)) - 1.0);
+      }
+      case 8: {
+        y -= 0.5;
+        y *= ((2.0 * PI) / jwx_synth_e_frq_c);
+        z = cos(y);
+        x = (z / ((1.0 + 1.0e-30) - z));
+      }
+      case default: {
+      }
+    }
+    switch i32(jwx_synth_e_layer_c) {
+      case 0: {
+        theta_factor += (jwx_synth_e_c * x);
+      }
+      case 1: {
+        theta_factor *= (1.0 + (jwx_synth_e_c * x));
+      }
+      case 2: {
+        z = (jwx_synth_a_c + (jwx_synth_e_c * x));
+        theta_factor = select(z, theta_factor, (theta_factor > z));
+      }
+      case 3: {
+        z = (jwx_synth_a_c + (jwx_synth_e_c * x));
+        theta_factor = select(z, theta_factor, (theta_factor < z));
+      }
+      case default: {
+      }
+    }
+  }
+  if ((jwx_synth_f_c != 0.0)) {
+    z = (jwx_synth_f_phs_c + (theta * jwx_synth_f_frq_c));
+    y = (z / (2 * PI));
+    y -= floor(y);
+    if ((jwx_synth_f_skew_c != 0.0)) {
+      z = (0.5 + (0.5 * jwx_synth_f_skew_c));
+      if ((y > z)) {
+        y = (0.5 + ((0.5 * (y - z)) / ((1.0 - z) + 1.0e-30)));
+      } else {
+        y = (0.5 - ((0.5 * (z - y)) / (z + 1.0e-30)));
+      }
+    }
+    switch i32(jwx_synth_f_type_c) {
+      case 0: {
+        x = sin(((y * 2) * PI));
+      }
+      case 1: {
+        x = cos(((y * 2) * PI));
+      }
+      case 2: {
+        x = select(-1.0, 1.0, (y > 0.5));
+      }
+      case 3: {
+        x = (1.0 - (2.0 * y));
+      }
+      case 4: {
+        x = select(((2.0 * y) - 1.0), (3.0 - (4.0 * y)), (y > 0.5));
+      }
+      case 5: {
+        x = (((8.0 * (y - 0.5)) * (y - 0.5)) - 1.0);
+      }
+      case 6: {
+        x = ((2.0 * sqrt(y)) - 1.0);
+      }
+      case 7: {
+        y -= 0.5;
+        y *= ((2.0 * PI) / jwx_synth_f_frq_c);
+        x = ((1.0 / (cos(y) + 1.0e-30)) - 1.0);
+      }
+      case 8: {
+        y -= 0.5;
+        y *= ((2.0 * PI) / jwx_synth_f_frq_c);
+        z = cos(y);
+        x = (z / ((1.0 + 1.0e-30) - z));
+      }
+      case default: {
+      }
+    }
+    switch i32(jwx_synth_f_layer_c) {
+      case 0: {
+        theta_factor += (jwx_synth_f_c * x);
+      }
+      case 1: {
+        theta_factor *= (1.0 + (jwx_synth_f_c * x));
+      }
+      case 2: {
+        z = (jwx_synth_a_c + (jwx_synth_f_c * x));
+        theta_factor = select(z, theta_factor, (theta_factor > z));
+      }
+      case 3: {
+        z = (jwx_synth_a_c + (jwx_synth_f_c * x));
+        theta_factor = select(z, theta_factor, (theta_factor < z));
+      }
+      case default: {
+      }
+    }
+  }
+  return ((theta_factor * jwx_synth_mix_c) + (1.0 - jwx_synth_mix_c));
+}
+
+fn synth_bezier_quad_map(x_in: f32, m_in: f32) -> f32 {
+  var x: f32 = x_in;
+  var m: f32 = m_in;
+  var a: f32 = 1.0;
+  var t_: f32 = 0.0;
+  if ((m < 0.0)) {
+    m = -m;
+    a = -1.0;
+  }
+  if ((x < 0.0)) {
+    x = -x;
+    a = -a;
+  }
+  var iM: f32 = 10000000000.0;
+  if ((m > 1.0e-10)) {
+    iM = (1.0 / m);
+  }
+  var L: f32 = select((2.0 * m), (2.0 - m), ((2.0 - m) > (2.0 * m)));
+  if (((x > L) || (m == 1.0))) {
+    return (a * x);
+  }
+  if (((m < 1.0) && (x <= 1.0))) {
+    t_ = x;
+    if ((((m - 0.5) * (m - 0.5)) > 1.0e-10)) {
+      t_ = (((-1.0 * m) + sqrt(((m * m) + ((1.0 - (2.0 * m)) * x)))) / (1.0 - (2.0 * m)));
+    }
+    return (a * (x + (((m - 1.0) * t_) * t_)));
+  }
+  if (((1.0 < m) && (x <= 1.0))) {
+    t_ = x;
+    if ((((m - 2.0) * (m - 2.0)) > 1.0e-10)) {
+      t_ = (((-1.0 * iM) + sqrt(((iM * iM) + ((1.0 - (2.0 * iM)) * x)))) / (1 - (2 * iM)));
+    }
+    return (a * (x + (((m - 1.0) * t_) * t_)));
+  }
+  if ((m < 1.0)) {
+    t_ = sqrt(((x - 1.0) / (L - 1.0)));
+    return (a * (((x + (((m - 1.0) * t_) * t_)) + ((2 * (1.0 - m)) * t_)) + (m - 1.0)));
+  }
+  t_ = ((1.0 - m) + sqrt((((m - 1.0) * (m - 1.0)) + (x - 1.0))));
+  return (a * (((x + (((m - 1.0) * t_) * t_)) - ((2.0 * (m - 1.0)) * t_)) + (m - 1.0)));
+}
+
+fn synth_interpolate(x: f32, m: f32, lerp_type: i32) -> f32 {
+  switch lerp_type {
+    case 0: {
+      return (x * m);
+    }
+    case 1: {
+      return synth_bezier_quad_map(x, m);
+    }
+    default: {}
+  }
+  return (x * m);
+}
+
+fn synth_synthsincos(theta: f32, pair: ptr<function, synth_SinCosPair>, sine_type: i32) {
+  (*pair).s = sin(theta);
+  (*pair).c = cos(theta);
+  switch sine_type {
+    case 0: {
+      (*pair).s = ((*pair).s * synth_synth_value(theta));
+      (*pair).c = ((*pair).c * synth_synth_value((theta + (PI / 2.0))));
+    }
+    case 1: {
+      (*pair).s = (((1.0 - jwx_synth_mix_c) * (*pair).s) + (synth_synth_value(theta) - 1.0));
+      (*pair).c = (((1.0 - jwx_synth_mix_c) * (*pair).c) + (synth_synth_value((theta + (PI / 2.0))) - 1.0));
+    }
+    case default: {
+    }
+  }
+  return;
+}
+
+var<private> jwx_synth_a_c: f32 = 0.0;
+
+var<private> jwx_synth_b_c: f32 = 0.0;
+
+var<private> jwx_synth_b_phs_c: f32 = 0.0;
+
+var<private> jwx_synth_b_frq_c: f32 = 0.0;
+
+var<private> jwx_synth_b_skew_c: f32 = 0.0;
+
+var<private> jwx_synth_b_type_c: f32 = 0.0;
+
+var<private> jwx_synth_b_layer_c: f32 = 0.0;
+
+var<private> jwx_synth_c_c: f32 = 0.0;
+
+var<private> jwx_synth_c_phs_c: f32 = 0.0;
+
+var<private> jwx_synth_c_frq_c: f32 = 0.0;
+
+var<private> jwx_synth_c_skew_c: f32 = 0.0;
+
+var<private> jwx_synth_c_type_c: f32 = 0.0;
+
+var<private> jwx_synth_c_layer_c: f32 = 0.0;
+
+var<private> jwx_synth_d_c: f32 = 0.0;
+
+var<private> jwx_synth_d_phs_c: f32 = 0.0;
+
+var<private> jwx_synth_d_frq_c: f32 = 0.0;
+
+var<private> jwx_synth_d_skew_c: f32 = 0.0;
+
+var<private> jwx_synth_d_type_c: f32 = 0.0;
+
+var<private> jwx_synth_d_layer_c: f32 = 0.0;
+
+var<private> jwx_synth_e_c: f32 = 0.0;
+
+var<private> jwx_synth_e_phs_c: f32 = 0.0;
+
+var<private> jwx_synth_e_frq_c: f32 = 0.0;
+
+var<private> jwx_synth_e_skew_c: f32 = 0.0;
+
+var<private> jwx_synth_e_type_c: f32 = 0.0;
+
+var<private> jwx_synth_e_layer_c: f32 = 0.0;
+
+var<private> jwx_synth_f_c: f32 = 0.0;
+
+var<private> jwx_synth_f_phs_c: f32 = 0.0;
+
+var<private> jwx_synth_f_frq_c: f32 = 0.0;
+
+var<private> jwx_synth_f_skew_c: f32 = 0.0;
+
+var<private> jwx_synth_f_type_c: f32 = 0.0;
+
+var<private> jwx_synth_f_layer_c: f32 = 0.0;
+
+var<private> jwx_synth_mix_c: f32 = 0.0;`,
+    code: (w, p) => `{
+jwx_synth_a_c = ${p[0]};
+jwx_synth_b_c = ${p[5]};
+jwx_synth_b_phs_c = ${p[9]};
+jwx_synth_b_frq_c = ${p[8]};
+jwx_synth_b_skew_c = ${p[7]};
+jwx_synth_b_type_c = f32(i32(${p[6]}));
+jwx_synth_b_layer_c = f32(i32(${p[10]}));
+jwx_synth_c_c = ${p[11]};
+jwx_synth_c_phs_c = ${p[15]};
+jwx_synth_c_frq_c = ${p[14]};
+jwx_synth_c_skew_c = ${p[13]};
+jwx_synth_c_type_c = f32(i32(${p[12]}));
+jwx_synth_c_layer_c = f32(i32(${p[16]}));
+jwx_synth_d_c = ${p[17]};
+jwx_synth_d_phs_c = ${p[21]};
+jwx_synth_d_frq_c = ${p[20]};
+jwx_synth_d_skew_c = ${p[19]};
+jwx_synth_d_type_c = f32(i32(${p[18]}));
+jwx_synth_d_layer_c = f32(i32(${p[22]}));
+jwx_synth_e_c = ${p[23]};
+jwx_synth_e_phs_c = ${p[27]};
+jwx_synth_e_frq_c = ${p[26]};
+jwx_synth_e_skew_c = ${p[25]};
+jwx_synth_e_type_c = f32(i32(${p[24]}));
+jwx_synth_e_layer_c = f32(i32(${p[28]}));
+jwx_synth_f_c = ${p[29]};
+jwx_synth_f_phs_c = ${p[33]};
+jwx_synth_f_frq_c = ${p[32]};
+jwx_synth_f_skew_c = ${p[31]};
+jwx_synth_f_type_c = f32(i32(${p[30]}));
+jwx_synth_f_layer_c = f32(i32(${p[34]}));
+jwx_synth_mix_c = ${p[3]};
+var Vx: f32;
+var Vy: f32;
+var radius: f32;
+var theta: f32;
+var theta_factor: f32;
+var s: f32;
+var c: f32;
+var mu: f32;
+var pair: synth_SinCosPair = synth_SinCosPair_zero();
+switch i32(${p[1]}) {
+  case 5: {
+    Vx = t.x;
+    Vy = t.y;
+    radius = sqrt(((Vx * Vx) + (Vy * Vy)));
+    theta = atan2j(Vx, Vy);
+    theta_factor = synth_synth_value(theta);
+    radius = synth_interpolate(radius, theta_factor, i32(${p[4]}));
+    s = sin(theta);
+    c = cos(theta);
+    v.x += ((${w} * radius) * s);
+    v.y += ((${w} * radius) * c);
+  }
+  case 7: {
+    Vx = t.x;
+    Vy = t.y;
+    theta_factor = synth_synth_value(Vx);
+    v.x += (${w} * Vx);
+    v.y += (${w} * synth_interpolate(Vy, theta_factor, i32(${p[4]})));
+  }
+  case 6: {
+    Vx = t.x;
+    Vy = t.y;
+    theta_factor = synth_synth_value(Vy);
+    v.x += (${w} * synth_interpolate(Vx, theta_factor, i32(${p[4]})));
+    v.y += (${w} * Vy);
+  }
+  case 8: {
+    Vx = t.x;
+    Vy = t.y;
+    theta_factor = synth_synth_value(Vy);
+    v.x += (${w} * synth_interpolate(Vx, theta_factor, i32(${p[4]})));
+    theta_factor = synth_synth_value(Vx);
+    v.y += (${w} * synth_interpolate(Vy, theta_factor, i32(${p[4]})));
+  }
+  case 0: {
+    Vx = t.x;
+    Vy = t.y;
+    radius = powc((((Vx * Vx) + (Vy * Vy)) + 1.0e-30), ((${p[2]} + 1.0) / 2.0));
+    theta = atan2j(Vx, Vy);
+    theta_factor = synth_synth_value(theta);
+    radius = synth_interpolate(radius, theta_factor, i32(${p[4]}));
+    s = sin(theta);
+    c = cos(theta);
+    v.x += ((${w} * radius) * s);
+    v.y += ((${w} * radius) * c);
+  }
+  case 1: {
+    Vx = t.x;
+    Vy = t.y;
+    radius = (sqrt(((Vx * Vx) + (Vy * Vy))) / ((((Vx * Vx) + (Vy * Vy)) / 4) + 1));
+    theta = atan2j(Vx, Vy);
+    theta_factor = synth_synth_value(theta);
+    radius = synth_interpolate(radius, theta_factor, i32(${p[4]}));
+    s = sin(theta);
+    c = cos(theta);
+    v.x += ((${w} * radius) * s);
+    v.y += ((${w} * radius) * c);
+  }
+  case 2: {
+    radius = (((rnd(rs) + rnd(rs)) + (0.002 * rnd(rs))) / 2.002);
+    theta = (((2.0 * PI) * rnd(rs)) - PI);
+    Vx = (radius * sin(theta));
+    Vy = (radius * cos(theta));
+    radius = powc(((radius * radius) + 1.0e-30), (${p[2]} / 2.0));
+    theta_factor = synth_synth_value(theta);
+    radius = (${w} * synth_interpolate(radius, theta_factor, i32(${p[4]})));
+    v.x += (Vx * radius);
+    v.y += (Vy * radius);
+  }
+  case 3: {
+    radius = (0.5 * (rnd(rs) + rnd(rs)));
+    theta = (((2 * PI) * rnd(rs)) - PI);
+    radius = powc(((radius * radius) + 1.0e-30), (-(${p[2]}) / 2.0));
+    theta_factor = synth_synth_value(theta);
+    radius = synth_interpolate(radius, theta_factor, i32(${p[4]}));
+    s = sin(theta);
+    c = cos(theta);
+    v.x += ((${w} * radius) * s);
+    v.y += ((${w} * radius) * c);
+  }
+  case 12: {
+    radius = (1.0 + ((0.1 * ((rnd(rs) + rnd(rs)) - 1.0)) * ${p[2]}));
+    theta = (((2 * PI) * rnd(rs)) - PI);
+    theta_factor = synth_synth_value(theta);
+    radius = synth_interpolate(radius, theta_factor, i32(${p[4]}));
+    s = sin(theta);
+    c = cos(theta);
+    v.x += ((${w} * radius) * s);
+    v.y += ((${w} * radius) * c);
+  }
+  case 13: {
+    theta = (((2 * PI) * rnd(rs)) - PI);
+    radius = powc((rnd(rs) + 1.0e-30), ${p[2]});
+    radius = (synth_synth_value(theta) + (0.1 * radius));
+    s = sin(theta);
+    c = cos(theta);
+    v.x += ((${w} * radius) * s);
+    v.y += ((${w} * radius) * c);
+  }
+  case 14: {
+    Vx = t.x;
+    Vy = t.y;
+    radius = powc((((Vx * Vx) + (Vy * Vy)) + 1.0e-30), (${p[2]} / 2.0));
+    theta = ((atan2j(Vx, Vy) - 1.0) + synth_synth_value(radius));
+    s = sin(theta);
+    c = cos(theta);
+    v.x += ((${w} * radius) * s);
+    v.y += ((${w} * radius) * c);
+  }
+  case 15: {
+    Vx = t.x;
+    Vy = t.y;
+    radius = powc((((Vx * Vx) + (Vy * Vy)) + 1.0e-30), (${p[2]} / 2.0));
+    theta = atan2j(Vx, Vy);
+    s = sin(theta);
+    c = cos(theta);
+    mu = (synth_synth_value(radius) - 1.0);
+    Vx += (mu * c);
+    Vy -= (mu * s);
+    v.x += (${w} * Vx);
+    v.y += (${w} * Vy);
+  }
+  case 16: {
+    Vx = t.x;
+    Vy = t.y;
+    radius = powc((((Vx * Vx) + (Vy * Vy)) + 1.0e-30), (${p[2]} / 2.0));
+    theta = ((atan2j(Vx, Vy) - 1.0) + synth_synth_value(radius));
+    s = sin(theta);
+    c = cos(theta);
+    radius = sqrt(((Vx * Vx) + (Vy * Vy)));
+    v.x += ((${w} * radius) * s);
+    v.y += ((${w} * radius) * c);
+  }
+  case 4: {
+    Vy = (1.0 + ((0.1 * ((rnd(rs) + rnd(rs)) - 1.0)) * ${p[2]}));
+    theta = (2.0 * asin(((rnd(rs) - 0.5) * 2.0)));
+    theta_factor = synth_synth_value(theta);
+    Vy = synth_interpolate(Vy, theta_factor, i32(${p[4]}));
+    v.x += (${w} * (theta / PI));
+    v.y += (${w} * (Vy - 1.0));
+  }
+  case 9: {
+    Vx = t.x;
+    Vy = t.y;
+    v.x += (${w} * ((Vx + synth_synth_value(Vy)) - 1.0));
+    v.y += (${w} * Vy);
+  }
+  case 10: {
+    Vx = t.x;
+    Vy = t.y;
+    v.x += (${w} * Vx);
+    v.y += (${w} * ((Vy + synth_synth_value(Vx)) - 1.0));
+  }
+  case 11: {
+    Vx = t.x;
+    Vy = t.y;
+    v.x += (${w} * ((Vx + synth_synth_value(Vy)) - 1.0));
+    v.y += (${w} * ((Vy + synth_synth_value(Vx)) - 1.0));
+  }
+  case 1001: {
+    Vx = t.x;
+    Vy = t.y;
+    v.x += (${w} * ((synth_synth_value(Vx) - 1.0) + ((1.0 - ${p[3]}) * sin(Vx))));
+    v.y += (${w} * ((synth_synth_value(Vy) - 1.0) + ((1.0 - ${p[3]}) * sin(Vy))));
+  }
+  case 1002: {
+    Vx = t.x;
+    Vy = t.y;
+    radius = powc((((Vx * Vx) + (Vy * Vy)) + 1.0e-30), (${p[2]} / 2.0));
+    synth_synthsincos(radius, &(pair), i32(${p[4]}));
+    s = pair.s;
+    c = pair.c;
+    v.x += (${w} * ((s * Vx) - (c * Vy)));
+    v.y += (${w} * ((c * Vx) + (s * Vy)));
+  }
+  case 1003: {
+    Vx = t.x;
+    Vy = t.y;
+    radius = powc((((Vx * Vx) + (Vy * Vy)) + 1.0e-30), (${p[2]} / 2.0));
+    theta = atan2j(Vx, Vy);
+    synth_synthsincos(theta, &(pair), i32(${p[4]}));
+    s = pair.s;
+    c = pair.c;
+    v.x += ((${w} * s) / radius);
+    v.y += ((${w} * c) * radius);
+  }
+  case 1004: {
+    Vx = t.x;
+    Vy = t.y;
+    radius = powc((((Vx * Vx) + (Vy * Vy)) + 1.0e-30), (${p[2]} / 4.0));
+    theta = (atan2j(Vx, Vy) / 2.0);
+    if ((rnd(rs) < 0.5)) {
+      theta += PI;
+    }
+    synth_synthsincos(theta, &(pair), i32(${p[4]}));
+    s = pair.s;
+    c = pair.c;
+    v.x += ((${w} * radius) * c);
+    v.y += ((${w} * radius) * s);
+  }
+  case 1005: {
+    Vx = t.x;
+    Vy = t.y;
+    theta = (atan2j(Vx, Vy) / PI);
+    radius = (PI * powc((((Vx * Vx) + (Vy * Vy)) + 1.0e-30), (${p[2]} / 2.0)));
+    synth_synthsincos(radius, &(pair), i32(${p[4]}));
+    s = pair.s;
+    c = pair.c;
+    v.x = ((${w} * s) * theta);
+    v.y = ((${w} * c) * theta);
+  }
+  case 1006: {
+    Vx = t.x;
+    Vy = t.y;
+    radius = sqrt(((Vx * Vx) + (Vy * Vy)));
+    theta = atan2j(Vx, Vy);
+    mu = ((${p[2]} * ${p[2]}) + 1.0e-30);
+    radius += (((-2.0 * mu) * f32(i32(((radius + mu) / (2.0 * mu))))) + (radius * (1.0 - mu)));
+    synth_synthsincos(theta, &(pair), i32(${p[4]}));
+    s = pair.s;
+    c = pair.c;
+    v.x += ((${w} * s) * radius);
+    v.y += ((${w} * c) * radius);
+  }
+  case 1007: {
+    Vx = t.x;
+    Vy = t.y;
+    radius = powc((((Vx * Vx) + (Vy * Vy)) + 1.0e-30), (${p[2]} / 2.0));
+    synth_synthsincos(Vx, &(pair), i32(${p[4]}));
+    s = pair.s;
+    c = pair.c;
+    v.x += ((${w} * radius) * s);
+    v.y += ((${w} * radius) * Vy);
+  }
+  case 17: {
+    Vx = t.x;
+    Vy = t.y;
+    mu = (synth_synth_value(Vx) - 1.0);
+    Vy = ((2.0 * mu) - Vy);
+    v.x += (${w} * Vx);
+    v.y += (${w} * Vy);
+  }
+  case 18: {
+    Vx = t.x;
+    Vy = t.y;
+    mu = (synth_synth_value(Vx) - 1.0);
+    radius = (synth_synth_value(Vy) - 1.0);
+    Vy = ((2.0 * mu) - Vy);
+    Vx = ((2.0 * radius) - Vx);
+    v.x += (${w} * Vx);
+    v.y += (${w} * Vy);
+  }
+  case 19: {
+    Vx = t.x;
+    Vy = t.y;
+    radius = sqrt(((Vx * Vx) + (Vy * Vy)));
+    theta = atan2j(Vx, Vy);
+    theta_factor = synth_synth_value(theta);
+    radius = synth_interpolate(radius, theta_factor, i32(${p[4]}));
+    radius = powc(radius, ${p[2]});
+    s = sin(theta);
+    c = cos(theta);
+    v.x += ((${w} * radius) * s);
+    v.y += ((${w} * radius) * c);
+  }
+  case default: {
+  }
+}
+if (false) {
+  pz_ += (${w} * z_);
 }
 }`,
   },
@@ -9300,6 +11498,495 @@ t.x = (((x * re) + (y * im)) * r_);
 t.y = (((y * re) - (x * im)) * r_);
 }`,
   },
+  "falloff3": {
+    params: [{ name: "blur_type", def: 0 }, { name: "blur_shape", def: 0 }, { name: "blur_strength", def: 1 }, { name: "min_distance", def: 0.5 }, { name: "invert_distance", def: 0 }, { name: "mul_x", def: 1 }, { name: "mul_y", def: 1 }, { name: "mul_z", def: 0 }, { name: "mul_c", def: 0 }, { name: "center_x", def: 0 }, { name: "center_y", def: 0 }, { name: "center_z", def: 0 }, { name: "alpha", def: 0 }],
+    verified: true, priority: 0, flags: ["3d","dc","state","z"], types: ["3D","BLUR"],
+    funcNames: ["jwx_falloff3_alpha_c","jwx_falloff3_inited_","jwx_falloff3_r_max","falloff3_Double4","falloff3_Double3","atan2j","sqr","falloff3_Double4_zero","falloff3_Double4_make","falloff3_Double3_make","falloff3_bs_circle","falloff3_bs_square","falloff3_bt_gaussian","falloff3_bt_radial","falloff3_sgnd","falloff3_log_map","falloff3_log_scale","falloff3_bt_log"],
+    funcs: `struct falloff3_Double4 {
+  x: f32,
+  y: f32,
+  z: f32,
+  c: f32,
+}
+
+struct falloff3_Double3 {
+  x: f32,
+  y: f32,
+  z: f32,
+}
+
+fn atan2j(y: f32, x: f32) -> f32 { if (x == 0.0 && y == 0.0) { return select(0.0, PI, (bitcast<u32>(x) >> 31u) == 1u) * select(1.0, -1.0, (bitcast<u32>(y) >> 31u) == 1u); } return atan2(y, x); }
+
+fn sqr(x: f32) -> f32 { return x * x; }
+
+fn falloff3_Double4_zero() -> falloff3_Double4 {
+  var r_: falloff3_Double4;
+  return r_;
+}
+
+fn falloff3_Double4_make(pX: f32, pY: f32, pZ: f32, pC: f32) -> falloff3_Double4 {
+  var r_: falloff3_Double4;
+  r_.x = pX;
+  r_.y = pY;
+  r_.z = pZ;
+  r_.c = pC;
+  return r_;
+}
+
+fn falloff3_Double3_make(pX: f32, pY: f32, pZ: f32) -> falloff3_Double3 {
+  var r_: falloff3_Double3;
+  r_.x = pX;
+  r_.y = pY;
+  r_.z = pZ;
+  return r_;
+}
+
+fn falloff3_bs_circle(v_in: falloff3_Double4, center: falloff3_Double3) -> f32 {
+  var distance_: f32 = sqrt(((sqr((v_in.x - center.x)) + sqr((v_in.y - center.y))) + sqr((v_in.z - center.z))));
+  return distance_;
+}
+
+fn falloff3_bs_square(v_in: falloff3_Double4, center: falloff3_Double3) -> f32 {
+  return max(abs((v_in.x - center.x)), max(abs((v_in.y - center.y)), abs((v_in.z - center.z))));
+}
+
+fn falloff3_bt_gaussian(v_in: falloff3_Double4, mul: falloff3_Double4, random: falloff3_Double4, dist: f32) -> falloff3_Double4 {
+  var sigma: f32 = ((dist * random.y) * (2.0 * PI));
+  var phi: f32 = ((dist * random.z) * PI);
+  var rad: f32 = (dist * random.x);
+  var sigma_s: f32 = sin(sigma);
+  var sigma_c: f32 = cos(sigma);
+  var phi_s: f32 = sin(phi);
+  var phi_c: f32 = cos(phi);
+  return falloff3_Double4_make((v_in.x + (((mul.x * rad) * sigma_c) * phi_c)), (v_in.y + (((mul.y * rad) * sigma_c) * phi_s)), (v_in.z + ((mul.z * rad) * sigma_s)), (v_in.c + ((mul.c * dist) * random.c)));
+}
+
+fn falloff3_bt_radial(v_in: falloff3_Double4, mul: falloff3_Double4, random: falloff3_Double4, dist: f32) -> falloff3_Double4 {
+  if ((((v_in.x == 0) && (v_in.y == 0)) && (v_in.z == 0))) {
+    return v_in;
+  }
+  var r_in: f32 = sqrt(((sqr(v_in.x) + sqr(v_in.y)) + sqr(v_in.z)));
+  var a: f32 = ((mul.y * dist) + ((jwx_falloff3_alpha_c * dist) / sqrt(jwx_falloff3_r_max)));
+  var b: f32 = (mul.z * dist);
+  var sigma: f32 = (asin((v_in.z / r_in)) + (b * random.z));
+  var phi: f32 = (atan2j(v_in.y, v_in.x) + (a * random.y));
+  var r_: f32 = (r_in + ((mul.x * random.x) * dist));
+  var sigma_s: f32 = sin(sigma);
+  var sigma_c: f32 = cos(sigma);
+  var phi_s: f32 = sin(phi);
+  var phi_c: f32 = cos(phi);
+  return falloff3_Double4_make(((r_ * sigma_c) * phi_c), ((r_ * sigma_c) * phi_s), (r_ * sigma_s), (v_in.c + ((mul.c * random.c) * dist)));
+}
+
+fn falloff3_sgnd(x: f32) -> f32 {
+  return f32(select(1, -1, (x < 0)));
+}
+
+fn falloff3_log_map(x: f32) -> f32 {
+  return select((((2.718281828459045 + log((x * 2.718281828459045))) / 4.0) * falloff3_sgnd(x)), 0, (x == 0));
+}
+
+fn falloff3_log_scale(x: f32) -> f32 {
+  return select(((log(((abs(x) + 1.0) * 2.718281828459045)) * falloff3_sgnd(x)) / 2.718281828459045), 0, (x == 0));
+}
+
+fn falloff3_bt_log(v_in: falloff3_Double4, mul: falloff3_Double4, random: falloff3_Double4, dist: f32) -> falloff3_Double4 {
+  var coeff: f32 = select((dist + (jwx_falloff3_alpha_c * (falloff3_log_map(dist) - dist))), dist, (jwx_falloff3_r_max <= 1.0e-9));
+  return falloff3_Double4_make((v_in.x + ((falloff3_log_map(mul.x) * falloff3_log_scale(random.x)) * coeff)), (v_in.y + ((falloff3_log_map(mul.y) * falloff3_log_scale(random.y)) * coeff)), (v_in.z + ((falloff3_log_map(mul.z) * falloff3_log_scale(random.z)) * coeff)), (v_in.c + ((falloff3_log_map(mul.c) * falloff3_log_scale(random.c)) * coeff)));
+}
+
+var<private> jwx_falloff3_alpha_c: f32 = 0.0;
+
+var<private> jwx_falloff3_inited_: f32 = 0.0;
+
+var<private> jwx_falloff3_r_max: f32 = 0.0;`,
+    code: (w, p) => `{
+jwx_falloff3_alpha_c = ${p[12]};
+var v_in: falloff3_Double4;
+var mul: falloff3_Double4;
+var center: falloff3_Double3;
+if ((jwx_falloff3_inited_ == 0.0)) {
+  jwx_falloff3_inited_ = 1.0;
+  jwx_falloff3_r_max = 0;
+}
+{
+  v_in = falloff3_Double4_zero();
+  mul = falloff3_Double4_make(${p[5]}, ${p[6]}, ${p[7]}, ${p[8]});
+  center = falloff3_Double3_make(${p[9]}, ${p[10]}, ${p[11]});
+  jwx_falloff3_r_max = (0.04 * ${p[2]});
+}
+{
+  v_in.x = t.x;
+  v_in.y = t.y;
+  v_in.z = z_;
+  v_in.c = (*cp);
+}
+var weight: f32 = ${w};
+var d_0: f32 = ${p[3]};
+var random: falloff3_Double4 = falloff3_Double4_make((rnd(rs) - 0.5), (rnd(rs) - 0.5), (rnd(rs) - 0.5), (rnd(rs) - 0.5));
+var radius: f32;
+switch i32(${p[1]}) {
+  case 0: {
+    radius = falloff3_bs_circle(v_in, center);
+  }
+  case 1: {
+    radius = falloff3_bs_square(v_in, center);
+  }
+  case default: {
+  }
+}
+var dist: f32 = max(((select(max(radius, 0), max((1 - radius), 0), (${p[4]} != 0)) - d_0) * jwx_falloff3_r_max), 0);
+var v_out: falloff3_Double4;
+switch i32(${p[0]}) {
+  case 0: {
+    v_out = falloff3_bt_gaussian(v_in, mul, random, dist);
+  }
+  case 1: {
+    v_out = falloff3_bt_radial(v_in, mul, random, dist);
+  }
+  case 2: {
+    v_out = falloff3_bt_log(v_in, mul, random, dist);
+  }
+  case default: {
+  }
+}
+{
+  v.x += (v_out.x * weight);
+  v.y += (v_out.y * weight);
+  pz_ += (v_out.z * weight);
+}
+(*cp) = abs((v_out.c % 1.0));
+}`,
+  },
+  "pre_falloff3": {
+    params: [{ name: "blur_type", def: 0 }, { name: "blur_shape", def: 0 }, { name: "blur_strength", def: 1 }, { name: "min_distance", def: 0.5 }, { name: "invert_distance", def: 0 }, { name: "mul_x", def: 1 }, { name: "mul_y", def: 1 }, { name: "mul_z", def: 0 }, { name: "mul_c", def: 0 }, { name: "center_x", def: 0 }, { name: "center_y", def: 0 }, { name: "center_z", def: 0 }, { name: "alpha", def: 0 }],
+    verified: true, priority: -1, flags: ["3d","dc","state","z"], types: ["3D","PRE","BLUR"],
+    funcNames: ["jwx_pre_falloff3_alpha_c","jwx_pre_falloff3_inited_","jwx_pre_falloff3_r_max","pre_falloff3_Double4","pre_falloff3_Double3","atan2j","sqr","pre_falloff3_Double4_zero","pre_falloff3_Double4_make","pre_falloff3_Double3_make","pre_falloff3_bs_circle","pre_falloff3_bs_square","pre_falloff3_bt_gaussian","pre_falloff3_bt_radial","pre_falloff3_sgnd","pre_falloff3_log_map","pre_falloff3_log_scale","pre_falloff3_bt_log"],
+    funcs: `struct pre_falloff3_Double4 {
+  x: f32,
+  y: f32,
+  z: f32,
+  c: f32,
+}
+
+struct pre_falloff3_Double3 {
+  x: f32,
+  y: f32,
+  z: f32,
+}
+
+fn atan2j(y: f32, x: f32) -> f32 { if (x == 0.0 && y == 0.0) { return select(0.0, PI, (bitcast<u32>(x) >> 31u) == 1u) * select(1.0, -1.0, (bitcast<u32>(y) >> 31u) == 1u); } return atan2(y, x); }
+
+fn sqr(x: f32) -> f32 { return x * x; }
+
+fn pre_falloff3_Double4_zero() -> pre_falloff3_Double4 {
+  var r_: pre_falloff3_Double4;
+  return r_;
+}
+
+fn pre_falloff3_Double4_make(pX: f32, pY: f32, pZ: f32, pC: f32) -> pre_falloff3_Double4 {
+  var r_: pre_falloff3_Double4;
+  r_.x = pX;
+  r_.y = pY;
+  r_.z = pZ;
+  r_.c = pC;
+  return r_;
+}
+
+fn pre_falloff3_Double3_make(pX: f32, pY: f32, pZ: f32) -> pre_falloff3_Double3 {
+  var r_: pre_falloff3_Double3;
+  r_.x = pX;
+  r_.y = pY;
+  r_.z = pZ;
+  return r_;
+}
+
+fn pre_falloff3_bs_circle(v_in: pre_falloff3_Double4, center: pre_falloff3_Double3) -> f32 {
+  var distance_: f32 = sqrt(((sqr((v_in.x - center.x)) + sqr((v_in.y - center.y))) + sqr((v_in.z - center.z))));
+  return distance_;
+}
+
+fn pre_falloff3_bs_square(v_in: pre_falloff3_Double4, center: pre_falloff3_Double3) -> f32 {
+  return max(abs((v_in.x - center.x)), max(abs((v_in.y - center.y)), abs((v_in.z - center.z))));
+}
+
+fn pre_falloff3_bt_gaussian(v_in: pre_falloff3_Double4, mul: pre_falloff3_Double4, random: pre_falloff3_Double4, dist: f32) -> pre_falloff3_Double4 {
+  var sigma: f32 = ((dist * random.y) * (2.0 * PI));
+  var phi: f32 = ((dist * random.z) * PI);
+  var rad: f32 = (dist * random.x);
+  var sigma_s: f32 = sin(sigma);
+  var sigma_c: f32 = cos(sigma);
+  var phi_s: f32 = sin(phi);
+  var phi_c: f32 = cos(phi);
+  return pre_falloff3_Double4_make((v_in.x + (((mul.x * rad) * sigma_c) * phi_c)), (v_in.y + (((mul.y * rad) * sigma_c) * phi_s)), (v_in.z + ((mul.z * rad) * sigma_s)), (v_in.c + ((mul.c * dist) * random.c)));
+}
+
+fn pre_falloff3_bt_radial(v_in: pre_falloff3_Double4, mul: pre_falloff3_Double4, random: pre_falloff3_Double4, dist: f32) -> pre_falloff3_Double4 {
+  if ((((v_in.x == 0) && (v_in.y == 0)) && (v_in.z == 0))) {
+    return v_in;
+  }
+  var r_in: f32 = sqrt(((sqr(v_in.x) + sqr(v_in.y)) + sqr(v_in.z)));
+  var a: f32 = ((mul.y * dist) + ((jwx_pre_falloff3_alpha_c * dist) / sqrt(jwx_pre_falloff3_r_max)));
+  var b: f32 = (mul.z * dist);
+  var sigma: f32 = (asin((v_in.z / r_in)) + (b * random.z));
+  var phi: f32 = (atan2j(v_in.y, v_in.x) + (a * random.y));
+  var r_: f32 = (r_in + ((mul.x * random.x) * dist));
+  var sigma_s: f32 = sin(sigma);
+  var sigma_c: f32 = cos(sigma);
+  var phi_s: f32 = sin(phi);
+  var phi_c: f32 = cos(phi);
+  return pre_falloff3_Double4_make(((r_ * sigma_c) * phi_c), ((r_ * sigma_c) * phi_s), (r_ * sigma_s), (v_in.c + ((mul.c * random.c) * dist)));
+}
+
+fn pre_falloff3_sgnd(x: f32) -> f32 {
+  return f32(select(1, -1, (x < 0)));
+}
+
+fn pre_falloff3_log_map(x: f32) -> f32 {
+  return select((((2.718281828459045 + log((x * 2.718281828459045))) / 4.0) * pre_falloff3_sgnd(x)), 0, (x == 0));
+}
+
+fn pre_falloff3_log_scale(x: f32) -> f32 {
+  return select(((log(((abs(x) + 1.0) * 2.718281828459045)) * pre_falloff3_sgnd(x)) / 2.718281828459045), 0, (x == 0));
+}
+
+fn pre_falloff3_bt_log(v_in: pre_falloff3_Double4, mul: pre_falloff3_Double4, random: pre_falloff3_Double4, dist: f32) -> pre_falloff3_Double4 {
+  var coeff: f32 = select((dist + (jwx_pre_falloff3_alpha_c * (pre_falloff3_log_map(dist) - dist))), dist, (jwx_pre_falloff3_r_max <= 1.0e-9));
+  return pre_falloff3_Double4_make((v_in.x + ((pre_falloff3_log_map(mul.x) * pre_falloff3_log_scale(random.x)) * coeff)), (v_in.y + ((pre_falloff3_log_map(mul.y) * pre_falloff3_log_scale(random.y)) * coeff)), (v_in.z + ((pre_falloff3_log_map(mul.z) * pre_falloff3_log_scale(random.z)) * coeff)), (v_in.c + ((pre_falloff3_log_map(mul.c) * pre_falloff3_log_scale(random.c)) * coeff)));
+}
+
+var<private> jwx_pre_falloff3_alpha_c: f32 = 0.0;
+
+var<private> jwx_pre_falloff3_inited_: f32 = 0.0;
+
+var<private> jwx_pre_falloff3_r_max: f32 = 0.0;`,
+    code: (w, p) => `{
+var rinv_: f32 = 1.0 / r;
+jwx_pre_falloff3_alpha_c = ${p[12]};
+var v_in: pre_falloff3_Double4;
+var mul: pre_falloff3_Double4;
+var center: pre_falloff3_Double3;
+if ((jwx_pre_falloff3_inited_ == 0.0)) {
+  jwx_pre_falloff3_inited_ = 1.0;
+  jwx_pre_falloff3_r_max = 0;
+}
+{
+  v_in = pre_falloff3_Double4_zero();
+  mul = pre_falloff3_Double4_make(${p[5]}, ${p[6]}, ${p[7]}, ${p[8]});
+  center = pre_falloff3_Double3_make(${p[9]}, ${p[10]}, ${p[11]});
+  jwx_pre_falloff3_r_max = (0.04 * ${p[2]});
+}
+{
+  v_in.x = t.x;
+  v_in.y = t.y;
+  v_in.z = z_;
+  v_in.c = (*cp);
+}
+var weight: f32 = ${w};
+var d_0: f32 = ${p[3]};
+var random: pre_falloff3_Double4 = pre_falloff3_Double4_make((rnd(rs) - 0.5), (rnd(rs) - 0.5), (rnd(rs) - 0.5), (rnd(rs) - 0.5));
+var radius: f32;
+switch i32(${p[1]}) {
+  case 0: {
+    radius = pre_falloff3_bs_circle(v_in, center);
+  }
+  case 1: {
+    radius = pre_falloff3_bs_square(v_in, center);
+  }
+  case default: {
+  }
+}
+var dist: f32 = max(((select(max(radius, 0), max((1 - radius), 0), (${p[4]} != 0)) - d_0) * jwx_pre_falloff3_r_max), 0);
+var v_out: pre_falloff3_Double4;
+switch i32(${p[0]}) {
+  case 0: {
+    v_out = pre_falloff3_bt_gaussian(v_in, mul, random, dist);
+  }
+  case 1: {
+    v_out = pre_falloff3_bt_radial(v_in, mul, random, dist);
+  }
+  case 2: {
+    v_out = pre_falloff3_bt_log(v_in, mul, random, dist);
+  }
+  case default: {
+  }
+}
+{
+  t.x = (v_out.x * weight);
+  t.y = (v_out.y * weight);
+  z_ = (v_out.z * weight);
+}
+(*cp) = abs((v_out.c % 1.0));
+r2 = ((t.x * t.x) + (t.y * t.y));
+r = sqrt(r2);
+rinv_ = (1.0 / r);
+th = atan2j(t.x, t.y);
+ph = ((0.5 * PI) - th);
+if ((ph > PI)) {
+  ph -= (2.0 * PI);
+}
+}`,
+  },
+  "post_falloff3": {
+    params: [{ name: "blur_type", def: 0 }, { name: "blur_shape", def: 0 }, { name: "blur_strength", def: 1 }, { name: "min_distance", def: 0.5 }, { name: "invert_distance", def: 0 }, { name: "mul_x", def: 1 }, { name: "mul_y", def: 1 }, { name: "mul_z", def: 0 }, { name: "mul_c", def: 0 }, { name: "center_x", def: 0 }, { name: "center_y", def: 0 }, { name: "center_z", def: 0 }, { name: "alpha", def: 0 }],
+    verified: true, priority: 1, flags: ["3d","dc","state","z"], types: ["3D","POST","BLUR"],
+    funcNames: ["jwx_post_falloff3_alpha_c","jwx_post_falloff3_inited_","jwx_post_falloff3_r_max","post_falloff3_Double4","post_falloff3_Double3","atan2j","sqr","post_falloff3_Double4_zero","post_falloff3_Double4_make","post_falloff3_Double3_make","post_falloff3_bs_circle","post_falloff3_bs_square","post_falloff3_bt_gaussian","post_falloff3_bt_radial","post_falloff3_sgnd","post_falloff3_log_map","post_falloff3_log_scale","post_falloff3_bt_log"],
+    funcs: `struct post_falloff3_Double4 {
+  x: f32,
+  y: f32,
+  z: f32,
+  c: f32,
+}
+
+struct post_falloff3_Double3 {
+  x: f32,
+  y: f32,
+  z: f32,
+}
+
+fn atan2j(y: f32, x: f32) -> f32 { if (x == 0.0 && y == 0.0) { return select(0.0, PI, (bitcast<u32>(x) >> 31u) == 1u) * select(1.0, -1.0, (bitcast<u32>(y) >> 31u) == 1u); } return atan2(y, x); }
+
+fn sqr(x: f32) -> f32 { return x * x; }
+
+fn post_falloff3_Double4_zero() -> post_falloff3_Double4 {
+  var r_: post_falloff3_Double4;
+  return r_;
+}
+
+fn post_falloff3_Double4_make(pX: f32, pY: f32, pZ: f32, pC: f32) -> post_falloff3_Double4 {
+  var r_: post_falloff3_Double4;
+  r_.x = pX;
+  r_.y = pY;
+  r_.z = pZ;
+  r_.c = pC;
+  return r_;
+}
+
+fn post_falloff3_Double3_make(pX: f32, pY: f32, pZ: f32) -> post_falloff3_Double3 {
+  var r_: post_falloff3_Double3;
+  r_.x = pX;
+  r_.y = pY;
+  r_.z = pZ;
+  return r_;
+}
+
+fn post_falloff3_bs_circle(v_in: post_falloff3_Double4, center: post_falloff3_Double3) -> f32 {
+  var distance_: f32 = sqrt(((sqr((v_in.x - center.x)) + sqr((v_in.y - center.y))) + sqr((v_in.z - center.z))));
+  return distance_;
+}
+
+fn post_falloff3_bs_square(v_in: post_falloff3_Double4, center: post_falloff3_Double3) -> f32 {
+  return max(abs((v_in.x - center.x)), max(abs((v_in.y - center.y)), abs((v_in.z - center.z))));
+}
+
+fn post_falloff3_bt_gaussian(v_in: post_falloff3_Double4, mul: post_falloff3_Double4, random: post_falloff3_Double4, dist: f32) -> post_falloff3_Double4 {
+  var sigma: f32 = ((dist * random.y) * (2.0 * PI));
+  var phi: f32 = ((dist * random.z) * PI);
+  var rad: f32 = (dist * random.x);
+  var sigma_s: f32 = sin(sigma);
+  var sigma_c: f32 = cos(sigma);
+  var phi_s: f32 = sin(phi);
+  var phi_c: f32 = cos(phi);
+  return post_falloff3_Double4_make((v_in.x + (((mul.x * rad) * sigma_c) * phi_c)), (v_in.y + (((mul.y * rad) * sigma_c) * phi_s)), (v_in.z + ((mul.z * rad) * sigma_s)), (v_in.c + ((mul.c * dist) * random.c)));
+}
+
+fn post_falloff3_bt_radial(v_in: post_falloff3_Double4, mul: post_falloff3_Double4, random: post_falloff3_Double4, dist: f32) -> post_falloff3_Double4 {
+  if ((((v_in.x == 0) && (v_in.y == 0)) && (v_in.z == 0))) {
+    return v_in;
+  }
+  var r_in: f32 = sqrt(((sqr(v_in.x) + sqr(v_in.y)) + sqr(v_in.z)));
+  var a: f32 = ((mul.y * dist) + ((jwx_post_falloff3_alpha_c * dist) / sqrt(jwx_post_falloff3_r_max)));
+  var b: f32 = (mul.z * dist);
+  var sigma: f32 = (asin((v_in.z / r_in)) + (b * random.z));
+  var phi: f32 = (atan2j(v_in.y, v_in.x) + (a * random.y));
+  var r_: f32 = (r_in + ((mul.x * random.x) * dist));
+  var sigma_s: f32 = sin(sigma);
+  var sigma_c: f32 = cos(sigma);
+  var phi_s: f32 = sin(phi);
+  var phi_c: f32 = cos(phi);
+  return post_falloff3_Double4_make(((r_ * sigma_c) * phi_c), ((r_ * sigma_c) * phi_s), (r_ * sigma_s), (v_in.c + ((mul.c * random.c) * dist)));
+}
+
+fn post_falloff3_sgnd(x: f32) -> f32 {
+  return f32(select(1, -1, (x < 0)));
+}
+
+fn post_falloff3_log_map(x: f32) -> f32 {
+  return select((((2.718281828459045 + log((x * 2.718281828459045))) / 4.0) * post_falloff3_sgnd(x)), 0, (x == 0));
+}
+
+fn post_falloff3_log_scale(x: f32) -> f32 {
+  return select(((log(((abs(x) + 1.0) * 2.718281828459045)) * post_falloff3_sgnd(x)) / 2.718281828459045), 0, (x == 0));
+}
+
+fn post_falloff3_bt_log(v_in: post_falloff3_Double4, mul: post_falloff3_Double4, random: post_falloff3_Double4, dist: f32) -> post_falloff3_Double4 {
+  var coeff: f32 = select((dist + (jwx_post_falloff3_alpha_c * (post_falloff3_log_map(dist) - dist))), dist, (jwx_post_falloff3_r_max <= 1.0e-9));
+  return post_falloff3_Double4_make((v_in.x + ((post_falloff3_log_map(mul.x) * post_falloff3_log_scale(random.x)) * coeff)), (v_in.y + ((post_falloff3_log_map(mul.y) * post_falloff3_log_scale(random.y)) * coeff)), (v_in.z + ((post_falloff3_log_map(mul.z) * post_falloff3_log_scale(random.z)) * coeff)), (v_in.c + ((post_falloff3_log_map(mul.c) * post_falloff3_log_scale(random.c)) * coeff)));
+}
+
+var<private> jwx_post_falloff3_alpha_c: f32 = 0.0;
+
+var<private> jwx_post_falloff3_inited_: f32 = 0.0;
+
+var<private> jwx_post_falloff3_r_max: f32 = 0.0;`,
+    code: (w, p) => `{
+jwx_post_falloff3_alpha_c = ${p[12]};
+var v_in: post_falloff3_Double4;
+var mul: post_falloff3_Double4;
+var center: post_falloff3_Double3;
+if ((jwx_post_falloff3_inited_ == 0.0)) {
+  jwx_post_falloff3_inited_ = 1.0;
+  jwx_post_falloff3_r_max = 0;
+}
+{
+  v_in = post_falloff3_Double4_zero();
+  mul = post_falloff3_Double4_make(${p[5]}, ${p[6]}, ${p[7]}, ${p[8]});
+  center = post_falloff3_Double3_make(${p[9]}, ${p[10]}, ${p[11]});
+  jwx_post_falloff3_r_max = (0.04 * ${p[2]});
+}
+{
+  v_in.x = v.x;
+  v_in.y = v.y;
+  v_in.z = pz_;
+  v_in.c = (*cp);
+}
+var weight: f32 = ${w};
+var d_0: f32 = ${p[3]};
+var random: post_falloff3_Double4 = post_falloff3_Double4_make((rnd(rs) - 0.5), (rnd(rs) - 0.5), (rnd(rs) - 0.5), (rnd(rs) - 0.5));
+var radius: f32;
+switch i32(${p[1]}) {
+  case 0: {
+    radius = post_falloff3_bs_circle(v_in, center);
+  }
+  case 1: {
+    radius = post_falloff3_bs_square(v_in, center);
+  }
+  case default: {
+  }
+}
+var dist: f32 = max(((select(max(radius, 0), max((1 - radius), 0), (${p[4]} != 0)) - d_0) * jwx_post_falloff3_r_max), 0);
+var v_out: post_falloff3_Double4;
+switch i32(${p[0]}) {
+  case 0: {
+    v_out = post_falloff3_bt_gaussian(v_in, mul, random, dist);
+  }
+  case 1: {
+    v_out = post_falloff3_bt_radial(v_in, mul, random, dist);
+  }
+  case 2: {
+    v_out = post_falloff3_bt_log(v_in, mul, random, dist);
+  }
+  case default: {
+  }
+}
+{
+  v.x = (v_out.x * weight);
+  v.y = (v_out.y * weight);
+  pz_ = (v_out.z * weight);
+}
+(*cp) = abs((v_out.c % 1.0));
+}`,
+  },
   "julian3Dx": {
     params: [{ name: "power", def: 3 }, { name: "dist", def: 1 }, { name: "a", def: 1 }, { name: "b", def: 0 }, { name: "c", def: 0 }, { name: "d", def: 1 }, { name: "e", def: 0 }, { name: "f", def: 0 }],
     verified: true, priority: 0, flags: ["z"], types: ["2D"],
@@ -9335,6 +12022,142 @@ var sina: f32 = sin(alpha);
 var cosa: f32 = cos(alpha);
 v.x += (gamma * cosa);
 v.y += (gamma * sina);
+}`,
+  },
+  "waves2b": {
+    params: [{ name: "freqx", def: 1.5 }, { name: "freqy", def: 2.5 }, { name: "pwx", def: 1 }, { name: "pwy", def: 1.5 }, { name: "scalex", def: 2 }, { name: "scaleinfx", def: 1 }, { name: "scaley", def: 0.75 }, { name: "scaleinfy", def: 1.5 }, { name: "unity", def: 1 }, { name: "jacok", def: 0.25 }],
+    verified: true, priority: 0, flags: [], types: ["2D"],
+    funcNames: ["besselJ1","powc","atan2j","waves2b_safediv","waves2b_Jacobi_elliptic"],
+    funcs: `fn besselJ1(x: f32) -> f32 { let ax = abs(x);
+  if (ax < 8.0) { let y = x * x;
+    let a1 = x * (72362614232.0 + y * (-7895059235.0 + y * (242396853.1 + y * (-2972611.439 + y * (15704.48260 + y * (-30.16036606))))));
+    let a2 = 144725228442.0 + y * (2300535178.0 + y * (18583304.74 + y * (99447.43394 + y * (376.9991397 + y * 1.0))));
+    return a1 / a2; }
+  let z = 8.0 / ax; let y = z * z; let xx = ax - 2.356194491;
+  let a1 = 1.0 + y * (0.183105e-2 + y * (-0.3516396496e-4 + y * (0.2457520174e-5 + y * (-0.240337019e-6))));
+  let a2 = 0.04687499995 + y * (-0.2002690873e-3 + y * (0.8449199096e-5 + y * (-0.88228987e-6 + y * 0.105787412e-6)));
+  let ans = sqrt(0.636619772 / ax) * (cos(xx) * a1 - z * sin(xx) * a2);
+  return select(ans, -ans, x < 0.0); }
+
+fn powc(x: f32, y: f32) -> f32 {
+  if (x >= 0.0) { return pow(x, y); }
+  let yi = round(y);
+  if (abs(y - yi) > 1e-6) { return pow(x, y); }
+  let m = pow(-x, y);
+  return select(m, -m, (i32(yi) & 1) != 0);
+}
+
+fn atan2j(y: f32, x: f32) -> f32 { if (x == 0.0 && y == 0.0) { return select(0.0, PI, (bitcast<u32>(x) >> 31u) == 1u) * select(1.0, -1.0, (bitcast<u32>(y) >> 31u) == 1u); } return atan2(y, x); }
+
+fn waves2b_safediv(q: f32, r_: f32) -> f32 {
+  if ((r_ < 1.0e-10)) {
+    return (1.0 / r_);
+  }
+  return (q / r_);
+}
+
+fn waves2b_Jacobi_elliptic(uu: f32, emmc: f32) -> f32 {
+  var sn: f32 = 0.0;
+  var CA: f32 = 0.0003;
+  var a: f32;
+  var b: f32;
+  var c: f32 = 0;
+  var d: f32 = 0;
+  var em: array<f32, 13>;
+  var en: array<f32, 13>;
+  var dn: f32;
+  var cn: f32;
+  var bo: i32;
+  var l: i32 = 0;
+  var ii: i32;
+  var i: i32;
+  var emc: f32 = emmc;
+  var u: f32 = uu;
+  if ((emc != 0.0)) {
+    bo = 0;
+    if ((emc < 0.0)) {
+      bo = 1;
+    }
+    if ((bo != 0)) {
+      d = (1.0 - emc);
+      emc = (-emc / d);
+      d = sqrt(d);
+      u = (d * u);
+    }
+    a = 1.0;
+    dn = 1.0;
+    for (i = 0; (i < 8); i++) {
+      l = i;
+      em[i] = a;
+      emc = sqrt(emc);
+      en[i] = emc;
+      c = (0.5 * (a + emc));
+      if ((abs((a - emc)) <= (CA * a))) {
+        break;
+      }
+      emc = (a * emc);
+      a = c;
+    }
+    u = (c * u);
+    sn = sin(u);
+    cn = cos(u);
+    if ((sn != 0.0)) {
+      a = (cn / sn);
+      c = (a * c);
+      for (ii = l; (ii >= 0); ii--) {
+        b = em[ii];
+        a = (c * a);
+        c = (dn * c);
+        dn = ((en[ii] + a) / (b + a));
+        a = (c / b);
+      }
+      a = (1.0 / sqrt(((c * c) + 1.0)));
+      if ((sn < 0.0)) {
+        sn = -a;
+      } else {
+        sn = a;
+      }
+      cn = (c * sn);
+    }
+    if ((bo != 0)) {
+      a = dn;
+      dn = cn;
+      cn = a;
+      sn = (sn / d);
+    }
+  } else {
+    sn = tanh(u);
+  }
+  return sn;
+}`,
+    code: (w, p) => `{
+var _six: f32;
+var _siy: f32;
+_six = (${p[4]} - ${p[5]});
+_siy = (${p[6]} - ${p[7]});
+var CsX: f32 = 1.0;
+var CsY: f32 = 1.0;
+var JCB_sn: f32;
+CsX = waves2b_safediv(${p[8]}, (${p[8]} + (t.x * t.x)));
+CsX = ((CsX * _six) + ${p[5]});
+CsY = waves2b_safediv(${p[8]}, (${p[8]} + (t.y * t.y)));
+CsY = ((CsY * _siy) + ${p[7]});
+if (((min(max(${p[2]}, -10.0), 10.0) >= 0.0) && (min(max(${p[2]}, -10.0), 10.0) < 0.0001))) {
+  JCB_sn = waves2b_Jacobi_elliptic((t.y * ${p[0]}), min(max(${p[9]}, -1.0), 1.0));
+  v.x += (${w} * (t.x + (CsX * JCB_sn)));
+} else if (((min(max(${p[2]}, -10.0), 10.0) < 0.0) && (min(max(${p[2]}, -10.0), 10.0) > -0.0001))) {
+  v.x += (${w} * (t.x + (CsX * besselJ1((t.y * ${p[0]})))));
+} else {
+  v.x += (${w} * (t.x + (CsX * sin(((f32(select(select(0, 1, (t.y > 0.0)), -1, (t.y < 0.0))) * powc((abs(t.y) + 1.0e-10), min(max(${p[2]}, -10.0), 10.0))) * ${p[0]})))));
+}
+if (((min(max(${p[3]}, -10.0), 10.0) >= 0.0) && (min(max(${p[3]}, -10.0), 10.0) < 0.0001))) {
+  JCB_sn = waves2b_Jacobi_elliptic((t.x * ${p[1]}), min(max(${p[9]}, -1.0), 1.0));
+  v.y += (${w} * (t.y + (CsY * JCB_sn)));
+} else if (((min(max(${p[3]}, -10.0), 10.0) < 0.0) && (min(max(${p[3]}, -10.0), 10.0) > -0.0001))) {
+  v.y += (${w} * (t.y + (CsY * besselJ1((t.x * ${p[1]})))));
+} else {
+  v.y += (${w} * (t.y + (CsY * sin(((f32(select(select(0, 1, (t.x > 0.0)), -1, (t.x < 0.0))) * powc((abs(t.x) + 1.0e-10), min(max(${p[3]}, -10.0), 10.0))) * ${p[1]})))));
+}
 }`,
   },
   "bwrands": {
@@ -10939,6 +13762,59 @@ if (false) {
 }
 }`,
   },
+  "pre_blur3D": {
+    params: [],
+    verified: true, priority: -1, flags: ["3d","state","z"], types: ["3D","BLUR","PRE"],
+    funcNames: ["jwx_pre_blur3D_inited_","jwx_pre_blur3D_gauss_N","jdw_","atan2j"],
+    funcs: `struct jdw_ {
+  value: f32,
+}
+
+fn atan2j(y: f32, x: f32) -> f32 { if (x == 0.0 && y == 0.0) { return select(0.0, PI, (bitcast<u32>(x) >> 31u) == 1u) * select(1.0, -1.0, (bitcast<u32>(y) >> 31u) == 1u); } return atan2(y, x); }
+
+var<private> jwx_pre_blur3D_inited_: f32 = 0.0;
+
+var<private> jwx_pre_blur3D_gauss_N: i32 = 0;`,
+    code: (w, _p) => `{
+var rinv_: f32 = 1.0 / r;
+var sina: jdw_;
+var cosa: jdw_;
+var sinb: jdw_;
+var cosb: jdw_;
+var gauss_rnd: array<f32, 6>;
+if ((jwx_pre_blur3D_inited_ == 0.0)) {
+  jwx_pre_blur3D_inited_ = 1.0;
+  jwx_pre_blur3D_gauss_N = 0;
+  {
+    gauss_rnd[0] = rnd(rs);
+    gauss_rnd[1] = rnd(rs);
+    gauss_rnd[2] = rnd(rs);
+    gauss_rnd[3] = rnd(rs);
+    gauss_rnd[4] = rnd(rs);
+    gauss_rnd[5] = rnd(rs);
+    jwx_pre_blur3D_gauss_N = 0;
+  }
+}
+var angle: f32 = ((rnd(rs) * 2) * PI);
+sina.value = sin(angle);
+cosa.value = cos(angle);
+var r_: f32 = (${w} * ((((rnd(rs) + rnd(rs)) + rnd(rs)) + rnd(rs)) - 2.0));
+angle = (rnd(rs) * PI);
+sinb.value = sin(angle);
+cosb.value = cos(angle);
+t.x += ((r_ * sinb.value) * cosa.value);
+t.y += ((r_ * sinb.value) * sina.value);
+z_ += (r_ * cosb.value);
+r2 = ((t.x * t.x) + (t.y * t.y));
+r = sqrt(r2);
+rinv_ = (1.0 / r);
+th = atan2j(t.x, t.y);
+ph = ((0.5 * PI) - th);
+if ((ph > PI)) {
+  ph -= (2.0 * PI);
+}
+}`,
+  },
   "vogel": {
     params: [{ name: "n", def: 20 }, { name: "scale", def: 1 }],
     verified: true, priority: 0, flags: [], types: ["2D"],
@@ -11066,6 +13942,77 @@ v.x += (t_ * t.x);
 v.y += (t_ * t.y);
 pz_ += (${w} * ((2.0 / select(r_, t_, (${p[3]} == 1))) - 1.0));
 (*cp) = (abs((bdcs * (sqr((v.x + ${p[0]})) + sqr((v.y + ${p[1]}))))) % 1.0);
+}`,
+  },
+  "dc_triangle": {
+    params: [{ name: "scatter_area", def: 0 }, { name: "zero_edges", def: 0 }],
+    verified: true, priority: 0, flags: ["affine","dc","z"], types: ["2D","DC"],
+    funcNames: ["atan2j"],
+    funcs: `fn atan2j(y: f32, x: f32) -> f32 { if (x == 0.0 && y == 0.0) { return select(0.0, PI, (bitcast<u32>(x) >> 31u) == 1u) * select(1.0, -1.0, (bitcast<u32>(y) >> 31u) == 1u); } return atan2(y, x); }`,
+    code: (w, p, A) => `{
+var A_: f32 = 0;
+{
+  A_ = select(select(${p[0]}, 1, (${p[0]} > 1)), -1, (${p[0]} < -1));
+}
+var xx: f32 = ${A(0)};
+var xy: f32 = ${A(1)};
+var yx: f32 = (${A(3)} * -1);
+var yy: f32 = (${A(4)} * -1);
+var ox: f32 = ${A(2)};
+var oy: f32 = ${A(5)};
+var px: f32 = (t.x - ox);
+var py: f32 = (t.y - oy);
+var dot00: f32 = ((xx * xx) + (xy * xy));
+var dot01: f32 = ((xx * yx) + (xy * yy));
+var dot02: f32 = ((xx * px) + (xy * py));
+var dot11: f32 = ((yx * yx) + (yy * yy));
+var dot12: f32 = ((yx * px) + (yy * py));
+var denom: f32 = ((dot00 * dot11) - (dot01 * dot01));
+var num_u: f32 = ((dot11 * dot02) - (dot01 * dot12));
+var num_v: f32 = ((dot00 * dot12) - (dot01 * dot02));
+var u: f32 = (num_u / denom);
+var v_: f32 = (num_v / denom);
+var inside: i32 = 0;
+var f: i32 = 1;
+if (((u + v_) > 1)) {
+  f = -1;
+  if ((u > v_)) {
+    u = select(u, 1, (u > 1));
+    v_ = (1 - u);
+  } else {
+    v_ = select(v_, 1, (v_ > 1));
+    u = (1 - v_);
+  }
+} else if (((u < 0) || (v_ < 0))) {
+  u = select(select(u, 1, (u > 1)), 0, (u < 0));
+  v_ = select(select(v_, 1, (v_ > 1)), 0, (v_ < 0));
+} else {
+  inside = 1;
+}
+if (((min(max(${p[1]}, 0.0), 1.0) == 1) && (inside == 0))) {
+  v_ = 0;
+  u = v_;
+} else if ((inside != 0)) {
+  u = (u + ((rnd(rs) * A_) * f32(f)));
+  v_ = (v_ + ((rnd(rs) * A_) * f32(f)));
+  u = select(select(u, 1, (u > 1)), -1, (u < -1));
+  v_ = select(select(v_, 1, (v_ > 1)), -1, (v_ < -1));
+  if ((((u + v_) > 1) && (A_ > 0))) {
+    if ((u > v_)) {
+      u = select(u, 1, (u > 1));
+      v_ = (1 - u);
+    } else {
+      v_ = select(v_, 1, (v_ > 1));
+      u = (1 - v_);
+    }
+  }
+}
+v.x += (${w} * ((ox + (u * xx)) + (v_ * yx)));
+v.y += (${w} * ((oy + (u * xy)) + (v_ * yy)));
+if (false) {
+  pz_ += (${w} * z_);
+}
+(*cp) = (abs((u + v_)) % 1.0);
 }`,
   },
   "waveblur_wf": {
@@ -11431,6 +14378,235 @@ var prx: f32 = (pr * xfactor);
 var pry: f32 = (pr * yfactor);
 v.x += ((((${p[4]} * prx) + ((${p[5]} * t.x) * prx)) + ((${p[6]} * t.x) * pr)) + (${p[7]} * t.x));
 v.y += ((((${p[4]} * pry) + ((${p[5]} * t.y) * pry)) + ((${p[6]} * t.y) * pr)) + (${p[7]} * t.y));
+}`,
+  },
+  "rhodonea": {
+    params: [{ name: "knumer", def: 3 }, { name: "kdenom", def: 4 }, { name: "inner_mode", def: 1 }, { name: "outer_mode", def: 1 }, { name: "inner_spread", def: 0 }, { name: "outer_spread", def: 0 }, { name: "inner_spread_ratio", def: 1 }, { name: "outer_spread_ratio", def: 1 }, { name: "spread_split", def: 1 }, { name: "fill", def: 0 }, { name: "radial_offset", def: 0 }, { name: "cycles", def: 0 }, { name: "cycle_offset", def: 0 }, { name: "metacycles", def: 1 }, { name: "metacycle_expansion", def: 0 }],
+    verified: true, priority: 0, flags: ["hide","z"], types: ["BASE_SHAPE","SIMULATION"],
+    funcNames: ["atan2j","jgcd"],
+    funcs: `fn atan2j(y: f32, x: f32) -> f32 { if (x == 0.0 && y == 0.0) { return select(0.0, PI, (bitcast<u32>(x) >> 31u) == 1u) * select(1.0, -1.0, (bitcast<u32>(y) >> 31u) == 1u); } return atan2(y, x); }
+
+fn jgcd(a_in: i32, b_in: i32) -> i32 {
+  var a: i32 = a_in;
+  var b: i32 = b_in;
+  a = abs(a);
+  b = abs(b);
+  while ((b != 0)) {
+    var t_: i32 = (a % b);
+    a = b;
+    b = t_;
+  }
+  return a;
+}`,
+    code: (w, p) => `{
+var kn: f32 = 0;
+var kd: f32 = 0;
+var k: f32 = 0;
+var cycles: f32 = 0;
+var cycles_to_close: f32 = 0;
+{
+  kn = ${p[0]};
+  kd = ${p[1]};
+  k = (kn / kd);
+  if (((k % 1) == 0)) {
+    if (((k % 2) == 0)) {
+      cycles_to_close = 1;
+    } else {
+      if (((((${p[10]} != 0) || (${p[4]} != 0)) || (${p[5]} != 0)) || (${p[9]} != 0))) {
+        cycles_to_close = 1;
+      } else {
+        cycles_to_close = 0.5;
+      }
+    }
+  } else if ((((kn % 1) == 0) && ((kd % 1) == 0))) {
+    var gcd: i32 = jgcd(i32(kn), i32(kd));
+    if ((gcd != 1)) {
+      kn = (kn / f32(gcd));
+      kd = (kd / f32(gcd));
+    }
+    if ((((kn % 2) == 0) || ((kd % 2) == 0))) {
+      cycles_to_close = kd;
+    } else {
+      cycles_to_close = (kd / 2);
+    }
+  } else {
+    cycles_to_close = ((2 * kn) * kd);
+    if ((cycles < 16)) {
+      cycles_to_close = 16;
+    }
+  }
+  if ((${p[11]} == 0)) {
+    cycles = (cycles_to_close * ${p[13]});
+  } else {
+    cycles = ${p[11]};
+  }
+}
+var rin: f32 = (${p[8]} * sqrt(((t.x * t.x) + (t.y * t.y))));
+var tin: f32 = atan2j(t.y, t.x);
+var t_: f32 = (cycles * (tin + ((${p[12]} * 2) * PI)));
+var r_: f32 = (cos((k * t_)) + ${p[10]});
+if ((${p[9]} != 0)) {
+  r_ = (r_ + (${p[9]} * (rnd(rs) - 0.5)));
+}
+var x: f32 = (r_ * cos(t_));
+var y: f32 = (r_ * sin(t_));
+var expansion: f32 = floor(((cycles * (tin + PI)) / ((cycles_to_close * 2) * PI)));
+var adjustedAmount: f32 = (${w} + (expansion * ${p[14]}));
+var xin: f32;
+var yin: f32;
+var rinx: f32;
+var riny: f32;
+if ((abs(rin) > abs(r_))) {
+  switch i32(${p[3]}) {
+    case 0: {
+      v.x += (adjustedAmount * x);
+      v.y += (adjustedAmount * y);
+    }
+    case 1: {
+      rinx = ((((rin * ${p[5]}) * ${p[7]}) - (${p[5]} * ${p[7]})) + 1);
+      riny = (((rin * ${p[5]}) - ${p[5]}) + 1);
+      v.x += ((adjustedAmount * rinx) * x);
+      v.y += ((adjustedAmount * riny) * y);
+      if ((v.y == 0)) {
+        v.x = 0;
+      }
+    }
+    case 2: {
+      xin = abs(t.x);
+      yin = abs(t.y);
+      if ((x < 0)) {
+        xin = (xin * -1);
+      }
+      if ((y < 0)) {
+        yin = (yin * -1);
+      }
+      v.x += (adjustedAmount * (x + ((${p[5]} * ${p[7]}) * (xin - x))));
+      v.y += (adjustedAmount * (y + (${p[5]} * (yin - y))));
+    }
+    case 3: {
+      xin = abs(t.x);
+      yin = abs(t.y);
+      if ((x < 0)) {
+        xin = (xin * -1);
+      }
+      if ((y < 0)) {
+        yin = (yin * -1);
+      }
+      v.x += (adjustedAmount * (x + ((${p[5]} * ${p[7]}) * xin)));
+      v.y += (adjustedAmount * (y + (${p[5]} * yin)));
+    }
+    case 4: {
+      rinx = ((0.5 * rin) + (${p[5]} * ${p[7]}));
+      riny = ((0.5 * rin) + ${p[5]});
+      v.x += ((adjustedAmount * rinx) * x);
+      v.y += ((adjustedAmount * riny) * y);
+    }
+    case 5: {
+      v.x += t.x;
+      v.y += t.y;
+    }
+    case 6: {
+      (*hd) = true;
+    }
+    case default: {
+      v.x += (adjustedAmount * x);
+      v.y += (adjustedAmount * y);
+    }
+  }
+} else {
+  switch i32(${p[2]}) {
+    case 0: {
+      v.x += (adjustedAmount * x);
+      v.y += (adjustedAmount * y);
+    }
+    case 1: {
+      rinx = ((((rin * ${p[4]}) * ${p[6]}) - (${p[4]} * ${p[6]})) + 1);
+      riny = (((rin * ${p[4]}) - ${p[4]}) + 1);
+      v.x += ((adjustedAmount * rinx) * x);
+      v.y += ((adjustedAmount * riny) * y);
+      if ((v.y == 0)) {
+        v.x = 0;
+      }
+    }
+    case 2: {
+      xin = abs(t.x);
+      yin = abs(t.y);
+      if ((x < 0)) {
+        xin = (xin * -1);
+      }
+      if ((y < 0)) {
+        yin = (yin * -1);
+      }
+      v.x += (adjustedAmount * (x - ((${p[4]} * ${p[6]}) * (x - xin))));
+      v.y += (adjustedAmount * (y - (${p[4]} * (y - yin))));
+    }
+    case 3: {
+      xin = abs(t.x);
+      yin = abs(t.y);
+      if ((x < 0)) {
+        xin = (xin * -1);
+      }
+      if ((y < 0)) {
+        yin = (yin * -1);
+      }
+      v.x += (adjustedAmount * (x - ((${p[4]} * ${p[6]}) * xin)));
+      v.y += (adjustedAmount * (y - (${p[4]} * yin)));
+    }
+    case 4: {
+      rinx = ((0.5 * rin) + (${p[4]} * ${p[6]}));
+      riny = ((0.5 * rin) + ${p[4]});
+      v.x += ((adjustedAmount * rinx) * x);
+      v.y += ((adjustedAmount * riny) * y);
+    }
+    case 5: {
+      (*hd) = true;
+    }
+    case 6: {
+      v.x += t.x;
+      v.y += t.y;
+    }
+    case default: {
+      v.x += (adjustedAmount * x);
+      v.y += (adjustedAmount * y);
+    }
+  }
+}
+var draw_diagnostics: bool = false;
+if (draw_diagnostics) {
+  var diagnostic_: f32 = (rnd(rs) * 100);
+  if ((diagnostic_ == 0)) {
+  }
+  if ((diagnostic_ <= 3)) {
+    var radius: f32 = ceil(diagnostic_);
+    var angle: f32 = ((diagnostic_ * 2) * PI);
+    v.x = (radius * cos(angle));
+    v.y = (radius * sin(angle));
+  } else if ((diagnostic_ <= 6)) {
+    var unit: f32 = (ceil(diagnostic_) - 3);
+    var side: i32 = i32(ceil((4 * (ceil(diagnostic_) - diagnostic_))));
+    var varpos: f32 = (((rnd(rs) * unit) * 2) - unit);
+    var sx: f32 = 0;
+    var sy: f32 = 0;
+    if ((side == 1)) {
+      sx = unit;
+      sy = varpos;
+    } else if ((side == 2)) {
+      sx = varpos;
+      sy = unit;
+    } else if ((side == 3)) {
+      sx = (-1 * unit);
+      sy = varpos;
+    } else if ((side == 4)) {
+      sx = varpos;
+      sy = (-1 * unit);
+    }
+    v.x = sx;
+    v.y = sy;
+  }
+}
+if (false) {
+  pz_ += (${w} * z_);
+}
 }`,
   },
   "butterfly_fay": {
@@ -14476,7 +17652,6 @@ var<private> jwx_truchet_ae_z2: f32 = 0.0;
 var<private> jwx_truchet_ae_AM: f32 = 0.0;`,
     code: (w, p) => `{
 var p3_: f32 = ${p[3]};
-var M_SQ3_2: f32 = 0.8660254037844386;
 var sinang: f32 = 0;
 var cosang: f32 = 0;
 if ((jwx_truchet_ae_inited_ == 0.0)) {
@@ -14589,25 +17764,25 @@ if ((min(max(${p[4]}, 0.0), 4.0) == 1)) {
   switch i {
     case 0: {
       u1 = ((jwx_truchet_ae_x * 0.5) + 1);
-      v1 = ((jwx_truchet_ae_y * 0.5) + M_SQ3_2);
+      v1 = ((jwx_truchet_ae_y * 0.5) + 0.8660254037844386);
       jwx_truchet_ae_z1 = truchet_ae_fmod2(((${p[6]} * jwx_truchet_ae_z1) + ${p[7]}), 1.0);
       jwx_truchet_ae_z2 = truchet_ae_fmod2(((${p[8]} * jwx_truchet_ae_z2) + ${p[9]}), 1.0);
     }
     case 1: {
       u1 = ((jwx_truchet_ae_x * 0.5) - 1);
-      v1 = ((jwx_truchet_ae_y * 0.5) + M_SQ3_2);
+      v1 = ((jwx_truchet_ae_y * 0.5) + 0.8660254037844386);
       jwx_truchet_ae_z1 = truchet_ae_fmod2(((${p[10]} * jwx_truchet_ae_z1) + ${p[11]}), 1.0);
       jwx_truchet_ae_z2 = truchet_ae_fmod2(((${p[12]} * jwx_truchet_ae_z2) + ${p[13]}), 1.0);
     }
     case 2: {
       u1 = (jwx_truchet_ae_x * 0.5);
-      v1 = ((jwx_truchet_ae_y * 0.5) - M_SQ3_2);
+      v1 = ((jwx_truchet_ae_y * 0.5) - 0.8660254037844386);
       jwx_truchet_ae_z1 = truchet_ae_fmod2(((${p[14]} * jwx_truchet_ae_z1) + ${p[15]}), 1.0);
       jwx_truchet_ae_z2 = truchet_ae_fmod2(((${p[16]} * jwx_truchet_ae_z2) + ${p[17]}), 0.5);
     }
     case 3: {
       u1 = (jwx_truchet_ae_x * 0.5);
-      v1 = ((-jwx_truchet_ae_y * 0.5) + M_SQ3_2);
+      v1 = ((-jwx_truchet_ae_y * 0.5) + 0.8660254037844386);
       jwx_truchet_ae_z1 = truchet_ae_fmod2(((${p[18]} * jwx_truchet_ae_z1) + ${p[19]}), 1.0);
       jwx_truchet_ae_z2 = truchet_ae_fmod2(((${p[20]} * jwx_truchet_ae_z2) + ${p[21]}), 1.0);
     }
@@ -14955,6 +18130,135 @@ v.x += (((${w} * atan2j(x1, y1)) * 1.0) / PI);
 v.y += (${w} * (aux - 0.5));
 }`,
   },
+  "maurer_rose": {
+    params: [{ name: "kn", def: 2 }, { name: "kd", def: 1 }, { name: "c", def: 0 }, { name: "line_offset_degrees", def: 71 }, { name: "line_count", def: 360 }, { name: "show_lines", def: 1 }, { name: "show_points", def: 0 }, { name: "show_curve", def: 0.05 }, { name: "line_thickness", def: 0.5 }, { name: "point_thickness", def: 3 }, { name: "curve_thickness", def: 1 }],
+    verified: true, priority: 0, flags: ["state","z"], types: ["SIMULATION","BASE_SHAPE"],
+    funcNames: ["jwx_maurer_rose_c_c","jwx_maurer_rose_inited_","jwx_maurer_rose_k","maurer_rose_DoublePoint2D","atan2j","maurer_rose_getCurveCoords"],
+    funcs: `struct maurer_rose_DoublePoint2D {
+  x: f32,
+  y: f32,
+}
+
+fn atan2j(y: f32, x: f32) -> f32 { if (x == 0.0 && y == 0.0) { return select(0.0, PI, (bitcast<u32>(x) >> 31u) == 1u) * select(1.0, -1.0, (bitcast<u32>(y) >> 31u) == 1u); } return atan2(y, x); }
+
+fn maurer_rose_getCurveCoords(theta: f32, result: ptr<function, maurer_rose_DoublePoint2D>) {
+  var r_: f32 = (cos((jwx_maurer_rose_k * theta)) + jwx_maurer_rose_c_c);
+  (*result).x = (r_ * cos(theta));
+  (*result).y = (r_ * sin(theta));
+}
+
+var<private> jwx_maurer_rose_c_c: f32 = 0.0;
+
+var<private> jwx_maurer_rose_inited_: f32 = 0.0;
+
+var<private> jwx_maurer_rose_k: f32 = 0.0;`,
+    code: (w, p) => `{
+jwx_maurer_rose_c_c = ${p[2]};
+var cycles: f32 = 0;
+var step_size_radians: f32 = 0;
+var line_fraction: f32 = 0;
+var point_fraction: f32 = 0;
+var curve_fraction: f32 = 0;
+var line_threshold: f32 = 0;
+var point_threshold: f32 = 0;
+var point_half_threshold: f32 = 0;
+var line_thickness: f32 = 0;
+var point_thickness: f32 = 0;
+var curve_thickness: f32 = 0;
+var curve_point: maurer_rose_DoublePoint2D;
+var endpoint1: maurer_rose_DoublePoint2D;
+var endpoint2: maurer_rose_DoublePoint2D;
+if ((jwx_maurer_rose_inited_ == 0.0)) {
+  jwx_maurer_rose_inited_ = 1.0;
+  jwx_maurer_rose_k = 0;
+}
+{
+  jwx_maurer_rose_k = (${p[0]} / ${p[1]});
+  step_size_radians = ((2.0 * PI) * (${p[3]} / 360));
+  cycles = ((${p[4]} * step_size_radians) / (2.0 * PI));
+  var show_sum: f32 = ((${p[5]} + ${p[6]}) + ${p[7]});
+  line_fraction = (${p[5]} / show_sum);
+  point_fraction = (${p[6]} / show_sum);
+  curve_fraction = (${p[7]} / show_sum);
+  line_threshold = line_fraction;
+  point_threshold = (line_fraction + point_fraction);
+  point_half_threshold = (line_fraction + (point_fraction / 2));
+  line_thickness = (${p[8]} / 100);
+  point_thickness = (${p[9]} / 100);
+  curve_thickness = (${p[10]} / 100);
+}
+var tin: f32 = atan2j(t.y, t.x);
+var t_: f32 = (cycles * tin);
+var step_number: f32 = floor((t_ / step_size_radians));
+var theta1: f32 = (step_number * step_size_radians);
+var theta2: f32 = (theta1 + step_size_radians);
+maurer_rose_getCurveCoords(theta1, &(endpoint1));
+var x1: f32 = endpoint1.x;
+var y1: f32 = endpoint1.y;
+maurer_rose_getCurveCoords(theta2, &(endpoint2));
+var x2: f32 = endpoint2.x;
+var y2: f32 = endpoint2.y;
+var ydiff: f32 = (y2 - y1);
+var xdiff: f32 = (x2 - x1);
+var m: f32 = (ydiff / xdiff);
+var line_length: f32 = sqrt(((xdiff * xdiff) + (ydiff * ydiff)));
+var xout: f32;
+var yout: f32;
+var xoffset: f32 = 0;
+var yoffset: f32 = 0;
+var rnd_: f32 = rnd(rs);
+if ((rnd_ < line_threshold)) {
+  var d: f32 = (rnd(rs) * line_length);
+  xoffset = (d / sqrt((1 + (m * m))));
+  if ((x2 < x1)) {
+    xoffset = (-1 * xoffset);
+  }
+  yoffset = abs((m * xoffset));
+  if ((y2 < y1)) {
+    yoffset = (-1 * yoffset);
+  }
+  if ((line_thickness != 0)) {
+    xoffset += ((rnd(rs) - 0.5) * line_thickness);
+    yoffset += ((rnd(rs) - 0.5) * line_thickness);
+  }
+  xout = (x1 + xoffset);
+  yout = (y1 + yoffset);
+} else if ((rnd_ <= point_threshold)) {
+  if ((point_thickness != 0)) {
+    var roffset: f32 = (rnd(rs) * point_thickness);
+    var rangle: f32 = (rnd(rs) * (2.0 * PI));
+    xoffset = (roffset * cos(rangle));
+    yoffset = (roffset * sin(rangle));
+  } else {
+    xoffset = 0;
+    yoffset = 0;
+  }
+  if ((rnd_ <= point_half_threshold)) {
+    xout = (x1 + xoffset);
+    yout = (y1 + yoffset);
+  } else {
+    xout = (x2 + xoffset);
+    yout = (y2 + yoffset);
+  }
+} else {
+  maurer_rose_getCurveCoords(t_, &(curve_point));
+  var curvex: f32 = curve_point.x;
+  var curvey: f32 = curve_point.y;
+  if ((curve_thickness != 0)) {
+    xout = (curvex + ((rnd(rs) - 0.5) * curve_thickness));
+    yout = (curvey + ((rnd(rs) - 0.5) * curve_thickness));
+  } else {
+    xout = curvex;
+    yout = curvey;
+  }
+}
+v.x += (${w} * xout);
+v.y += (${w} * yout);
+if (false) {
+  pz_ += (${w} * z_);
+}
+}`,
+  },
   "cpow3_wf": {
     params: [{ name: "r", def: 1 }, { name: "a", def: 0.1 }, { name: "divisor", def: 1 }, { name: "spread", def: 1 }, { name: "discrete_spread", def: 1 }, { name: "spread2", def: 0 }, { name: "offset2", def: 1 }],
     verified: true, priority: 0, flags: [], types: ["2D"],
@@ -14992,6 +18296,26 @@ var ri: f32 = (${w} * exp(((half_c * lnr2) - (d * ai))));
 var ang2: f32 = (((((c * ai) * half_d) * lnr2) * ang) * ((rnd(rs) * ${p[5]}) + ${p[6]}));
 v.x += (ri * cos(ang2));
 v.y += (ri * sin(ang2));
+}`,
+  },
+  "dc_cylinder": {
+    params: [{ name: "offset", def: 0 }, { name: "angle", def: 0 }, { name: "scale", def: 0.5 }, { name: "x", def: 0.125 }, { name: "y", def: 0.125 }, { name: "blur", def: 1 }],
+    verified: true, priority: 0, flags: ["3d","dc","z"], types: ["3D","DC","BASE_SHAPE"],
+    funcNames: ["atan2j"],
+    funcs: `fn atan2j(y: f32, x: f32) -> f32 { if (x == 0.0 && y == 0.0) { return select(0.0, PI, (bitcast<u32>(x) >> 31u) == 1u) * select(1.0, -1.0, (bitcast<u32>(y) >> 31u) == 1u); } return atan2(y, x); }`,
+    code: (w, p) => `{
+var ldcs: f32;
+var ldca: f32;
+ldcs = (1.0 / select(${p[2]}, 0.00001, (${p[2]} == 0)));
+ldca = (${p[0]} * PI);
+var a: f32 = ((rnd(rs) * 2.0) * PI);
+var sr: f32 = sin(a);
+var cr: f32 = cos(a);
+var rr: f32 = (${p[5]} * ((((rnd(rs) + rnd(rs)) + rnd(rs)) + rnd(rs)) - 2.0));
+v.x += ((${w} * sin((t.x + (rr * sr)))) * ${p[3]});
+v.y += (rr + (t.y * ${p[4]}));
+pz_ += (${w} * cos((t.x + (rr * cr))));
+(*cp) = (abs((0.5 * ((ldcs * (((cos(${p[1]}) * v.x) + (sin(${p[1]}) * v.y)) + ${p[0]})) + 1.0))) % 1.0);
 }`,
   },
   "dc_cylinder2": {
@@ -16166,6 +19490,38 @@ if (false) {
 }
 }`,
   },
+  "iconattractor_js": {
+    params: [{ name: "presetId", def: 4 }, { name: "degree", def: 3 }, { name: "a", def: -2.5 }, { name: "b", def: 0 }, { name: "g", def: 0.9 }, { name: "o", def: 0 }, { name: "l", def: 2.5 }, { name: "centerx", def: 0 }, { name: "centery", def: 0 }, { name: "scale", def: 5 }],
+    verified: true, priority: 0, flags: ["dc"], types: ["2D","SIMULATION","DC","BASE_SHAPE"],
+    funcNames: ["atan2j","sqrf"],
+    funcs: `fn atan2j(y: f32, x: f32) -> f32 { if (x == 0.0 && y == 0.0) { return select(0.0, PI, (bitcast<u32>(x) >> 31u) == 1u) * select(1.0, -1.0, (bitcast<u32>(y) >> 31u) == 1u); } return atan2(y, x); }
+
+fn sqrf(x: f32) -> f32 {
+  return (x * x);
+}`,
+    code: (w, p) => `{
+var bdcs: f32 = (1.0 / select(${p[9]}, 0.00001, (${p[9]} == 0.0)));
+var x: f32;
+var y: f32;
+var zzbar: f32 = ((t.x * t.x) + (t.y * t.y));
+var p_: f32 = ((min(max(${p[2]}, -3.0), 3.0) * zzbar) + min(max(${p[6]}, -3.0), 3.0));
+var zreal: f32 = t.x;
+var zimag: f32 = t.y;
+for (var i: i32 = 1; (f32(i) <= (${p[1]} - 2)); i++) {
+  var za: f32 = ((zreal * t.x) - (zimag * t.y));
+  var zb: f32 = ((zimag * t.x) + (zreal * t.y));
+  zreal = za;
+  zimag = zb;
+}
+var zn: f32 = ((t.x * zreal) - (t.y * zimag));
+p_ = (p_ + (min(max(${p[3]}, -3.0), 3.0) * zn));
+x = (((p_ * t.x) + (min(max(${p[4]}, -3.0), 3.0) * zreal)) - (min(max(${p[5]}, -3.0), 3.0) * t.y));
+y = (((p_ * t.y) - (min(max(${p[4]}, -3.0), 3.0) * zimag)) + (min(max(${p[5]}, -3.0), 3.0) * t.x));
+v.x = (x * ${w});
+v.y = (y * ${w});
+(*cp) = (abs((bdcs * (sqrf((v.x + ${p[7]})) + sqrf((v.y + ${p[8]}))))) % 1.0);
+}`,
+  },
   "apollony": {
     params: [],
     verified: true, priority: 0, flags: [], types: ["2D"],
@@ -16264,6 +19620,302 @@ v.x += (x * ${w});
 v.y += (y * ${w});
 }`,
   },
+  "recurrenceplot": {
+    params: [{ name: "func_id", def: 0 }, { name: "a", def: 0.5 }, { name: "b", def: 10 }, { name: "k", def: 5 }, { name: "Density", def: 700 }, { name: "dc", def: 0 }, { name: "scale", def: 1 }, { name: "angle", def: 0 }, { name: "offset", def: 0 }, { name: "tolerance", def: 5 }],
+    verified: true, priority: 0, flags: ["dc","state","stateful"], types: ["BASE_SHAPE","SIMULATION"],
+    funcNames: ["jwx_recurrenceplot_oldx","jwx_recurrenceplot_oldy","atan2j","powc","recurrenceplot_F6","recurrenceplot_F22","recurrenceplot_F23","recurrenceplot_F24","recurrenceplot_F25","recurrenceplot_F26","recurrenceplot_F27","recurrenceplot_F28","F29"],
+    funcs: `fn atan2j(y: f32, x: f32) -> f32 { if (x == 0.0 && y == 0.0) { return select(0.0, PI, (bitcast<u32>(x) >> 31u) == 1u) * select(1.0, -1.0, (bitcast<u32>(y) >> 31u) == 1u); } return atan2(y, x); }
+
+fn powc(x: f32, y: f32) -> f32 {
+  if (x >= 0.0) { return pow(x, y); }
+  let yi = round(y);
+  if (abs(y - yi) > 1e-6) { return pow(x, y); }
+  let m = pow(-x, y);
+  return select(m, -m, (i32(yi) & 1) != 0);
+}
+
+fn recurrenceplot_F6(a: f32, b: f32, N: i32, i: i32) -> f32 {
+  var Summe: f32 = 0;
+  Summe = (a / (1 + exp(((-b * (f32(i) - (f32(N) / 2.0))) / f32(N)))));
+  return Summe;
+}
+
+fn recurrenceplot_F22(a: f32, b: f32, N: i32, i: i32) -> f32 {
+  var Sum: f32 = 0;
+  var x: f32;
+  x = (((2.0 * f32(i)) / f32(N)) - 1);
+  switch i32(b) {
+    case 0: {
+      Sum = a;
+    }
+    case 1: {
+      Sum = (a * x);
+    }
+    case 2: {
+      Sum = ((a * ((3.0 * powc(x, 2)) - 1.0)) / 2.0);
+    }
+    case 3: {
+      Sum = ((a * ((5.0 * powc(x, 3)) - (3.0 * x))) / 2.0);
+    }
+    case 4: {
+      Sum = ((a * (((35.0 * powc(x, 4)) - (30.0 * powc(x, 2))) + 3)) / 8.0);
+    }
+    case 5: {
+      Sum = ((a * (((63.0 * powc(x, 5)) - (70.0 * powc(x, 3))) + (15.0 * x))) / 8.0);
+    }
+    case 6: {
+      Sum = ((a * ((((231.0 * powc(x, 6)) - (315.0 * powc(x, 4))) + (105.0 * powc(x, 2))) - 5)) / 16.0);
+    }
+    case 7: {
+      Sum = ((a * ((((429.0 * powc(x, 7)) - (693.0 * powc(x, 5))) + (315.0 * powc(x, 3))) - (35.0 * x))) / 16.0);
+    }
+    case 8: {
+      Sum = ((a * (((((6435.0 * powc(x, 8)) - (12012.0 * powc(x, 6))) + (6930.0 * powc(x, 4))) - (1260.0 * powc(x, 2))) + 35)) / 128.0);
+    }
+    case 9: {
+      Sum = ((a * (((((12155.0 * powc(x, 9)) - (25740.0 * powc(x, 7))) + (18018.0 * powc(x, 5))) - (4620.0 * powc(x, 3))) + (315.0 * x))) / 128.0);
+    }
+    case 10: {
+      Sum = ((a * ((((((46189.0 * powc(x, 10)) - (109395.0 * powc(x, 8))) + (90090.0 * powc(x, 6))) - (30030.0 * powc(x, 4))) + (3465.0 * powc(x, 2))) - 63)) / 256.0);
+    }
+    default: {}
+  }
+  return Sum;
+}
+
+fn recurrenceplot_F23(a: f32, b: f32, N: i32, i: i32, k: i32) -> f32 {
+  var j: f32;
+  var Summe: f32 = 0;
+  for (j = 1; (j <= f32(k)); j += 1.0) {
+    Summe = (Summe + (sin((((((f32(i) * ((2 * j) - 1)) * b) * 2) * PI) / f32(N))) / ((2 * j) - 1)));
+  }
+  Summe = (Summe * ((4 * a) / PI));
+  return Summe;
+}
+
+fn recurrenceplot_F24(a: f32, b: f32, N: i32, i: i32, k: i32) -> f32 {
+  var j: f32;
+  var Summe: f32 = 0;
+  for (j = 1; (j <= f32(k)); j += 1.0) {
+    Summe = (Summe + (sin((((((f32(i) * j) * b) * 2) * PI) / f32(N))) / j));
+  }
+  Summe = (Summe * ((-2 * a) / PI));
+  return Summe;
+}
+
+fn recurrenceplot_F25(a: f32, b: f32, N: i32, i: i32, k: i32) -> f32 {
+  var j: f32;
+  var Summe: f32 = 0;
+  for (j = 1; (j <= f32(k)); j += 1.0) {
+    Summe = (Summe + (cos((((((f32(i) * (2 * j)) * b) * 2) * PI) / f32(N))) / (((2 * j) - 1) * ((2 * j) + 1))));
+  }
+  Summe = (((4 * a) / PI) * (0.5 - Summe));
+  return Summe;
+}
+
+fn recurrenceplot_F26(a: f32, b: f32, N: i32, i: i32, k: i32) -> f32 {
+  var j: f32;
+  var Summe: f32 = 0;
+  for (j = 1; (j <= f32(k)); j += 1.0) {
+    Summe = (Summe + ((powc(-1.0, j) * cos((((((f32(i) * (2 * j)) * b) * 1) * PI) / f32(N)))) / (j * j)));
+  }
+  Summe = ((((a * PI) * PI) / 3.0) + ((4.0 * a) * Summe));
+  return Summe;
+}
+
+fn recurrenceplot_F27(a: f32, b: f32, N: i32, i: i32) -> f32 {
+  var Sinc: f32 = 0;
+  Sinc = ((a * sin((((b * PI) * (f32(i) - (0.5 * f32(N)))) / f32(N)))) / (((b * PI) * (f32(i) - (0.5 * f32(N)))) / f32(N)));
+  return Sinc;
+}
+
+fn recurrenceplot_F28(a: f32, b: f32, N: i32, i: i32, k: i32) -> f32 {
+  var Gabor: f32 = 0;
+  Gabor = ((a * exp((-b * ((((f32(i) - (0.5 * f32(N))) / f32(N)) * (f32(i) - (0.5 * f32(N)))) / f32(N))))) * cos(((((2.0 * f32(k)) * PI) * f32(i)) / f32(N))));
+  return Gabor;
+}
+
+fn F29(a: f32, N: i32, i: i32, k: i32) -> f32 {
+  var Summe: f32;
+  var x: f32;
+  x = (((2.0 * f32(i)) / f32(N)) - 1);
+  Summe = 0.0;
+  switch k {
+    case 0: {
+      Summe = a;
+    }
+    case 1: {
+      Summe = (a * x);
+    }
+    case 2: {
+      Summe = (a * ((2.0 * powc(x, 2)) - 1.0));
+    }
+    case 3: {
+      Summe = (a * ((4.0 * powc(x, 3)) - (3.0 * x)));
+    }
+    case 4: {
+      Summe = (a * (((8.0 * powc(x, 4)) - (8.0 * powc(x, 2))) + 1));
+    }
+    case 5: {
+      Summe = (a * (((16.0 * powc(x, 5)) - (20.0 * powc(x, 3))) + (5.0 * x)));
+    }
+    case 6: {
+      Summe = (a * ((((32.0 * powc(x, 6)) - (48.0 * powc(x, 4))) + (18.0 * powc(x, 2))) - 1));
+    }
+    case 7: {
+      Summe = (a * ((((64.0 * powc(x, 7)) - (112.0 * powc(x, 5))) + (56.0 * powc(x, 3))) - (7.0 * x)));
+    }
+    case 8: {
+      Summe = (a * (((((128.0 * powc(x, 8)) - (256.0 * powc(x, 6))) + (160.0 * powc(x, 4))) - (32.0 * powc(x, 2))) + 1));
+    }
+    case 9: {
+      Summe = (a * (((((256.0 * powc(x, 9)) - (576.0 * powc(x, 7))) + (432.0 * powc(x, 5))) - (120.0 * powc(x, 3))) + (9.0 * x)));
+    }
+    case 10: {
+      Summe = (a * ((((((512.0 * powc(x, 10)) - (1280.0 * powc(x, 8))) + (1120.0 * powc(x, 6))) - (400.0 * powc(x, 4))) + (50.0 * powc(x, 2))) - 1));
+    }
+    case 11: {
+      Summe = (a * ((((((1024.0 * powc(x, 11)) - (2816.0 * powc(x, 9))) + (2816.0 * powc(x, 7))) - (1232.0 * powc(x, 5))) + (220.0 * powc(x, 3))) - (11.0 * x)));
+    }
+    case 12: {
+      Summe = (a * (((((((2048.0 * powc(x, 12)) - (6144.0 * powc(x, 10))) + (6912.0 * powc(x, 8))) - (3584.0 * powc(x, 6))) + (840.0 * powc(x, 4))) - (72.0 * powc(x, 2))) + 1));
+    }
+    default: {}
+  }
+  return Summe;
+}
+
+var<private> jwx_recurrenceplot_oldx: f32 = 0.0;
+
+var<private> jwx_recurrenceplot_oldy: f32 = 0.0;`,
+    code: (w, p) => `{
+var ldcs: f32 = (1.0 / select(${p[6]}, 0.00001, (${p[6]} == 0.0)));
+var y1: f32;
+var y2: f32;
+var i: i32;
+var j: i32;
+var dist: f32;
+var x: f32;
+var y: f32;
+var N: i32 = i32(${p[4]});
+var func_id: i32 = i32(${p[0]});
+i = i32((f32(N) * rnd(rs)));
+j = i32((f32(N) * rnd(rs)));
+if ((func_id == 0)) {
+  y1 = ((50 * sin(((f32((i * 4)) * PI) / f32((1 * N))))) + (25 * sin(((f32((i * 40)) * PI) / f32((1 * N))))));
+  y2 = ((50 * sin(((f32((j * 4)) * PI) / f32((1 * N))))) + (25 * sin(((f32((j * 40)) * PI) / f32((1 * N))))));
+} else if ((func_id == 1)) {
+  y1 = (((10 * sin(((f32((i * 5)) * PI) / f32((1 * N))))) * 5) * sin(((f32((i * 15)) * PI) / f32((1 * N)))));
+  y2 = (((10 * sin(((f32((j * 5)) * PI) / f32((1 * N))))) * 5) * sin(((f32((j * 15)) * PI) / f32((1 * N)))));
+} else if ((func_id == 2)) {
+  y1 = (50 * cos((((f32((i * 24)) * PI) / f32((1 * N))) + (5 * sin(((f32((i * 6)) * PI) / f32((1 * N))))))));
+  y2 = (50 * cos((((f32((j * 24)) * PI) / f32((1 * N))) + (5 * sin(((f32((j * 6)) * PI) / f32((1 * N))))))));
+} else if ((func_id == 3)) {
+  y1 = ((50 * sin(((f32((i * 20)) * PI) / f32((1 * N))))) + (50 * sin((((f32((i * 22)) * PI) / f32((1 * N))) + PI))));
+  y2 = ((50 * sin(((f32((j * 20)) * PI) / f32((1 * N))))) + (50 * sin((((f32((j * 22)) * PI) / f32((1 * N))) + PI))));
+} else if ((func_id == 4)) {
+  y1 = ((50 * sin(((f32((i * 20)) * PI) / f32((1 * N))))) + (10 * sin(((f32((i * 22)) * PI) / f32((1 * N))))));
+  y2 = ((50 * sin(((f32((j * 20)) * PI) / f32((1 * N))))) + (10 * sin(((f32((j * 22)) * PI) / f32((1 * N))))));
+} else if ((func_id == 5)) {
+  y1 = (50 * sin(((((f32(i) * ${p[1]}) * PI) / f32((1 * N))) + (1 * sin((((f32(i) * ${p[1]}) * PI) / f32((1 * N))))))));
+  y2 = (50 * sin(((((f32(j) * ${p[1]}) * PI) / f32((1 * N))) + (1 * sin((((f32(j) * ${p[1]}) * PI) / f32((1 * N))))))));
+} else if ((func_id == 6)) {
+  y1 = recurrenceplot_F6(${p[1]}, ${p[2]}, N, i);
+  y2 = recurrenceplot_F6(${p[1]}, ${p[2]}, N, j);
+} else if ((func_id == 7)) {
+  y1 = ((400 / PI) * (((sin(((f32(i) * PI) / (0.5 * f32(N)))) + (sin(((f32((i * 3)) * PI) / (0.5 * f32(N)))) / 3.0)) + (sin(((f32((i * 5)) * PI) / (0.5 * f32(N)))) / 5.0)) + (sin(((f32((i * 7)) * PI) / (0.5 * f32(N)))) / 7.0)));
+  y2 = ((400 / PI) * (((sin(((f32(j) * PI) / (0.5 * f32(N)))) + (sin(((f32((j * 3)) * PI) / (0.5 * f32(N)))) / 3.0)) + (sin(((f32((j * 5)) * PI) / (0.5 * f32(N)))) / 5.0)) + (sin(((f32((j * 7)) * PI) / (0.5 * f32(N)))) / 7.0)));
+} else if ((func_id == 8)) {
+  y1 = (((400 / PI) * PI) * (((sin(((f32(i) * PI) / (0.5 * f32(N)))) - (sin(((f32((i * 3)) * PI) / (0.5 * f32(N)))) / 9.0)) + (sin(((f32((i * 5)) * PI) / (0.5 * f32(N)))) / 25.0)) - (sin(((f32((i * 7)) * PI) / (0.5 * f32(N)))) / 49.0)));
+  y2 = (((400 / PI) * PI) * (((sin(((f32(j) * PI) / (0.5 * f32(N)))) - (sin(((f32((j * 3)) * PI) / (0.5 * f32(N)))) / 9.0)) + (sin(((f32((j * 5)) * PI) / (0.5 * f32(N)))) / 25.0)) - (sin(((f32((j * 7)) * PI) / (0.5 * f32(N)))) / 49.0)));
+} else if ((func_id == 9)) {
+  y1 = tanh((((${p[1]} * f32(i)) * PI) / f32(N)));
+  y2 = tanh((((${p[1]} * f32(j)) * PI) / f32(N)));
+} else if ((func_id == 10)) {
+  y1 = tan((((${p[1]} * f32(i)) * PI) / f32(N)));
+  y2 = tan((((${p[1]} * f32(j)) * PI) / f32(N)));
+} else if ((func_id == 11)) {
+  y1 = ((-200 / PI) * (((((((sin(((f32(i) * PI) / (0.5 * f32(N)))) + (sin(((f32((i * 2)) * PI) / (0.5 * f32(N)))) / 2.0)) + (sin(((f32((i * 3)) * PI) / (0.5 * f32(N)))) / 3.0)) + (sin(((f32((i * 4)) * PI) / (0.5 * f32(N)))) / 4.0)) + (sin(((f32((i * 5)) * PI) / (0.5 * f32(N)))) / 5.0)) + (sin(((f32((i * 6)) * PI) / (0.5 * f32(N)))) / 6.0)) + (sin(((f32((i * 7)) * PI) / (0.5 * f32(N)))) / 7.0)) + (sin(((f32((i * 8)) * PI) / (0.5 * f32(N)))) / 8.0)));
+  y2 = ((-200 / PI) * (((((((sin(((f32(j) * PI) / (0.5 * f32(N)))) + (sin(((f32((j * 2)) * PI) / (0.5 * f32(N)))) / 2.0)) + (sin(((f32((j * 3)) * PI) / (0.5 * f32(N)))) / 3.0)) + (sin(((f32((j * 4)) * PI) / (0.5 * f32(N)))) / 4.0)) + (sin(((f32((j * 5)) * PI) / (0.5 * f32(N)))) / 5.0)) + (sin(((f32((j * 6)) * PI) / (0.5 * f32(N)))) / 6.0)) + (sin(((f32((j * 7)) * PI) / (0.5 * f32(N)))) / 7.0)) + (sin(((f32((j * 8)) * PI) / (0.5 * f32(N)))) / 8.0)));
+} else if ((func_id == 12)) {
+  y1 = ((50 * sin(((f32((i * 40)) * PI) / f32((1 * N))))) + (50 * sin(((f32((i * 44)) * PI) / (1.0 * f32(N))))));
+  y2 = ((50 * sin(((f32((j * 40)) * PI) / f32((1 * N))))) + (50 * sin(((f32((j * 44)) * PI) / (1.0 * f32(N))))));
+} else if ((func_id == 13)) {
+  y1 = ((50 * sin(((f32((i * 40)) * PI) / f32((1 * N))))) + (50 * sin((((f32((i * 44)) * PI) / (1.0 * f32(N))) + PI))));
+  y2 = ((50 * sin(((f32((j * 40)) * PI) / f32((1 * N))))) + (50 * sin((((f32((j * 44)) * PI) / (1.0 * f32(N))) + PI))));
+} else if ((func_id == 14)) {
+  y1 = (((100 * sin(((f32((i * 16)) * PI) / f32((1 * N))))) - 500) + (f32(i) * 0.25));
+  y2 = (((100 * sin(((f32((j * 16)) * PI) / f32((1 * N))))) - 500) + (f32(j) * 0.25));
+} else if ((func_id == 15)) {
+  y1 = (100 * sin(((f32((i * 16)) * PI) / f32((1 * N)))));
+  y2 = (100 * sin(((f32((j * 16)) * PI) / f32((1 * N)))));
+} else if ((func_id == 16)) {
+  y1 = (1.0 / cos((((f32(i) * ${p[1]}) * PI) / f32(N))));
+  y2 = (1.0 / cos((((f32(j) * ${p[1]}) * PI) / f32(N))));
+} else if ((func_id == 17)) {
+  y1 = (50 * cos(((((f32((i * 2)) * PI) * 25) / f32((1 * N))) + (25 * sin((((f32((i * 2)) * PI) * 0.5) / f32((1 * N))))))));
+  y2 = (50 * cos(((((f32((j * 2)) * PI) * 25) / f32((1 * N))) + (25 * sin((((f32((j * 2)) * PI) * 0.5) / f32((1 * N))))))));
+} else if ((func_id == 18)) {
+  y1 = (${p[1]} * exp(((-(${p[2]}) * ((((2.0 * ${p[1]}) * f32(i)) / f32(N)) - ${p[1]})) * ((((2.0 * ${p[1]}) * f32(i)) / f32(N)) - ${p[1]}))));
+  y2 = (${p[1]} * exp(((-(${p[2]}) * ((((2.0 * ${p[1]}) * f32(j)) / f32(N)) - ${p[1]})) * ((((2.0 * ${p[1]}) * f32(j)) / f32(N)) - ${p[1]}))));
+} else if ((func_id == 19)) {
+  y1 = ((500 * sin(((f32((i * 10)) * PI) / f32(N)))) * exp(((-5.0 * f32(i)) / f32(N))));
+  y2 = ((500 * sin(((f32((j * 10)) * PI) / f32(N)))) * exp(((-5.0 * f32(j)) / f32(N))));
+} else if ((func_id == 20)) {
+  y1 = ((500 * sin(((f32((i * 20)) * PI) / f32(N)))) * exp(((-3.0 * f32(i)) / f32(N))));
+  y2 = ((500 * sin(((f32((j * 20)) * PI) / f32(N)))) * exp(((-3.0 * f32(j)) / f32(N))));
+} else if ((func_id == 21)) {
+  y1 = (50 * tan(((f32((i * 2)) * PI) / f32((1 * N)))));
+  y2 = (50 * tan(((f32((j * 2)) * PI) / f32((1 * N)))));
+} else if ((func_id == 22)) {
+  y1 = recurrenceplot_F22(${p[1]}, ${p[2]}, N, i);
+  y2 = recurrenceplot_F22(${p[1]}, ${p[2]}, N, j);
+} else if ((func_id == 23)) {
+  y1 = recurrenceplot_F23(${p[1]}, ${p[2]}, N, i, i32(${p[3]}));
+  y2 = recurrenceplot_F23(${p[1]}, ${p[2]}, N, j, i32(${p[3]}));
+} else if ((func_id == 24)) {
+  y1 = recurrenceplot_F24(${p[1]}, ${p[2]}, N, i, i32(${p[3]}));
+  y2 = recurrenceplot_F24(${p[1]}, ${p[2]}, N, j, i32(${p[3]}));
+} else if ((func_id == 25)) {
+  y1 = recurrenceplot_F25(${p[1]}, ${p[2]}, N, i, i32(${p[3]}));
+  y2 = recurrenceplot_F25(${p[1]}, ${p[2]}, N, j, i32(${p[3]}));
+} else if ((func_id == 26)) {
+  y1 = recurrenceplot_F26(${p[1]}, ${p[2]}, N, i, i32(${p[3]}));
+  y2 = recurrenceplot_F26(${p[1]}, ${p[2]}, N, j, i32(${p[3]}));
+} else if ((func_id == 27)) {
+  y1 = recurrenceplot_F27(${p[1]}, ${p[2]}, N, i);
+  y2 = recurrenceplot_F27(${p[1]}, ${p[2]}, N, j);
+} else if ((func_id == 28)) {
+  y1 = recurrenceplot_F28(${p[1]}, ${p[2]}, N, i, i32(${p[3]}));
+  y2 = recurrenceplot_F28(${p[1]}, ${p[2]}, N, j, i32(${p[3]}));
+} else if ((func_id == 29)) {
+  y1 = F29(${p[1]}, N, i, i32(${p[3]}));
+  y2 = F29(${p[1]}, N, j, i32(${p[3]}));
+}
+dist = sqrt(((y1 - y2) * (y1 - y2)));
+if ((dist < ${p[9]})) {
+  x = ((f32(i) / f32(N)) - 0.5);
+  y = ((f32(j) / f32(N)) - 0.5);
+  v.x += (${w} * x);
+  v.y += (${w} * y);
+  jwx_recurrenceplot_oldx = v.x;
+  jwx_recurrenceplot_oldy = v.y;
+} else {
+  v.x = jwx_recurrenceplot_oldx;
+  v.y = jwx_recurrenceplot_oldy;
+}
+if ((i32(${p[5]}) != 0)) {
+  var s: f32 = sin(${p[7]});
+  var c: f32 = cos(${p[7]});
+  if ((i32(${p[5]}) == 1)) {
+    (*cp) = (abs(((((0.5 * ldcs) * v.x) * v.y) + ${p[8]})) % 1.0);
+  }
+  if ((i32(${p[5]}) == 2)) {
+    (*cp) = (abs((0.5 * ((ldcs * (((c * v.x) + (s * v.y)) + ${p[8]})) + 1.0))) % 1.0);
+  }
+}
+}`,
+  },
   "macmillan": {
     params: [{ name: "a", def: 1.6 }, { name: "b", def: 0.4 }, { name: "startx", def: 0.1 }, { name: "starty", def: 0.1 }],
     verified: true, priority: 0, flags: ["state"], types: ["2D"],
@@ -16314,6 +19966,113 @@ var cosr: f32 = (cos(rPI) * ${p[1]});
 var r_: f32 = (((${w} * th) / PI) * ${p[2]});
 v.x += ((sinr * ${p[7]}) * r_);
 v.y += ((cosr * ${p[7]}) * r_);
+if (false) {
+  pz_ += (${w} * z_);
+}
+}`,
+  },
+  "dc_kaleidotile": {
+    params: [{ name: "pull", def: -1.5 }, { name: "rotate", def: 0 }, { name: "line_up", def: 1 }, { name: "x", def: 0 }, { name: "y", def: 0 }, { name: "color1", def: 0 }, { name: "speed1", def: 0 }, { name: "color2", def: 1 }, { name: "speed2", def: 0 }],
+    verified: true, priority: 0, flags: ["dc","state","z"], types: ["2D","SIMULATION","DC","BASE_SHAPE"],
+    funcNames: ["jwx_dc_kaleidotile_inited_","jwx_dc_kaleidotile_oldColor","jwx_dc_kaleidotile_newColor","jwx_dc_kaleidotile__q","jwx_dc_kaleidotile__q1","jwx_dc_kaleidotile__w","jwx_dc_kaleidotile__w1","jwx_dc_kaleidotile__e","jwx_dc_kaleidotile__e1","jwx_dc_kaleidotile__r","jwx_dc_kaleidotile__r1","jwx_dc_kaleidotile__t","jwx_dc_kaleidotile__t1","jwx_dc_kaleidotile_c11","jwx_dc_kaleidotile_c12","jwx_dc_kaleidotile_c21","jwx_dc_kaleidotile_c22","atan2j"],
+    funcs: `fn atan2j(y: f32, x: f32) -> f32 { if (x == 0.0 && y == 0.0) { return select(0.0, PI, (bitcast<u32>(x) >> 31u) == 1u) * select(1.0, -1.0, (bitcast<u32>(y) >> 31u) == 1u); } return atan2(y, x); }
+
+var<private> jwx_dc_kaleidotile_inited_: f32 = 0.0;
+
+var<private> jwx_dc_kaleidotile_oldColor: f32 = 0.0;
+
+var<private> jwx_dc_kaleidotile_newColor: f32 = 0.0;
+
+var<private> jwx_dc_kaleidotile__q: f32 = 0.0;
+
+var<private> jwx_dc_kaleidotile__q1: f32 = 0.0;
+
+var<private> jwx_dc_kaleidotile__w: f32 = 0.0;
+
+var<private> jwx_dc_kaleidotile__w1: f32 = 0.0;
+
+var<private> jwx_dc_kaleidotile__e: f32 = 0.0;
+
+var<private> jwx_dc_kaleidotile__e1: f32 = 0.0;
+
+var<private> jwx_dc_kaleidotile__r: f32 = 0.0;
+
+var<private> jwx_dc_kaleidotile__r1: f32 = 0.0;
+
+var<private> jwx_dc_kaleidotile__t: f32 = 0.0;
+
+var<private> jwx_dc_kaleidotile__t1: f32 = 0.0;
+
+var<private> jwx_dc_kaleidotile_c11: f32 = 0.0;
+
+var<private> jwx_dc_kaleidotile_c12: f32 = 0.0;
+
+var<private> jwx_dc_kaleidotile_c21: f32 = 0.0;
+
+var<private> jwx_dc_kaleidotile_c22: f32 = 0.0;`,
+    code: (w, p) => `{
+var _i: f32 = 0;
+if ((jwx_dc_kaleidotile_inited_ == 0.0)) {
+  jwx_dc_kaleidotile_inited_ = 1.0;
+  jwx_dc_kaleidotile__q = 0;
+  jwx_dc_kaleidotile__q1 = 0;
+  jwx_dc_kaleidotile__w = 0;
+  jwx_dc_kaleidotile__w1 = 0;
+  jwx_dc_kaleidotile__e = 0;
+  jwx_dc_kaleidotile__e1 = 0;
+  jwx_dc_kaleidotile__r = 0;
+  jwx_dc_kaleidotile__r1 = 0;
+  jwx_dc_kaleidotile__t = 0;
+  jwx_dc_kaleidotile__t1 = 0;
+  jwx_dc_kaleidotile_c11 = 0;
+  jwx_dc_kaleidotile_c12 = 0;
+  jwx_dc_kaleidotile_c21 = 0;
+  jwx_dc_kaleidotile_c22 = 0;
+  jwx_dc_kaleidotile_oldColor = 0;
+  jwx_dc_kaleidotile_newColor = 0;
+  {
+    jwx_dc_kaleidotile__q = ${p[0]};
+    jwx_dc_kaleidotile__q1 = -(${p[0]});
+    jwx_dc_kaleidotile__w = ${p[1]};
+    jwx_dc_kaleidotile__w1 = -(${p[1]});
+    jwx_dc_kaleidotile__e = ${p[2]};
+    jwx_dc_kaleidotile__e1 = -(${p[2]});
+    jwx_dc_kaleidotile__r = ${p[3]};
+    jwx_dc_kaleidotile__r1 = -(${p[3]});
+    jwx_dc_kaleidotile__t = ${p[4]};
+    jwx_dc_kaleidotile__t1 = -(${p[4]});
+    jwx_dc_kaleidotile_c11 = ((1 + ${p[6]}) / 2);
+    jwx_dc_kaleidotile_c12 = ((${p[5]} * (1 - ${p[6]})) / 2);
+    jwx_dc_kaleidotile_c21 = ((1 + ${p[8]}) / 2);
+    jwx_dc_kaleidotile_c22 = ((${p[7]} * (1 - ${p[8]})) / 2);
+    jwx_dc_kaleidotile_oldColor = 0.5;
+  }
+  jwx_dc_kaleidotile_oldColor += ((rnd(rs) - 0.5) * 0.0001);
+  jwx_dc_kaleidotile_newColor += ((rnd(rs) - 0.5) * 0.0001);
+}
+if ((rnd(rs) < 0.5)) {
+  var xin: f32 = (t.x * 0.831);
+  var yin: f32 = (t.y * 0.831);
+  v.x += (((((jwx_dc_kaleidotile__w * xin) * cos(45.0)) - (yin * sin(45.0))) + jwx_dc_kaleidotile__e) + jwx_dc_kaleidotile__r);
+  if ((yin > 0)) {
+    v.y += ((((((jwx_dc_kaleidotile__w * yin) * cos(45.0)) + (xin * sin(45.0))) + jwx_dc_kaleidotile__q) + jwx_dc_kaleidotile__e) + jwx_dc_kaleidotile__t);
+  } else {
+    v.y += (((((jwx_dc_kaleidotile__w * yin) * cos(45.0)) + (xin * sin(45.0))) - jwx_dc_kaleidotile__q) - jwx_dc_kaleidotile__e);
+  }
+  jwx_dc_kaleidotile_newColor = ((jwx_dc_kaleidotile_oldColor * jwx_dc_kaleidotile_c11) + jwx_dc_kaleidotile_c12);
+} else {
+  var xin: f32 = (t.x * 0.831);
+  var yin: f32 = (t.y * 0.831);
+  v.x += (((((jwx_dc_kaleidotile__w1 * xin) * cos(45.0)) - (yin * sin(45.0))) + jwx_dc_kaleidotile__e1) + jwx_dc_kaleidotile__r1);
+  if ((yin > 0)) {
+    v.y += ((((((jwx_dc_kaleidotile__w1 * yin) * cos(45.0)) + (xin * sin(45.0))) + jwx_dc_kaleidotile__q1) + jwx_dc_kaleidotile__e1) + jwx_dc_kaleidotile__t1);
+  } else {
+    v.y += (((((jwx_dc_kaleidotile__w1 * yin) * cos(45.0)) + (xin * sin(45.0))) - jwx_dc_kaleidotile__q1) - jwx_dc_kaleidotile__e1);
+  }
+  jwx_dc_kaleidotile_newColor = ((jwx_dc_kaleidotile_oldColor * jwx_dc_kaleidotile_c21) + jwx_dc_kaleidotile_c22);
+}
+(*cp) = (jwx_dc_kaleidotile_newColor % 1);
+jwx_dc_kaleidotile_oldColor = jwx_dc_kaleidotile_newColor;
 if (false) {
   pz_ += (${w} * z_);
 }
@@ -16516,6 +20275,106 @@ v.x += ((${p[0]} + ((${w} * ${p[1]}) * t.x)) + ((${p[2]} * t.x) * t.x));
 v.x += ((((${p[3]} * t.x) * t.y) + (${p[4]} * t.y)) + ((${p[5]} * t.y) * t.y));
 v.y += ((${p[6]} + (${p[7]} * t.x)) + ((${p[8]} * t.x) * t.x));
 v.y += ((((${p[9]} * t.x) * t.y) + ((${w} * ${p[10]}) * t.y)) + ((${p[11]} * t.y) * t.y));
+}`,
+  },
+  "curliecue2": {
+    params: [{ name: "seed", def: 1000 }],
+    verified: true, priority: 0, flags: ["state","z"], types: ["2D"],
+    funcNames: ["jwx_curliecue2_inited_","jwx_curliecue2_x0","jwx_curliecue2_y0","jwx_curliecue2_x1","jwx_curliecue2_y1","jwx_curliecue2_theta","jwx_curliecue2_phi","jwx_curliecue2_s","jrand_","atan2j","rndi","jrand_make","jrand_next","jrand_nextDouble"],
+    funcs: `struct jrand_ {
+  s0: i32,
+  s1: i32,
+  s2: i32,
+}
+
+fn atan2j(y: f32, x: f32) -> f32 { if (x == 0.0 && y == 0.0) { return select(0.0, PI, (bitcast<u32>(x) >> 31u) == 1u) * select(1.0, -1.0, (bitcast<u32>(y) >> 31u) == 1u); } return atan2(y, x); }
+
+fn rndi(state: ptr<function, u32>) -> u32 { var x = *state; x ^= x << 13u; x ^= x >> 17u; x ^= x << 5u; *state = x; return x; }
+
+fn jrand_make(seed: i32) -> jrand_ {
+  var r_: jrand_;
+  r_.s0 = ((seed & 65535) ^ 58989);
+  r_.s1 = (((seed >> 16) & 65535) ^ 57068);
+  r_.s2 = (select(0, 65535, (seed < 0)) ^ 5);
+  return r_;
+}
+
+fn jrand_next(r_: ptr<function, jrand_>, bits: i32) -> i32 {
+  var a0: u32 = u32((*r_).s0);
+  var a1: u32 = u32((*r_).s1);
+  var a2: u32 = u32((*r_).s2);
+  var t0: u32 = ((a0 * 58989) + 11);
+  var r0: u32 = (t0 & 65535);
+  var c0: u32 = (t0 >> 16);
+  var t1a: u32 = ((a0 * 57068) + c0);
+  var c1a: u32 = (t1a >> 16);
+  var t1b: u32 = ((a1 * 58989) + (t1a & 65535));
+  var r1: u32 = (t1b & 65535);
+  var c1: u32 = (c1a + (t1b >> 16));
+  var r2_: u32 = (((((a0 * 5) + (a1 * 57068)) + (a2 * 58989)) + c1) & 65535);
+  (*r_).s0 = i32(r0);
+  (*r_).s1 = i32(r1);
+  (*r_).s2 = i32(r2_);
+  var hi: u32 = ((r2_ << 16) | r1);
+  return i32((hi >> u32((32 - bits))));
+}
+
+fn jrand_nextDouble(r_: ptr<function, jrand_>) -> f32 {
+  return ((f32(jrand_next(r_, 26)) * (1.0 / 67108864.0)) + (f32(jrand_next(r_, 27)) * (1.0 / 9007199254740992.0)));
+}
+
+var<private> jwx_curliecue2_inited_: f32 = 0.0;
+
+var<private> jwx_curliecue2_x0: f32 = 0.0;
+
+var<private> jwx_curliecue2_y0: f32 = 0.0;
+
+var<private> jwx_curliecue2_x1: f32 = 0.0;
+
+var<private> jwx_curliecue2_y1: f32 = 0.0;
+
+var<private> jwx_curliecue2_theta: f32 = 0.0;
+
+var<private> jwx_curliecue2_phi: f32 = 0.0;
+
+var<private> jwx_curliecue2_s: f32 = 0.0;`,
+    code: (w, p) => `{
+var randomize: jrand_ = jrand_make(i32(${p[0]}));
+if ((jwx_curliecue2_inited_ == 0.0)) {
+  jwx_curliecue2_inited_ = 1.0;
+  jwx_curliecue2_s = 0.02;
+  jwx_curliecue2_x0 = 0.0;
+  jwx_curliecue2_y0 = 0.0;
+  jwx_curliecue2_x1 = 0;
+  jwx_curliecue2_y1 = 0;
+  jwx_curliecue2_theta = 0;
+  jwx_curliecue2_phi = 0;
+  {
+    randomize = jrand_make(i32(${p[0]}));
+    jwx_curliecue2_x0 = 0.0;
+    jwx_curliecue2_y0 = 0.0;
+    jwx_curliecue2_theta = 0;
+    jwx_curliecue2_phi = 0;
+    jwx_curliecue2_s = jrand_nextDouble(&(randomize));
+  }
+  jwx_curliecue2_x0 += ((rnd(rs) - 0.5) * 0.0001);
+  jwx_curliecue2_y0 += ((rnd(rs) - 0.5) * 0.0001);
+  jwx_curliecue2_x1 += ((rnd(rs) - 0.5) * 0.0001);
+  jwx_curliecue2_y1 += ((rnd(rs) - 0.5) * 0.0001);
+  jwx_curliecue2_theta += ((rnd(rs) - 0.5) * 0.0001);
+  jwx_curliecue2_phi += ((rnd(rs) - 0.5) * 0.0001);
+}
+jwx_curliecue2_x1 = (jwx_curliecue2_x0 + (0.001 * cos(jwx_curliecue2_phi)));
+jwx_curliecue2_y1 = (jwx_curliecue2_y0 + (0.001 * sin(jwx_curliecue2_phi)));
+jwx_curliecue2_x0 = jwx_curliecue2_x1;
+jwx_curliecue2_y0 = jwx_curliecue2_y1;
+jwx_curliecue2_phi = ((jwx_curliecue2_theta + jwx_curliecue2_phi) % (2 * PI));
+jwx_curliecue2_theta = ((jwx_curliecue2_theta + ((2 * PI) * jwx_curliecue2_s)) % (2 * PI));
+v.x += (${w} * jwx_curliecue2_x0);
+v.y += (${w} * jwx_curliecue2_y0);
+if (false) {
+  pz_ += (${w} * z_);
+}
 }`,
   },
   "starfractal": {
@@ -18287,6 +22146,241 @@ v.y += (y * ${w});
 pz_ += (z * ${w});
 }`,
   },
+  "glsl_mandala": {
+    params: [{ name: "Density Pixels", def: 1000000 }, { name: "mX", def: 0.025 }, { name: "mY", def: -0.001245675 }, { name: "scale", def: 2 }, { name: "sides", def: 12 }, { name: "multiply", def: 1.5 }, { name: "loops", def: 64 }, { name: "iR", def: 0 }, { name: "iG", def: 0 }, { name: "iB", def: 1 }, { name: "Gradient", def: 0 }],
+    verified: true, priority: 0, flags: ["dc","rgb","state"], types: ["SIMULATION","DC","BASE_SHAPE"],
+    funcNames: ["jwx_glsl_mandala_scale_c","jwx_glsl_mandala_Density_Pixels_c","jwx_glsl_mandala_sides_c","jwx_glsl_mandala_multiply_c","jwx_glsl_mandala_mX_c","jwx_glsl_mandala_loops_c","jwx_glsl_mandala_mY_c","jwx_glsl_mandala_iR_c","jwx_glsl_mandala_iG_c","jwx_glsl_mandala_iB_c","jwx_glsl_mandala_inited_","jwx_glsl_mandala_resolutionY","atan2j","mmod2","G_Kscope","glsl_mandala_getRGBColor","dbl2int"],
+    funcs: `fn atan2j(y: f32, x: f32) -> f32 { if (x == 0.0 && y == 0.0) { return select(0.0, PI, (bitcast<u32>(x) >> 31u) == 1u) * select(1.0, -1.0, (bitcast<u32>(y) >> 31u) == 1u); } return atan2(y, x); }
+
+fn mmod2(a: vec2f, b: vec2f) -> vec2f { return a - b * floor(a / b); }
+
+fn G_Kscope(uv: vec2f, k: f32) -> vec2f {
+  var angle: f32 = abs((mmod(atan2j(uv.y, uv.x), (2.0 * k)) - k));
+  return vec2f((length(uv) * cos(angle)), (length(uv) * sin(angle)));
+}
+
+fn glsl_mandala_getRGBColor(i: i32, j: i32) -> vec3f {
+  var xt: f32 = (f32(i) + 0.5);
+  var yt: f32 = (f32(j) + 0.5);
+  var rcpi: f32 = 0.318309886183791;
+  var uv: vec2f = vec2f(0.0, 0.0);
+  uv.x = ((5.5 - jwx_glsl_mandala_scale_c) * (((2.0 * xt) / jwx_glsl_mandala_Density_Pixels_c) - 1.0));
+  uv.y = ((5.5 - jwx_glsl_mandala_scale_c) * (((2.0 * yt) / f32(jwx_glsl_mandala_resolutionY)) - 1.0));
+  var k: f32 = (PI / floor(jwx_glsl_mandala_sides_c));
+  var s: vec2f = G_Kscope(uv, k);
+  var t_: vec2f = G_Kscope(s, k);
+  var v_: f32 = dot(t_, s);
+  var u: vec2f = mix(s, t_, cos(v_));
+  if ((jwx_glsl_mandala_multiply_c > 0.001)) {
+    var t1: vec2f = vec2f(u.y, u.x);
+    var t2: vec2f = mmod2(t1, vec2f(floor(jwx_glsl_mandala_multiply_c)));
+    var t3: vec2f = vec2f(-u.x, -u.y);
+    var t4: vec2f = vec2f(u.y, u.x);
+    var t5: vec2f = (t4 + mmod2(t2, t3));
+    u = vec2f(t5.y, t5.x);
+  }
+  var p_: vec3f = vec3f(u.x, u.y, (jwx_glsl_mandala_mX_c * v_));
+  for (var l: i32 = 0; (l < 73); l++) {
+    if ((f32(l) > floor(jwx_glsl_mandala_loops_c))) {
+      break;
+    }
+    var t1: vec3f = vec3f(1.3, 0.999, 0.678);
+    var t2: vec3f = ((abs(p_) / vec3f(dot(p_, p_))) - vec3f(1.0, 1.02, (jwx_glsl_mandala_mY_c * rcpi)));
+    var t3: vec3f = abs(t2);
+    var t4: vec3f = (t1 * t3);
+    p_ = vec3f(t4.x, t4.z, t4.y);
+  }
+  if ((jwx_glsl_mandala_iR_c == 1)) {
+    p_.x = (1.0 - p_.x);
+  }
+  if ((jwx_glsl_mandala_iG_c == 1)) {
+    p_.y = (1.0 - p_.y);
+  }
+  if ((jwx_glsl_mandala_iB_c == 1)) {
+    p_.z = (1.0 - p_.z);
+  }
+  return p_;
+}
+
+fn dbl2int(theColor: vec3f) -> vec3i {
+  var red: i32 = max(0, min(255, i32(floor((theColor.x * 256.0)))));
+  var green: i32 = max(0, min(255, i32(floor((theColor.y * 256.0)))));
+  var blue: i32 = max(0, min(255, i32(floor((theColor.z * 256.0)))));
+  return vec3i(red, green, blue);
+}
+
+var<private> jwx_glsl_mandala_scale_c: f32 = 0.0;
+
+var<private> jwx_glsl_mandala_Density_Pixels_c: f32 = 0.0;
+
+var<private> jwx_glsl_mandala_sides_c: f32 = 0.0;
+
+var<private> jwx_glsl_mandala_multiply_c: f32 = 0.0;
+
+var<private> jwx_glsl_mandala_mX_c: f32 = 0.0;
+
+var<private> jwx_glsl_mandala_loops_c: f32 = 0.0;
+
+var<private> jwx_glsl_mandala_mY_c: f32 = 0.0;
+
+var<private> jwx_glsl_mandala_iR_c: f32 = 0.0;
+
+var<private> jwx_glsl_mandala_iG_c: f32 = 0.0;
+
+var<private> jwx_glsl_mandala_iB_c: f32 = 0.0;
+
+var<private> jwx_glsl_mandala_inited_: f32 = 0.0;
+
+var<private> jwx_glsl_mandala_resolutionY: i32 = 0;`,
+    code: (w, p) => `{
+jwx_glsl_mandala_scale_c = ${p[3]};
+jwx_glsl_mandala_Density_Pixels_c = ${p[0]};
+jwx_glsl_mandala_sides_c = ${p[4]};
+jwx_glsl_mandala_multiply_c = ${p[5]};
+jwx_glsl_mandala_mX_c = ${p[1]};
+jwx_glsl_mandala_loops_c = ${p[6]};
+jwx_glsl_mandala_mY_c = ${p[2]};
+jwx_glsl_mandala_iR_c = min(max(${p[7]}, 0.0), 1.0);
+jwx_glsl_mandala_iG_c = min(max(${p[8]}, 0.0), 1.0);
+jwx_glsl_mandala_iB_c = min(max(${p[9]}, 0.0), 1.0);
+if ((jwx_glsl_mandala_inited_ == 0.0)) {
+  jwx_glsl_mandala_inited_ = 1.0;
+  jwx_glsl_mandala_resolutionY = i32(${p[0]});
+}
+jwx_glsl_mandala_resolutionY = i32(${p[0]});
+var i: i32 = i32((rnd(rs) * ${p[0]}));
+var j: i32 = i32((rnd(rs) * f32(jwx_glsl_mandala_resolutionY)));
+var color: vec3f = vec3f(0.0, 0.0, 0.0);
+color = glsl_mandala_getRGBColor(i, j);
+if ((min(max(${p[10]}, 0.0), 1.0) == 0)) {
+  var tcolor: vec3i = dbl2int(color);
+  (*rgb).w = select(0.0, 1.0, true);
+  (*rgb).x = (f32(tcolor.x) / 255.0);
+  (*rgb).y = (f32(tcolor.y) / 255.0);
+  (*rgb).z = (f32(tcolor.z) / 255.0);
+} else {
+  (*cp) = (color.x * color.y);
+}
+v.x += (${w} * ((f32(i) / ${p[0]}) - 0.5));
+v.y += (${w} * ((f32(j) / f32(jwx_glsl_mandala_resolutionY)) - 0.5));
+}`,
+  },
+  "glsl_apollonian": {
+    params: [{ name: "Density Pixels", def: 1000000 }, { name: "seed", def: 10000 }, { name: "time", def: 0 }, { name: "Gradient", def: 0 }],
+    verified: true, priority: 0, flags: ["dc","rgb","state"], types: ["SIMULATION","DC","BASE_SHAPE"],
+    funcNames: ["jwx_glsl_apollonian_Density_Pixels_c","jwx_glsl_apollonian_time_c","jwx_glsl_apollonian_inited_","jwx_glsl_apollonian_resolutionY","mat3_","atan2j","rndi","mat3_make","G_rot","mat3_scale","G_app","glsl_apollonian_getRGBColor","dbl2int"],
+    funcs: `struct mat3_ {
+  a00: f32,
+  a10: f32,
+  a20: f32,
+  a01: f32,
+  a11: f32,
+  a21: f32,
+  a02: f32,
+  a12: f32,
+  a22: f32,
+}
+
+fn atan2j(y: f32, x: f32) -> f32 { if (x == 0.0 && y == 0.0) { return select(0.0, PI, (bitcast<u32>(x) >> 31u) == 1u) * select(1.0, -1.0, (bitcast<u32>(y) >> 31u) == 1u); } return atan2(y, x); }
+
+fn rndi(state: ptr<function, u32>) -> u32 { var x = *state; x ^= x << 13u; x ^= x >> 17u; x ^= x << 5u; *state = x; return x; }
+
+fn mat3_make(a00: f32, a10: f32, a20: f32, a01: f32, a11: f32, a21: f32, a02: f32, a12: f32, a22: f32) -> mat3_ {
+  var m: mat3_;
+  m.a00 = a00;
+  m.a10 = a10;
+  m.a20 = a20;
+  m.a01 = a01;
+  m.a11 = a11;
+  m.a21 = a21;
+  m.a02 = a02;
+  m.a12 = a12;
+  m.a22 = a22;
+  return m;
+}
+
+fn G_rot(s: vec3f) -> mat3_ {
+  var sa: f32 = sin(s.x);
+  var ca: f32 = cos(s.x);
+  var sb: f32 = sin(s.y);
+  var cb: f32 = cos(s.y);
+  var sc: f32 = sin(s.z);
+  var cc: f32 = cos(s.z);
+  return mat3_make((cb * cc), (-cb * sc), sb, (((sa * sb) * cc) + (ca * sc)), (((-sa * sb) * sc) + (ca * cc)), (-sa * cb), (((-ca * sb) * cc) + (sa * sc)), (((ca * sb) * sc) + (sa * cc)), (ca * cb));
+}
+
+fn mat3_scale(m: mat3_, f: f32) -> mat3_ {
+  return mat3_make((m.a00 * f), (m.a10 * f), (m.a20 * f), (m.a01 * f), (m.a11 * f), (m.a21 * f), (m.a02 * f), (m.a12 * f), (m.a22 * f));
+}
+
+fn G_app(v__in: vec3f, k: f32, m: mat3_) -> vec3f {
+  var v_: vec3f = v__in;
+  for (var i: i32 = 0; (i < 50); i++) {
+    var mv: vec3f = (vec3f((((m.a00 * v_.x) + (m.a01 * v_.y)) + (m.a02 * v_.z)), (((m.a10 * v_.x) + (m.a11 * v_.y)) + (m.a12 * v_.z)), (((m.a20 * v_.x) + (m.a21 * v_.y)) + (m.a22 * v_.z))) * vec3f(k));
+    v_ = ((abs((((mv / vec3f(dot(v_, v_))) * vec3f(0.5)) - vec3f(0.5))) * vec3f(2.0)) - vec3f(1.0));
+  }
+  return v_;
+}
+
+fn glsl_apollonian_getRGBColor(i: i32, j: i32) -> vec3f {
+  var x: f32 = (f32(i) + 0.5);
+  var y: f32 = (f32(j) + 0.5);
+  var uv: vec2f = vec2f((((2.0 * x) / jwx_glsl_apollonian_Density_Pixels_c) - 1.0), (((2.0 * y) / f32(jwx_glsl_apollonian_resolutionY)) - 1.0));
+  var col: vec3f = vec3f(0.0, 0.0, 0.0);
+  var t_: f32 = (0.05 * jwx_glsl_apollonian_time_c);
+  var m: mat3_ = G_rot((vec3f(t_, t_, t_) + vec3f(1, 2, 3)));
+  var k: f32 = (1.2 + (0.1 * sin((0.1 * jwx_glsl_apollonian_time_c))));
+  var f1: f32 = (2.0 + (0.25 * sin((0.3 * jwx_glsl_apollonian_time_c))));
+  var v2: vec2f = (vec2f(2.0, 2.0) * uv);
+  var v_: vec3f = vec3f((((mat3_scale(m, f1).a00 * vec3f(v2.x, v2.y, 0.0).x) + (mat3_scale(m, f1).a01 * vec3f(v2.x, v2.y, 0.0).y)) + (mat3_scale(m, f1).a02 * vec3f(v2.x, v2.y, 0.0).z)), (((mat3_scale(m, f1).a10 * vec3f(v2.x, v2.y, 0.0).x) + (mat3_scale(m, f1).a11 * vec3f(v2.x, v2.y, 0.0).y)) + (mat3_scale(m, f1).a12 * vec3f(v2.x, v2.y, 0.0).z)), (((mat3_scale(m, f1).a20 * vec3f(v2.x, v2.y, 0.0).x) + (mat3_scale(m, f1).a21 * vec3f(v2.x, v2.y, 0.0).y)) + (mat3_scale(m, f1).a22 * vec3f(v2.x, v2.y, 0.0).z)));
+  var v3: vec3f = sin(G_app(v_, k, m));
+  col = ((v3 * vec3f(0.6, 0.6, 0.6)) + vec3f(0.5, 0.5, 0.5));
+  return col;
+}
+
+fn dbl2int(theColor: vec3f) -> vec3i {
+  var red: i32 = max(0, min(255, i32(floor((theColor.x * 256.0)))));
+  var green: i32 = max(0, min(255, i32(floor((theColor.y * 256.0)))));
+  var blue: i32 = max(0, min(255, i32(floor((theColor.z * 256.0)))));
+  return vec3i(red, green, blue);
+}
+
+var<private> jwx_glsl_apollonian_Density_Pixels_c: f32 = 0.0;
+
+var<private> jwx_glsl_apollonian_time_c: f32 = 0.0;
+
+var<private> jwx_glsl_apollonian_inited_: f32 = 0.0;
+
+var<private> jwx_glsl_apollonian_resolutionY: i32 = 0;`,
+    code: (w, p) => `{
+var p1_: f32 = ${p[1]};
+jwx_glsl_apollonian_Density_Pixels_c = ${p[0]};
+jwx_glsl_apollonian_time_c = ${p[2]};
+if ((jwx_glsl_apollonian_inited_ == 0.0)) {
+  jwx_glsl_apollonian_inited_ = 1.0;
+  jwx_glsl_apollonian_resolutionY = i32(${p[0]});
+}
+jwx_glsl_apollonian_resolutionY = i32(${p[0]});
+{
+  p1_ = f32(i32(p1_));
+}
+var i: i32 = i32((rnd(rs) * ${p[0]}));
+var j: i32 = i32((rnd(rs) * f32(jwx_glsl_apollonian_resolutionY)));
+var color: vec3f = vec3f(0.0, 0.0, 0.0);
+color = glsl_apollonian_getRGBColor(i, j);
+if ((min(max(${p[3]}, 0.0), 1.0) == 0)) {
+  var tcolor: vec3i = dbl2int(color);
+  (*rgb).w = select(0.0, 1.0, true);
+  (*rgb).x = (f32(tcolor.x) / 255.0);
+  (*rgb).y = (f32(tcolor.y) / 255.0);
+  (*rgb).z = (f32(tcolor.z) / 255.0);
+} else {
+  (*cp) = (color.x * color.y);
+}
+v.x += (${w} * ((f32(i) / ${p[0]}) - 0.5));
+v.y += (${w} * ((f32(j) / f32(jwx_glsl_apollonian_resolutionY)) - 0.5));
+}`,
+  },
   "glsl_fractaldots": {
     params: [{ name: "Density Pixels", def: 1000000 }, { name: "iterations", def: 9 }, { name: "DotSize", def: 400 }, { name: "MaxIterations", def: 10 }, { name: "complexity", def: 0.001245675 }, { name: "pattern", def: 2.5 }, { name: "spacing", def: 12 }, { name: "rotate1", def: 1.5 }, { name: "rotate2", def: 64 }, { name: "zoom", def: 64 }, { name: "Gradient", def: 0 }],
     verified: true, priority: 0, flags: ["dc","rgb","state"], types: ["SIMULATION","DC","BASE_SHAPE"],
@@ -18390,15 +22484,321 @@ v.x += (${w} * ((f32(i) / ${p[0]}) - 0.5));
 v.y += (${w} * ((f32(j) / f32(jwx_glsl_fractaldots_resolutionY)) - 0.5));
 }`,
   },
+  "glsl_circuits": {
+    params: [{ name: "Density Pixels", def: 1000000 }, { name: "time", def: 0 }, { name: "rate", def: 0.8 }, { name: "intensity", def: 0.9 }, { name: "focus", def: 1.5 }, { name: "pulse", def: 10 }, { name: "glow", def: 2 }, { name: "loops", def: 15 }, { name: "zoom", def: 1 }, { name: "Gradient", def: 0 }],
+    verified: true, priority: 0, flags: ["dc","rgb","state"], types: ["SIMULATION","DC","BASE_SHAPE"],
+    funcNames: ["jwx_glsl_circuits_loops_c","jwx_glsl_circuits_zoom_c","jwx_glsl_circuits_intensity_c","jwx_glsl_circuits_pulse_c","jwx_glsl_circuits_Density_Pixels_c","jwx_glsl_circuits_time_c","jwx_glsl_circuits_rate_c","jwx_glsl_circuits_focus_c","jwx_glsl_circuits_inited_","jwx_glsl_circuits_S","jwx_glsl_circuits_resolutionY","atan2j","powc","glsl_circuits_formula","glsl_circuits_getRGBColor","dbl2int"],
+    funcs: `fn atan2j(y: f32, x: f32) -> f32 { if (x == 0.0 && y == 0.0) { return select(0.0, PI, (bitcast<u32>(x) >> 31u) == 1u) * select(1.0, -1.0, (bitcast<u32>(y) >> 31u) == 1u); } return atan2(y, x); }
+
+fn powc(x: f32, y: f32) -> f32 {
+  if (x >= 0.0) { return pow(x, y); }
+  let yi = round(y);
+  if (abs(y - yi) > 1e-6) { return pow(x, y); }
+  let m = pow(-x, y);
+  return select(m, -m, (i32(yi) & 1) != 0);
+}
+
+fn glsl_circuits_formula(z_in: vec2f, t_: f32) -> vec3f {
+  var z: vec2f = z_in;
+  var M: f32 = 0.0;
+  var o: f32;
+  var ot2: f32;
+  var ot: f32 = 1000.0;
+  ot2 = ot;
+  var K: f32 = floor(((jwx_glsl_circuits_loops_c / 4.0) + floor((5.0 * jwx_glsl_circuits_zoom_c))));
+  var color: vec3f = vec3f(0.0, 0.0, 0.0);
+  for (var i: i32 = 0; (i < 11); i++) {
+    z = ((abs(z) / vec2f(clamp(dot(z, z), 0.1, 0.5))) - vec2f(t_));
+    var l: f32 = length(z);
+    o = min(max(abs(min(z.x, z.y)), (-l + 0.25)), abs((l - 0.25)));
+    ot = min(ot, o);
+    ot2 = min((l * 0.1), ot2);
+    M = max(M, (f32(i) * (1.0 - abs(sign((ot - o))))));
+    if ((K <= 0.0)) {
+      break;
+    }
+    K -= 1.0;
+  }
+  M += 1.0;
+  var w_: f32 = ((jwx_glsl_circuits_intensity_c * jwx_glsl_circuits_zoom_c) * M);
+  var circ: f32 = powc((max(0.0, (w_ - ot2)) / w_), 6.0);
+  jwx_glsl_circuits_S += max(powc((max(0.0, (w_ - ot)) / w_), 0.25), circ);
+  var t1: vec3f = (vec3f(0.1, 0.1, 0.1) + vec3f(0.45, 0.75, (M * 0.1)));
+  var col: vec3f = normalize(t1);
+  var t2: vec3f = vec3f((0.4 + mmod((((M / 9.0) - (t_ * jwx_glsl_circuits_pulse_c)) + (ot2 * 2.0)), 1.0)), (0.4 + mmod((((M / 9.0) - (t_ * jwx_glsl_circuits_pulse_c)) + (ot2 * 2.0)), 1.0)), (0.4 + mmod((((M / 9.0) - (t_ * jwx_glsl_circuits_pulse_c)) + (ot2 * 2.0)), 1.0)));
+  color = (color + (col * t2));
+  var f1: f32 = ((circ * (10.0 - M)) * 3.0);
+  color = (color + (vec3f(1.0, 0.7, 0.3) * vec3f(f1)));
+  return color;
+}
+
+fn glsl_circuits_getRGBColor(xp: i32, yp: i32) -> vec3f {
+  var xt: f32 = (f32(xp) + 0.5);
+  var yt: f32 = (f32(yp) + 0.5);
+  var pos: vec2f = vec2f(((xt / jwx_glsl_circuits_Density_Pixels_c) - 0.5), ((yt / f32(jwx_glsl_circuits_resolutionY)) - 0.5));
+  var color: vec3f = vec3f(0.0, 0.0, 0.0);
+  var center: vec2f = vec2f(0.0, 0.0);
+  var R: f32 = 0.0;
+  var N: f32 = ((jwx_glsl_circuits_time_c * 0.01) * jwx_glsl_circuits_rate_c);
+  var T: f32 = (2.0 * jwx_glsl_circuits_rate_c);
+  if ((N > (6.0 * jwx_glsl_circuits_rate_c))) {
+    R += 1.0;
+    N -= ((R * 8.0) * jwx_glsl_circuits_rate_c);
+  }
+  if ((N < (4.0 * jwx_glsl_circuits_rate_c))) {
+    T += N;
+  } else {
+    T = ((8.0 * jwx_glsl_circuits_rate_c) - N);
+  }
+  var Z: f32 = (1.05 - jwx_glsl_circuits_zoom_c);
+  var uv: vec2f = (pos + center);
+  var sph: f32 = (length(uv) * 0.1);
+  sph = (sqrt((1.0 - (sph * sph))) * 2.0);
+  var a: f32 = (T * PI);
+  var b: f32 = (a + T);
+  var c: f32 = (cos(a) + sin(b));
+  uv = vec2f(((vec4f(cos(b), sin(b), -(sin(b)), cos(b)).x * uv.x) + (vec4f(cos(b), sin(b), -(sin(b)), cos(b)).y * uv.y)), ((vec4f(cos(b), sin(b), -(sin(b)), cos(b)).z * uv.x) + (vec4f(cos(b), sin(b), -(sin(b)), cos(b)).w * uv.y)));
+  uv = vec2f(((vec4f(cos(a), -(sin(a)), sin(a), cos(a)).x * uv.x) + (vec4f(cos(a), -(sin(a)), sin(a), cos(a)).y * uv.y)), ((vec4f(cos(a), -(sin(a)), sin(a), cos(a)).z * uv.x) + (vec4f(cos(a), -(sin(a)), sin(a), cos(a)).w * uv.y)));
+  uv = (uv - (vec2f(sin(c), cos(c)) / vec2f(PI)));
+  uv = (uv * vec2f(Z));
+  var pix: f32 = (((0.5 / jwx_glsl_circuits_Density_Pixels_c) * Z) / sph);
+  var dof: f32 = ((jwx_glsl_circuits_zoom_c * jwx_glsl_circuits_focus_c) + (T * 0.25));
+  var L: f32 = floor(jwx_glsl_circuits_loops_c);
+  for (var aa: i32 = 0; (aa < 24); aa++) {
+    var aauv: vec2f = floor(vec2f((f32(aa) / 6.0), mmod(f32(aa), 6.0)));
+    color = glsl_circuits_formula((uv + ((aauv * vec2f(pix)) * vec2f(dof))), T);
+    if ((L <= 0.0)) {
+      break;
+    }
+    L -= 1.0;
+  }
+  jwx_glsl_circuits_S /= floor(jwx_glsl_circuits_loops_c);
+  color = (color / vec3f(floor(jwx_glsl_circuits_loops_c)));
+  var colo: vec3f = (mix(vec3f(0.15, 0.15, 0.15), color, jwx_glsl_circuits_S) * vec3f((1.0 - length(pos))));
+  colo = (colo * vec3f(1.2, 1.1, 1.0));
+  return colo;
+}
+
+fn dbl2int(theColor: vec3f) -> vec3i {
+  var red: i32 = max(0, min(255, i32(floor((theColor.x * 256.0)))));
+  var green: i32 = max(0, min(255, i32(floor((theColor.y * 256.0)))));
+  var blue: i32 = max(0, min(255, i32(floor((theColor.z * 256.0)))));
+  return vec3i(red, green, blue);
+}
+
+var<private> jwx_glsl_circuits_loops_c: f32 = 0.0;
+
+var<private> jwx_glsl_circuits_zoom_c: f32 = 0.0;
+
+var<private> jwx_glsl_circuits_intensity_c: f32 = 0.0;
+
+var<private> jwx_glsl_circuits_pulse_c: f32 = 0.0;
+
+var<private> jwx_glsl_circuits_Density_Pixels_c: f32 = 0.0;
+
+var<private> jwx_glsl_circuits_time_c: f32 = 0.0;
+
+var<private> jwx_glsl_circuits_rate_c: f32 = 0.0;
+
+var<private> jwx_glsl_circuits_focus_c: f32 = 0.0;
+
+var<private> jwx_glsl_circuits_inited_: f32 = 0.0;
+
+var<private> jwx_glsl_circuits_S: f32 = 0.0;
+
+var<private> jwx_glsl_circuits_resolutionY: i32 = 0;`,
+    code: (w, p) => `{
+jwx_glsl_circuits_loops_c = ${p[7]};
+jwx_glsl_circuits_zoom_c = ${p[8]};
+jwx_glsl_circuits_intensity_c = ${p[3]};
+jwx_glsl_circuits_pulse_c = ${p[5]};
+jwx_glsl_circuits_Density_Pixels_c = ${p[0]};
+jwx_glsl_circuits_time_c = ${p[1]};
+jwx_glsl_circuits_rate_c = ${p[2]};
+jwx_glsl_circuits_focus_c = ${p[4]};
+if ((jwx_glsl_circuits_inited_ == 0.0)) {
+  jwx_glsl_circuits_inited_ = 1.0;
+  jwx_glsl_circuits_resolutionY = i32(${p[0]});
+  jwx_glsl_circuits_S = ((101.0 + ${p[6]}) * ${p[3]});
+}
+jwx_glsl_circuits_resolutionY = i32(${p[0]});
+var i: i32 = i32((rnd(rs) * ${p[0]}));
+var j: i32 = i32((rnd(rs) * f32(jwx_glsl_circuits_resolutionY)));
+var color: vec3f = vec3f(0.0, 0.0, 0.0);
+color = glsl_circuits_getRGBColor(i, j);
+if ((min(max(${p[9]}, 0.0), 1.0) == 0)) {
+  var tcolor: vec3i = dbl2int(color);
+  (*rgb).w = select(0.0, 1.0, true);
+  (*rgb).x = (f32(tcolor.x) / 255.0);
+  (*rgb).y = (f32(tcolor.y) / 255.0);
+  (*rgb).z = (f32(tcolor.z) / 255.0);
+} else {
+  (*cp) = (color.x * color.y);
+}
+v.x += (${w} * ((f32(i) / ${p[0]}) - 0.5));
+v.y += (${w} * ((f32(j) / f32(jwx_glsl_circuits_resolutionY)) - 0.5));
+}`,
+  },
+  "glsl_mandelbox2D": {
+    params: [{ name: "Density Pixels", def: 1000000 }, { name: "seed", def: 10000 }, { name: "time", def: 0 }, { name: "Gradient", def: 0 }],
+    verified: true, priority: 0, flags: ["dc","rgb","state"], types: ["SIMULATION","DC","BASE_SHAPE"],
+    funcNames: ["jwx_glsl_mandelbox2D_Density_Pixels_c","jwx_glsl_mandelbox2D_time_c","jwx_glsl_mandelbox2D_inited_","jwx_glsl_mandelbox2D_resolutionY","jrand_","atan2j","rndi","powc","jrand_next","jrand_nextDouble","glsl_mandelbox2D_random","glsl_mandelbox2D_getRGBColor","dbl2int"],
+    funcs: `struct jrand_ {
+  s0: i32,
+  s1: i32,
+  s2: i32,
+}
+
+fn atan2j(y: f32, x: f32) -> f32 { if (x == 0.0 && y == 0.0) { return select(0.0, PI, (bitcast<u32>(x) >> 31u) == 1u) * select(1.0, -1.0, (bitcast<u32>(y) >> 31u) == 1u); } return atan2(y, x); }
+
+fn rndi(state: ptr<function, u32>) -> u32 { var x = *state; x ^= x << 13u; x ^= x >> 17u; x ^= x << 5u; *state = x; return x; }
+
+fn powc(x: f32, y: f32) -> f32 {
+  if (x >= 0.0) { return pow(x, y); }
+  let yi = round(y);
+  if (abs(y - yi) > 1e-6) { return pow(x, y); }
+  let m = pow(-x, y);
+  return select(m, -m, (i32(yi) & 1) != 0);
+}
+
+fn jrand_next(r_: ptr<function, jrand_>, bits: i32) -> i32 {
+  var a0: u32 = u32((*r_).s0);
+  var a1: u32 = u32((*r_).s1);
+  var a2: u32 = u32((*r_).s2);
+  var t0: u32 = ((a0 * 58989) + 11);
+  var r0: u32 = (t0 & 65535);
+  var c0: u32 = (t0 >> 16);
+  var t1a: u32 = ((a0 * 57068) + c0);
+  var c1a: u32 = (t1a >> 16);
+  var t1b: u32 = ((a1 * 58989) + (t1a & 65535));
+  var r1: u32 = (t1b & 65535);
+  var c1: u32 = (c1a + (t1b >> 16));
+  var r2_: u32 = (((((a0 * 5) + (a1 * 57068)) + (a2 * 58989)) + c1) & 65535);
+  (*r_).s0 = i32(r0);
+  (*r_).s1 = i32(r1);
+  (*r_).s2 = i32(r2_);
+  var hi: u32 = ((r2_ << 16) | r1);
+  return i32((hi >> u32((32 - bits))));
+}
+
+fn jrand_nextDouble(r_: ptr<function, jrand_>) -> f32 {
+  return ((f32(jrand_next(r_, 26)) * (1.0 / 67108864.0)) + (f32(jrand_next(r_, 27)) * (1.0 / 9007199254740992.0)));
+}
+
+fn glsl_mandelbox2D_random(r1: f32, r2_: f32) -> f32 {
+  var randomize: jrand_;
+  return (r1 + ((r2_ - r1) * jrand_nextDouble(&(randomize))));
+}
+
+fn glsl_mandelbox2D_getRGBColor(xp: i32, yp: i32) -> vec3f {
+  var x: f32 = (f32(xp) + 0.5);
+  var y: f32 = (f32(yp) + 0.5);
+  var I: vec2f = vec2f(((7 * ((x + x) - jwx_glsl_mandelbox2D_Density_Pixels_c)) / jwx_glsl_mandelbox2D_Density_Pixels_c), ((7 * ((y + y) - f32(jwx_glsl_mandelbox2D_resolutionY))) / f32(jwx_glsl_mandelbox2D_resolutionY)));
+  var O: vec4f = vec4f(I, (-5.0 * cos((jwx_glsl_mandelbox2D_time_c * 0.1))), 1.0);
+  var d: f32 = 1.0;
+  for (var i: i32 = 0; (i < 20); i++) {
+    I = ((clamp(I, vec2f(-1.0), vec2f(1.0)) * vec2f(2.0)) - I);
+    O.a = length(I);
+    var b: f32 = select(select(1.0, (1.0 / O.a), (O.a < 1.0)), 4.0, (O.a < 0.5));
+    I = ((I * vec2f((O.z * b))) + vec2f(O.x, O.y));
+    d = (((b * d) * abs(O.z)) + 1.0);
+  }
+  d = (powc((length(I) / d), 0.1) * 5.0);
+  O = ((vec4f(cos(d), sin(((10.0 * d) + 1.0)), cos(((3.0 * d) + 1.0)), 0) * vec4f(0.5)) + vec4f(0.5));
+  return vec3f(O.x, O.y, O.z);
+}
+
+fn dbl2int(theColor: vec3f) -> vec3i {
+  var red: i32 = max(0, min(255, i32(floor((theColor.x * 256.0)))));
+  var green: i32 = max(0, min(255, i32(floor((theColor.y * 256.0)))));
+  var blue: i32 = max(0, min(255, i32(floor((theColor.z * 256.0)))));
+  return vec3i(red, green, blue);
+}
+
+var<private> jwx_glsl_mandelbox2D_Density_Pixels_c: f32 = 0.0;
+
+var<private> jwx_glsl_mandelbox2D_time_c: f32 = 0.0;
+
+var<private> jwx_glsl_mandelbox2D_inited_: f32 = 0.0;
+
+var<private> jwx_glsl_mandelbox2D_resolutionY: i32 = 0;`,
+    code: (w, p) => `{
+var p2_: f32 = ${p[2]};
+var p1_: f32 = ${p[1]};
+jwx_glsl_mandelbox2D_Density_Pixels_c = ${p[0]};
+jwx_glsl_mandelbox2D_time_c = p2_;
+if ((jwx_glsl_mandelbox2D_inited_ == 0.0)) {
+  jwx_glsl_mandelbox2D_inited_ = 1.0;
+  jwx_glsl_mandelbox2D_resolutionY = i32(${p[0]});
+}
+jwx_glsl_mandelbox2D_resolutionY = i32(${p[0]});
+{
+  p1_ = f32(i32(clamp(min(max(p1_, 0.0), 10000.0), 0, 10000)));
+  p2_ = glsl_mandelbox2D_random(0.0, 10000.0);
+}
+var i: i32 = i32((rnd(rs) * ${p[0]}));
+var j: i32 = i32((rnd(rs) * f32(jwx_glsl_mandelbox2D_resolutionY)));
+var color: vec3f = vec3f(0.0, 0.0, 0.0);
+color = glsl_mandelbox2D_getRGBColor(i, j);
+if ((min(max(${p[3]}, 0.0), 1.0) == 0)) {
+  var tcolor: vec3i = dbl2int(color);
+  (*rgb).w = select(0.0, 1.0, true);
+  (*rgb).x = (f32(tcolor.x) / 255.0);
+  (*rgb).y = (f32(tcolor.y) / 255.0);
+  (*rgb).z = (f32(tcolor.z) / 255.0);
+} else {
+  (*cp) = (color.x * color.y);
+}
+v.x += (${w} * ((f32(i) / ${p[0]}) - 0.5));
+v.y += (${w} * ((f32(j) / f32(jwx_glsl_mandelbox2D_resolutionY)) - 0.5));
+}`,
+  },
   "glsl_hoshi": {
     params: [{ name: "Density Pixels", def: 1000000 }, { name: "Seed", def: 100000 }, { name: "time", def: 10 }, { name: "Steps", def: 28 }, { name: "Scale", def: 1.25 }, { name: "Translate", def: 1.5 }, { name: "Gradient", def: 0 }],
     verified: true, priority: 0, flags: ["dc","rgb","state"], types: ["SIMULATION","DC","BASE_SHAPE"],
-    funcNames: ["jwx_glsl_hoshi_Density_Pixels_c","jwx_glsl_hoshi_Steps_c","jwx_glsl_hoshi_time_c","jwx_glsl_hoshi_inited_","jwx_glsl_hoshi_resolutionY","jwx_glsl_hoshi_fold","jwx_glsl_hoshi_translate","jwx_glsl_hoshi_scale","atan2j","mmod2","smoothstepc","glsl_hoshi_rotate","glsl_hoshi_hsv","glsl_hoshi_getRGBColor","dbl2int"],
-    funcs: `fn atan2j(y: f32, x: f32) -> f32 { if (x == 0.0 && y == 0.0) { return select(0.0, PI, (bitcast<u32>(x) >> 31u) == 1u) * select(1.0, -1.0, (bitcast<u32>(y) >> 31u) == 1u); } return atan2(y, x); }
+    funcNames: ["jwx_glsl_hoshi_Density_Pixels_c","jwx_glsl_hoshi_Steps_c","jwx_glsl_hoshi_time_c","jwx_glsl_hoshi_inited_","jwx_glsl_hoshi_resolutionY","jwx_glsl_hoshi_fold","jwx_glsl_hoshi_translate","jwx_glsl_hoshi_scale","jrand_","atan2j","rndi","mmod2","smoothstepc","jrand_next","jrand_nextDouble","glsl_hoshi_random","glsl_hoshi_rotate","glsl_hoshi_hsv","glsl_hoshi_getRGBColor","dbl2int"],
+    funcs: `struct jrand_ {
+  s0: i32,
+  s1: i32,
+  s2: i32,
+}
+
+fn atan2j(y: f32, x: f32) -> f32 { if (x == 0.0 && y == 0.0) { return select(0.0, PI, (bitcast<u32>(x) >> 31u) == 1u) * select(1.0, -1.0, (bitcast<u32>(y) >> 31u) == 1u); } return atan2(y, x); }
+
+fn rndi(state: ptr<function, u32>) -> u32 { var x = *state; x ^= x << 13u; x ^= x >> 17u; x ^= x << 5u; *state = x; return x; }
 
 fn mmod2(a: vec2f, b: vec2f) -> vec2f { return a - b * floor(a / b); }
 
 fn smoothstepc(a: f32, b: f32, x: f32) -> f32 { if (a == b) { return step(a, x); } let t = clamp((x - a) / (b - a), 0.0, 1.0); return t * t * (3.0 - 2.0 * t); }
+
+fn jrand_next(r_: ptr<function, jrand_>, bits: i32) -> i32 {
+  var a0: u32 = u32((*r_).s0);
+  var a1: u32 = u32((*r_).s1);
+  var a2: u32 = u32((*r_).s2);
+  var t0: u32 = ((a0 * 58989) + 11);
+  var r0: u32 = (t0 & 65535);
+  var c0: u32 = (t0 >> 16);
+  var t1a: u32 = ((a0 * 57068) + c0);
+  var c1a: u32 = (t1a >> 16);
+  var t1b: u32 = ((a1 * 58989) + (t1a & 65535));
+  var r1: u32 = (t1b & 65535);
+  var c1: u32 = (c1a + (t1b >> 16));
+  var r2_: u32 = (((((a0 * 5) + (a1 * 57068)) + (a2 * 58989)) + c1) & 65535);
+  (*r_).s0 = i32(r0);
+  (*r_).s1 = i32(r1);
+  (*r_).s2 = i32(r2_);
+  var hi: u32 = ((r2_ << 16) | r1);
+  return i32((hi >> u32((32 - bits))));
+}
+
+fn jrand_nextDouble(r_: ptr<function, jrand_>) -> f32 {
+  return ((f32(jrand_next(r_, 26)) * (1.0 / 67108864.0)) + (f32(jrand_next(r_, 27)) * (1.0 / 9007199254740992.0)));
+}
+
+fn glsl_hoshi_random(r1: f32, r2_: f32) -> f32 {
+  var randomize: jrand_;
+  return (r1 + ((r2_ - r1) * jrand_nextDouble(&(randomize))));
+}
 
 fn glsl_hoshi_rotate(p_: vec2f, a: f32) -> vec2f {
   return vec2f(((p_.x * cos(a)) - (p_.y * sin(a))), ((p_.x * sin(a)) + (p_.y * cos(a))));
@@ -18453,22 +22853,28 @@ var<private> jwx_glsl_hoshi_translate: vec2f = vec2f(0.0);
 
 var<private> jwx_glsl_hoshi_scale: f32 = 0.0;`,
     code: (w, p) => `{
+var p2_: f32 = ${p[2]};
+var p1_: f32 = ${p[1]};
 jwx_glsl_hoshi_Density_Pixels_c = ${p[0]};
 jwx_glsl_hoshi_Steps_c = min(max(${p[3]}, 1.0), 60.0);
-jwx_glsl_hoshi_time_c = ${p[2]};
+jwx_glsl_hoshi_time_c = p2_;
 if ((jwx_glsl_hoshi_inited_ == 0.0)) {
   jwx_glsl_hoshi_inited_ = 1.0;
   jwx_glsl_hoshi_resolutionY = i32(${p[0]});
   jwx_glsl_hoshi_fold = vec2f(-0.5, -0.5);
   jwx_glsl_hoshi_translate = vec2f(min(max(${p[5]}, 0.0), 5.0), min(max(${p[5]}, 0.0), 5.0));
   jwx_glsl_hoshi_scale = min(max(${p[4]}, 1.0), 5.0);
-  {
-    jwx_glsl_hoshi_translate = vec2f(min(max(${p[5]}, 0.0), 5.0), min(max(${p[5]}, 0.0), 5.0));
-    jwx_glsl_hoshi_scale = min(max(${p[4]}, 1.0), 5.0);
-  }
 }
 jwx_glsl_hoshi_resolutionY = i32(${p[0]});
 jwx_glsl_hoshi_fold = vec2f(-0.5, -0.5);
+{
+  p1_ = f32(i32(clamp(min(max(p1_, 0.0), 10000.0), 0, 10000)));
+  p2_ = glsl_hoshi_random(0.0, 10000.0);
+}
+{
+  jwx_glsl_hoshi_translate = vec2f(min(max(${p[5]}, 0.0), 5.0), min(max(${p[5]}, 0.0), 5.0));
+  jwx_glsl_hoshi_scale = min(max(${p[4]}, 1.0), 5.0);
+}
 var i: i32 = i32((rnd(rs) * ${p[0]}));
 var j: i32 = i32((rnd(rs) * f32(jwx_glsl_hoshi_resolutionY)));
 var color: vec3f = vec3f(0.0, 0.0, 0.0);
@@ -18489,8 +22895,45 @@ v.y += (${w} * ((f32(j) / f32(jwx_glsl_hoshi_resolutionY)) - 0.5));
   "glsl_kaleidocomplex": {
     params: [{ name: "Density Pixels", def: 1000000 }, { name: "Seed", def: 10000 }, { name: "time", def: 0 }, { name: "iMax", def: 12 }, { name: "Color", def: 2 }, { name: "Red Fac.", def: 1 }, { name: "Green Fac.", def: 1 }, { name: "Blue Fac.", def: 1 }, { name: "Gradient", def: 0 }],
     verified: true, priority: 0, flags: ["dc","rgb","state"], types: ["SIMULATION","DC","BASE_SHAPE"],
-    funcNames: ["jwx_glsl_kaleidocomplex_Density_Pixels_c","jwx_glsl_kaleidocomplex_iMax_c","jwx_glsl_kaleidocomplex_time_c","jwx_glsl_kaleidocomplex_Color_c","jwx_glsl_kaleidocomplex_Red_Fac__c","jwx_glsl_kaleidocomplex_Green_Fac__c","jwx_glsl_kaleidocomplex_Blue_Fac__c","jwx_glsl_kaleidocomplex_inited_","jwx_glsl_kaleidocomplex_resolutionY","atan2j","glsl_kaleidocomplex_cmult","glsl_kaleidocomplex_getRGBColor","dbl2int"],
-    funcs: `fn atan2j(y: f32, x: f32) -> f32 { if (x == 0.0 && y == 0.0) { return select(0.0, PI, (bitcast<u32>(x) >> 31u) == 1u) * select(1.0, -1.0, (bitcast<u32>(y) >> 31u) == 1u); } return atan2(y, x); }
+    funcNames: ["jwx_glsl_kaleidocomplex_Density_Pixels_c","jwx_glsl_kaleidocomplex_iMax_c","jwx_glsl_kaleidocomplex_time_c","jwx_glsl_kaleidocomplex_Color_c","jwx_glsl_kaleidocomplex_Red_Fac__c","jwx_glsl_kaleidocomplex_Green_Fac__c","jwx_glsl_kaleidocomplex_Blue_Fac__c","jwx_glsl_kaleidocomplex_inited_","jwx_glsl_kaleidocomplex_resolutionY","jrand_","atan2j","rndi","jrand_next","jrand_nextDouble","glsl_kaleidocomplex_random","glsl_kaleidocomplex_cmult","glsl_kaleidocomplex_getRGBColor","dbl2int"],
+    funcs: `struct jrand_ {
+  s0: i32,
+  s1: i32,
+  s2: i32,
+}
+
+fn atan2j(y: f32, x: f32) -> f32 { if (x == 0.0 && y == 0.0) { return select(0.0, PI, (bitcast<u32>(x) >> 31u) == 1u) * select(1.0, -1.0, (bitcast<u32>(y) >> 31u) == 1u); } return atan2(y, x); }
+
+fn rndi(state: ptr<function, u32>) -> u32 { var x = *state; x ^= x << 13u; x ^= x >> 17u; x ^= x << 5u; *state = x; return x; }
+
+fn jrand_next(r_: ptr<function, jrand_>, bits: i32) -> i32 {
+  var a0: u32 = u32((*r_).s0);
+  var a1: u32 = u32((*r_).s1);
+  var a2: u32 = u32((*r_).s2);
+  var t0: u32 = ((a0 * 58989) + 11);
+  var r0: u32 = (t0 & 65535);
+  var c0: u32 = (t0 >> 16);
+  var t1a: u32 = ((a0 * 57068) + c0);
+  var c1a: u32 = (t1a >> 16);
+  var t1b: u32 = ((a1 * 58989) + (t1a & 65535));
+  var r1: u32 = (t1b & 65535);
+  var c1: u32 = (c1a + (t1b >> 16));
+  var r2_: u32 = (((((a0 * 5) + (a1 * 57068)) + (a2 * 58989)) + c1) & 65535);
+  (*r_).s0 = i32(r0);
+  (*r_).s1 = i32(r1);
+  (*r_).s2 = i32(r2_);
+  var hi: u32 = ((r2_ << 16) | r1);
+  return i32((hi >> u32((32 - bits))));
+}
+
+fn jrand_nextDouble(r_: ptr<function, jrand_>) -> f32 {
+  return ((f32(jrand_next(r_, 26)) * (1.0 / 67108864.0)) + (f32(jrand_next(r_, 27)) * (1.0 / 9007199254740992.0)));
+}
+
+fn glsl_kaleidocomplex_random(r1: f32, r2_: f32) -> f32 {
+  var randomize: jrand_;
+  return (r1 + ((r2_ - r1) * jrand_nextDouble(&(randomize))));
+}
 
 fn glsl_kaleidocomplex_cmult(a: vec2f, b: vec2f) -> vec2f {
   return vec2f(((a.x * b.x) - (a.y * b.y)), ((a.x * b.y) + (a.y * b.x)));
@@ -18566,9 +23009,11 @@ var<private> jwx_glsl_kaleidocomplex_inited_: f32 = 0.0;
 
 var<private> jwx_glsl_kaleidocomplex_resolutionY: i32 = 0;`,
     code: (w, p) => `{
+var p2_: f32 = ${p[2]};
+var p1_: f32 = ${p[1]};
 jwx_glsl_kaleidocomplex_Density_Pixels_c = ${p[0]};
 jwx_glsl_kaleidocomplex_iMax_c = min(max(${p[3]}, 1.0), 50.0);
-jwx_glsl_kaleidocomplex_time_c = ${p[2]};
+jwx_glsl_kaleidocomplex_time_c = p2_;
 jwx_glsl_kaleidocomplex_Color_c = ${p[4]};
 jwx_glsl_kaleidocomplex_Red_Fac__c = ${p[5]};
 jwx_glsl_kaleidocomplex_Green_Fac__c = ${p[6]};
@@ -18578,6 +23023,10 @@ if ((jwx_glsl_kaleidocomplex_inited_ == 0.0)) {
   jwx_glsl_kaleidocomplex_resolutionY = i32(${p[0]});
 }
 jwx_glsl_kaleidocomplex_resolutionY = i32(${p[0]});
+{
+  p1_ = f32(i32(clamp(min(max(p1_, 0.0), 10000.0), 0, 10000)));
+  p2_ = glsl_kaleidocomplex_random(0.0, 10000.0);
+}
 var i: i32 = i32((rnd(rs) * ${p[0]}));
 var j: i32 = i32((rnd(rs) * f32(jwx_glsl_kaleidocomplex_resolutionY)));
 var color: vec3f = vec3f(0.0, 0.0, 0.0);
@@ -18597,11 +23046,215 @@ v.x += (${w} * ((f32(i) / ${p[0]}) - 0.5));
 v.y += (${w} * ((f32(j) / f32(jwx_glsl_kaleidocomplex_resolutionY)) - 0.5));
 }`,
   },
+  "glsl_starsfield": {
+    params: [{ name: "Density Pixels", def: 1000000 }, { name: "Seed", def: 10000 }, { name: "time", def: 0 }, { name: "Z distance", def: 2 }, { name: "Glow", def: 2 }, { name: "Gradient", def: 0 }],
+    verified: true, priority: 0, flags: ["dc","rgb","state"], types: ["SIMULATION","DC","BASE_SHAPE"],
+    funcNames: ["jwx_glsl_starsfield_Z_distance_c","jwx_glsl_starsfield_time_c","jwx_glsl_starsfield_Glow_c","jwx_glsl_starsfield_Density_Pixels_c","jwx_glsl_starsfield_inited_","jwx_glsl_starsfield_resolutionY","jrand_","atan2j","rndi","smoothstepc","jrand_next","jrand_nextDouble","glsl_starsfield_random","glsl_starsfield_rotate","glsl_starsfield_hash11","glsl_starsfield_hash22","glsl_starsfield_hash21","glsl_starsfield_layer","glsl_starsfield_render","glsl_starsfield_getRGBColor","dbl2int"],
+    funcs: `struct jrand_ {
+  s0: i32,
+  s1: i32,
+  s2: i32,
+}
+
+fn atan2j(y: f32, x: f32) -> f32 { if (x == 0.0 && y == 0.0) { return select(0.0, PI, (bitcast<u32>(x) >> 31u) == 1u) * select(1.0, -1.0, (bitcast<u32>(y) >> 31u) == 1u); } return atan2(y, x); }
+
+fn rndi(state: ptr<function, u32>) -> u32 { var x = *state; x ^= x << 13u; x ^= x >> 17u; x ^= x << 5u; *state = x; return x; }
+
+fn smoothstepc(a: f32, b: f32, x: f32) -> f32 { if (a == b) { return step(a, x); } let t = clamp((x - a) / (b - a), 0.0, 1.0); return t * t * (3.0 - 2.0 * t); }
+
+fn jrand_next(r_: ptr<function, jrand_>, bits: i32) -> i32 {
+  var a0: u32 = u32((*r_).s0);
+  var a1: u32 = u32((*r_).s1);
+  var a2: u32 = u32((*r_).s2);
+  var t0: u32 = ((a0 * 58989) + 11);
+  var r0: u32 = (t0 & 65535);
+  var c0: u32 = (t0 >> 16);
+  var t1a: u32 = ((a0 * 57068) + c0);
+  var c1a: u32 = (t1a >> 16);
+  var t1b: u32 = ((a1 * 58989) + (t1a & 65535));
+  var r1: u32 = (t1b & 65535);
+  var c1: u32 = (c1a + (t1b >> 16));
+  var r2_: u32 = (((((a0 * 5) + (a1 * 57068)) + (a2 * 58989)) + c1) & 65535);
+  (*r_).s0 = i32(r0);
+  (*r_).s1 = i32(r1);
+  (*r_).s2 = i32(r2_);
+  var hi: u32 = ((r2_ << 16) | r1);
+  return i32((hi >> u32((32 - bits))));
+}
+
+fn jrand_nextDouble(r_: ptr<function, jrand_>) -> f32 {
+  return ((f32(jrand_next(r_, 26)) * (1.0 / 67108864.0)) + (f32(jrand_next(r_, 27)) * (1.0 / 9007199254740992.0)));
+}
+
+fn glsl_starsfield_random(r1: f32, r2_: f32) -> f32 {
+  var randomize: jrand_;
+  return (r1 + ((r2_ - r1) * jrand_nextDouble(&(randomize))));
+}
+
+fn glsl_starsfield_rotate(a: f32) -> vec4f {
+  var c: f32 = cos(a);
+  var s: f32 = sin(a);
+  return vec4f(c, s, -s, c);
+}
+
+fn glsl_starsfield_hash11(p__in: f32) -> f32 {
+  var p_: f32 = p__in;
+  p_ = fract((p_ * 35.35));
+  p_ += (p_ * (p_ + 45.85));
+  return fract((p_ * 7858.58));
+}
+
+fn glsl_starsfield_hash22(p_: vec2f) -> vec2f {
+  var t1: vec3f = vec3f(p_.x, p_.y, p_.x);
+  t1 = (t1 * vec3f(451.45, 231.95, 7878.5));
+  var q: vec3f = fract(t1);
+  q = (q + vec3f(dot(q, (q + vec3f(78.78)))));
+  return fract((vec2f(q.x, q.z) * vec2f(q.y)));
+}
+
+fn glsl_starsfield_hash21(p__in: vec2f) -> f32 {
+  var p_: vec2f = p__in;
+  p_ = fract((p_ * vec2f(451.45, 231.95)));
+  p_ = (p_ + vec2f(dot(p_, (p_ + vec2f(78.78)))));
+  return fract((p_.x * p_.y));
+}
+
+fn glsl_starsfield_layer(uv_in: vec2f) -> f32 {
+  var uv: vec2f = uv_in;
+  var c: f32 = 0.0;
+  uv = (uv * vec2f(5.0));
+  var i: vec2f = floor(uv);
+  var f: vec2f = ((fract(uv) * vec2f(jwx_glsl_starsfield_Z_distance_c)) - vec2f(1.0));
+  var p_: vec2f = (glsl_starsfield_hash22(i) * vec2f(0.3));
+  var d: f32 = length((f - p_));
+  c += smoothstepc((0.1 + (0.8 * glsl_starsfield_hash21(i))), 0.01, d);
+  c *= ((1.0 / d) * 0.2);
+  return c;
+}
+
+fn glsl_starsfield_render(uv_in: vec2f) -> vec3f {
+  var uv: vec2f = uv_in;
+  var col: vec3f = vec3f(0.0, 0.0, 0.0);
+  uv = vec2f(((glsl_starsfield_rotate(jwx_glsl_starsfield_time_c).x * uv.x) + (glsl_starsfield_rotate(jwx_glsl_starsfield_time_c).y * uv.y)), ((glsl_starsfield_rotate(jwx_glsl_starsfield_time_c).z * uv.x) + (glsl_starsfield_rotate(jwx_glsl_starsfield_time_c).w * uv.y)));
+  uv = (uv + (vec2f(cos(jwx_glsl_starsfield_time_c), sin(jwx_glsl_starsfield_time_c)) * vec2f(2.0)));
+  for (var i: f32 = 0.0; (i < 1.0); i += 0.1) {
+    uv = vec2f(((glsl_starsfield_rotate((glsl_starsfield_hash11(i) * 6.28)).x * uv.x) + (glsl_starsfield_rotate((glsl_starsfield_hash11(i) * 6.28)).y * uv.y)), ((glsl_starsfield_rotate((glsl_starsfield_hash11(i) * 6.28)).z * uv.x) + (glsl_starsfield_rotate((glsl_starsfield_hash11(i) * 6.28)).w * uv.y)));
+    var t_: f32 = fract((i - jwx_glsl_starsfield_time_c));
+    var s: f32 = smoothstepc(0.0, 1.0, t_);
+    var f: f32 = smoothstepc(0.0, 1.0, t_);
+    f *= smoothstepc(1.0, 0.0, t_);
+    var k: vec2f = (glsl_starsfield_hash22(vec2f(i, (i * 5.0))) * vec2f(0.1));
+    var l: f32 = glsl_starsfield_layer(((uv - k) * vec2f(s)));
+    col = (col + (mix(vec3f(0.0, 0.0, 0), vec3f(1.0, 1.0, 1.0), l) * vec3f(f)));
+  }
+  var t1: f32 = (jwx_glsl_starsfield_Glow_c * glsl_starsfield_hash21((uv + vec2f(jwx_glsl_starsfield_time_c))));
+  col = (col + vec3f(t1, t1, t1));
+  return col;
+}
+
+fn glsl_starsfield_getRGBColor(xp: i32, yp: i32) -> vec3f {
+  var x: f32 = (f32(xp) + 0.5);
+  var y: f32 = (f32(yp) + 0.5);
+  var uv: vec2f = vec2f(((x / jwx_glsl_starsfield_Density_Pixels_c) - 0.5), ((y / f32(jwx_glsl_starsfield_resolutionY)) - 0.5));
+  var col: vec3f = glsl_starsfield_render(uv);
+  return col;
+}
+
+fn dbl2int(theColor: vec3f) -> vec3i {
+  var red: i32 = max(0, min(255, i32(floor((theColor.x * 256.0)))));
+  var green: i32 = max(0, min(255, i32(floor((theColor.y * 256.0)))));
+  var blue: i32 = max(0, min(255, i32(floor((theColor.z * 256.0)))));
+  return vec3i(red, green, blue);
+}
+
+var<private> jwx_glsl_starsfield_Z_distance_c: f32 = 0.0;
+
+var<private> jwx_glsl_starsfield_time_c: f32 = 0.0;
+
+var<private> jwx_glsl_starsfield_Glow_c: f32 = 0.0;
+
+var<private> jwx_glsl_starsfield_Density_Pixels_c: f32 = 0.0;
+
+var<private> jwx_glsl_starsfield_inited_: f32 = 0.0;
+
+var<private> jwx_glsl_starsfield_resolutionY: i32 = 0;`,
+    code: (w, p) => `{
+var p2_: f32 = ${p[2]};
+var p1_: f32 = ${p[1]};
+jwx_glsl_starsfield_Z_distance_c = ${p[3]};
+jwx_glsl_starsfield_time_c = p2_;
+jwx_glsl_starsfield_Glow_c = min(max(${p[4]}, 0.0), 1.0);
+jwx_glsl_starsfield_Density_Pixels_c = ${p[0]};
+if ((jwx_glsl_starsfield_inited_ == 0.0)) {
+  jwx_glsl_starsfield_inited_ = 1.0;
+  jwx_glsl_starsfield_resolutionY = i32(${p[0]});
+}
+jwx_glsl_starsfield_resolutionY = i32(${p[0]});
+{
+  p1_ = f32(i32(p1_));
+  p2_ = glsl_starsfield_random(0.0, 10000000.0);
+}
+var i: i32 = i32((rnd(rs) * ${p[0]}));
+var j: i32 = i32((rnd(rs) * f32(jwx_glsl_starsfield_resolutionY)));
+var color: vec3f = vec3f(0.0, 0.0, 0.0);
+color = glsl_starsfield_getRGBColor(i, j);
+if ((min(max(${p[5]}, 0.0), 1.0) == 0)) {
+  var tcolor: vec3i = dbl2int(color);
+  (*rgb).w = select(0.0, 1.0, true);
+  (*rgb).x = (f32(tcolor.x) / 255.0);
+  (*rgb).y = (f32(tcolor.y) / 255.0);
+  (*rgb).z = (f32(tcolor.z) / 255.0);
+} else {
+  var s: f32 = ((color.x + color.y) + color.z);
+  var red: f32 = (color.x / s);
+  (*cp) = sin(red);
+}
+v.x += (${w} * ((f32(i) / ${p[0]}) - 0.5));
+v.y += (${w} * ((f32(j) / f32(jwx_glsl_starsfield_resolutionY)) - 0.5));
+}`,
+  },
   "glsl_kaleidoscopic": {
     params: [{ name: "Density Pixels", def: 1000000 }, { name: "Seed", def: 10000 }, { name: "time", def: 0 }, { name: "Sides", def: 8 }, { name: "zoom", def: 0 }, { name: "P1", def: 0 }, { name: "Radial", def: 0 }, { name: "Gradient", def: 0 }],
     verified: true, priority: 0, flags: ["dc","rgb","state"], types: ["SIMULATION","DC","BASE_SHAPE"],
-    funcNames: ["jwx_glsl_kaleidoscopic_time_c","jwx_glsl_kaleidoscopic_Density_Pixels_c","jwx_glsl_kaleidoscopic_zoom_c","jwx_glsl_kaleidoscopic_Radial_c","jwx_glsl_kaleidoscopic_P1_c","jwx_glsl_kaleidoscopic_inited_","jwx_glsl_kaleidoscopic_KA","jwx_glsl_kaleidoscopic_resolutionY","atan2j","glsl_kaleidoscopic_smallKoleidoscope","glsl_kaleidoscopic_getRGBColor","dbl2int"],
-    funcs: `fn atan2j(y: f32, x: f32) -> f32 { if (x == 0.0 && y == 0.0) { return select(0.0, PI, (bitcast<u32>(x) >> 31u) == 1u) * select(1.0, -1.0, (bitcast<u32>(y) >> 31u) == 1u); } return atan2(y, x); }
+    funcNames: ["jwx_glsl_kaleidoscopic_time_c","jwx_glsl_kaleidoscopic_Density_Pixels_c","jwx_glsl_kaleidoscopic_zoom_c","jwx_glsl_kaleidoscopic_Radial_c","jwx_glsl_kaleidoscopic_P1_c","jwx_glsl_kaleidoscopic_inited_","jwx_glsl_kaleidoscopic_KA","jwx_glsl_kaleidoscopic_resolutionY","jrand_","atan2j","rndi","jrand_next","jrand_nextDouble","glsl_kaleidoscopic_random","glsl_kaleidoscopic_smallKoleidoscope","glsl_kaleidoscopic_getRGBColor","dbl2int"],
+    funcs: `struct jrand_ {
+  s0: i32,
+  s1: i32,
+  s2: i32,
+}
+
+fn atan2j(y: f32, x: f32) -> f32 { if (x == 0.0 && y == 0.0) { return select(0.0, PI, (bitcast<u32>(x) >> 31u) == 1u) * select(1.0, -1.0, (bitcast<u32>(y) >> 31u) == 1u); } return atan2(y, x); }
+
+fn rndi(state: ptr<function, u32>) -> u32 { var x = *state; x ^= x << 13u; x ^= x >> 17u; x ^= x << 5u; *state = x; return x; }
+
+fn jrand_next(r_: ptr<function, jrand_>, bits: i32) -> i32 {
+  var a0: u32 = u32((*r_).s0);
+  var a1: u32 = u32((*r_).s1);
+  var a2: u32 = u32((*r_).s2);
+  var t0: u32 = ((a0 * 58989) + 11);
+  var r0: u32 = (t0 & 65535);
+  var c0: u32 = (t0 >> 16);
+  var t1a: u32 = ((a0 * 57068) + c0);
+  var c1a: u32 = (t1a >> 16);
+  var t1b: u32 = ((a1 * 58989) + (t1a & 65535));
+  var r1: u32 = (t1b & 65535);
+  var c1: u32 = (c1a + (t1b >> 16));
+  var r2_: u32 = (((((a0 * 5) + (a1 * 57068)) + (a2 * 58989)) + c1) & 65535);
+  (*r_).s0 = i32(r0);
+  (*r_).s1 = i32(r1);
+  (*r_).s2 = i32(r2_);
+  var hi: u32 = ((r2_ << 16) | r1);
+  return i32((hi >> u32((32 - bits))));
+}
+
+fn jrand_nextDouble(r_: ptr<function, jrand_>) -> f32 {
+  return ((f32(jrand_next(r_, 26)) * (1.0 / 67108864.0)) + (f32(jrand_next(r_, 27)) * (1.0 / 9007199254740992.0)));
+}
+
+fn glsl_kaleidoscopic_random(r1: f32, r2_: f32) -> f32 {
+  var randomize: jrand_;
+  return (r1 + ((r2_ - r1) * jrand_nextDouble(&(randomize))));
+}
 
 fn glsl_kaleidoscopic_smallKoleidoscope(uv: vec2f) -> vec2f {
   var angle: f32 = (abs((mmod(atan2j(uv.y, uv.x), (2.0 * jwx_glsl_kaleidoscopic_KA)) - jwx_glsl_kaleidoscopic_KA)) + (0.1 * jwx_glsl_kaleidoscopic_time_c));
@@ -18650,7 +23303,9 @@ var<private> jwx_glsl_kaleidoscopic_KA: f32 = 0.0;
 
 var<private> jwx_glsl_kaleidoscopic_resolutionY: i32 = 0;`,
     code: (w, p) => `{
-jwx_glsl_kaleidoscopic_time_c = ${p[2]};
+var p2_: f32 = ${p[2]};
+var p1_: f32 = ${p[1]};
+jwx_glsl_kaleidoscopic_time_c = p2_;
 jwx_glsl_kaleidoscopic_Density_Pixels_c = ${p[0]};
 jwx_glsl_kaleidoscopic_zoom_c = min(max(${p[4]}, 0.0), 1.0);
 jwx_glsl_kaleidoscopic_Radial_c = min(max(${p[6]}, 0.0), 1.0);
@@ -18662,6 +23317,10 @@ if ((jwx_glsl_kaleidoscopic_inited_ == 0.0)) {
 }
 jwx_glsl_kaleidoscopic_resolutionY = i32(${p[0]});
 jwx_glsl_kaleidoscopic_KA = (PI / min(max(${p[3]}, 2.0), 20.0));
+{
+  p1_ = f32(i32(p1_));
+  p2_ = glsl_kaleidoscopic_random(0.0, 10000000.0);
+}
 var i: i32 = i32((rnd(rs) * ${p[0]}));
 var j: i32 = i32((rnd(rs) * f32(jwx_glsl_kaleidoscopic_resolutionY)));
 var color: vec3f = vec3f(0.0, 0.0, 0.0);
@@ -18681,11 +23340,309 @@ v.x += (${w} * ((f32(i) / ${p[0]}) - 0.5));
 v.y += (${w} * ((f32(j) / f32(jwx_glsl_kaleidoscopic_resolutionY)) - 0.5));
 }`,
   },
+  "glsl_randomoctree": {
+    params: [{ name: "Density Pixels", def: 1000000 }, { name: "Seed", def: 10000 }, { name: "time", def: 0 }, { name: "Steps", def: 10 }, { name: "Rot. L-R", def: 0 }, { name: "Rot. U-D", def: 0 }, { name: "Grid", def: 0 }, { name: "Borders", def: 1 }, { name: "Black Borders", def: 1 }, { name: "Gradient", def: 0 }],
+    verified: true, priority: 0, flags: ["dc","rgb","state"], types: ["SIMULATION","DC","BASE_SHAPE"],
+    funcNames: ["jwx_glsl_randomoctree_Density_Pixels_c","jwx_glsl_randomoctree_time_c","jwx_glsl_randomoctree_Rot__L_R_c","jwx_glsl_randomoctree_Rot__U_D_c","jwx_glsl_randomoctree_Steps_c","jwx_glsl_randomoctree_Grid_c","jwx_glsl_randomoctree_Borders_c","jwx_glsl_randomoctree_Black_Borders_c","jwx_glsl_randomoctree_inited_","jwx_glsl_randomoctree_HASHSCALE3","jwx_glsl_randomoctree_emptycells","jwx_glsl_randomoctree_subdivisions","jwx_glsl_randomoctree_resolutionY","jwx_glsl_randomoctree_detail","jrand_","atan2j","rndi","mmod3","jrand_next","jrand_nextDouble","glsl_randomoctree_random","glsl_randomoctree_rot","glsl_randomoctree_rnd","glsl_randomoctree_getvoxel","glsl_randomoctree_voxel","glsl_randomoctree_getRGBColor","dbl2int"],
+    funcs: `struct jrand_ {
+  s0: i32,
+  s1: i32,
+  s2: i32,
+}
+
+fn atan2j(y: f32, x: f32) -> f32 { if (x == 0.0 && y == 0.0) { return select(0.0, PI, (bitcast<u32>(x) >> 31u) == 1u) * select(1.0, -1.0, (bitcast<u32>(y) >> 31u) == 1u); } return atan2(y, x); }
+
+fn rndi(state: ptr<function, u32>) -> u32 { var x = *state; x ^= x << 13u; x ^= x >> 17u; x ^= x << 5u; *state = x; return x; }
+
+fn mmod3(a: vec3f, b: vec3f) -> vec3f { return a - b * floor(a / b); }
+
+fn jrand_next(r_: ptr<function, jrand_>, bits: i32) -> i32 {
+  var a0: u32 = u32((*r_).s0);
+  var a1: u32 = u32((*r_).s1);
+  var a2: u32 = u32((*r_).s2);
+  var t0: u32 = ((a0 * 58989) + 11);
+  var r0: u32 = (t0 & 65535);
+  var c0: u32 = (t0 >> 16);
+  var t1a: u32 = ((a0 * 57068) + c0);
+  var c1a: u32 = (t1a >> 16);
+  var t1b: u32 = ((a1 * 58989) + (t1a & 65535));
+  var r1: u32 = (t1b & 65535);
+  var c1: u32 = (c1a + (t1b >> 16));
+  var r2_: u32 = (((((a0 * 5) + (a1 * 57068)) + (a2 * 58989)) + c1) & 65535);
+  (*r_).s0 = i32(r0);
+  (*r_).s1 = i32(r1);
+  (*r_).s2 = i32(r2_);
+  var hi: u32 = ((r2_ << 16) | r1);
+  return i32((hi >> u32((32 - bits))));
+}
+
+fn jrand_nextDouble(r_: ptr<function, jrand_>) -> f32 {
+  return ((f32(jrand_next(r_, 26)) * (1.0 / 67108864.0)) + (f32(jrand_next(r_, 27)) * (1.0 / 9007199254740992.0)));
+}
+
+fn glsl_randomoctree_random(r1: f32, r2_: f32) -> f32 {
+  var randomize: jrand_;
+  return (r1 + ((r2_ - r1) * jrand_nextDouble(&(randomize))));
+}
+
+fn glsl_randomoctree_rot(spin: f32) -> vec4f {
+  return vec4f(cos(spin), sin(spin), -(sin(spin)), cos(spin));
+}
+
+fn glsl_randomoctree_rnd(v_: vec4f) -> f32 {
+  return fract((40000.0 * sin((dot(v_, vec4f(13.46, 41.74, -73.36, 14.24)) + 17.34))));
+}
+
+fn glsl_randomoctree_getvoxel(p_: vec3f, size: f32) -> i32 {
+  if (((p_.x == 0.0) && (p_.y == 0.0))) {
+    return 0;
+  }
+  var val: f32 = glsl_randomoctree_rnd(vec4f(p_, size));
+  if ((val < jwx_glsl_randomoctree_emptycells)) {
+    return 0;
+  } else if ((val < jwx_glsl_randomoctree_subdivisions)) {
+    return 1;
+  } else {
+    return 2;
+  }
+}
+
+fn glsl_randomoctree_voxel(ro: vec3f, rd: vec3f, ird: vec3f, size_in: f32) -> vec3f {
+  var size: f32 = size_in;
+  size *= 0.5;
+  var hit: vec3f = ((((sign(rd) * (ro - vec3f(size))) - vec3f(size)) * ird) * vec3f(-1.0));
+  return hit;
+}
+
+fn glsl_randomoctree_getRGBColor(xp: i32, yp: i32) -> vec3f {
+  var x: f32 = (f32(xp) + 0.5);
+  var y: f32 = (f32(yp) + 0.5);
+  var uv: vec2f = vec2f((((2.0 * x) / jwx_glsl_randomoctree_Density_Pixels_c) - 1.0), (((2.0 * y) / f32(jwx_glsl_randomoctree_resolutionY)) - 1.0));
+  var size: f32 = 1.0;
+  var maxdistance: f32 = 6.0;
+  var ro: vec3f = vec3f((0.5 + (sin(jwx_glsl_randomoctree_time_c) * 0.4)), (0.5 + (cos(jwx_glsl_randomoctree_time_c) * 0.4)), jwx_glsl_randomoctree_time_c);
+  var rd: vec3f = normalize(vec3f(uv.x, uv.y, 1.0));
+  var rdyz: vec2f = vec2f(rd.y, rd.z);
+  var rdxz: vec2f = vec2f(rd.x, rd.z);
+  if ((length(vec2f((jwx_glsl_randomoctree_Rot__L_R_c * jwx_glsl_randomoctree_Density_Pixels_c), (jwx_glsl_randomoctree_Rot__U_D_c * f32(jwx_glsl_randomoctree_resolutionY)))) > 40.0)) {
+    var t1: vec2f = vec2f(rd.y, rd.z);
+    t1 = vec2f(((glsl_randomoctree_rot(((jwx_glsl_randomoctree_Rot__U_D_c * PI) - (PI / 2.0))).x * t1.x) + (glsl_randomoctree_rot(((jwx_glsl_randomoctree_Rot__U_D_c * PI) - (PI / 2.0))).y * t1.y)), ((glsl_randomoctree_rot(((jwx_glsl_randomoctree_Rot__U_D_c * PI) - (PI / 2.0))).z * t1.x) + (glsl_randomoctree_rot(((jwx_glsl_randomoctree_Rot__U_D_c * PI) - (PI / 2.0))).w * t1.y)));
+    rd = vec3f(rd.x, t1.x, t1.y);
+    var t2: vec2f = vec2f(rd.x, rd.z);
+    t2 = vec2f(((glsl_randomoctree_rot((((2.0 * jwx_glsl_randomoctree_Rot__L_R_c) * PI) - PI)).x * t2.x) + (glsl_randomoctree_rot((((2.0 * jwx_glsl_randomoctree_Rot__L_R_c) * PI) - PI)).y * t2.y)), ((glsl_randomoctree_rot((((2.0 * jwx_glsl_randomoctree_Rot__L_R_c) * PI) - PI)).z * t2.x) + (glsl_randomoctree_rot((((2.0 * jwx_glsl_randomoctree_Rot__L_R_c) * PI) - PI)).w * t2.y)));
+    rd = vec3f(t2.x, rd.y, t2.y);
+  }
+  var lro: vec3f = mmod3(ro, vec3f(size));
+  var fro: vec3f = (ro - lro);
+  var ird: vec3f = (vec3f(1.0, 1.0, 1.0) / max(abs(rd), vec3f(0.001, 0.001, 0.001)));
+  var mask: vec3f = vec3f(0.0, 0.0, 0.0);
+  var exitoct: bool = false;
+  var recursions: i32 = 0;
+  var dist: f32 = 0.0;
+  var i: i32 = 0;
+  var edge: f32 = 1.0;
+  var lastmask: vec3f = vec3f(0.0, 0.0, 0.0);
+  var normal: vec3f = vec3f(0.0, 0.0, 0.0);
+  for (var k: i32 = 0; (f32(k) < jwx_glsl_randomoctree_Steps_c); k++) {
+    if ((dist > maxdistance)) {
+      break;
+    }
+    var voxelstate: i32 = glsl_randomoctree_getvoxel(fro, size);
+    if (exitoct) {
+      var v1: vec3f = ((fro / vec3f((size / 0.5))) + vec3f(0.25));
+      var newfro: vec3f = (floor(v1) * vec3f((size * 2.0)));
+      lro = (lro + (fro - newfro));
+      fro = newfro;
+      recursions--;
+      size *= 2.0;
+      var v0: vec3f = mmod3(((fro / vec3f(size)) + vec3f(0.5)), vec3f(2.0));
+      var v3: vec3f = ((mask * sign(rd)) * vec3f(0.5));
+      v1 = ((v0 - vec3f(1.0, 1.0, 1.0)) + v3);
+      var f1: f32 = abs(dot(v1, mask));
+      exitoct = ((recursions > 0) && (f1 < 0.1));
+    } else if (((voxelstate == 1) && (recursions <= jwx_glsl_randomoctree_detail))) {
+      recursions++;
+      size *= 0.5;
+      var mask2: vec3f = step(vec3f(size, size, size), lro);
+      fro = (fro + (mask2 * vec3f(size)));
+      lro = (lro - (mask2 * vec3f(size)));
+    } else if ((((voxelstate == 0) || (voxelstate == 2)) || (recursions > jwx_glsl_randomoctree_detail))) {
+      var hit: vec3f = glsl_randomoctree_voxel(lro, rd, ird, size);
+      if ((hit.x < min(hit.y, hit.z))) {
+        mask = vec3f(1, 0, 0);
+      } else if ((hit.y < hit.z)) {
+        mask = vec3f(0, 1, 0);
+      } else {
+        mask = vec3f(0, 0, 1);
+      }
+      var len: f32 = dot(hit, mask);
+      if ((voxelstate == 2)) {
+        break;
+      }
+      dist += len;
+      var v5: vec3f = ((rd * vec3f(len)) - ((mask * sign(rd)) * vec3f(size)));
+      lro = (lro + v5);
+      var newfro: vec3f = (fro + ((mask * sign(rd)) * vec3f(size)));
+      var v4: vec3f = ((newfro / vec3f((size / 0.5))) + vec3f(0.25));
+      exitoct = (all(floor(v4) != floor(v4)) && (recursions > 0));
+      fro = newfro;
+      lastmask = mask;
+    }
+    if ((jwx_glsl_randomoctree_Grid_c == 1)) {
+      var q: vec3f = (abs(((lro / vec3f(size)) - vec3f(0.5))) * (vec3f(1.0, 1.0, 1.0) - lastmask));
+      edge = min(edge, ((-(max(max(q.x, q.y), q.z) - 0.5) * 80.0) * size));
+    }
+  }
+  ro = (ro + (rd * vec3f(dist)));
+  var color: vec3f = vec3f(0.0, 0.0, 0.0);
+  if (((f32(i) < jwx_glsl_randomoctree_Steps_c) && (dist < maxdistance))) {
+    var val: f32 = fract(dot(fro, vec3f(15.23, 754.345, 3.454)));
+    normal = ((lastmask * sign(rd)) * vec3f(-1.0));
+    color = ((sin((vec3f(39.896, 57.3225, 48.25) * vec3f(val))) * vec3f(0.5)) + vec3f(0.5));
+    color = (color * ((normal * vec3f(0.25)) + vec3f(0.75)));
+    if ((jwx_glsl_randomoctree_Borders_c == 1)) {
+      var q: vec3f = (abs(((lro / vec3f(size)) - vec3f(0.5))) * (vec3f(1.0, 1.0, 1.0) - lastmask));
+      edge = clamp(((-(max(max(q.x, q.y), q.z) - 0.5) * 20.0) * size), 0.0, edge);
+    }
+    if ((jwx_glsl_randomoctree_Black_Borders_c == 1)) {
+      color = (color * vec3f(edge));
+    } else {
+      color = (vec3f(1.0, 1.0, 1.0) - ((vec3f(1.0, 1.0, 1.0) - color) * vec3f(edge)));
+    }
+  } else {
+    if ((jwx_glsl_randomoctree_Black_Borders_c == 1)) {
+      color = vec3f(edge, edge, edge);
+    } else {
+      color = vec3f((1.0 - edge), (1.0 - edge), (1.0 - edge));
+    }
+  }
+  color = sqrt(color);
+  return color;
+}
+
+fn dbl2int(theColor: vec3f) -> vec3i {
+  var red: i32 = max(0, min(255, i32(floor((theColor.x * 256.0)))));
+  var green: i32 = max(0, min(255, i32(floor((theColor.y * 256.0)))));
+  var blue: i32 = max(0, min(255, i32(floor((theColor.z * 256.0)))));
+  return vec3i(red, green, blue);
+}
+
+var<private> jwx_glsl_randomoctree_Density_Pixels_c: f32 = 0.0;
+
+var<private> jwx_glsl_randomoctree_time_c: f32 = 0.0;
+
+var<private> jwx_glsl_randomoctree_Rot__L_R_c: f32 = 0.0;
+
+var<private> jwx_glsl_randomoctree_Rot__U_D_c: f32 = 0.0;
+
+var<private> jwx_glsl_randomoctree_Steps_c: f32 = 0.0;
+
+var<private> jwx_glsl_randomoctree_Grid_c: f32 = 0.0;
+
+var<private> jwx_glsl_randomoctree_Borders_c: f32 = 0.0;
+
+var<private> jwx_glsl_randomoctree_Black_Borders_c: f32 = 0.0;
+
+var<private> jwx_glsl_randomoctree_inited_: f32 = 0.0;
+
+var<private> jwx_glsl_randomoctree_HASHSCALE3: vec3f = vec3f(0.0);
+
+var<private> jwx_glsl_randomoctree_emptycells: f32 = 0.0;
+
+var<private> jwx_glsl_randomoctree_subdivisions: f32 = 0.0;
+
+var<private> jwx_glsl_randomoctree_resolutionY: i32 = 0;
+
+var<private> jwx_glsl_randomoctree_detail: i32 = 0;`,
+    code: (w, p) => `{
+var p2_: f32 = ${p[2]};
+var p1_: f32 = ${p[1]};
+jwx_glsl_randomoctree_Density_Pixels_c = ${p[0]};
+jwx_glsl_randomoctree_time_c = p2_;
+jwx_glsl_randomoctree_Rot__L_R_c = ${p[4]};
+jwx_glsl_randomoctree_Rot__U_D_c = ${p[5]};
+jwx_glsl_randomoctree_Steps_c = min(max(${p[3]}, 3.0), 100.0);
+jwx_glsl_randomoctree_Grid_c = min(max(${p[6]}, 0.0), 1.0);
+jwx_glsl_randomoctree_Borders_c = min(max(${p[7]}, 0.0), 1.0);
+jwx_glsl_randomoctree_Black_Borders_c = ${p[8]};
+if ((jwx_glsl_randomoctree_inited_ == 0.0)) {
+  jwx_glsl_randomoctree_inited_ = 1.0;
+  jwx_glsl_randomoctree_resolutionY = i32(${p[0]});
+  jwx_glsl_randomoctree_HASHSCALE3 = vec3f(0.1031, 0.103, 0.0973);
+  jwx_glsl_randomoctree_emptycells = 0.5;
+  jwx_glsl_randomoctree_subdivisions = 0.95;
+  jwx_glsl_randomoctree_detail = 5;
+}
+jwx_glsl_randomoctree_resolutionY = i32(${p[0]});
+jwx_glsl_randomoctree_HASHSCALE3 = vec3f(0.1031, 0.103, 0.0973);
+jwx_glsl_randomoctree_emptycells = 0.5;
+jwx_glsl_randomoctree_subdivisions = 0.95;
+jwx_glsl_randomoctree_detail = 5;
+{
+  p1_ = f32(i32(p1_));
+  p2_ = glsl_randomoctree_random(0.0, 10000000.0);
+}
+var i: i32 = i32((rnd(rs) * ${p[0]}));
+var j: i32 = i32((rnd(rs) * f32(jwx_glsl_randomoctree_resolutionY)));
+var color: vec3f = vec3f(0.0, 0.0, 0.0);
+color = glsl_randomoctree_getRGBColor(i, j);
+if ((min(max(${p[9]}, 0.0), 1.0) == 0)) {
+  var tcolor: vec3i = dbl2int(color);
+  (*rgb).w = select(0.0, 1.0, true);
+  (*rgb).x = (f32(tcolor.x) / 255.0);
+  (*rgb).y = (f32(tcolor.y) / 255.0);
+  (*rgb).z = (f32(tcolor.z) / 255.0);
+} else {
+  var s: f32 = ((color.x + color.y) + color.z);
+  var red: f32 = (color.x / s);
+  (*cp) = sin(red);
+}
+v.x += (${w} * ((f32(i) / ${p[0]}) - 0.5));
+v.y += (${w} * ((f32(j) / f32(jwx_glsl_randomoctree_resolutionY)) - 0.5));
+}`,
+  },
   "glsl_acrilic": {
     params: [{ name: "Density Pixels", def: 1000000 }, { name: "Seed", def: 10000 }, { name: "time", def: 0 }, { name: "Steps", def: 10 }, { name: "p1", def: 12 }, { name: "p2", def: 12 }, { name: "p3", def: 12 }, { name: "p4", def: 12 }, { name: "p5", def: 75 }, { name: "p6", def: 75 }, { name: "Red Fac.", def: 1 }, { name: "Green Fac.", def: 1 }, { name: "Blue Fac.", def: 1 }, { name: "Gradient", def: 0 }],
     verified: true, priority: 0, flags: ["dc","rgb","state"], types: ["SIMULATION","DC","BASE_SHAPE"],
-    funcNames: ["jwx_glsl_acrilic_Density_Pixels_c","jwx_glsl_acrilic_Steps_c","jwx_glsl_acrilic_p1_c","jwx_glsl_acrilic_time_c","jwx_glsl_acrilic_p2_c","jwx_glsl_acrilic_p3_c","jwx_glsl_acrilic_p4_c","jwx_glsl_acrilic_p5_c","jwx_glsl_acrilic_p6_c","jwx_glsl_acrilic_Red_Fac__c","jwx_glsl_acrilic_Green_Fac__c","jwx_glsl_acrilic_Blue_Fac__c","jwx_glsl_acrilic_inited_","jwx_glsl_acrilic_resolutionY","atan2j","glsl_acrilic_sq","glsl_acrilic_getRGBColor","dbl2int"],
-    funcs: `fn atan2j(y: f32, x: f32) -> f32 { if (x == 0.0 && y == 0.0) { return select(0.0, PI, (bitcast<u32>(x) >> 31u) == 1u) * select(1.0, -1.0, (bitcast<u32>(y) >> 31u) == 1u); } return atan2(y, x); }
+    funcNames: ["jwx_glsl_acrilic_Density_Pixels_c","jwx_glsl_acrilic_Steps_c","jwx_glsl_acrilic_p1_c","jwx_glsl_acrilic_time_c","jwx_glsl_acrilic_p2_c","jwx_glsl_acrilic_p3_c","jwx_glsl_acrilic_p4_c","jwx_glsl_acrilic_p5_c","jwx_glsl_acrilic_p6_c","jwx_glsl_acrilic_Red_Fac__c","jwx_glsl_acrilic_Green_Fac__c","jwx_glsl_acrilic_Blue_Fac__c","jwx_glsl_acrilic_inited_","jwx_glsl_acrilic_resolutionY","jrand_","atan2j","rndi","jrand_next","jrand_nextDouble","glsl_acrilic_random","glsl_acrilic_sq","glsl_acrilic_getRGBColor","dbl2int"],
+    funcs: `struct jrand_ {
+  s0: i32,
+  s1: i32,
+  s2: i32,
+}
+
+fn atan2j(y: f32, x: f32) -> f32 { if (x == 0.0 && y == 0.0) { return select(0.0, PI, (bitcast<u32>(x) >> 31u) == 1u) * select(1.0, -1.0, (bitcast<u32>(y) >> 31u) == 1u); } return atan2(y, x); }
+
+fn rndi(state: ptr<function, u32>) -> u32 { var x = *state; x ^= x << 13u; x ^= x >> 17u; x ^= x << 5u; *state = x; return x; }
+
+fn jrand_next(r_: ptr<function, jrand_>, bits: i32) -> i32 {
+  var a0: u32 = u32((*r_).s0);
+  var a1: u32 = u32((*r_).s1);
+  var a2: u32 = u32((*r_).s2);
+  var t0: u32 = ((a0 * 58989) + 11);
+  var r0: u32 = (t0 & 65535);
+  var c0: u32 = (t0 >> 16);
+  var t1a: u32 = ((a0 * 57068) + c0);
+  var c1a: u32 = (t1a >> 16);
+  var t1b: u32 = ((a1 * 58989) + (t1a & 65535));
+  var r1: u32 = (t1b & 65535);
+  var c1: u32 = (c1a + (t1b >> 16));
+  var r2_: u32 = (((((a0 * 5) + (a1 * 57068)) + (a2 * 58989)) + c1) & 65535);
+  (*r_).s0 = i32(r0);
+  (*r_).s1 = i32(r1);
+  (*r_).s2 = i32(r2_);
+  var hi: u32 = ((r2_ << 16) | r1);
+  return i32((hi >> u32((32 - bits))));
+}
+
+fn jrand_nextDouble(r_: ptr<function, jrand_>) -> f32 {
+  return ((f32(jrand_next(r_, 26)) * (1.0 / 67108864.0)) + (f32(jrand_next(r_, 27)) * (1.0 / 9007199254740992.0)));
+}
+
+fn glsl_acrilic_random(r1: f32, r2_: f32) -> f32 {
+  var randomize: jrand_;
+  return (r1 + ((r2_ - r1) * jrand_nextDouble(&(randomize))));
+}
 
 fn glsl_acrilic_sq(x: f32) -> f32 {
   return (x * x);
@@ -18750,10 +23707,12 @@ var<private> jwx_glsl_acrilic_inited_: f32 = 0.0;
 
 var<private> jwx_glsl_acrilic_resolutionY: i32 = 0;`,
     code: (w, p) => `{
+var p2_: f32 = ${p[2]};
+var p1_: f32 = ${p[1]};
 jwx_glsl_acrilic_Density_Pixels_c = ${p[0]};
 jwx_glsl_acrilic_Steps_c = min(max(${p[3]}, 3.0), 100.0);
 jwx_glsl_acrilic_p1_c = min(max(${p[4]}, 1.0), 100.0);
-jwx_glsl_acrilic_time_c = ${p[2]};
+jwx_glsl_acrilic_time_c = p2_;
 jwx_glsl_acrilic_p2_c = min(max(${p[5]}, 1.0), 100.0);
 jwx_glsl_acrilic_p3_c = min(max(${p[6]}, 1.0), 100.0);
 jwx_glsl_acrilic_p4_c = min(max(${p[7]}, 1.0), 100.0);
@@ -18767,6 +23726,10 @@ if ((jwx_glsl_acrilic_inited_ == 0.0)) {
   jwx_glsl_acrilic_resolutionY = i32(${p[0]});
 }
 jwx_glsl_acrilic_resolutionY = i32(${p[0]});
+{
+  p1_ = f32(i32(p1_));
+  p2_ = glsl_acrilic_random(0.0, 10000000.0);
+}
 var i: i32 = i32((rnd(rs) * ${p[0]}));
 var j: i32 = i32((rnd(rs) * f32(jwx_glsl_acrilic_resolutionY)));
 var color: vec3f = vec3f(0.0, 0.0, 0.0);
@@ -18789,8 +23752,16 @@ v.y += (${w} * ((f32(j) / f32(jwx_glsl_acrilic_resolutionY)) - 0.5));
   "glsl_circlesblue": {
     params: [{ name: "Density Pixels", def: 1000000 }, { name: "Seed", def: 10000 }, { name: "time", def: 1 }, { name: "Radiusy", def: 0.04 }, { name: "Bubles", def: 40 }, { name: "Gradient", def: 0 }],
     verified: true, priority: 0, flags: ["dc","rgb","state"], types: ["SIMULATION","DC","BASE_SHAPE"],
-    funcNames: ["jwx_glsl_circlesblue_Density_Pixels_c","jwx_glsl_circlesblue_Bubles_c","jwx_glsl_circlesblue_Radiusy_c","jwx_glsl_circlesblue_time_c","jwx_glsl_circlesblue_inited_","jwx_glsl_circlesblue_resolutionY","atan2j","powc","smoothstepc","glsl_circlesblue_getRGBColor","dbl2int"],
-    funcs: `fn atan2j(y: f32, x: f32) -> f32 { if (x == 0.0 && y == 0.0) { return select(0.0, PI, (bitcast<u32>(x) >> 31u) == 1u) * select(1.0, -1.0, (bitcast<u32>(y) >> 31u) == 1u); } return atan2(y, x); }
+    funcNames: ["jwx_glsl_circlesblue_Density_Pixels_c","jwx_glsl_circlesblue_Bubles_c","jwx_glsl_circlesblue_Radiusy_c","jwx_glsl_circlesblue_time_c","jwx_glsl_circlesblue_inited_","jwx_glsl_circlesblue_resolutionY","jrand_","atan2j","rndi","powc","smoothstepc","jrand_next","jrand_nextDouble","glsl_circlesblue_random","glsl_circlesblue_getRGBColor","dbl2int"],
+    funcs: `struct jrand_ {
+  s0: i32,
+  s1: i32,
+  s2: i32,
+}
+
+fn atan2j(y: f32, x: f32) -> f32 { if (x == 0.0 && y == 0.0) { return select(0.0, PI, (bitcast<u32>(x) >> 31u) == 1u) * select(1.0, -1.0, (bitcast<u32>(y) >> 31u) == 1u); } return atan2(y, x); }
+
+fn rndi(state: ptr<function, u32>) -> u32 { var x = *state; x ^= x << 13u; x ^= x >> 17u; x ^= x << 5u; *state = x; return x; }
 
 fn powc(x: f32, y: f32) -> f32 {
   if (x >= 0.0) { return pow(x, y); }
@@ -18801,6 +23772,35 @@ fn powc(x: f32, y: f32) -> f32 {
 }
 
 fn smoothstepc(a: f32, b: f32, x: f32) -> f32 { if (a == b) { return step(a, x); } let t = clamp((x - a) / (b - a), 0.0, 1.0); return t * t * (3.0 - 2.0 * t); }
+
+fn jrand_next(r_: ptr<function, jrand_>, bits: i32) -> i32 {
+  var a0: u32 = u32((*r_).s0);
+  var a1: u32 = u32((*r_).s1);
+  var a2: u32 = u32((*r_).s2);
+  var t0: u32 = ((a0 * 58989) + 11);
+  var r0: u32 = (t0 & 65535);
+  var c0: u32 = (t0 >> 16);
+  var t1a: u32 = ((a0 * 57068) + c0);
+  var c1a: u32 = (t1a >> 16);
+  var t1b: u32 = ((a1 * 58989) + (t1a & 65535));
+  var r1: u32 = (t1b & 65535);
+  var c1: u32 = (c1a + (t1b >> 16));
+  var r2_: u32 = (((((a0 * 5) + (a1 * 57068)) + (a2 * 58989)) + c1) & 65535);
+  (*r_).s0 = i32(r0);
+  (*r_).s1 = i32(r1);
+  (*r_).s2 = i32(r2_);
+  var hi: u32 = ((r2_ << 16) | r1);
+  return i32((hi >> u32((32 - bits))));
+}
+
+fn jrand_nextDouble(r_: ptr<function, jrand_>) -> f32 {
+  return ((f32(jrand_next(r_, 26)) * (1.0 / 67108864.0)) + (f32(jrand_next(r_, 27)) * (1.0 / 9007199254740992.0)));
+}
+
+fn glsl_circlesblue_random(r1: f32, r2_: f32) -> f32 {
+  var randomize: jrand_;
+  return (r1 + ((r2_ - r1) * jrand_nextDouble(&(randomize))));
+}
 
 fn glsl_circlesblue_getRGBColor(xp: i32, yp: i32) -> vec3f {
   var x: f32 = (f32(xp) + 0.5);
@@ -18839,15 +23839,21 @@ var<private> jwx_glsl_circlesblue_inited_: f32 = 0.0;
 
 var<private> jwx_glsl_circlesblue_resolutionY: i32 = 0;`,
     code: (w, p) => `{
+var p2_: f32 = ${p[2]};
+var p1_: f32 = ${p[1]};
 jwx_glsl_circlesblue_Density_Pixels_c = ${p[0]};
 jwx_glsl_circlesblue_Bubles_c = min(max(${p[4]}, 1.0), 100.0);
 jwx_glsl_circlesblue_Radiusy_c = min(max(${p[3]}, 0.0), 1.0);
-jwx_glsl_circlesblue_time_c = min(max(${p[2]}, 1.0), 1000.0);
+jwx_glsl_circlesblue_time_c = min(max(p2_, 1.0), 1000.0);
 if ((jwx_glsl_circlesblue_inited_ == 0.0)) {
   jwx_glsl_circlesblue_inited_ = 1.0;
   jwx_glsl_circlesblue_resolutionY = i32(${p[0]});
 }
 jwx_glsl_circlesblue_resolutionY = i32(${p[0]});
+{
+  p1_ = f32(i32(p1_));
+  p2_ = glsl_circlesblue_random(1.0, 1000.0);
+}
 var i: i32 = i32((rnd(rs) * ${p[0]}));
 var j: i32 = i32((rnd(rs) * f32(jwx_glsl_circlesblue_resolutionY)));
 var color: vec3f = vec3f(0.0, 0.0, 0.0);
@@ -18870,8 +23876,45 @@ v.y += (${w} * ((f32(j) / f32(jwx_glsl_circlesblue_resolutionY)) - 0.5));
   "glsl_kaliset": {
     params: [{ name: "Density Pixels", def: 1000000 }, { name: "Seed", def: 10000 }, { name: "time", def: 200 }, { name: "N", def: 60 }, { name: "ShiftX", def: -0.22 }, { name: "ShiftY", def: -0.21 }, { name: "Gradient", def: 0 }],
     verified: true, priority: 0, flags: ["dc","rgb","state"], types: ["SIMULATION","DC","BASE_SHAPE"],
-    funcNames: ["jwx_glsl_kaliset_Density_Pixels_c","jwx_glsl_kaliset_time_c","jwx_glsl_kaliset_ShiftX_c","jwx_glsl_kaliset_ShiftY_c","jwx_glsl_kaliset_N_c","jwx_glsl_kaliset_inited_","jwx_glsl_kaliset_resolutionY","atan2j","glsl_kaliset_getRGBColor","dbl2int"],
-    funcs: `fn atan2j(y: f32, x: f32) -> f32 { if (x == 0.0 && y == 0.0) { return select(0.0, PI, (bitcast<u32>(x) >> 31u) == 1u) * select(1.0, -1.0, (bitcast<u32>(y) >> 31u) == 1u); } return atan2(y, x); }
+    funcNames: ["jwx_glsl_kaliset_Density_Pixels_c","jwx_glsl_kaliset_time_c","jwx_glsl_kaliset_ShiftX_c","jwx_glsl_kaliset_ShiftY_c","jwx_glsl_kaliset_N_c","jwx_glsl_kaliset_inited_","jwx_glsl_kaliset_resolutionY","jrand_","atan2j","rndi","jrand_next","jrand_nextDouble","glsl_kaliset_random","glsl_kaliset_getRGBColor","dbl2int"],
+    funcs: `struct jrand_ {
+  s0: i32,
+  s1: i32,
+  s2: i32,
+}
+
+fn atan2j(y: f32, x: f32) -> f32 { if (x == 0.0 && y == 0.0) { return select(0.0, PI, (bitcast<u32>(x) >> 31u) == 1u) * select(1.0, -1.0, (bitcast<u32>(y) >> 31u) == 1u); } return atan2(y, x); }
+
+fn rndi(state: ptr<function, u32>) -> u32 { var x = *state; x ^= x << 13u; x ^= x >> 17u; x ^= x << 5u; *state = x; return x; }
+
+fn jrand_next(r_: ptr<function, jrand_>, bits: i32) -> i32 {
+  var a0: u32 = u32((*r_).s0);
+  var a1: u32 = u32((*r_).s1);
+  var a2: u32 = u32((*r_).s2);
+  var t0: u32 = ((a0 * 58989) + 11);
+  var r0: u32 = (t0 & 65535);
+  var c0: u32 = (t0 >> 16);
+  var t1a: u32 = ((a0 * 57068) + c0);
+  var c1a: u32 = (t1a >> 16);
+  var t1b: u32 = ((a1 * 58989) + (t1a & 65535));
+  var r1: u32 = (t1b & 65535);
+  var c1: u32 = (c1a + (t1b >> 16));
+  var r2_: u32 = (((((a0 * 5) + (a1 * 57068)) + (a2 * 58989)) + c1) & 65535);
+  (*r_).s0 = i32(r0);
+  (*r_).s1 = i32(r1);
+  (*r_).s2 = i32(r2_);
+  var hi: u32 = ((r2_ << 16) | r1);
+  return i32((hi >> u32((32 - bits))));
+}
+
+fn jrand_nextDouble(r_: ptr<function, jrand_>) -> f32 {
+  return ((f32(jrand_next(r_, 26)) * (1.0 / 67108864.0)) + (f32(jrand_next(r_, 27)) * (1.0 / 9007199254740992.0)));
+}
+
+fn glsl_kaliset_random(r1: f32, r2_: f32) -> f32 {
+  var randomize: jrand_;
+  return (r1 + ((r2_ - r1) * jrand_nextDouble(&(randomize))));
+}
 
 fn glsl_kaliset_getRGBColor(xp: i32, yp: i32) -> vec3f {
   var x: f32 = (f32(xp) + 0.5);
@@ -18919,8 +23962,10 @@ var<private> jwx_glsl_kaliset_inited_: f32 = 0.0;
 
 var<private> jwx_glsl_kaliset_resolutionY: i32 = 0;`,
     code: (w, p) => `{
+var p2_: f32 = ${p[2]};
+var p1_: f32 = ${p[1]};
 jwx_glsl_kaliset_Density_Pixels_c = ${p[0]};
-jwx_glsl_kaliset_time_c = min(max(${p[2]}, 1.0), 1000.0);
+jwx_glsl_kaliset_time_c = min(max(p2_, 1.0), 1000.0);
 jwx_glsl_kaliset_ShiftX_c = min(max(${p[4]}, -5.0), 5.0);
 jwx_glsl_kaliset_ShiftY_c = min(max(${p[5]}, -5.0), 5.0);
 jwx_glsl_kaliset_N_c = min(max(${p[3]}, 1.0), 100.0);
@@ -18929,6 +23974,10 @@ if ((jwx_glsl_kaliset_inited_ == 0.0)) {
   jwx_glsl_kaliset_resolutionY = i32(${p[0]});
 }
 jwx_glsl_kaliset_resolutionY = i32(${p[0]});
+{
+  p1_ = f32(i32(p1_));
+  p2_ = glsl_kaliset_random(1.0, 1000.0);
+}
 var i: i32 = i32((rnd(rs) * ${p[0]}));
 var j: i32 = i32((rnd(rs) * f32(jwx_glsl_kaliset_resolutionY)));
 var color: vec3f = vec3f(0.0, 0.0, 0.0);
@@ -18951,8 +24000,45 @@ v.y += (${w} * ((f32(j) / f32(jwx_glsl_kaliset_resolutionY)) - 0.5));
   "glsl_kaliset2": {
     params: [{ name: "Density Pixels", def: 1000000 }, { name: "Seed", def: 5000 }, { name: "time", def: 85.5 }, { name: "N", def: 100 }, { name: "radio", def: 1 }, { name: "ShiftX", def: -0.356 }, { name: "ShiftY", def: 0.686 }, { name: "Red Fac.", def: 1.8 }, { name: "Green Fac.", def: 1.9 }, { name: "Blue Fac.", def: 2.2 }, { name: "Gradient", def: 0 }],
     verified: true, priority: 0, flags: ["dc","rgb","state"], types: ["SIMULATION","DC","BASE_SHAPE"],
-    funcNames: ["jwx_glsl_kaliset2_Density_Pixels_c","jwx_glsl_kaliset2_ShiftX_c","jwx_glsl_kaliset2_time_c","jwx_glsl_kaliset2_ShiftY_c","jwx_glsl_kaliset2_N_c","jwx_glsl_kaliset2_radio_c","jwx_glsl_kaliset2_Red_Fac__c","jwx_glsl_kaliset2_Green_Fac__c","jwx_glsl_kaliset2_Blue_Fac__c","jwx_glsl_kaliset2_inited_","jwx_glsl_kaliset2_resolutionY","atan2j","glsl_kaliset2_getRGBColor","dbl2int"],
-    funcs: `fn atan2j(y: f32, x: f32) -> f32 { if (x == 0.0 && y == 0.0) { return select(0.0, PI, (bitcast<u32>(x) >> 31u) == 1u) * select(1.0, -1.0, (bitcast<u32>(y) >> 31u) == 1u); } return atan2(y, x); }
+    funcNames: ["jwx_glsl_kaliset2_Density_Pixels_c","jwx_glsl_kaliset2_ShiftX_c","jwx_glsl_kaliset2_time_c","jwx_glsl_kaliset2_ShiftY_c","jwx_glsl_kaliset2_N_c","jwx_glsl_kaliset2_radio_c","jwx_glsl_kaliset2_Red_Fac__c","jwx_glsl_kaliset2_Green_Fac__c","jwx_glsl_kaliset2_Blue_Fac__c","jwx_glsl_kaliset2_inited_","jwx_glsl_kaliset2_resolutionY","jrand_","atan2j","rndi","jrand_next","jrand_nextDouble","glsl_kaliset2_random","glsl_kaliset2_getRGBColor","dbl2int"],
+    funcs: `struct jrand_ {
+  s0: i32,
+  s1: i32,
+  s2: i32,
+}
+
+fn atan2j(y: f32, x: f32) -> f32 { if (x == 0.0 && y == 0.0) { return select(0.0, PI, (bitcast<u32>(x) >> 31u) == 1u) * select(1.0, -1.0, (bitcast<u32>(y) >> 31u) == 1u); } return atan2(y, x); }
+
+fn rndi(state: ptr<function, u32>) -> u32 { var x = *state; x ^= x << 13u; x ^= x >> 17u; x ^= x << 5u; *state = x; return x; }
+
+fn jrand_next(r_: ptr<function, jrand_>, bits: i32) -> i32 {
+  var a0: u32 = u32((*r_).s0);
+  var a1: u32 = u32((*r_).s1);
+  var a2: u32 = u32((*r_).s2);
+  var t0: u32 = ((a0 * 58989) + 11);
+  var r0: u32 = (t0 & 65535);
+  var c0: u32 = (t0 >> 16);
+  var t1a: u32 = ((a0 * 57068) + c0);
+  var c1a: u32 = (t1a >> 16);
+  var t1b: u32 = ((a1 * 58989) + (t1a & 65535));
+  var r1: u32 = (t1b & 65535);
+  var c1: u32 = (c1a + (t1b >> 16));
+  var r2_: u32 = (((((a0 * 5) + (a1 * 57068)) + (a2 * 58989)) + c1) & 65535);
+  (*r_).s0 = i32(r0);
+  (*r_).s1 = i32(r1);
+  (*r_).s2 = i32(r2_);
+  var hi: u32 = ((r2_ << 16) | r1);
+  return i32((hi >> u32((32 - bits))));
+}
+
+fn jrand_nextDouble(r_: ptr<function, jrand_>) -> f32 {
+  return ((f32(jrand_next(r_, 26)) * (1.0 / 67108864.0)) + (f32(jrand_next(r_, 27)) * (1.0 / 9007199254740992.0)));
+}
+
+fn glsl_kaliset2_random(r1: f32, r2_: f32) -> f32 {
+  var randomize: jrand_;
+  return (r1 + ((r2_ - r1) * jrand_nextDouble(&(randomize))));
+}
 
 fn glsl_kaliset2_getRGBColor(xp: i32, yp: i32) -> vec3f {
   var x: f32 = (f32(xp) + 0.5);
@@ -19008,9 +24094,11 @@ var<private> jwx_glsl_kaliset2_inited_: f32 = 0.0;
 
 var<private> jwx_glsl_kaliset2_resolutionY: i32 = 0;`,
     code: (w, p) => `{
+var p2_: f32 = ${p[2]};
+var p1_: f32 = ${p[1]};
 jwx_glsl_kaliset2_Density_Pixels_c = ${p[0]};
 jwx_glsl_kaliset2_ShiftX_c = min(max(${p[5]}, -1.0), 1.0);
-jwx_glsl_kaliset2_time_c = min(max(${p[2]}, 1.0), 1000.0);
+jwx_glsl_kaliset2_time_c = min(max(p2_, 1.0), 1000.0);
 jwx_glsl_kaliset2_ShiftY_c = min(max(${p[6]}, -1.0), 1.0);
 jwx_glsl_kaliset2_N_c = min(max(${p[3]}, 1.0), 100.0);
 jwx_glsl_kaliset2_radio_c = min(max(${p[4]}, 0.1), 10.0);
@@ -19022,6 +24110,10 @@ if ((jwx_glsl_kaliset2_inited_ == 0.0)) {
   jwx_glsl_kaliset2_resolutionY = i32(${p[0]});
 }
 jwx_glsl_kaliset2_resolutionY = i32(${p[0]});
+{
+  p1_ = f32(i32(p1_));
+  p2_ = glsl_kaliset2_random(1.0, 1000.0);
+}
 var i: i32 = i32((rnd(rs) * ${p[0]}));
 var j: i32 = i32((rnd(rs) * f32(jwx_glsl_kaliset2_resolutionY)));
 var color: vec3f = vec3f(0.0, 0.0, 0.0);
@@ -19039,6 +24131,158 @@ if ((min(max(${p[10]}, 0.0), 1.0) == 0)) {
 }
 v.x += (${w} * ((f32(i) / ${p[0]}) - 0.5));
 v.y += (${w} * ((f32(j) / f32(jwx_glsl_kaliset2_resolutionY)) - 0.5));
+}`,
+  },
+  "glsl_grid3D": {
+    params: [{ name: "Density Pixels", def: 1000000 }, { name: "Seed", def: 10000 }, { name: "time", def: 200 }],
+    verified: true, priority: 0, flags: ["dc","rgb","state"], types: ["SIMULATION","DC","BASE_SHAPE"],
+    funcNames: ["jwx_glsl_grid3D_Density_Pixels_c","jwx_glsl_grid3D_time_c","jwx_glsl_grid3D_inited_","jwx_glsl_grid3D_resolutionY","jrand_","mat3_","atan2j","rndi","jrand_next","jrand_nextDouble","glsl_grid3D_random","mat3_make","glsl_grid3D_field","glsl_grid3D_getRGBColor","dbl2int"],
+    funcs: `struct jrand_ {
+  s0: i32,
+  s1: i32,
+  s2: i32,
+}
+
+struct mat3_ {
+  a00: f32,
+  a10: f32,
+  a20: f32,
+  a01: f32,
+  a11: f32,
+  a21: f32,
+  a02: f32,
+  a12: f32,
+  a22: f32,
+}
+
+fn atan2j(y: f32, x: f32) -> f32 { if (x == 0.0 && y == 0.0) { return select(0.0, PI, (bitcast<u32>(x) >> 31u) == 1u) * select(1.0, -1.0, (bitcast<u32>(y) >> 31u) == 1u); } return atan2(y, x); }
+
+fn rndi(state: ptr<function, u32>) -> u32 { var x = *state; x ^= x << 13u; x ^= x >> 17u; x ^= x << 5u; *state = x; return x; }
+
+fn jrand_next(r_: ptr<function, jrand_>, bits: i32) -> i32 {
+  var a0: u32 = u32((*r_).s0);
+  var a1: u32 = u32((*r_).s1);
+  var a2: u32 = u32((*r_).s2);
+  var t0: u32 = ((a0 * 58989) + 11);
+  var r0: u32 = (t0 & 65535);
+  var c0: u32 = (t0 >> 16);
+  var t1a: u32 = ((a0 * 57068) + c0);
+  var c1a: u32 = (t1a >> 16);
+  var t1b: u32 = ((a1 * 58989) + (t1a & 65535));
+  var r1: u32 = (t1b & 65535);
+  var c1: u32 = (c1a + (t1b >> 16));
+  var r2_: u32 = (((((a0 * 5) + (a1 * 57068)) + (a2 * 58989)) + c1) & 65535);
+  (*r_).s0 = i32(r0);
+  (*r_).s1 = i32(r1);
+  (*r_).s2 = i32(r2_);
+  var hi: u32 = ((r2_ << 16) | r1);
+  return i32((hi >> u32((32 - bits))));
+}
+
+fn jrand_nextDouble(r_: ptr<function, jrand_>) -> f32 {
+  return ((f32(jrand_next(r_, 26)) * (1.0 / 67108864.0)) + (f32(jrand_next(r_, 27)) * (1.0 / 9007199254740992.0)));
+}
+
+fn glsl_grid3D_random(r1: f32, r2_: f32) -> f32 {
+  var randomize: jrand_;
+  return (r1 + ((r2_ - r1) * jrand_nextDouble(&(randomize))));
+}
+
+fn mat3_make(a00: f32, a10: f32, a20: f32, a01: f32, a11: f32, a21: f32, a02: f32, a12: f32, a22: f32) -> mat3_ {
+  var m: mat3_;
+  m.a00 = a00;
+  m.a10 = a10;
+  m.a20 = a20;
+  m.a01 = a01;
+  m.a11 = a11;
+  m.a21 = a21;
+  m.a02 = a02;
+  m.a12 = a12;
+  m.a22 = a22;
+  return m;
+}
+
+fn glsl_grid3D_field(p__in: vec3f) -> vec3f {
+  var p_: vec3f = p__in;
+  p_ = (p_ * vec3f(0.1));
+  var f: f32 = 0.1;
+  for (var i: i32 = 0; (i < 3); i++) {
+    p_ = vec3f(p_.y, p_.z, p_.x);
+    p_ = abs((fract(p_) - vec3f(0.5)));
+    p_ = (p_ * vec3f(2.0));
+    f *= 2.0;
+  }
+  p_ = (p_ * p_);
+  return ((sqrt((p_ + vec3f(p_.y, p_.z, p_.x))) / vec3f(f)) - vec3f(0.05));
+}
+
+fn glsl_grid3D_getRGBColor(xp: i32, yp: i32) -> vec3f {
+  var x: f32 = (f32(xp) + 0.5);
+  var y: f32 = (f32(yp) + 0.5);
+  var MAXITER: i32 = 30;
+  var dir: vec3f = normalize(vec3f(((x / jwx_glsl_grid3D_Density_Pixels_c) - 0.5), ((y / f32(jwx_glsl_grid3D_resolutionY)) - 0.5), 1.0));
+  var a: f32 = (jwx_glsl_grid3D_time_c * 0.021);
+  var pos: vec3f = vec3f(0.0, (jwx_glsl_grid3D_time_c * 0.1), 0.0);
+  dir = vec3f((((dir.x * mat3_make(1, 0, 0, 0, cos(a), -(sin(a)), 0, sin(a), cos(a)).a00) + (dir.y * mat3_make(1, 0, 0, 0, cos(a), -(sin(a)), 0, sin(a), cos(a)).a10)) + (dir.z * mat3_make(1, 0, 0, 0, cos(a), -(sin(a)), 0, sin(a), cos(a)).a20)), (((dir.x * mat3_make(1, 0, 0, 0, cos(a), -(sin(a)), 0, sin(a), cos(a)).a01) + (dir.y * mat3_make(1, 0, 0, 0, cos(a), -(sin(a)), 0, sin(a), cos(a)).a11)) + (dir.z * mat3_make(1, 0, 0, 0, cos(a), -(sin(a)), 0, sin(a), cos(a)).a21)), (((dir.x * mat3_make(1, 0, 0, 0, cos(a), -(sin(a)), 0, sin(a), cos(a)).a02) + (dir.y * mat3_make(1, 0, 0, 0, cos(a), -(sin(a)), 0, sin(a), cos(a)).a12)) + (dir.z * mat3_make(1, 0, 0, 0, cos(a), -(sin(a)), 0, sin(a), cos(a)).a22)));
+  dir = vec3f((((dir.x * mat3_make(cos(a), 0, -(sin(a)), 0, 1, 0, sin(a), 0, cos(a)).a00) + (dir.y * mat3_make(cos(a), 0, -(sin(a)), 0, 1, 0, sin(a), 0, cos(a)).a10)) + (dir.z * mat3_make(cos(a), 0, -(sin(a)), 0, 1, 0, sin(a), 0, cos(a)).a20)), (((dir.x * mat3_make(cos(a), 0, -(sin(a)), 0, 1, 0, sin(a), 0, cos(a)).a01) + (dir.y * mat3_make(cos(a), 0, -(sin(a)), 0, 1, 0, sin(a), 0, cos(a)).a11)) + (dir.z * mat3_make(cos(a), 0, -(sin(a)), 0, 1, 0, sin(a), 0, cos(a)).a21)), (((dir.x * mat3_make(cos(a), 0, -(sin(a)), 0, 1, 0, sin(a), 0, cos(a)).a02) + (dir.y * mat3_make(cos(a), 0, -(sin(a)), 0, 1, 0, sin(a), 0, cos(a)).a12)) + (dir.z * mat3_make(cos(a), 0, -(sin(a)), 0, 1, 0, sin(a), 0, cos(a)).a22)));
+  var color: vec3f = vec3f(0, 0, 0);
+  for (var i: i32 = 0; (i < MAXITER); i++) {
+    var f2: vec3f = glsl_grid3D_field(pos);
+    var f: f32 = min(min(f2.x, f2.y), f2.z);
+    pos = (pos + (dir * vec3f(f)));
+    var t0: vec3f = (vec3f((f32(MAXITER) - f32(i)), (f32(MAXITER) - f32(i)), (f32(MAXITER) - f32(i))) / (f2 + vec3f(0.1)));
+    color = (color + t0);
+  }
+  var color3: vec3f = (vec3f(1.0, 1.0, 1.0) - (vec3f(1.0, 1.0, 1.0) / (vec3f(1.0, 1.0, 1.0) + (color * vec3f((0.09 / f32((MAXITER * MAXITER))))))));
+  return vec3f(((color3.x + color3.y) + color3.z), ((color3.x + color3.y) + color3.z), ((color3.x + color3.y) + color3.z));
+}
+
+fn dbl2int(theColor: vec3f) -> vec3i {
+  var red: i32 = max(0, min(255, i32(floor((theColor.x * 256.0)))));
+  var green: i32 = max(0, min(255, i32(floor((theColor.y * 256.0)))));
+  var blue: i32 = max(0, min(255, i32(floor((theColor.z * 256.0)))));
+  return vec3i(red, green, blue);
+}
+
+var<private> jwx_glsl_grid3D_Density_Pixels_c: f32 = 0.0;
+
+var<private> jwx_glsl_grid3D_time_c: f32 = 0.0;
+
+var<private> jwx_glsl_grid3D_inited_: f32 = 0.0;
+
+var<private> jwx_glsl_grid3D_resolutionY: i32 = 0;`,
+    code: (w, p) => `{
+var p2_: f32 = ${p[2]};
+var p1_: f32 = ${p[1]};
+jwx_glsl_grid3D_Density_Pixels_c = ${p[0]};
+jwx_glsl_grid3D_time_c = min(max(p2_, 1.0), 1000.0);
+var gradient: i32 = 0;
+if ((jwx_glsl_grid3D_inited_ == 0.0)) {
+  jwx_glsl_grid3D_inited_ = 1.0;
+  jwx_glsl_grid3D_resolutionY = i32(${p[0]});
+}
+jwx_glsl_grid3D_resolutionY = i32(${p[0]});
+{
+  p1_ = f32(i32(p1_));
+  p2_ = glsl_grid3D_random(1.0, 1000.0);
+}
+var i: i32 = i32((rnd(rs) * ${p[0]}));
+var j: i32 = i32((rnd(rs) * f32(jwx_glsl_grid3D_resolutionY)));
+var color: vec3f = vec3f(0.0, 0.0, 0.0);
+color = glsl_grid3D_getRGBColor(i, j);
+if ((gradient == 0)) {
+  var tcolor: vec3i = dbl2int(color);
+  (*rgb).w = select(0.0, 1.0, true);
+  (*rgb).x = (f32(tcolor.x) / 255.0);
+  (*rgb).y = (f32(tcolor.y) / 255.0);
+  (*rgb).z = (f32(tcolor.z) / 255.0);
+} else {
+  var s: f32 = ((color.x + color.y) + color.z);
+  var red: f32 = (color.x / s);
+  (*cp) = sin(red);
+}
+v.x += (${w} * ((f32(i) / ${p[0]}) - 0.5));
+v.y += (${w} * ((f32(j) / f32(jwx_glsl_grid3D_resolutionY)) - 0.5));
 }`,
   },
   "glsl_hyperbolictile": {
@@ -19154,8 +24398,16 @@ v.y += (${w} * ((f32(j) / f32(jwx_glsl_hyperbolictile_resolutionY)) - 0.5));
   "glsl_squares": {
     params: [{ name: "Density Pixels", def: 1000000 }, { name: "Seed", def: 5000 }, { name: "time", def: 85.5 }, { name: "N", def: 3 }, { name: "Direction", def: 1 }, { name: "Red Fac.", def: 1.8 }, { name: "Green Fac.", def: 1.9 }, { name: "Blue Fac.", def: 2.2 }, { name: "Gradient", def: 0 }],
     verified: true, priority: 0, flags: ["dc","rgb","state"], types: ["SIMULATION","DC","BASE_SHAPE"],
-    funcNames: ["jwx_glsl_squares_Direction_c","jwx_glsl_squares_N_c","jwx_glsl_squares_time_c","jwx_glsl_squares_Density_Pixels_c","jwx_glsl_squares_Red_Fac__c","jwx_glsl_squares_Green_Fac__c","jwx_glsl_squares_Blue_Fac__c","jwx_glsl_squares_inited_","jwx_glsl_squares_resolutionY","atan2j","powc","mmod2","glsl_squares_hit","glsl_squares_getRGBColor","dbl2int"],
-    funcs: `fn atan2j(y: f32, x: f32) -> f32 { if (x == 0.0 && y == 0.0) { return select(0.0, PI, (bitcast<u32>(x) >> 31u) == 1u) * select(1.0, -1.0, (bitcast<u32>(y) >> 31u) == 1u); } return atan2(y, x); }
+    funcNames: ["jwx_glsl_squares_Direction_c","jwx_glsl_squares_N_c","jwx_glsl_squares_time_c","jwx_glsl_squares_Density_Pixels_c","jwx_glsl_squares_Red_Fac__c","jwx_glsl_squares_Green_Fac__c","jwx_glsl_squares_Blue_Fac__c","jwx_glsl_squares_inited_","jwx_glsl_squares_resolutionY","jrand_","atan2j","rndi","powc","mmod2","jrand_next","jrand_nextDouble","glsl_squares_random","glsl_squares_hit","glsl_squares_getRGBColor","dbl2int"],
+    funcs: `struct jrand_ {
+  s0: i32,
+  s1: i32,
+  s2: i32,
+}
+
+fn atan2j(y: f32, x: f32) -> f32 { if (x == 0.0 && y == 0.0) { return select(0.0, PI, (bitcast<u32>(x) >> 31u) == 1u) * select(1.0, -1.0, (bitcast<u32>(y) >> 31u) == 1u); } return atan2(y, x); }
+
+fn rndi(state: ptr<function, u32>) -> u32 { var x = *state; x ^= x << 13u; x ^= x >> 17u; x ^= x << 5u; *state = x; return x; }
 
 fn powc(x: f32, y: f32) -> f32 {
   if (x >= 0.0) { return pow(x, y); }
@@ -19166,6 +24418,35 @@ fn powc(x: f32, y: f32) -> f32 {
 }
 
 fn mmod2(a: vec2f, b: vec2f) -> vec2f { return a - b * floor(a / b); }
+
+fn jrand_next(r_: ptr<function, jrand_>, bits: i32) -> i32 {
+  var a0: u32 = u32((*r_).s0);
+  var a1: u32 = u32((*r_).s1);
+  var a2: u32 = u32((*r_).s2);
+  var t0: u32 = ((a0 * 58989) + 11);
+  var r0: u32 = (t0 & 65535);
+  var c0: u32 = (t0 >> 16);
+  var t1a: u32 = ((a0 * 57068) + c0);
+  var c1a: u32 = (t1a >> 16);
+  var t1b: u32 = ((a1 * 58989) + (t1a & 65535));
+  var r1: u32 = (t1b & 65535);
+  var c1: u32 = (c1a + (t1b >> 16));
+  var r2_: u32 = (((((a0 * 5) + (a1 * 57068)) + (a2 * 58989)) + c1) & 65535);
+  (*r_).s0 = i32(r0);
+  (*r_).s1 = i32(r1);
+  (*r_).s2 = i32(r2_);
+  var hi: u32 = ((r2_ << 16) | r1);
+  return i32((hi >> u32((32 - bits))));
+}
+
+fn jrand_nextDouble(r_: ptr<function, jrand_>) -> f32 {
+  return ((f32(jrand_next(r_, 26)) * (1.0 / 67108864.0)) + (f32(jrand_next(r_, 27)) * (1.0 / 9007199254740992.0)));
+}
+
+fn glsl_squares_random(r1: f32, r2_: f32) -> f32 {
+  var randomize: jrand_;
+  return (r1 + (f32(i32(((r2_ - r1) + 1))) * jrand_nextDouble(&(randomize))));
+}
 
 fn glsl_squares_hit(p_: vec2f) -> bool {
   var direction: f32;
@@ -19227,9 +24508,11 @@ var<private> jwx_glsl_squares_inited_: f32 = 0.0;
 
 var<private> jwx_glsl_squares_resolutionY: i32 = 0;`,
     code: (w, p) => `{
+var p2_: f32 = ${p[2]};
+var p1_: f32 = ${p[1]};
 jwx_glsl_squares_Direction_c = min(max(${p[4]}, 0.0), 1.0);
 jwx_glsl_squares_N_c = min(max(${p[3]}, 1.0), 20.0);
-jwx_glsl_squares_time_c = min(max(${p[2]}, 0.0), 1000.0);
+jwx_glsl_squares_time_c = min(max(p2_, 0.0), 1000.0);
 jwx_glsl_squares_Density_Pixels_c = ${p[0]};
 jwx_glsl_squares_Red_Fac__c = ${p[5]};
 jwx_glsl_squares_Green_Fac__c = ${p[6]};
@@ -19239,6 +24522,10 @@ if ((jwx_glsl_squares_inited_ == 0.0)) {
   jwx_glsl_squares_resolutionY = i32(${p[0]});
 }
 jwx_glsl_squares_resolutionY = i32(${p[0]});
+{
+  p1_ = f32(i32(p1_));
+  p2_ = glsl_squares_random(0.0, 10000.0);
+}
 var i: i32 = i32((rnd(rs) * ${p[0]}));
 var j: i32 = i32((rnd(rs) * f32(jwx_glsl_squares_resolutionY)));
 var color: vec3f = vec3f(0.0, 0.0, 0.0);
@@ -20457,6 +25744,41 @@ if (((((${w} * d) + x) < l) || (((${w} * e) + y) < m))) {
       v.x += (x * j);
       v.y -= (y * k);
     }
+  }
+}
+}`,
+  },
+  "dc_carpet3D": {
+    params: [{ name: "origin", def: 0.5 }, { name: "color_a", def: 0.5 }, { name: "color_b", def: 1 }, { name: "color_c", def: 1 }, { name: "color_d", def: 1 }, { name: "color_e", def: 0.5 }, { name: "color_f", def: 1 }, { name: "stretch_x", def: 1 }, { name: "stretch_y", def: 1 }, { name: "scale_x", def: 1 }, { name: "scale_y", def: 1 }, { name: "scale_z", def: 1 }, { name: "offset_z", def: 0 }, { name: "reset_z", def: 0 }, { name: "sides", def: 0 }],
+    verified: true, priority: 0, flags: ["3d","affine","dc","z"], types: ["3D","DC"],
+    funcNames: ["atan2j"],
+    funcs: `fn atan2j(y: f32, x: f32) -> f32 { if (x == 0.0 && y == 0.0) { return select(0.0, PI, (bitcast<u32>(x) >> 31u) == 1u) * select(1.0, -1.0, (bitcast<u32>(y) >> 31u) == 1u); } return atan2(y, x); }`,
+    code: (w, p, A) => `{
+var H: f32 = 0;
+{
+  H = (0.1 * ${p[0]});
+}
+var x0: i32 = select(1, -1, (rnd(rs) < 0.5));
+var y0: i32 = select(1, -1, (rnd(rs) > 0.5));
+var x: f32 = (t.x + (f32(x0) * ${p[7]}));
+var y: f32 = (t.y + (f32(y0) * ${p[8]}));
+var x0_xor_y0: f32 = f32((x0 ^ y0));
+var hh: f32 = (-H + ((${p[2]} - x0_xor_y0) * H));
+v.x += ((${w} * (((${A(0)} * x) + (${A(1)} * y)) + ${A(2)})) * ${p[9]});
+v.y += ((${w} * (((${A(3)} * x) + (${A(4)} * y)) + ${A(5)})) * ${p[10]});
+(*cp) = (abs(((((*cp) * ${p[1]}) * (${p[3]} + hh)) + ((x0_xor_y0 * (${p[4]} - hh)) * ${p[5]}))) % ${p[6]});
+if (false) {
+  pz_ += (${w} * z_);
+}
+var dz: f32 = (((*cp) * ${p[11]}) + ${p[12]});
+if ((${p[13]} > 0)) {
+  pz_ = dz;
+} else {
+  pz_ += dz;
+  if ((${p[14]} > 0)) {
+    pz_ += (dz * rnd(rs));
+  } else {
+    pz_ += dz;
   }
 }
 }`,
@@ -24304,6 +29626,356 @@ if ((${p[7]} == 1)) {
   pz_ = dz;
 } else {
   pz_ += dz;
+}
+}`,
+  },
+  "glynnlissa": {
+    params: [{ name: "radius", def: 1 }, { name: "radius1", def: 0.5 }, { name: "thickness", def: 1 }, { name: "phi1", def: 0 }, { name: "a", def: 3 }, { name: "b", def: 2 }, { name: "width", def: 0 }, { name: "phase", def: 0 }, { name: "scale", def: 0.71 }, { name: "pow", def: 1.5 }, { name: "contrast", def: 0.5 }],
+    verified: true, priority: 0, flags: ["state","z"], types: ["2D","SIMULATION"],
+    funcNames: ["jwx_glynnlissa_radius1_c","jwx_glynnlissa_thickness_c","jwx_glynnlissa_inited_","jwx_glynnlissa__x1","jwx_glynnlissa__y1","powc","sqr","atan2j","glynnlissa_lissajous","glynnlissa_circle"],
+    funcs: `fn powc(x: f32, y: f32) -> f32 {
+  if (x >= 0.0) { return pow(x, y); }
+  let yi = round(y);
+  if (abs(y - yi) > 1e-6) { return pow(x, y); }
+  let m = pow(-x, y);
+  return select(m, -m, (i32(yi) & 1) != 0);
+}
+
+fn sqr(x: f32) -> f32 { return x * x; }
+
+fn atan2j(y: f32, x: f32) -> f32 { if (x == 0.0 && y == 0.0) { return select(0.0, PI, (bitcast<u32>(x) >> 31u) == 1u) * select(1.0, -1.0, (bitcast<u32>(y) >> 31u) == 1u); } return atan2(y, x); }
+
+fn glynnlissa_lissajous(t_: f32, a: f32, b: f32, d: f32) -> vec2f {
+  return vec2f(sin(((a * t_) + d)), sin((b * t_)));
+}
+
+fn glynnlissa_circle(p__in: vec2f, rs: ptr<function, u32>) {
+  var p_: vec2f = p__in;
+  var r_: f32 = (jwx_glynnlissa_radius1_c * (jwx_glynnlissa_thickness_c + ((1.0 - jwx_glynnlissa_thickness_c) * rnd(rs))));
+  var Phi: f32 = ((2.0 * PI) * rnd(rs));
+  var sinPhi: f32 = sin(Phi);
+  var cosPhi: f32 = cos(Phi);
+  p_.x = ((r_ * cosPhi) + jwx_glynnlissa__x1);
+  p_.y = ((r_ * sinPhi) + jwx_glynnlissa__y1);
+}
+
+var<private> jwx_glynnlissa_radius1_c: f32 = 0.0;
+
+var<private> jwx_glynnlissa_thickness_c: f32 = 0.0;
+
+var<private> jwx_glynnlissa_inited_: f32 = 0.0;
+
+var<private> jwx_glynnlissa__x1: f32 = 0.0;
+
+var<private> jwx_glynnlissa__y1: f32 = 0.0;`,
+    code: (w, p) => `{
+jwx_glynnlissa_radius1_c = ${p[1]};
+jwx_glynnlissa_thickness_c = ${p[2]};
+var _absPow: f32 = 0;
+if ((jwx_glynnlissa_inited_ == 0.0)) {
+  jwx_glynnlissa_inited_ = 1.0;
+  jwx_glynnlissa__x1 = 0;
+  jwx_glynnlissa__y1 = 0;
+}
+{
+  var a: f32 = ((PI * ${p[3]}) / 180.0);
+  var sinPhi1: f32 = sin(a);
+  var cosPhi1: f32 = cos(a);
+  jwx_glynnlissa__x1 = (${p[0]} * cosPhi1);
+  jwx_glynnlissa__y1 = (${p[0]} * sinPhi1);
+  _absPow = abs(${p[9]});
+}
+var period: f32 = (PI * 2.0);
+var d: f32 = ${p[7]};
+var t_: f32 = (rnd(rs) * period);
+var p_: vec2f = glynnlissa_lissajous(t_, ${p[4]}, ${p[5]}, d);
+var r_: f32 = sqrt(((t.x * t.x) + (t.y * t.y)));
+var y: f32 = (rnd(rs) - 0.5);
+var xi: f32;
+var yi: f32;
+if ((r_ < abs(${p[0]}))) {
+  if ((${p[1]} >= 0)) {
+    p_ = glynnlissa_lissajous(t_, ${p[4]}, ${p[5]}, d);
+    v.x += (${w} * ((((p_.x * ${p[8]}) + (${p[6]} * y)) * ${p[1]}) + jwx_glynnlissa__x1));
+    v.y += (${w} * ((((p_.y * ${p[8]}) + (${p[6]} * y)) * ${p[1]}) + jwx_glynnlissa__y1));
+  } else {
+    glynnlissa_circle(p_, rs);
+    v.x += (${w} * p_.x);
+    v.y += (${w} * p_.y);
+  }
+} else {
+  var Alpha: f32 = (abs(${p[0]}) / r_);
+  if ((rnd(rs) > (min(max(${p[10]}, 0.0), 1.0) * powc(Alpha, _absPow)))) {
+    xi = t.x;
+    yi = t.y;
+  } else {
+    xi = ((Alpha * Alpha) * t.x);
+    yi = ((Alpha * Alpha) * t.y);
+  }
+  var Z: f32 = (sqr((xi - jwx_glynnlissa__x1)) + sqr((yi - jwx_glynnlissa__y1)));
+  if ((Z < (${p[1]} * ${p[1]}))) {
+    var p1: vec2f = glynnlissa_lissajous(t_, ${p[4]}, ${p[5]}, d);
+    v.x += (${w} * ((((p_.x * ${p[8]}) + (${p[6]} * y)) * ${p[1]}) + jwx_glynnlissa__x1));
+    v.y += (${w} * ((((p_.y * ${p[8]}) + (${p[6]} * y)) * ${p[1]}) + jwx_glynnlissa__y1));
+  } else {
+    v.x += (${w} * xi);
+    v.y += (${w} * yi);
+  }
+}
+if (false) {
+  pz_ += (${w} * z_);
+}
+}`,
+  },
+  "glynnspiro": {
+    params: [{ name: "radius", def: 1 }, { name: "radius1", def: 0.5 }, { name: "thickness", def: 1 }, { name: "phi1", def: 0 }, { name: "a", def: 1 }, { name: "b", def: -0.3 }, { name: "c", def: 0.4 }, { name: "time", def: 1000 }, { name: "mode", def: 0 }, { name: "width", def: 0 }, { name: "scale", def: 0.71 }, { name: "pow", def: 1.5 }, { name: "contrast", def: 0.5 }],
+    verified: true, priority: 0, flags: ["state","z"], types: ["2D"],
+    funcNames: ["jwx_glynnspiro_radius1_c","jwx_glynnspiro_thickness_c","jwx_glynnspiro_inited_","jwx_glynnspiro__x1","jwx_glynnspiro__y1","powc","sqr","atan2j","glynnspiro_spirograph3D","glynnspiro_circle"],
+    funcs: `fn powc(x: f32, y: f32) -> f32 {
+  if (x >= 0.0) { return pow(x, y); }
+  let yi = round(y);
+  if (abs(y - yi) > 1e-6) { return pow(x, y); }
+  let m = pow(-x, y);
+  return select(m, -m, (i32(yi) & 1) != 0);
+}
+
+fn sqr(x: f32) -> f32 { return x * x; }
+
+fn atan2j(y: f32, x: f32) -> f32 { if (x == 0.0 && y == 0.0) { return select(0.0, PI, (bitcast<u32>(x) >> 31u) == 1u) * select(1.0, -1.0, (bitcast<u32>(y) >> 31u) == 1u); } return atan2(y, x); }
+
+fn glynnspiro_spirograph3D(t_: f32, a: f32, b: f32, c: f32) -> vec3f {
+  var x1: f32 = (((a + b) * cos(t_)) - (c * cos((((a + b) / b) * t_))));
+  var y1: f32 = (((a + b) * sin(t_)) - (c * sin((((a + b) / b) * t_))));
+  var z1: f32 = (c * sin((((a + b) / b) * t_)));
+  return vec3f(x1, y1, z1);
+}
+
+fn glynnspiro_circle(p__in: vec3f, rs: ptr<function, u32>) {
+  var p_: vec3f = p__in;
+  var r_: f32 = (jwx_glynnspiro_radius1_c * (jwx_glynnspiro_thickness_c + ((1.0 - jwx_glynnspiro_thickness_c) * rnd(rs))));
+  var Phi: f32 = ((2.0 * PI) * rnd(rs));
+  var sinPhi: f32 = sin(Phi);
+  var cosPhi: f32 = cos(Phi);
+  p_.x = ((r_ * cosPhi) + jwx_glynnspiro__x1);
+  p_.y = ((r_ * sinPhi) + jwx_glynnspiro__y1);
+}
+
+var<private> jwx_glynnspiro_radius1_c: f32 = 0.0;
+
+var<private> jwx_glynnspiro_thickness_c: f32 = 0.0;
+
+var<private> jwx_glynnspiro_inited_: f32 = 0.0;
+
+var<private> jwx_glynnspiro__x1: f32 = 0.0;
+
+var<private> jwx_glynnspiro__y1: f32 = 0.0;`,
+    code: (w, p) => `{
+jwx_glynnspiro_radius1_c = ${p[1]};
+jwx_glynnspiro_thickness_c = ${p[2]};
+var _absPow: f32 = 0;
+if ((jwx_glynnspiro_inited_ == 0.0)) {
+  jwx_glynnspiro_inited_ = 1.0;
+  jwx_glynnspiro__x1 = 0;
+  jwx_glynnspiro__y1 = 0;
+}
+{
+  var a: f32 = ((PI * ${p[3]}) / 180.0);
+  var sinPhi1: f32 = sin(a);
+  var cosPhi1: f32 = cos(a);
+  jwx_glynnspiro__x1 = (${p[0]} * cosPhi1);
+  jwx_glynnspiro__y1 = (${p[0]} * sinPhi1);
+  _absPow = abs(${p[11]});
+}
+var w1: f32 = ((${p[9]} * rnd(rs)) - (${p[9]} / 2));
+var w2: f32 = ((${p[9]} * rnd(rs)) - (${p[9]} / 2));
+var w3: f32 = ((${p[9]} * rnd(rs)) - (${p[9]} / 2));
+var t_: f32 = (rnd(rs) * ${p[7]});
+var p_: vec3f = glynnspiro_spirograph3D(t_, ${p[4]}, ${p[5]}, ${p[6]});
+var r_: f32 = sqrt(((t.x * t.x) + (t.y * t.y)));
+switch i32(min(max(${p[8]}, 0.0), 4.0)) {
+  case 0: {
+    w3 = ((${p[9]} * rnd(rs)) - (${p[9]} / 2));
+    w2 = w3;
+    w1 = w2;
+  }
+  case 1: {
+    w1 = ((${p[9]} * rnd(rs)) - (${p[9]} / 2));
+    w2 = (w1 * sin(((36 * t_) + ((2.0 * PI) / 3))));
+    w3 = (w1 * sin(((36 * t_) + ((2 * (2.0 * PI)) / 3))));
+    w1 = (w1 * sin((36 * t_)));
+  }
+  case 2: {
+    w1 = ((${p[9]} * rnd(rs)) - (${p[9]} / 2));
+    w2 = ((${p[9]} * rnd(rs)) - (${p[9]} / 2));
+    w3 = ((${p[9]} * rnd(rs)) - (${p[9]} / 2));
+  }
+  case 3: {
+    w1 = ((${p[9]} * ((((rnd(rs) + rnd(rs)) + rnd(rs)) + rnd(rs)) - 2)) / 2);
+    w2 = ((${p[9]} * ((((rnd(rs) + rnd(rs)) + rnd(rs)) + rnd(rs)) - 2)) / 2);
+    w3 = ((${p[9]} * ((((rnd(rs) + rnd(rs)) + rnd(rs)) + rnd(rs)) - 2)) / 2);
+  }
+  case 4: {
+    w1 = select(-(${p[9]}), ${p[9]}, (rnd(rs) < 0.5));
+    w3 = 0;
+    w2 = w3;
+  }
+  case default: {
+    w3 = 0;
+    w2 = w3;
+    w1 = w2;
+  }
+}
+var y: f32 = (rnd(rs) - 0.5);
+var xi: f32;
+var yi: f32;
+if ((r_ < abs(${p[0]}))) {
+  if ((${p[1]} >= 0)) {
+    p_ = glynnspiro_spirograph3D(t_, ${p[4]}, ${p[5]}, ${p[6]});
+    v.x += (${w} * ((((p_.x * ${p[10]}) + (${p[9]} * y)) * ${p[1]}) + jwx_glynnspiro__x1));
+    v.y += (${w} * ((((p_.y * ${p[10]}) + (${p[9]} * y)) * ${p[1]}) + jwx_glynnspiro__y1));
+  } else {
+    glynnspiro_circle(p_, rs);
+    v.x += (${w} * p_.x);
+    v.y += (${w} * p_.y);
+  }
+} else {
+  var Alpha: f32 = (abs(${p[0]}) / r_);
+  if ((rnd(rs) > (min(max(${p[12]}, 0.0), 1.0) * powc(Alpha, _absPow)))) {
+    xi = t.x;
+    yi = t.y;
+  } else {
+    xi = ((Alpha * Alpha) * t.x);
+    yi = ((Alpha * Alpha) * t.y);
+  }
+  var Z: f32 = (sqr((xi - jwx_glynnspiro__x1)) + sqr((yi - jwx_glynnspiro__y1)));
+  if ((Z < (${p[1]} * ${p[1]}))) {
+    var p1: vec3f = glynnspiro_spirograph3D(t_, ${p[4]}, ${p[5]}, ${p[6]});
+    v.x += (${w} * ((((p_.x * ${p[10]}) + (${p[9]} * y)) * ${p[1]}) + jwx_glynnspiro__x1));
+    v.y += (${w} * ((((p_.y * ${p[10]}) + (${p[9]} * y)) * ${p[1]}) + jwx_glynnspiro__y1));
+  } else {
+    v.x += (${w} * xi);
+    v.y += (${w} * yi);
+  }
+}
+if (false) {
+  pz_ += (${w} * z_);
+}
+}`,
+  },
+  "glynnSShape": {
+    params: [{ name: "radius", def: 1 }, { name: "radius1", def: 0.5 }, { name: "thickness", def: 1 }, { name: "phi1", def: 0 }, { name: "m", def: 5 }, { name: "n1", def: 1.7 }, { name: "n2", def: 1.7 }, { name: "n3", def: 1.7 }, { name: "scale", def: 0.71 }, { name: "pow", def: 1.5 }, { name: "contrast", def: 0.5 }],
+    verified: true, priority: 0, flags: ["state","z"], types: ["2D"],
+    funcNames: ["jwx_glynnSShape_radius1_c","jwx_glynnSShape_thickness_c","jwx_glynnSShape_inited_","jwx_glynnSShape__x1","jwx_glynnSShape__y1","powc","sqr","atan2j","glynnSShape_supershape","glynnSShape_circle"],
+    funcs: `fn powc(x: f32, y: f32) -> f32 {
+  if (x >= 0.0) { return pow(x, y); }
+  let yi = round(y);
+  if (abs(y - yi) > 1e-6) { return pow(x, y); }
+  let m = pow(-x, y);
+  return select(m, -m, (i32(yi) & 1) != 0);
+}
+
+fn sqr(x: f32) -> f32 { return x * x; }
+
+fn atan2j(y: f32, x: f32) -> f32 { if (x == 0.0 && y == 0.0) { return select(0.0, PI, (bitcast<u32>(x) >> 31u) == 1u) * select(1.0, -1.0, (bitcast<u32>(y) >> 31u) == 1u); } return atan2(y, x); }
+
+fn glynnSShape_supershape(m: f32, n1: f32, n2: f32, n3: f32, phi: f32) -> vec2f {
+  var r_: f32;
+  var t1: f32;
+  var t2: f32;
+  var a: f32 = 1;
+  var b: f32 = 1;
+  var p_: vec2f = vec2f(0.0, 0.0);
+  t1 = (cos(((m * phi) / 4)) / a);
+  t1 = abs(t1);
+  t1 = powc(t1, n2);
+  t2 = (sin(((m * phi) / 4)) / b);
+  t2 = abs(t2);
+  t2 = powc(t2, n3);
+  r_ = powc((t1 + t2), (1 / n1));
+  if ((abs(r_) == 0)) {
+    p_.x = 0;
+    p_.y = 0;
+  } else {
+    r_ = (1 / r_);
+    p_.x = (r_ * cos(phi));
+    p_.y = (r_ * sin(phi));
+  }
+  return p_;
+}
+
+fn glynnSShape_circle(p__in: vec2f, rs: ptr<function, u32>) {
+  var p_: vec2f = p__in;
+  var r_: f32 = (jwx_glynnSShape_radius1_c * (jwx_glynnSShape_thickness_c + ((1.0 - jwx_glynnSShape_thickness_c) * rnd(rs))));
+  var Phi: f32 = ((2.0 * PI) * rnd(rs));
+  var sinPhi: f32 = sin(Phi);
+  var cosPhi: f32 = cos(Phi);
+  p_.x = ((r_ * cosPhi) + jwx_glynnSShape__x1);
+  p_.y = ((r_ * sinPhi) + jwx_glynnSShape__y1);
+}
+
+var<private> jwx_glynnSShape_radius1_c: f32 = 0.0;
+
+var<private> jwx_glynnSShape_thickness_c: f32 = 0.0;
+
+var<private> jwx_glynnSShape_inited_: f32 = 0.0;
+
+var<private> jwx_glynnSShape__x1: f32 = 0.0;
+
+var<private> jwx_glynnSShape__y1: f32 = 0.0;`,
+    code: (w, p) => `{
+jwx_glynnSShape_radius1_c = ${p[1]};
+jwx_glynnSShape_thickness_c = ${p[2]};
+var _absPow: f32 = 0;
+if ((jwx_glynnSShape_inited_ == 0.0)) {
+  jwx_glynnSShape_inited_ = 1.0;
+  jwx_glynnSShape__x1 = 0;
+  jwx_glynnSShape__y1 = 0;
+}
+{
+  var a: f32 = ((PI * ${p[3]}) / 180.0);
+  var sinPhi1: f32 = sin(a);
+  var cosPhi1: f32 = cos(a);
+  jwx_glynnSShape__x1 = (${p[0]} * cosPhi1);
+  jwx_glynnSShape__y1 = (${p[0]} * sinPhi1);
+  _absPow = abs(${p[9]});
+}
+var period: f32 = (PI * 2.0);
+var phi: f32 = (rnd(rs) * period);
+var p_: vec2f = glynnSShape_supershape(${p[4]}, ${p[5]}, ${p[6]}, ${p[7]}, phi);
+var r_: f32 = sqrt(((t.x * t.x) + (t.y * t.y)));
+var xi: f32;
+var yi: f32;
+if ((r_ < abs(${p[0]}))) {
+  if ((${p[1]} >= 0)) {
+    p_ = glynnSShape_supershape(${p[4]}, ${p[5]}, ${p[6]}, ${p[7]}, phi);
+    v.x += (${w} * (((p_.x * ${p[8]}) * ${p[1]}) + jwx_glynnSShape__x1));
+    v.y += (${w} * (((p_.y * ${p[8]}) * ${p[1]}) + jwx_glynnSShape__y1));
+  } else {
+    glynnSShape_circle(p_, rs);
+    v.x += (${w} * p_.x);
+    v.y += (${w} * p_.y);
+  }
+} else {
+  var Alpha: f32 = (abs(${p[0]}) / r_);
+  if ((rnd(rs) > (min(max(${p[10]}, 0.0), 1.0) * powc(Alpha, _absPow)))) {
+    xi = t.x;
+    yi = t.y;
+  } else {
+    xi = ((Alpha * Alpha) * t.x);
+    yi = ((Alpha * Alpha) * t.y);
+  }
+  var Z: f32 = (sqr((xi - jwx_glynnSShape__x1)) + sqr((yi - jwx_glynnSShape__y1)));
+  if ((Z < (${p[1]} * ${p[1]}))) {
+    var p1: vec2f = glynnSShape_supershape(${p[4]}, ${p[5]}, ${p[6]}, ${p[7]}, phi);
+    v.x += (${w} * (((p_.x * ${p[8]}) * ${p[1]}) + jwx_glynnSShape__x1));
+    v.y += (${w} * (((p_.y * ${p[8]}) * ${p[1]}) + jwx_glynnSShape__y1));
+  } else {
+    v.x += (${w} * xi);
+    v.y += (${w} * yi);
+  }
+}
+if (false) {
+  pz_ += (${w} * z_);
 }
 }`,
   },
@@ -28178,6 +33850,220 @@ v.x = (${w} * (x - px_center));
 v.y = (${w} * (y - py_center));
 }`,
   },
+  "cut_tstruchet": {
+    params: [{ name: "seed", def: 1000 }, { name: "mode", def: 1 }, { name: "shape", def: 0 }, { name: "levels", def: 0 }, { name: "arcs", def: 0 }, { name: "zoom", def: 5 }, { name: "invert", def: 0 }],
+    verified: true, priority: 0, flags: ["hide","state","z"], types: ["BASE_SHAPE","SIMULATION"],
+    funcNames: ["jwx_cut_tstruchet_shape_c","jrand_","smoothstepc","atan2j","rndi","jrand_make","jrand_next","jrand_nextDouble","cut_tstruchet_hash22","cut_tstruchet_r2","cut_tstruchet_dist","cut_tstruchet_n2D","cut_tstruchet_fbm"],
+    funcs: `struct jrand_ {
+  s0: i32,
+  s1: i32,
+  s2: i32,
+}
+
+fn smoothstepc(a: f32, b: f32, x: f32) -> f32 { if (a == b) { return step(a, x); } let t = clamp((x - a) / (b - a), 0.0, 1.0); return t * t * (3.0 - 2.0 * t); }
+
+fn atan2j(y: f32, x: f32) -> f32 { if (x == 0.0 && y == 0.0) { return select(0.0, PI, (bitcast<u32>(x) >> 31u) == 1u) * select(1.0, -1.0, (bitcast<u32>(y) >> 31u) == 1u); } return atan2(y, x); }
+
+fn rndi(state: ptr<function, u32>) -> u32 { var x = *state; x ^= x << 13u; x ^= x >> 17u; x ^= x << 5u; *state = x; return x; }
+
+fn jrand_make(seed: i32) -> jrand_ {
+  var r_: jrand_;
+  r_.s0 = ((seed & 65535) ^ 58989);
+  r_.s1 = (((seed >> 16) & 65535) ^ 57068);
+  r_.s2 = (select(0, 65535, (seed < 0)) ^ 5);
+  return r_;
+}
+
+fn jrand_next(r_: ptr<function, jrand_>, bits: i32) -> i32 {
+  var a0: u32 = u32((*r_).s0);
+  var a1: u32 = u32((*r_).s1);
+  var a2: u32 = u32((*r_).s2);
+  var t0: u32 = ((a0 * 58989) + 11);
+  var r0: u32 = (t0 & 65535);
+  var c0: u32 = (t0 >> 16);
+  var t1a: u32 = ((a0 * 57068) + c0);
+  var c1a: u32 = (t1a >> 16);
+  var t1b: u32 = ((a1 * 58989) + (t1a & 65535));
+  var r1: u32 = (t1b & 65535);
+  var c1: u32 = (c1a + (t1b >> 16));
+  var r2_: u32 = (((((a0 * 5) + (a1 * 57068)) + (a2 * 58989)) + c1) & 65535);
+  (*r_).s0 = i32(r0);
+  (*r_).s1 = i32(r1);
+  (*r_).s2 = i32(r2_);
+  var hi: u32 = ((r2_ << 16) | r1);
+  return i32((hi >> u32((32 - bits))));
+}
+
+fn jrand_nextDouble(r_: ptr<function, jrand_>) -> f32 {
+  return ((f32(jrand_next(r_, 26)) * (1.0 / 67108864.0)) + (f32(jrand_next(r_, 27)) * (1.0 / 9007199254740992.0)));
+}
+
+fn cut_tstruchet_hash22(p_: vec2f) -> vec2f {
+  var n: f32 = dot(p_, vec2f(57.0, 27.0));
+  return fract((vec2f(262144.0, 32768.0) * vec2f(sin(n))));
+}
+
+fn cut_tstruchet_r2(a: f32) -> vec4f {
+  var c: f32 = cos(a);
+  var s: f32 = sin(a);
+  return vec4f(c, -s, s, c);
+}
+
+fn cut_tstruchet_dist(p__in: vec2f) -> f32 {
+  var p_: vec2f = p__in;
+  if ((jwx_cut_tstruchet_shape_c == 0)) {
+    return length(p_);
+  } else {
+    p_ = abs(p_);
+  }
+  if ((jwx_cut_tstruchet_shape_c == 1)) {
+    return max(max(p_.x, p_.y), ((p_.x + p_.y) * 0.7071));
+  } else if ((jwx_cut_tstruchet_shape_c == 2)) {
+    var p2: vec2f = ((p_ * vec2f(0.8660254)) + (vec2f(p_.y, p_.x) * vec2f(0.5)));
+    return max(max(p2.x, p2.y), max(p_.x, p_.y));
+  } else {
+    var p2: vec2f = vec2f(((cut_tstruchet_r2((3.14159 / 8.0)).x * p_.x) + (cut_tstruchet_r2((3.14159 / 8.0)).y * p_.y)), ((cut_tstruchet_r2((3.14159 / 8.0)).z * p_.x) + (cut_tstruchet_r2((3.14159 / 8.0)).w * p_.y)));
+    var c: f32 = max(max(p2.x, p2.y), ((p2.x + p2.y) * 0.7071));
+    return max(c, max(max(p_.x, p_.y), ((p_.x + p_.y) * 0.7071)));
+  }
+}
+
+fn cut_tstruchet_n2D(p__in: vec2f) -> f32 {
+  var p_: vec2f = p__in;
+  var i: vec2f = floor(p_);
+  p_ = (p_ - i);
+  p_ = (((vec2f(3.0, 3.0) - (p_ * vec2f(2.0))) * p_) * p_);
+  return dot(vec2f(((vec4f(fract(sin(((vec4f(0, 1, 113, 114) + vec4f(dot(i, vec2f(1, 113)))) * vec4f(43758.5453)))).x, fract(sin(((vec4f(0, 1, 113, 114) + vec4f(dot(i, vec2f(1, 113)))) * vec4f(43758.5453)))).y, fract(sin(((vec4f(0, 1, 113, 114) + vec4f(dot(i, vec2f(1, 113)))) * vec4f(43758.5453)))).z, fract(sin(((vec4f(0, 1, 113, 114) + vec4f(dot(i, vec2f(1, 113)))) * vec4f(43758.5453)))).w).x * vec2f((1.0 - p_.y), p_.y).x) + (vec4f(fract(sin(((vec4f(0, 1, 113, 114) + vec4f(dot(i, vec2f(1, 113)))) * vec4f(43758.5453)))).x, fract(sin(((vec4f(0, 1, 113, 114) + vec4f(dot(i, vec2f(1, 113)))) * vec4f(43758.5453)))).y, fract(sin(((vec4f(0, 1, 113, 114) + vec4f(dot(i, vec2f(1, 113)))) * vec4f(43758.5453)))).z, fract(sin(((vec4f(0, 1, 113, 114) + vec4f(dot(i, vec2f(1, 113)))) * vec4f(43758.5453)))).w).y * vec2f((1.0 - p_.y), p_.y).y)), ((vec4f(fract(sin(((vec4f(0, 1, 113, 114) + vec4f(dot(i, vec2f(1, 113)))) * vec4f(43758.5453)))).x, fract(sin(((vec4f(0, 1, 113, 114) + vec4f(dot(i, vec2f(1, 113)))) * vec4f(43758.5453)))).y, fract(sin(((vec4f(0, 1, 113, 114) + vec4f(dot(i, vec2f(1, 113)))) * vec4f(43758.5453)))).z, fract(sin(((vec4f(0, 1, 113, 114) + vec4f(dot(i, vec2f(1, 113)))) * vec4f(43758.5453)))).w).z * vec2f((1.0 - p_.y), p_.y).x) + (vec4f(fract(sin(((vec4f(0, 1, 113, 114) + vec4f(dot(i, vec2f(1, 113)))) * vec4f(43758.5453)))).x, fract(sin(((vec4f(0, 1, 113, 114) + vec4f(dot(i, vec2f(1, 113)))) * vec4f(43758.5453)))).y, fract(sin(((vec4f(0, 1, 113, 114) + vec4f(dot(i, vec2f(1, 113)))) * vec4f(43758.5453)))).z, fract(sin(((vec4f(0, 1, 113, 114) + vec4f(dot(i, vec2f(1, 113)))) * vec4f(43758.5453)))).w).w * vec2f((1.0 - p_.y), p_.y).y))), vec2f((1.0 - p_.x), p_.x));
+}
+
+fn cut_tstruchet_fbm(p_: vec2f) -> f32 {
+  return ((((cut_tstruchet_n2D(p_) * 0.533) + (cut_tstruchet_n2D((p_ * vec2f(2.0))) * 0.267)) + (cut_tstruchet_n2D((p_ * vec2f(4.0))) * 0.133)) + (cut_tstruchet_n2D((p_ * vec2f(8.0))) * 0.067));
+}
+
+var<private> jwx_cut_tstruchet_shape_c: f32 = 0.0;`,
+    code: (w, p) => `{
+var p0_: f32 = ${p[0]};
+jwx_cut_tstruchet_shape_c = min(max(${p[2]}, 0.0), 3.0);
+var randomize: jrand_ = jrand_make(i32(p0_));
+var x0: f32 = 0.0;
+var y0: f32 = 0.0;
+{
+  p0_ = f32(i32(p0_));
+}
+{
+  randomize = jrand_make(i32(p0_));
+  x0 = (f32(i32(p0_)) * jrand_nextDouble(&(randomize)));
+  y0 = (f32(i32(p0_)) * jrand_nextDouble(&(randomize)));
+}
+var x: f32;
+var y: f32;
+var px_center: f32;
+var py_center: f32;
+if ((min(max(${p[1]}, 0.0), 1.0) == 0)) {
+  x = t.x;
+  y = t.y;
+  px_center = 0.0;
+  py_center = 0.0;
+} else {
+  x = rnd(rs);
+  y = rnd(rs);
+  px_center = 0.5;
+  py_center = 0.5;
+}
+var uv: vec2f = vec2f(x, y);
+var oP: vec2f = vec2f((x * ${p[5]}), (y * ${p[5]}));
+oP = (oP + vec2f(x0, y0));
+var d: vec4f = vec4f(100000.0, 100000.0, 100000.0, 100000.0);
+var dim: f32 = 2.0;
+var rndTh: array<vec2f, 3> = array<vec2f, 3>(vec2f(0.35, 0.5), vec2f(0.7, 0.5), vec2f(1, 0.5));
+if ((min(max(${p[3]}, 0.0), 1.0) == 1)) {
+  rndTh[0].x = 0.5;
+}
+rndTh[1].x = 1.0;
+var lwg: f32 = 0.015;
+var side: f32 = 100000.0;
+var rnd_: vec2f = vec2f(0, 0);
+for (var k: i32 = 0; (k < 3); k++) {
+  var ip: vec2f = floor((oP * vec2f(dim)));
+  rnd_ = cut_tstruchet_hash22(ip);
+  if ((rnd_.x < rndTh[k].x)) {
+    var p_: vec2f = (oP - ((ip + vec2f(0.5)) / vec2f(dim)));
+    rnd_ = fract(((rnd_ * vec2f(27.63)) + vec2f(f32(((k * 57) + 1)))));
+    d.y = (abs((max(abs(p_.x), abs(p_.y)) - (0.5 / dim))) - (lwg / 2.0));
+    p_.y *= select(-1.0, 1.0, (rnd_.y < 0.5));
+    var aw: f32 = ((0.5 / 3.0) / dim);
+    var c1: f32 = (abs((cut_tstruchet_dist((p_ - (vec2f(0.5, 0.5) / vec2f(dim)))) - (0.5 / dim))) - aw);
+    var c2: f32;
+    if ((min(max(${p[4]}, 0.0), 1.0) == 1)) {
+      c2 = (abs((cut_tstruchet_dist((p_ - (vec2f(-0.5, -0.5) / vec2f(dim)))) - (0.5 / dim))) - aw);
+    } else {
+      if ((fract(((rnd_.y * 57.53) + 0.47)) < 0.35)) {
+        c2 = (cut_tstruchet_dist((p_ - (vec2f(-0.5, 0) / vec2f(dim)))) - aw);
+        c2 = min(c2, (cut_tstruchet_dist((p_ - (vec2f(0, -0.5) / vec2f(dim)))) - aw));
+      } else {
+        c2 = (abs((cut_tstruchet_dist((p_ - (vec2f(-0.5, -0.5) / vec2f(dim)))) - (0.5 / dim))) - aw);
+      }
+    }
+    d.x = min(c1, c2);
+    side = select((1.57 * ((rnd_.y * 0.5) + 1.0)), 0.0, (c1 > c2));
+    d.x *= select(1.0, -1.0, (k == 1));
+    var p2: vec2f = (abs((vec2f((p_.y - p_.x), (p_.x + p_.y)) * vec2f(0.7071))) - vec2f(((0.5 * 0.7071) / dim)));
+    p2 = (vec2f((p2.y - p2.x), (p2.x + p2.y)) * vec2f(0.7071));
+    var c3: f32 = (cut_tstruchet_dist(p2) - (aw / 2.0));
+    p_ = (abs(p_) - vec2f((0.5 / dim)));
+    if (((k < 2) && (rndTh[0].x < 0.99))) {
+      d.x = min(d.x, (cut_tstruchet_dist(p_) - aw));
+    }
+    if ((rndTh[1].x < 0.99)) {
+      if ((k == 0)) {
+        d.x = max(d.x, -c3);
+      }
+      if ((k == 1)) {
+        d.x = max(d.x, -(cut_tstruchet_dist(p_) - aw));
+      } else {
+        d.x = max(d.x, -(cut_tstruchet_dist(p_) - (aw / 2.0)));
+      }
+    }
+    d.x -= 0.01;
+    break;
+  }
+  dim *= 2.0;
+}
+var bg: vec3f = vec3f(0.0, 0.0, 0.0);
+var ns: f32 = cut_tstruchet_fbm((oP * vec2f(32.0)));
+var col: vec3f = bg;
+var fo: f32;
+fo = (4.0 / 1000.0);
+fo = ((10.0 / 1000.0) / sqrt(dim));
+var pCol: vec3f = vec3f(1.0, 1.0, 1.0);
+var sh: f32 = max((0.75 - (d.x * 10.0)), 0.0);
+sh *= (clamp((-(sin(((d.x * 6.283) * 18.0))) + 0.75), -0.25, 1.0) + 0.25);
+col = mix(col, vec3f(0, 0, 0), ((1.0 - smoothstepc(0.0, (fo * 5.0), d.x)) * 0.75));
+col = mix(col, vec3f(0, 0, 0), (1.0 - smoothstepc(0.0, fo, d.x)));
+col = mix(col, (pCol * vec3f(sh)), (1.0 - smoothstepc(0.0, fo, (d.x + 0.015))));
+col = mix(col, (bg * vec3f(sh)), (1.0 - smoothstepc(0.0, fo, max((d.x + 0.1), -(d.x + 0.14)))));
+var color: f32 = col.x;
+(*hd) = false;
+if ((min(max(${p[6]}, 0.0), 1.0) == 0)) {
+  if ((color > 0.3)) {
+    x = 0;
+    y = 0;
+    (*hd) = true;
+  }
+} else {
+  if ((color <= 0.3)) {
+    x = 0;
+    y = 0;
+    (*hd) = true;
+  }
+}
+v.x = (${w} * (x - px_center));
+v.y = (${w} * (y - py_center));
+if (false) {
+  pz_ += (${w} * z_);
+}
+}`,
+  },
   "cut_alientext": {
     params: [{ name: "seed", def: 1000 }, { name: "mode", def: 1 }, { name: "subdivisions", def: 3 }, { name: "zoom", def: 1 }, { name: "invert", def: 0 }],
     verified: true, priority: 0, flags: ["hide"], types: ["2D","BASE_SHAPE","SIMULATION"],
@@ -28407,6 +34293,244 @@ if ((min(max(${p[10]}, 0.0), 1.0) == 0)) {
 }
 v.x = (${w} * x);
 v.y = (${w} * y);
+}`,
+  },
+  "cut_2ewangtile": {
+    params: [{ name: "seed", def: 1000 }, { name: "mode", def: 1 }, { name: "zoom", def: 25 }, { name: "invert", def: 0 }],
+    verified: true, priority: 0, flags: ["hide","state","z"], types: ["BASE_SHAPE","SIMULATION"],
+    funcNames: ["jwx_cut_2ewangtile_inited_","jwx_cut_2ewangtile_K2","jwx_cut_2ewangtile_K3","jwx_cut_2ewangtile_k","jwx_cut_2ewangtile_HASHSCALE1","jrand_","smoothstepc","atan2j","rndi","jrand_make","jrand_next","jrand_nextDouble","cut_2ewangtile_hash","cut_2ewangtile_tile0","cut_2ewangtile_tile1","cut_2ewangtile_tile2","cut_2ewangtile_tile3","cut_2ewangtile_tile4","cut_2ewangtile_tile","cut_2ewangtile_map","cut_2ewangtile_height"],
+    funcs: `struct jrand_ {
+  s0: i32,
+  s1: i32,
+  s2: i32,
+}
+
+fn smoothstepc(a: f32, b: f32, x: f32) -> f32 { if (a == b) { return step(a, x); } let t = clamp((x - a) / (b - a), 0.0, 1.0); return t * t * (3.0 - 2.0 * t); }
+
+fn atan2j(y: f32, x: f32) -> f32 { if (x == 0.0 && y == 0.0) { return select(0.0, PI, (bitcast<u32>(x) >> 31u) == 1u) * select(1.0, -1.0, (bitcast<u32>(y) >> 31u) == 1u); } return atan2(y, x); }
+
+fn rndi(state: ptr<function, u32>) -> u32 { var x = *state; x ^= x << 13u; x ^= x >> 17u; x ^= x << 5u; *state = x; return x; }
+
+fn jrand_make(seed: i32) -> jrand_ {
+  var r_: jrand_;
+  r_.s0 = ((seed & 65535) ^ 58989);
+  r_.s1 = (((seed >> 16) & 65535) ^ 57068);
+  r_.s2 = (select(0, 65535, (seed < 0)) ^ 5);
+  return r_;
+}
+
+fn jrand_next(r_: ptr<function, jrand_>, bits: i32) -> i32 {
+  var a0: u32 = u32((*r_).s0);
+  var a1: u32 = u32((*r_).s1);
+  var a2: u32 = u32((*r_).s2);
+  var t0: u32 = ((a0 * 58989) + 11);
+  var r0: u32 = (t0 & 65535);
+  var c0: u32 = (t0 >> 16);
+  var t1a: u32 = ((a0 * 57068) + c0);
+  var c1a: u32 = (t1a >> 16);
+  var t1b: u32 = ((a1 * 58989) + (t1a & 65535));
+  var r1: u32 = (t1b & 65535);
+  var c1: u32 = (c1a + (t1b >> 16));
+  var r2_: u32 = (((((a0 * 5) + (a1 * 57068)) + (a2 * 58989)) + c1) & 65535);
+  (*r_).s0 = i32(r0);
+  (*r_).s1 = i32(r1);
+  (*r_).s2 = i32(r2_);
+  var hi: u32 = ((r2_ << 16) | r1);
+  return i32((hi >> u32((32 - bits))));
+}
+
+fn jrand_nextDouble(r_: ptr<function, jrand_>) -> f32 {
+  return ((f32(jrand_next(r_, 26)) * (1.0 / 67108864.0)) + (f32(jrand_next(r_, 27)) * (1.0 / 9007199254740992.0)));
+}
+
+fn cut_2ewangtile_hash(p_: vec2f) -> f32 {
+  var p3: vec3f = fract((vec3f(p_.x, p_.y, p_.x) * vec3f(jwx_cut_2ewangtile_HASHSCALE1)));
+  p3 = (p3 + vec3f(dot(p3, (vec3f(p3.y, p3.z, p3.x) + vec3f(19.19)))));
+  return fract(((p3.x + p3.y) * p3.z));
+}
+
+fn cut_2ewangtile_tile0(uv: vec2f) -> f32 {
+  var v_: f32 = (length(uv) - jwx_cut_2ewangtile_K3);
+  var w_: f32 = (jwx_cut_2ewangtile_K2 - length(vec2f((abs(uv.x) - 0.5), (uv.y - 0.5))));
+  v_ = mix(v_, w_, step(abs(uv.x), uv.y));
+  return v_;
+}
+
+fn cut_2ewangtile_tile1(uv: vec2f) -> f32 {
+  return (abs((length((uv - vec2f(0.5))) - 0.5)) - (jwx_cut_2ewangtile_k * 0.5));
+}
+
+fn cut_2ewangtile_tile2(uv: vec2f) -> f32 {
+  return (abs(uv.x) - (jwx_cut_2ewangtile_k * 0.5));
+}
+
+fn cut_2ewangtile_tile3(uv: vec2f) -> f32 {
+  return max((-uv.x - (jwx_cut_2ewangtile_k * 0.5)), (jwx_cut_2ewangtile_K2 - length(vec2f((uv.x - 0.5), (abs(uv.y) - 0.5)))));
+}
+
+fn cut_2ewangtile_tile4(uv: vec2f) -> f32 {
+  return (jwx_cut_2ewangtile_K2 - length(vec2f((abs(uv.x) - 0.5), (abs(uv.y) - 0.5))));
+}
+
+fn cut_2ewangtile_tile(uv: vec2f, tile: i32) -> f32 {
+  switch tile {
+    case 0: {
+      return 1.414;
+    }
+    case 1: {
+      return max(cut_2ewangtile_tile0(uv), (0.15 - length(uv)));
+    }
+    case 2: {
+      return cut_2ewangtile_tile0(vec2f(uv.y, uv.x));
+    }
+    case 3: {
+      return cut_2ewangtile_tile1(uv);
+    }
+    case 4: {
+      return cut_2ewangtile_tile0(vec2f(uv.x, -uv.y));
+    }
+    case 5: {
+      return cut_2ewangtile_tile2(uv);
+    }
+    case 6: {
+      return cut_2ewangtile_tile1(vec2f(uv.x, -uv.y));
+    }
+    case 7: {
+      return cut_2ewangtile_tile3(uv);
+    }
+    case 8: {
+      return cut_2ewangtile_tile0(vec2f(uv.y, -uv.x));
+    }
+    case 9: {
+      return cut_2ewangtile_tile1(vec2f(-uv.x, uv.y));
+    }
+    case 10: {
+      return cut_2ewangtile_tile2(vec2f(uv.y, uv.x));
+    }
+    case 11: {
+      return cut_2ewangtile_tile3(vec2f(uv.y, uv.x));
+    }
+    case 12: {
+      return cut_2ewangtile_tile1(vec2f(-uv.x, -uv.y));
+    }
+    case 13: {
+      return cut_2ewangtile_tile3(vec2f(-uv.x, uv.y));
+    }
+    case 14: {
+      return cut_2ewangtile_tile3(vec2f(-uv.y, uv.x));
+    }
+    case 15: {
+      return cut_2ewangtile_tile4(uv);
+    }
+    default: {}
+  }
+  return 1.414;
+}
+
+fn cut_2ewangtile_map(uv_in: vec2f) -> f32 {
+  var uv: vec2f = uv_in;
+  var b: i32 = 0;
+  uv = (uv + vec2f(0.5));
+  var id: vec2f = floor(uv);
+  if ((cut_2ewangtile_hash(id) >= 0.5)) {
+    b += 1;
+  }
+  if ((cut_2ewangtile_hash((id * vec2f(-1.0))) >= 0.5)) {
+    b += 8;
+  }
+  if ((cut_2ewangtile_hash((id - vec2f(0.0, 1.0))) >= 0.5)) {
+    b += 4;
+  }
+  if ((cut_2ewangtile_hash(((id + vec2f(1.0, 0.0)) * vec2f(-1.0))) >= 0.5)) {
+    b += 2;
+  }
+  return cut_2ewangtile_tile((fract(uv) - vec2f(0.5)), b);
+}
+
+fn cut_2ewangtile_height(uv: vec2f) -> f32 {
+  var r_: f32 = (cut_2ewangtile_map(uv) - 0.1);
+  return sqrt((0.01 - min((r_ * r_), 0.01)));
+}
+
+var<private> jwx_cut_2ewangtile_inited_: f32 = 0.0;
+
+var<private> jwx_cut_2ewangtile_K2: f32 = 0.0;
+
+var<private> jwx_cut_2ewangtile_K3: f32 = 0.0;
+
+var<private> jwx_cut_2ewangtile_k: f32 = 0.0;
+
+var<private> jwx_cut_2ewangtile_HASHSCALE1: f32 = 0.0;`,
+    code: (w, p) => `{
+var p0_: f32 = ${p[0]};
+var randomize: jrand_ = jrand_make(i32(p0_));
+var x0: f32 = 0.0;
+var y0: f32 = 0.0;
+if ((jwx_cut_2ewangtile_inited_ == 0.0)) {
+  jwx_cut_2ewangtile_inited_ = 1.0;
+  jwx_cut_2ewangtile_k = 0.1;
+  jwx_cut_2ewangtile_K2 = ((1.0 - jwx_cut_2ewangtile_k) / 2.0);
+  jwx_cut_2ewangtile_K3 = ((sqrt(2.0) * 0.5) - jwx_cut_2ewangtile_K2);
+  jwx_cut_2ewangtile_HASHSCALE1 = 0.1031;
+}
+jwx_cut_2ewangtile_k = 0.1;
+jwx_cut_2ewangtile_K2 = ((1.0 - jwx_cut_2ewangtile_k) / 2.0);
+jwx_cut_2ewangtile_K3 = ((sqrt(2.0) * 0.5) - jwx_cut_2ewangtile_K2);
+jwx_cut_2ewangtile_HASHSCALE1 = 0.1031;
+{
+  p0_ = f32(i32(p0_));
+}
+{
+  randomize = jrand_make(i32(p0_));
+  x0 = (f32(i32(p0_)) * jrand_nextDouble(&(randomize)));
+  y0 = (f32(i32(p0_)) * jrand_nextDouble(&(randomize)));
+}
+var x: f32;
+var y: f32;
+var px_center: f32;
+var py_center: f32;
+if ((min(max(${p[1]}, 0.0), 1.0) == 0)) {
+  x = t.x;
+  y = t.y;
+  px_center = 0.0;
+  py_center = 0.0;
+} else {
+  x = rnd(rs);
+  y = rnd(rs);
+  px_center = 0.5;
+  py_center = 0.5;
+}
+var uv: vec2f = vec2f((x * ${p[2]}), (y * ${p[2]}));
+uv = (uv + vec2f(x0, y0));
+var rd: vec3f = normalize(vec3f(uv.x, uv.y, 1.66));
+var h: vec2f = vec2f(0.01, 0.0);
+var v_: f32 = cut_2ewangtile_map(uv);
+var c0: f32 = cut_2ewangtile_height(uv);
+var c1: f32 = cut_2ewangtile_height((uv + vec2f(h.x, h.y)));
+var c2: f32 = cut_2ewangtile_height((uv + vec2f(h.y, h.x)));
+var color: f32;
+color = 1.0;
+color = mix(1.0, 0.0, smoothstepc(0.0, (2.0 / 2000.0), (min(v_, (abs((v_ - 0.1)) - 0.1)) / ${p[2]})));
+color = sqrt(color);
+(*hd) = false;
+if ((min(max(${p[3]}, 0.0), 1.0) == 0)) {
+  if ((color > 0.3)) {
+    x = 0;
+    y = 0;
+    (*hd) = true;
+  }
+} else {
+  if ((color <= 0.3)) {
+    x = 0;
+    y = 0;
+    (*hd) = true;
+  }
+}
+v.x = (${w} * (x - px_center));
+v.y = (${w} * (y - py_center));
+if (false) {
+  pz_ += (${w} * z_);
+}
 }`,
   },
   "cut_booleans": {
@@ -30336,6 +36460,59 @@ v.x = (${w} * (x - px_center));
 v.y = (${w} * (y - py_center));
 }`,
   },
+  "cut_triskel": {
+    params: [{ name: "mode", def: 1 }, { name: "zoom", def: 1 }, { name: "invert", def: 0 }],
+    verified: true, priority: 0, flags: ["hide","z"], types: ["BASE_SHAPE","SIMULATION"],
+    funcNames: ["atan2j","smoothstepc"],
+    funcs: `fn atan2j(y: f32, x: f32) -> f32 { if (x == 0.0 && y == 0.0) { return select(0.0, PI, (bitcast<u32>(x) >> 31u) == 1u) * select(1.0, -1.0, (bitcast<u32>(y) >> 31u) == 1u); } return atan2(y, x); }
+
+fn smoothstepc(a: f32, b: f32, x: f32) -> f32 { if (a == b) { return step(a, x); } let t = clamp((x - a) / (b - a), 0.0, 1.0); return t * t * (3.0 - 2.0 * t); }`,
+    code: (w, p) => `{
+var x: f32;
+var y: f32;
+var l: f32;
+var b: f32;
+var A_: vec2f;
+var color: f32 = 0.0;
+if ((min(max(${p[0]}, 0.0), 1.0) == 0)) {
+  x = t.x;
+  y = t.y;
+} else {
+  x = ((2.0 * rnd(rs)) - 1.0);
+  y = ((2.0 * rnd(rs)) - 1.0);
+}
+var U: vec2f = vec2f((x * ${p[1]}), (y * ${p[1]}));
+U.y += 0.1;
+color -= color;
+for (var i: i32 = 0; (i < 3); i++) {
+  U = vec2f(((vec4f(-0.5, 0.866, -0.866, -0.5).x * U.x) + (vec4f(-0.5, 0.866, -0.866, -0.5).z * U.y)), ((vec4f(-0.5, 0.866, -0.866, -0.5).y * U.x) + (vec4f(-0.5, 0.866, -0.866, -0.5).w * U.y)));
+  A_ = (U + vec2f(0.03, -0.577));
+  l = (3.0 * length(A_));
+  b = atan2j(A_.y, A_.x);
+  color = max(color, select(0.0, (0.5 + (0.5 * sin((b + (6.24 * l))))), ((l + fract(((b / 7.0) + 0.3))) < 2.0)));
+}
+color = (smoothstepc(0.0, 0.1, abs((color - 0.5))) - smoothstepc(0.8, 0.9, color));
+(*hd) = false;
+if ((min(max(${p[2]}, 0.0), 1.0) == 0)) {
+  if ((color > 0.5)) {
+    x = 0;
+    y = 0;
+    (*hd) = true;
+  }
+} else {
+  if ((color <= 0.5)) {
+    x = 0;
+    y = 0;
+    (*hd) = true;
+  }
+}
+v.x = (${w} * x);
+v.y = (${w} * y);
+if (false) {
+  pz_ += (${w} * z_);
+}
+}`,
+  },
   "cut_vasarely": {
     params: [{ name: "mode", def: 1 }, { name: "zoom", def: 1 }, { name: "invert", def: 0 }, { name: "size", def: 0.5 }],
     verified: true, priority: 0, flags: ["hide"], types: ["2D","BASE_SHAPE","SIMULATION"],
@@ -30509,6 +36686,140 @@ v.x = (${w} * x);
 v.y = (${w} * y);
 }`,
   },
+  "cut_btruchet": {
+    params: [{ name: "mode", def: 1 }, { name: "width", def: 2 }, { name: "seed", def: 1000 }, { name: "zoom", def: 10 }, { name: "invert", def: 0 }],
+    verified: true, priority: 0, flags: ["hide","z"], types: ["BASE_SHAPE","SIMULATION"],
+    funcNames: ["jrand_","smoothstepc","atan2j","rndi","jrand_make","jrand_next","jrand_nextDouble","cut_btruchet_hash1","cut_btruchet_tile1","cut_btruchet_tile2","cut_btruchet_tile3"],
+    funcs: `struct jrand_ {
+  s0: i32,
+  s1: i32,
+  s2: i32,
+}
+
+fn smoothstepc(a: f32, b: f32, x: f32) -> f32 { if (a == b) { return step(a, x); } let t = clamp((x - a) / (b - a), 0.0, 1.0); return t * t * (3.0 - 2.0 * t); }
+
+fn atan2j(y: f32, x: f32) -> f32 { if (x == 0.0 && y == 0.0) { return select(0.0, PI, (bitcast<u32>(x) >> 31u) == 1u) * select(1.0, -1.0, (bitcast<u32>(y) >> 31u) == 1u); } return atan2(y, x); }
+
+fn rndi(state: ptr<function, u32>) -> u32 { var x = *state; x ^= x << 13u; x ^= x >> 17u; x ^= x << 5u; *state = x; return x; }
+
+fn jrand_make(seed: i32) -> jrand_ {
+  var r_: jrand_;
+  r_.s0 = ((seed & 65535) ^ 58989);
+  r_.s1 = (((seed >> 16) & 65535) ^ 57068);
+  r_.s2 = (select(0, 65535, (seed < 0)) ^ 5);
+  return r_;
+}
+
+fn jrand_next(r_: ptr<function, jrand_>, bits: i32) -> i32 {
+  var a0: u32 = u32((*r_).s0);
+  var a1: u32 = u32((*r_).s1);
+  var a2: u32 = u32((*r_).s2);
+  var t0: u32 = ((a0 * 58989) + 11);
+  var r0: u32 = (t0 & 65535);
+  var c0: u32 = (t0 >> 16);
+  var t1a: u32 = ((a0 * 57068) + c0);
+  var c1a: u32 = (t1a >> 16);
+  var t1b: u32 = ((a1 * 58989) + (t1a & 65535));
+  var r1: u32 = (t1b & 65535);
+  var c1: u32 = (c1a + (t1b >> 16));
+  var r2_: u32 = (((((a0 * 5) + (a1 * 57068)) + (a2 * 58989)) + c1) & 65535);
+  (*r_).s0 = i32(r0);
+  (*r_).s1 = i32(r1);
+  (*r_).s2 = i32(r2_);
+  var hi: u32 = ((r2_ << 16) | r1);
+  return i32((hi >> u32((32 - bits))));
+}
+
+fn jrand_nextDouble(r_: ptr<function, jrand_>) -> f32 {
+  return ((f32(jrand_next(r_, 26)) * (1.0 / 67108864.0)) + (f32(jrand_next(r_, 27)) * (1.0 / 9007199254740992.0)));
+}
+
+fn cut_btruchet_hash1(n_in: i32) -> f32 {
+  var n: i32 = n_in;
+  n = ((n << 13) ^ n);
+  n = ((n * (((n * n) * 15731) + 789221)) + 1376312589);
+  return ((f32(n) * 1.0) / 2147483647);
+}
+
+fn cut_btruchet_tile1(uv: vec2f) -> f32 {
+  var d: f32 = min(abs(uv.x), abs(uv.y));
+  return d;
+}
+
+fn cut_btruchet_tile2(uv_in: vec2f) -> f32 {
+  var uv: vec2f = uv_in;
+  if ((uv.y < -uv.x)) {
+    uv.x = -uv.x;
+    uv.y = -uv.y;
+  }
+  var d: f32 = abs((distance(uv, vec2f(1, 1)) - 1.0));
+  return d;
+}
+
+fn cut_btruchet_tile3(uv: vec2f) -> f32 {
+  return cut_btruchet_tile2(vec2f(-uv.x, uv.y));
+}`,
+    code: (w, p) => `{
+var p2_: f32 = ${p[2]};
+var time: f32 = 0;
+var randomize: jrand_ = jrand_make(i32(p2_));
+var x0: f32 = 0.0;
+var y0: f32 = 0.0;
+{
+  p2_ = f32(i32(p2_));
+}
+{
+  randomize = jrand_make(i32(p2_));
+  x0 = (f32(i32(p2_)) * jrand_nextDouble(&(randomize)));
+  y0 = (f32(i32(p2_)) * jrand_nextDouble(&(randomize)));
+}
+var x: f32;
+var y: f32;
+if ((min(max(${p[0]}, 0.0), 1.0) == 0)) {
+  x = t.x;
+  y = t.y;
+} else {
+  x = (rnd(rs) - 0.5);
+  y = (rnd(rs) - 0.5);
+}
+var uv: vec2f = vec2f((x * ${p[3]}), (y * ${p[3]}));
+uv = (uv + vec2f(x0, y0));
+var e: f32 = ((${p[3]} * min(max(${p[1]}, 0.5), 5.0)) / 1000.0);
+var tile: vec2f = floor(uv);
+var id: f32 = ((tile.x * 10000.0) + tile.y);
+uv = (((uv - floor(uv)) - vec2f(0.5, 0.5)) * vec2f(2.0));
+var color: f32 = 0.0;
+var t_: f32 = cut_btruchet_hash1(i32(id));
+var d: f32 = 100000000000000000000.0;
+if ((t_ < 0.33)) {
+  d = cut_btruchet_tile1(uv);
+} else if ((t_ < 0.67)) {
+  d = cut_btruchet_tile2(uv);
+} else {
+  d = cut_btruchet_tile3(uv);
+}
+color = smoothstepc((e * 5.0), e, d);
+(*hd) = false;
+if ((min(max(${p[4]}, 0.0), 1.0) == 0)) {
+  if ((color == 0.0)) {
+    x = 0;
+    y = 0;
+    (*hd) = true;
+  }
+} else {
+  if ((color > 0.0)) {
+    x = 0;
+    y = 0;
+    (*hd) = true;
+  }
+}
+v.x = (${w} * x);
+v.y = (${w} * y);
+if (false) {
+  pz_ += (${w} * z_);
+}
+}`,
+  },
   "cut_magfield": {
     params: [{ name: "randomize", def: 0 }, { name: "time", def: 0 }, { name: "density", def: 3 }, { name: "zoom", def: 3 }, { name: "mode", def: 1 }, { name: "invert", def: 0 }],
     verified: true, priority: 0, flags: ["hide"], types: ["2D","BASE_SHAPE","SIMULATION"],
@@ -30647,6 +36958,189 @@ if ((min(max(${p[5]}, 0.0), 1.0) == 0)) {
 }
 v.x = (${w} * x);
 v.y = (${w} * y);
+}`,
+  },
+  "octapol": {
+    params: [{ name: "polarweight", def: 0 }, { name: "radius", def: 1 }, { name: "s", def: 0.5 }, { name: "t", def: 0.5 }],
+    verified: true, priority: 0, flags: ["3d","z"], types: ["3D"],
+    funcNames: ["octapol_Double2","octapol_MutableDouble","sqr","atan2j","octapol_Double2_setXy","octapol_hits_circle_around_origin","octapol_lerp","octapol_hits_square_around_origin","octapol_hits_rect","octapol_dot","octapol_hits_triangle"],
+    funcs: `struct octapol_Double2 {
+  x: f32,
+  y: f32,
+}
+
+struct octapol_MutableDouble {
+  value: f32,
+}
+
+fn sqr(x: f32) -> f32 { return x * x; }
+
+fn atan2j(y: f32, x: f32) -> f32 { if (x == 0.0 && y == 0.0) { return select(0.0, PI, (bitcast<u32>(x) >> 31u) == 1u) * select(1.0, -1.0, (bitcast<u32>(y) >> 31u) == 1u); } return atan2(y, x); }
+
+fn octapol_Double2_setXy(self_: ptr<function, octapol_Double2>, x: f32, y: f32) {
+  (*self_).x = x;
+  (*self_).y = y;
+}
+
+fn octapol_hits_circle_around_origin(radius: f32, p_: octapol_Double2, r_: ptr<function, octapol_MutableDouble>) -> bool {
+  if ((radius == 0.0)) {
+    return true;
+  }
+  (*r_).value = sqrt((sqr(p_.x) + sqr(p_.y)));
+  return ((*r_).value <= radius);
+}
+
+fn octapol_lerp(a: f32, b: f32, p_: f32) -> f32 {
+  return (a + (p_ * (b - a)));
+}
+
+fn octapol_hits_square_around_origin(a: f32, p_: octapol_Double2) -> bool {
+  return ((abs(p_.x) <= a) && (abs(p_.y) <= a));
+}
+
+fn octapol_hits_rect(tl: octapol_Double2, br: octapol_Double2, p_: octapol_Double2) -> bool {
+  return ((((p_.x >= tl.x) && (p_.y >= tl.y)) && (p_.x <= br.x)) && (p_.y <= br.y));
+}
+
+fn octapol_dot(a: octapol_Double2, b: octapol_Double2) -> f32 {
+  return ((a.x * b.x) + (a.y * b.y));
+}
+
+fn octapol_hits_triangle(a: octapol_Double2, b: octapol_Double2, c: octapol_Double2, p_: octapol_Double2, u: ptr<function, octapol_MutableDouble>, v_: ptr<function, octapol_MutableDouble>) -> bool {
+  var _v2: octapol_Double2;
+  var _v1: octapol_Double2;
+  var _v0: octapol_Double2;
+  octapol_Double2_setXy(&(_v0), (c.x - a.x), (c.y - a.y));
+  octapol_Double2_setXy(&(_v1), (b.x - a.x), (b.y - a.y));
+  octapol_Double2_setXy(&(_v2), (p_.x - a.x), (p_.y - a.y));
+  var d00: f32 = octapol_dot(_v0, _v0);
+  var d01: f32 = octapol_dot(_v0, _v1);
+  var d02: f32 = octapol_dot(_v0, _v2);
+  var d11: f32 = octapol_dot(_v1, _v1);
+  var d12: f32 = octapol_dot(_v1, _v2);
+  var denom: f32 = ((d00 * d11) - (d01 * d01));
+  if ((denom != 0)) {
+    (*u).value = (((d11 * d02) - (d01 * d12)) / denom);
+    (*v_).value = (((d00 * d12) - (d01 * d02)) / denom);
+  } else {
+    (*v_).value = 0;
+    (*u).value = (*v_).value;
+  }
+  return (((((*u).value + (*v_).value) < 1.0) && ((*u).value > 0)) && ((*v_).value > 0));
+}`,
+    code: (w, p) => `{
+var _XY: octapol_Double2;
+var _r: octapol_MutableDouble;
+var _u: octapol_MutableDouble;
+var _v: octapol_MutableDouble;
+var _a: f32 = 0;
+var _rad: f32 = 0;
+var _ax: f32 = 0;
+var _bx: f32 = 0;
+var _cx: f32 = 0;
+var _dx: f32 = 0;
+var _ex: f32 = 0;
+var _fx: f32 = 0;
+var _gx: f32 = 0;
+var _hx: f32 = 0;
+var _ix: f32 = 0;
+var _jx: f32 = 0;
+var _kx: f32 = 0;
+var _lx: f32 = 0;
+var _ay: f32 = 0;
+var _by: f32 = 0;
+var _cy: f32 = 0;
+var _dy: f32 = 0;
+var _ey: f32 = 0;
+var _fy: f32 = 0;
+var _gy: f32 = 0;
+var _hy: f32 = 0;
+var _iy: f32 = 0;
+var _jy: f32 = 0;
+var _ky: f32 = 0;
+var _ly: f32 = 0;
+var _A: octapol_Double2;
+var _B: octapol_Double2;
+var _C: octapol_Double2;
+var _D: octapol_Double2;
+var _E: octapol_Double2;
+var _F: octapol_Double2;
+var _G: octapol_Double2;
+var _H: octapol_Double2;
+var _I: octapol_Double2;
+var _J: octapol_Double2;
+var _K: octapol_Double2;
+var _L: octapol_Double2;
+var DENOM_SQRT2: f32 = 0.707106781;
+{
+  _a = ((${p[2]} * 0.5) + ${p[3]});
+  _rad = ((DENOM_SQRT2 * ${p[2]}) * abs(${p[1]}));
+  _ax = (-0.5 * ${p[2]});
+  _ay = ((0.5 * ${p[2]}) + ${p[3]});
+  _bx = (0.5 * ${p[2]});
+  _by = ((0.5 * ${p[2]}) + ${p[3]});
+  _cx = ${p[3]};
+  _cy = (0.5 * ${p[2]});
+  _dx = ${p[3]};
+  _dy = (-0.5 * ${p[2]});
+  _ex = (0.5 * ${p[2]});
+  _ey = ((-0.5 * ${p[2]}) - ${p[3]});
+  _fx = (-0.5 * ${p[2]});
+  _fy = ((-0.5 * ${p[2]}) - ${p[3]});
+  _gx = -(${p[3]});
+  _gy = (-0.5 * ${p[2]});
+  _hx = -(${p[3]});
+  _hy = (0.5 * ${p[2]});
+  _ix = (-0.5 * ${p[2]});
+  _iy = (0.5 * ${p[2]});
+  _jx = (0.5 * ${p[2]});
+  _jy = (0.5 * ${p[2]});
+  _kx = (-0.5 * ${p[2]});
+  _ky = (-0.5 * ${p[2]});
+  _lx = (0.5 * ${p[2]});
+  _ly = (-0.5 * ${p[2]});
+  octapol_Double2_setXy(&(_A), _ax, _ay);
+  octapol_Double2_setXy(&(_B), _bx, _by);
+  octapol_Double2_setXy(&(_C), _cx, _cy);
+  octapol_Double2_setXy(&(_D), _dx, _dy);
+  octapol_Double2_setXy(&(_E), _ex, _ey);
+  octapol_Double2_setXy(&(_F), _fx, _fy);
+  octapol_Double2_setXy(&(_G), _gx, _gy);
+  octapol_Double2_setXy(&(_H), _hx, _hy);
+  octapol_Double2_setXy(&(_I), _ix, _iy);
+  octapol_Double2_setXy(&(_J), _jx, _jy);
+  octapol_Double2_setXy(&(_K), _kx, _ky);
+  octapol_Double2_setXy(&(_L), _lx, _ly);
+}
+var x: f32 = (t.x * 0.15);
+var y: f32 = (t.y * 0.15);
+var z: f32 = z_;
+var x2: f32 = 0;
+var y2: f32 = 0;
+_v.value = 0;
+_r.value = _v.value;
+_u.value = _v.value;
+octapol_Double2_setXy(&(_XY), x, y);
+if (((_rad > 0) && octapol_hits_circle_around_origin(_rad, _XY, &(_r)))) {
+  var rd: f32 = log(sqr((_r.value / _rad)));
+  var phi: f32 = atan2j(y, x);
+  v.x += (${w} * octapol_lerp(x, phi, (rd * ${p[0]})));
+  v.y += (${w} * octapol_lerp(y, _r.value, (rd * ${p[0]})));
+} else if (octapol_hits_square_around_origin(_a, _XY)) {
+  if ((((((((octapol_hits_rect(_H, _K, _XY) || octapol_hits_rect(_J, _D, _XY)) || octapol_hits_rect(_A, _J, _XY)) || octapol_hits_rect(_K, _E, _XY)) || octapol_hits_triangle(_I, _A, _H, _XY, &(_u), &(_v))) || octapol_hits_triangle(_J, _B, _C, _XY, &(_u), &(_v))) || octapol_hits_triangle(_L, _D, _E, _XY, &(_u), &(_v))) || octapol_hits_triangle(_K, _F, _G, _XY, &(_u), &(_v)))) {
+    v.x += (${w} * x);
+    v.y += (${w} * y);
+  } else {
+    v.y = 0;
+    v.x = v.y;
+  }
+} else {
+  v.y = 0;
+  v.x = v.y;
+}
+v.x += (${w} * x);
+v.y += (${w} * y);
+pz_ += (${w} * z);
 }`,
   },
   "post_crosscrop": {
@@ -30826,8 +37320,10 @@ if ((rnd(rs) < (${p[4]} / 2))) {
   "gumowski_mira": {
     params: [{ name: "random", def: 1 }, { name: "step", def: 0.001 }, { name: "a", def: 0.000001 }, { name: "b", def: 0.05 }],
     verified: true, priority: 0, flags: ["state","z"], types: ["2D"],
-    funcNames: ["jwx_gumowski_mira_inited_","jwx_gumowski_mira_x0","jwx_gumowski_mira_y0","jwx_gumowski_mira_m","atan2j","gumowski_mira_mira"],
+    funcNames: ["jwx_gumowski_mira_inited_","jwx_gumowski_mira_x0","jwx_gumowski_mira_y0","jwx_gumowski_mira_m","atan2j","rndi","gumowski_mira_mira"],
     funcs: `fn atan2j(y: f32, x: f32) -> f32 { if (x == 0.0 && y == 0.0) { return select(0.0, PI, (bitcast<u32>(x) >> 31u) == 1u) * select(1.0, -1.0, (bitcast<u32>(y) >> 31u) == 1u); } return atan2(y, x); }
+
+fn rndi(state: ptr<function, u32>) -> u32 { var x = *state; x ^= x << 13u; x ^= x >> 17u; x ^= x << 5u; *state = x; return x; }
 
 fn gumowski_mira_mira(x: f32) -> f32 {
   var xx: f32 = (x * x);
@@ -30884,8 +37380,24 @@ jwx_gumowski_mira_y0 = yn;
   "hopalong": {
     params: [{ name: "random", def: 1 }, { name: "a", def: 0.75 }, { name: "b", def: 0.5 }, { name: "c", def: 0.25 }, { name: "startx", def: 0 }, { name: "starty", def: 0 }],
     verified: true, priority: 0, flags: ["state"], types: ["2D","SIMULATION","BASE_SHAPE"],
-    funcNames: ["jwx_hopalong_inited_","jwx_hopalong_x0","jwx_hopalong_y0","atan2j"],
-    funcs: `fn atan2j(y: f32, x: f32) -> f32 { if (x == 0.0 && y == 0.0) { return select(0.0, PI, (bitcast<u32>(x) >> 31u) == 1u) * select(1.0, -1.0, (bitcast<u32>(y) >> 31u) == 1u); } return atan2(y, x); }
+    funcNames: ["jwx_hopalong_inited_","jwx_hopalong_x0","jwx_hopalong_y0","jrand_","atan2j","rndi","jrand_make"],
+    funcs: `struct jrand_ {
+  s0: i32,
+  s1: i32,
+  s2: i32,
+}
+
+fn atan2j(y: f32, x: f32) -> f32 { if (x == 0.0 && y == 0.0) { return select(0.0, PI, (bitcast<u32>(x) >> 31u) == 1u) * select(1.0, -1.0, (bitcast<u32>(y) >> 31u) == 1u); } return atan2(y, x); }
+
+fn rndi(state: ptr<function, u32>) -> u32 { var x = *state; x ^= x << 13u; x ^= x >> 17u; x ^= x << 5u; *state = x; return x; }
+
+fn jrand_make(seed: i32) -> jrand_ {
+  var r_: jrand_;
+  r_.s0 = ((seed & 65535) ^ 58989);
+  r_.s1 = (((seed >> 16) & 65535) ^ 57068);
+  r_.s2 = (select(0, 65535, (seed < 0)) ^ 5);
+  return r_;
+}
 
 var<private> jwx_hopalong_inited_: f32 = 0.0;
 
@@ -30893,12 +37405,17 @@ var<private> jwx_hopalong_x0: f32 = 0.0;
 
 var<private> jwx_hopalong_y0: f32 = 0.0;`,
     code: (w, p) => `{
+var p0_: f32 = ${p[0]};
+var randomize: jrand_ = jrand_make(i32(min(max(p0_, 0.0), 10000000.0)));
 if ((jwx_hopalong_inited_ == 0.0)) {
   jwx_hopalong_inited_ = 1.0;
   jwx_hopalong_x0 = ${p[4]};
   jwx_hopalong_y0 = ${p[5]};
   jwx_hopalong_x0 += ((rnd(rs) - 0.5) * 0.0001);
   jwx_hopalong_y0 += ((rnd(rs) - 0.5) * 0.0001);
+}
+{
+  p0_ = f32(i32(clamp(min(max(p0_, 0.0), 10000000.0), 0, 10000000)));
 }
 var x1: f32 = (jwx_hopalong_y0 - (sign(jwx_hopalong_x0) * sqrt(abs(((min(max(${p[2]}, -1.0), 1.0) * jwx_hopalong_x0) - min(max(${p[3]}, -1.0), 1.0))))));
 var y1: f32 = (min(max(${p[1]}, -1.0), 1.0) - jwx_hopalong_x0);
@@ -31872,6 +38389,7 @@ fn powc(x: f32, y: f32) -> f32 {
   return select(m, -m, (i32(yi) & 1) != 0);
 }`,
     code: (w, p) => `{
+var rinv_: f32 = 1.0 / r;
 var uv: vec2f = vec2f(t.x, t.y);
 var t_: f32 = (${p[0]} * atan2j(uv.y, uv.x));
 uv = (vec2f(cos(t_), sin(t_)) * vec2f(powc(length(uv), ${p[1]})));
@@ -31879,6 +38397,14 @@ t.x = (${w} * uv.x);
 t.y = (${w} * uv.y);
 if (false) {
   z_ = (${w} * z_);
+}
+r2 = ((t.x * t.x) + (t.y * t.y));
+r = sqrt(r2);
+rinv_ = (1.0 / r);
+th = atan2j(t.x, t.y);
+ph = ((0.5 * PI) - th);
+if ((ph > PI)) {
+  ph -= (2.0 * PI);
 }
 }`,
   },
@@ -33765,6 +40291,54 @@ if ((mode <= 0)) {
 }
 }`,
   },
+  "petal3D_apo": {
+    params: [{ name: "width", def: 1 }, { name: "Zshape", def: 0.25 }, { name: "scale1", def: 0.25 }, { name: "scale2", def: 0.25 }, { name: "style", def: 0 }],
+    verified: true, priority: 0, flags: ["3d","z"], types: ["3D"],
+    funcNames: ["atan2j","sqrf"],
+    funcs: `fn atan2j(y: f32, x: f32) -> f32 { if (x == 0.0 && y == 0.0) { return select(0.0, PI, (bitcast<u32>(x) >> 31u) == 1u) * select(1.0, -1.0, (bitcast<u32>(y) >> 31u) == 1u); } return atan2(y, x); }
+
+fn sqrf(x: f32) -> f32 {
+  return (x * x);
+}`,
+    code: (w, p) => `{
+var shaper: f32;
+var shaper2: f32;
+var tmpPY: f32;
+var tmpPZ: f32;
+var tmpSmth: f32;
+var squeeze: f32;
+var posNeg: i32 = 1;
+if ((rnd(rs) < 0.5)) {
+  posNeg = -1;
+}
+var styleSign: f32 = select(-1.0, 1.0, (${p[4]} >= 0));
+var a: f32 = cos(t.x);
+var bx: f32 = (((cos(t.x) * cos(t.y)) * (cos(t.x) * cos(t.y))) * (cos(t.x) * cos(t.y)));
+var by: f32 = (((sin(t.x) * cos(t.y)) * (sin(t.x) * cos(t.y))) * (sin(t.x) * cos(t.y)));
+v.x += ((${w} * a) * bx);
+tmpPY = (((${w} * a) * by) * ${p[0]});
+v.y += tmpPY;
+if ((abs(${p[2]}) > 1.0)) {
+  squeeze = (abs(${p[2]}) - 1.0);
+  shaper = ((((-1 * sin(((t.x * ${p[2]}) * PI))) * 0.5) + ((t.x * squeeze) * 0.5)) + sin(abs(((t.y * ${p[3]}) * PI))));
+  shaper2 = ((((-1 * sin(((t.x * ${p[2]}) * PI))) * 0.5) + ((t.x * squeeze) * 0.5)) + ((tmpPY * ${p[3]}) * 0.5));
+} else {
+  squeeze = 0.0;
+  shaper = (((-1 * sin(((t.x * ${p[2]}) * PI))) * 0.5) + sin(abs(((t.y * ${p[3]}) * PI))));
+  shaper2 = (((-1 * sin(((t.x * ${p[2]}) * PI))) * 0.5) + ((tmpPY * ${p[3]}) * 0.5));
+}
+tmpSmth = (0.5 - sqrf(${p[4]}));
+tmpPZ = shaper;
+if ((abs(${p[4]}) > 0.70710678)) {
+  tmpPZ = (shaper2 * styleSign);
+} else if ((${p[4]} < 0.0)) {
+  tmpPZ = (((tmpSmth * 2.0) * shaper) - ((1.0 - (tmpSmth * 2.0)) * shaper2));
+} else if ((${p[4]} > 0.0)) {
+  tmpPZ = (((tmpSmth * 2.0) * shaper) + ((1.0 - (tmpSmth * 2.0)) * shaper2));
+}
+pz_ += ((${w} * tmpPZ) * ${p[1]});
+}`,
+  },
   "cut_kleinian": {
     params: [{ name: "mode", def: 1 }, { name: "zoom", def: 2 }, { name: "boxSize", def: 1 }, { name: "time", def: 0 }, { name: "NIters", def: 150 }, { name: "Dx", def: 0 }, { name: "Dy", def: -0.955 }, { name: "invert", def: 0 }],
     verified: true, priority: 0, flags: ["hide"], types: ["2D","BASE_SHAPE","SIMULATION"],
@@ -34533,6 +41107,191 @@ for (var i: i32 = 0; (f32(i) < min(max(${p[0]}, 0.0), 250.0)); i++) {
     pz_ = 0;
     v.x = pz_;
     v.y = pz_;
+  }
+}
+}`,
+  },
+  "post_coastalbrot_crop": {
+    params: [{ name: "iterations", def: 12 }, { name: "bailout", def: 16 }, { name: "scaleX", def: 1 }, { name: "scaleY", def: 1 }, { name: "ScaleZ", def: 1 }, { name: "color", def: 1 }, { name: "alpha", def: 0 }, { name: "beta", def: 0 }, { name: "gamma", def: 0 }],
+    verified: true, priority: 1, flags: ["3d","dc","z"], types: ["3D","CROP","POST","ESCAPE_TIME_FRACTAL","DC"],
+    funcNames: ["mat3_","powc","atan2j","post_coastalbrot_crop_radians","mat3_make","post_coastalbrot_crop_multiply","post_coastalbrot_crop_euler_rotation"],
+    funcs: `struct mat3_ {
+  a00: f32,
+  a10: f32,
+  a20: f32,
+  a01: f32,
+  a11: f32,
+  a21: f32,
+  a02: f32,
+  a12: f32,
+  a22: f32,
+}
+
+fn powc(x: f32, y: f32) -> f32 {
+  if (x >= 0.0) { return pow(x, y); }
+  let yi = round(y);
+  if (abs(y - yi) > 1e-6) { return pow(x, y); }
+  let m = pow(-x, y);
+  return select(m, -m, (i32(yi) & 1) != 0);
+}
+
+fn atan2j(y: f32, x: f32) -> f32 { if (x == 0.0 && y == 0.0) { return select(0.0, PI, (bitcast<u32>(x) >> 31u) == 1u) * select(1.0, -1.0, (bitcast<u32>(y) >> 31u) == 1u); } return atan2(y, x); }
+
+fn post_coastalbrot_crop_radians(v1: vec3f) -> vec3f {
+  return vec3f(((v1.x * PI) / 180.0), ((v1.y * PI) / 180.0), ((v1.z * PI) / 180.0));
+}
+
+fn mat3_make(a00: f32, a10: f32, a20: f32, a01: f32, a11: f32, a21: f32, a02: f32, a12: f32, a22: f32) -> mat3_ {
+  var m: mat3_;
+  m.a00 = a00;
+  m.a10 = a10;
+  m.a20 = a20;
+  m.a01 = a01;
+  m.a11 = a11;
+  m.a21 = a21;
+  m.a02 = a02;
+  m.a12 = a12;
+  m.a22 = a22;
+  return m;
+}
+
+fn post_coastalbrot_crop_multiply(A_: mat3_, B: mat3_) -> mat3_ {
+  return mat3_make((((A_.a00 * B.a00) + (A_.a01 * B.a10)) + (A_.a02 * B.a20)), (((A_.a00 * B.a01) + (A_.a01 * B.a11)) + (A_.a02 * B.a21)), (((A_.a00 * B.a02) + (A_.a01 * B.a12)) + (A_.a02 * B.a22)), (((A_.a10 * B.a00) + (A_.a11 * B.a10)) + (A_.a12 * B.a20)), (((A_.a10 * B.a01) + (A_.a11 * B.a11)) + (A_.a12 * B.a21)), (((A_.a10 * B.a02) + (A_.a11 * B.a12)) + (A_.a12 * B.a22)), (((A_.a20 * B.a00) + (A_.a21 * B.a10)) + (A_.a22 * B.a20)), (((A_.a20 * B.a01) + (A_.a21 * B.a11)) + (A_.a22 * B.a21)), (((A_.a20 * B.a02) + (A_.a21 * B.a12)) + (A_.a22 * B.a22)));
+}
+
+fn post_coastalbrot_crop_euler_rotation(rot: vec3f) -> mat3_ {
+  var v1: vec3f = vec3f(-rot.x, -rot.y, -rot.z);
+  var v2: vec3f = post_coastalbrot_crop_radians(v1);
+  var rot_rad: vec3f = vec3f(v2.x, v2.y, v2.z);
+  var cosx: f32 = cos(rot_rad.x);
+  var sinx: f32 = sin(rot_rad.x);
+  var x: mat3_ = mat3_make(1.0, 0.0, 0.0, 0.0, cosx, -sinx, 0.0, sinx, cosx);
+  var cosy: f32 = cos(rot_rad.y);
+  var siny: f32 = sin(rot_rad.y);
+  var y: mat3_ = mat3_make(cosy, 0.0, siny, 0.0, 1.0, 0.0, -siny, 0.0, cosy);
+  var cosz: f32 = cos(rot_rad.z);
+  var sinz: f32 = sin(rot_rad.z);
+  var z: mat3_ = mat3_make(cosz, -sinz, 0.0, sinz, cosz, 0.0, 0.0, 0.0, 1.0);
+  var xform: mat3_ = mat3_make(1.0, 0.0, 0.0, 0.0, 1.0, 0.0, 0.0, 0.0, 1.0);
+  xform = post_coastalbrot_crop_multiply(xform, x);
+  xform = post_coastalbrot_crop_multiply(xform, y);
+  xform = post_coastalbrot_crop_multiply(xform, z);
+  return xform;
+}`,
+    code: (w, p) => `{
+var x: f32 = (v.x * ${p[2]});
+var y: f32 = (v.y * ${p[3]});
+var z: f32 = (pz_ * ${p[4]});
+var x1: f32 = x;
+var y1: f32 = y;
+var z1: f32 = z;
+var r_: f32 = sqrt((((x * x) + (y * y)) + (z * z)));
+var rotangles: vec3f = vec3f(${p[6]}, ${p[7]}, ${p[8]});
+var rot: mat3_ = post_coastalbrot_crop_euler_rotation(rotangles);
+for (var i: i32 = 0; (f32(i) < min(max(${p[0]}, 0.0), 250.0)); i++) {
+  var temp: f32;
+  temp = powc(r_, 7.7);
+  temp = (temp * r_);
+  x = sin(sin(sin(((PI / 3) + (x * PI)))));
+  y = sin(sin(sin(((PI / 3) + (y * PI)))));
+  z = sin(sin(sin(((PI / 3) + (z * PI)))));
+  z = (z * temp);
+  x += x1;
+  y += y1;
+  z += z1;
+  var zz: vec3f = vec3f(x, y, z);
+  zz = vec3f((((zz.x * rot.a00) + (zz.y * rot.a10)) + (zz.z * rot.a20)), (((zz.x * rot.a01) + (zz.y * rot.a11)) + (zz.z * rot.a21)), (((zz.x * rot.a02) + (zz.y * rot.a12)) + (zz.z * rot.a22)));
+  r_ = sqrt((((zz.x * zz.x) + (zz.y * zz.y)) + (zz.z * zz.z)));
+  if ((r_ < ${p[1]})) {
+    v.x = (${w} * v.x);
+    v.y = (${w} * v.y);
+    pz_ = (${w} * pz_);
+    (*cp) = (sin(r_) * min(max(${p[5]}, 0.0), 1.0));
+  } else {
+    pz_ = 0;
+    v.y = pz_;
+    v.x = v.y;
+  }
+}
+}`,
+  },
+  "post_asurf_crop": {
+    params: [{ name: "iterations", def: 12 }, { name: "bailout", def: 16 }, { name: "scaleX", def: 1 }, { name: "scaleY", def: 1 }, { name: "scaleZ", def: 1 }, { name: "color", def: 1 }, { name: "mode", def: 1 }, { name: "angle", def: 0 }, { name: "rot_x", def: 0 }, { name: "rot_y", def: 0 }, { name: "rot_z", def: 1 }, { name: "minR", def: 0.25 }, { name: "maxR", def: 1 }],
+    verified: true, priority: 1, flags: ["3d","dc","z"], types: ["3D","CROP","POST","ESCAPE_TIME_FRACTAL","DC"],
+    funcNames: ["mat3_","atan2j","post_asurf_crop_radians_ov1","mat3_make","post_asurf_crop_rotationMatrix3"],
+    funcs: `struct mat3_ {
+  a00: f32,
+  a10: f32,
+  a20: f32,
+  a01: f32,
+  a11: f32,
+  a21: f32,
+  a02: f32,
+  a12: f32,
+  a22: f32,
+}
+
+fn atan2j(y: f32, x: f32) -> f32 { if (x == 0.0 && y == 0.0) { return select(0.0, PI, (bitcast<u32>(x) >> 31u) == 1u) * select(1.0, -1.0, (bitcast<u32>(y) >> 31u) == 1u); } return atan2(y, x); }
+
+fn post_asurf_crop_radians_ov1(v1: f32) -> f32 {
+  return ((v1 * PI) / 180.0);
+}
+
+fn mat3_make(a00: f32, a10: f32, a20: f32, a01: f32, a11: f32, a21: f32, a02: f32, a12: f32, a22: f32) -> mat3_ {
+  var m: mat3_;
+  m.a00 = a00;
+  m.a10 = a10;
+  m.a20 = a20;
+  m.a01 = a01;
+  m.a11 = a11;
+  m.a21 = a21;
+  m.a02 = a02;
+  m.a12 = a12;
+  m.a22 = a22;
+  return m;
+}
+
+fn post_asurf_crop_rotationMatrix3(v_: vec3f, angle: f32) -> mat3_ {
+  var c: f32 = cos(post_asurf_crop_radians_ov1(angle));
+  var s: f32 = sin(post_asurf_crop_radians_ov1(angle));
+  return mat3_make((c + (((1.0 - c) * v_.x) * v_.x)), ((((1.0 - c) * v_.x) * v_.y) - (s * v_.z)), ((((1.0 - c) * v_.x) * v_.z) + (s * v_.y)), ((((1.0 - c) * v_.x) * v_.y) + (s * v_.z)), (c + (((1.0 - c) * v_.y) * v_.y)), ((((1.0 - c) * v_.y) * v_.z) - (s * v_.x)), ((((1.0 - c) * v_.x) * v_.z) - (s * v_.y)), ((((1.0 - c) * v_.y) * v_.z) + (s * v_.x)), (c + (((1.0 - c) * v_.z) * v_.z)));
+}`,
+    code: (w, p) => `{
+var x: f32 = (v.x * ${p[2]});
+var y: f32 = (v.y * ${p[3]});
+var z: f32 = (pz_ * ${p[4]});
+var x1: f32 = x;
+var y1: f32 = y;
+var z1: f32 = z;
+var rr: f32 = sqrt((((x * x) + (y * y)) + (z * z)));
+var rotvec: vec3f = vec3f(${p[8]}, ${p[9]}, ${p[10]});
+var rot: mat3_ = post_asurf_crop_rotationMatrix3(normalize(rotvec), ${p[7]});
+var p_: vec3f = vec3f(x, y, z);
+var limit: vec3f = vec3f(1.0, 1.0, 1.0);
+for (var i: i32 = 0; (f32(i) < min(max(${p[0]}, 0.0), 250.0)); i++) {
+  p_.x = ((abs((p_.x + limit.x)) - abs((p_.x - limit.x))) - p_.x);
+  p_.y = ((abs((p_.y + limit.y)) - abs((p_.y - limit.y))) - p_.y);
+  if ((min(max(${p[6]}, 0.0), 1.0) == 0)) {
+    p_.z = ((abs((p_.z + limit.z)) - abs((p_.z - limit.z))) - p_.z);
+  }
+  rr = length(p_);
+  if ((rr < ${p[11]})) {
+    p_ = (p_ * vec3f((${p[12]} / ${p[11]})));
+  } else if ((rr < ${p[12]})) {
+    p_ = (p_ * vec3f((${p[12]} / rr)));
+  }
+  p_ = vec3f((((p_.x * rot.a00) + (p_.y * rot.a10)) + (p_.z * rot.a20)), (((p_.x * rot.a01) + (p_.y * rot.a11)) + (p_.z * rot.a21)), (((p_.x * rot.a02) + (p_.y * rot.a12)) + (p_.z * rot.a22)));
+  p_ = (p_ + vec3f(x1, y1, z1));
+  rr = dot(p_, p_);
+  if ((rr < ${p[1]})) {
+    v.x = (${w} * v.x);
+    v.y = (${w} * v.y);
+    pz_ = (${w} * pz_);
+    (*cp) = (sin(rr) * min(max(${p[5]}, 0.0), 1.0));
+  } else {
+    pz_ = 0;
+    v.y = pz_;
+    v.x = v.y;
   }
 }
 }`,
@@ -36120,6 +42879,162 @@ if (false) {
 }
 }`,
   },
+  "hourglass3D": {
+    params: [{ name: "kx", def: 1 }, { name: "ky", def: 1 }, { name: "kz", def: 1 }, { name: "maxheight", def: 5.570303708569531 }, { name: "limit", def: 1 }, { name: "zero", def: 0 }],
+    verified: true, priority: 0, flags: ["3d","z"], types: ["3D"],
+    funcNames: ["sqr","atan2j"],
+    funcs: `fn sqr(x: f32) -> f32 { return x * x; }
+
+fn atan2j(y: f32, x: f32) -> f32 { if (x == 0.0 && y == 0.0) { return select(0.0, PI, (bitcast<u32>(x) >> 31u) == 1u) * select(1.0, -1.0, (bitcast<u32>(y) >> 31u) == 1u); } return atan2(y, x); }`,
+    code: (w, p) => `{
+var _h: f32 = 0;
+var _hb: f32 = 0;
+var _vkx: f32 = 0;
+var _vky: f32 = 0;
+var _vkz: f32 = 0;
+{
+  _vkx = (${w} * ${p[0]});
+  _vky = (${w} * ${p[1]});
+  _vkz = (${w} * ${p[2]});
+  _h = sqrt((1 + sqr((${p[3]} / ${p[1]}))));
+  _hb = sqrt((sqr(_h) - 1.0));
+}
+if ((${p[4]} == 0)) {
+  var sn: f32 = sin(t.x);
+  var cn: f32 = cos(t.x);
+  var sh: f32 = sinh(t.y);
+  var ch: f32 = cosh(t.y);
+  v.x += ((_vkx * ch) * sn);
+  v.y += (_vky * sh);
+  pz_ += ((_vkz * ch) * cn);
+} else if ((${p[5]} == 0)) {
+  var sn: f32 = sin(t.x);
+  var cn: f32 = cos(t.x);
+  var sh: f32 = sinh(t.y);
+  var ch: f32 = cosh(t.y);
+  if ((ch <= _h)) {
+    v.x += ((_vkx * ch) * sn);
+    v.y += (_vky * sh);
+    pz_ += ((_vkz * ch) * cn);
+  } else {
+    v.x += ((_vkx * _h) * sn);
+    v.y += ((_vky * sign(sh)) * _hb);
+    pz_ += ((_vkz * _h) * cn);
+  }
+} else {
+  var ch: f32 = cosh(t.y);
+  if ((ch <= _h)) {
+    var sh: f32 = sinh(t.y);
+    var sn: f32 = sin(t.x);
+    var cn: f32 = cos(t.x);
+    v.x += ((_vkx * ch) * sn);
+    v.y += (_vky * sh);
+    pz_ += ((_vkz * ch) * cn);
+  }
+}
+}`,
+  },
+  "pre_affine3D": {
+    params: [{ name: "translateX", def: 0 }, { name: "translateY", def: 0 }, { name: "translateZ", def: 0 }, { name: "scaleX", def: 1 }, { name: "scaleY", def: 1 }, { name: "scaleZ", def: 1 }, { name: "rotateX", def: 0 }, { name: "rotateY", def: 0 }, { name: "rotateZ", def: 0 }, { name: "shearXY", def: 0 }, { name: "shearXZ", def: 0 }, { name: "shearYX", def: 0 }, { name: "shearYZ", def: 0 }, { name: "shearZX", def: 0 }, { name: "shearZY", def: 0 }],
+    verified: true, priority: -1, flags: ["3d","z"], types: ["3D","PRE"],
+    funcNames: ["atan2j"],
+    funcs: `fn atan2j(y: f32, x: f32) -> f32 { if (x == 0.0 && y == 0.0) { return select(0.0, PI, (bitcast<u32>(x) >> 31u) == 1u) * select(1.0, -1.0, (bitcast<u32>(y) >> 31u) == 1u); } return atan2(y, x); }`,
+    code: (w, p) => `{
+var rinv_: f32 = 1.0 / r;
+var _sinX: f32 = 0;
+var _cosX: f32 = 0;
+var _sinY: f32 = 0;
+var _cosY: f32 = 0;
+var _sinZ: f32 = 0;
+var _cosZ: f32 = 0;
+var _hasShear: bool = (0 != 0);
+{
+  var xa: f32 = ((${p[6]} * PI) / 180.0);
+  _sinX = sin(xa);
+  _cosX = cos(xa);
+  var ya: f32 = ((${p[7]} * PI) / 180.0);
+  _sinY = sin(ya);
+  _cosY = cos(ya);
+  var za: f32 = ((${p[8]} * PI) / 180.0);
+  _sinZ = sin(za);
+  _cosZ = cos(za);
+  _hasShear = ((((((abs(${p[9]}) > 1.0e-9) || (abs(${p[10]}) > 1.0e-9)) || (abs(${p[11]}) > 1.0e-9)) || (abs(${p[12]}) > 1.0e-9)) || (abs(${p[13]}) > 1.0e-9)) || (abs(${p[14]}) > 1.0e-9));
+}
+{
+  var affineX: f32;
+  var affineY: f32;
+  var affineZ: f32;
+  if (_hasShear) {
+    affineX = (${w} * (((_cosZ * ((_cosY * ((((${p[9]} * ${p[4]}) * t.y) + ((${p[10]} * ${p[5]}) * z_)) + (${p[3]} * t.x))) + (_sinY * ((_sinX * ((((${p[11]} * ${p[3]}) * t.x) + ((${p[12]} * ${p[5]}) * z_)) + (${p[4]} * t.y))) + (_cosX * ((((${p[13]} * ${p[3]}) * t.x) + ((${p[14]} * ${p[4]}) * t.y)) + (${p[5]} * z_))))))) - (_sinZ * ((_cosX * ((((${p[11]} * ${p[3]}) * t.x) + ((${p[12]} * ${p[5]}) * z_)) + (${p[4]} * t.y))) - (_sinX * ((((${p[13]} * ${p[3]}) * t.x) + ((${p[14]} * ${p[4]}) * t.y)) + (${p[5]} * z_)))))) + ${p[0]}));
+    affineY = (${w} * (((_sinZ * ((_cosY * ((((${p[9]} * ${p[4]}) * t.y) + ((${p[10]} * ${p[5]}) * z_)) + (${p[3]} * t.x))) + (_sinY * ((_sinX * ((((${p[11]} * ${p[3]}) * t.x) + ((${p[12]} * ${p[5]}) * z_)) + (${p[4]} * t.y))) + (_cosX * ((((${p[13]} * ${p[3]}) * t.x) + ((${p[14]} * ${p[4]}) * t.y)) + (${p[5]} * z_))))))) + (_cosZ * ((_cosX * ((((${p[11]} * ${p[3]}) * t.x) + ((${p[12]} * ${p[5]}) * z_)) + (${p[4]} * t.y))) - (_sinX * ((((${p[13]} * ${p[3]}) * t.x) + ((${p[14]} * ${p[4]}) * t.y)) + (${p[5]} * z_)))))) + ${p[1]}));
+    affineZ = (${w} * (((-_sinY * ((((${p[9]} * ${p[4]}) * t.y) + ((${p[10]} * ${p[5]}) * z_)) + (${p[3]} * t.x))) + (_cosY * ((_sinX * ((((${p[11]} * ${p[3]}) * t.x) + ((${p[12]} * ${p[5]}) * z_)) + (${p[4]} * t.y))) + (_cosX * ((((${p[13]} * ${p[3]}) * t.x) + ((${p[14]} * ${p[4]}) * t.y)) + (${p[5]} * z_)))))) + ${p[2]}));
+  } else {
+    affineX = (${w} * (((_cosZ * (((_cosY * ${p[3]}) * t.x) + (_sinY * (((_cosX * ${p[5]}) * z_) + ((_sinX * ${p[4]}) * t.y))))) - (_sinZ * (((_cosX * ${p[4]}) * t.y) - ((_sinX * ${p[5]}) * z_)))) + ${p[0]}));
+    affineY = (${w} * (((_sinZ * (((_cosY * ${p[3]}) * t.x) + (_sinY * (((_cosX * ${p[5]}) * z_) + ((_sinX * ${p[4]}) * t.y))))) + (_cosZ * (((_cosX * ${p[4]}) * t.y) - ((_sinX * ${p[5]}) * z_)))) + ${p[1]}));
+    affineZ = (${w} * ((((-_sinY * ${p[3]}) * t.x) + (_cosY * (((_cosX * ${p[5]}) * z_) + ((_sinX * ${p[4]}) * t.y)))) + ${p[2]}));
+  }
+  {
+    t.x = affineX;
+    t.y = affineY;
+    z_ = affineZ;
+  }
+}
+r2 = ((t.x * t.x) + (t.y * t.y));
+r = sqrt(r2);
+rinv_ = (1.0 / r);
+th = atan2j(t.x, t.y);
+ph = ((0.5 * PI) - th);
+if ((ph > PI)) {
+  ph -= (2.0 * PI);
+}
+}`,
+  },
+  "post_affine3D": {
+    params: [{ name: "translateX", def: 0 }, { name: "translateY", def: 0 }, { name: "translateZ", def: 0 }, { name: "scaleX", def: 1 }, { name: "scaleY", def: 1 }, { name: "scaleZ", def: 1 }, { name: "rotateX", def: 0 }, { name: "rotateY", def: 0 }, { name: "rotateZ", def: 0 }, { name: "shearXY", def: 0 }, { name: "shearXZ", def: 0 }, { name: "shearYX", def: 0 }, { name: "shearYZ", def: 0 }, { name: "shearZX", def: 0 }, { name: "shearZY", def: 0 }],
+    verified: true, priority: 1, flags: ["3d","z"], types: ["3D","POST"],
+    funcNames: ["atan2j"],
+    funcs: `fn atan2j(y: f32, x: f32) -> f32 { if (x == 0.0 && y == 0.0) { return select(0.0, PI, (bitcast<u32>(x) >> 31u) == 1u) * select(1.0, -1.0, (bitcast<u32>(y) >> 31u) == 1u); } return atan2(y, x); }`,
+    code: (w, p) => `{
+var _sinX: f32 = 0;
+var _cosX: f32 = 0;
+var _sinY: f32 = 0;
+var _cosY: f32 = 0;
+var _sinZ: f32 = 0;
+var _cosZ: f32 = 0;
+var _hasShear: bool = (0 != 0);
+{
+  var xa: f32 = ((${p[6]} * PI) / 180.0);
+  _sinX = sin(xa);
+  _cosX = cos(xa);
+  var ya: f32 = ((${p[7]} * PI) / 180.0);
+  _sinY = sin(ya);
+  _cosY = cos(ya);
+  var za: f32 = ((${p[8]} * PI) / 180.0);
+  _sinZ = sin(za);
+  _cosZ = cos(za);
+  _hasShear = ((((((abs(${p[9]}) > 1.0e-9) || (abs(${p[10]}) > 1.0e-9)) || (abs(${p[11]}) > 1.0e-9)) || (abs(${p[12]}) > 1.0e-9)) || (abs(${p[13]}) > 1.0e-9)) || (abs(${p[14]}) > 1.0e-9));
+}
+{
+  var affineX: f32;
+  var affineY: f32;
+  var affineZ: f32;
+  if (_hasShear) {
+    affineX = (${w} * (((_cosZ * ((_cosY * ((((${p[9]} * ${p[4]}) * v.y) + ((${p[10]} * ${p[5]}) * pz_)) + (${p[3]} * v.x))) + (_sinY * ((_sinX * ((((${p[11]} * ${p[3]}) * v.x) + ((${p[12]} * ${p[5]}) * pz_)) + (${p[4]} * v.y))) + (_cosX * ((((${p[13]} * ${p[3]}) * v.x) + ((${p[14]} * ${p[4]}) * v.y)) + (${p[5]} * pz_))))))) - (_sinZ * ((_cosX * ((((${p[11]} * ${p[3]}) * v.x) + ((${p[12]} * ${p[5]}) * pz_)) + (${p[4]} * v.y))) - (_sinX * ((((${p[13]} * ${p[3]}) * v.x) + ((${p[14]} * ${p[4]}) * v.y)) + (${p[5]} * pz_)))))) + ${p[0]}));
+    affineY = (${w} * (((_sinZ * ((_cosY * ((((${p[9]} * ${p[4]}) * v.y) + ((${p[10]} * ${p[5]}) * pz_)) + (${p[3]} * v.x))) + (_sinY * ((_sinX * ((((${p[11]} * ${p[3]}) * v.x) + ((${p[12]} * ${p[5]}) * pz_)) + (${p[4]} * v.y))) + (_cosX * ((((${p[13]} * ${p[3]}) * v.x) + ((${p[14]} * ${p[4]}) * v.y)) + (${p[5]} * pz_))))))) + (_cosZ * ((_cosX * ((((${p[11]} * ${p[3]}) * v.x) + ((${p[12]} * ${p[5]}) * pz_)) + (${p[4]} * v.y))) - (_sinX * ((((${p[13]} * ${p[3]}) * v.x) + ((${p[14]} * ${p[4]}) * v.y)) + (${p[5]} * pz_)))))) + ${p[1]}));
+    affineZ = (${w} * (((-_sinY * ((((${p[9]} * ${p[4]}) * v.y) + ((${p[10]} * ${p[5]}) * pz_)) + (${p[3]} * v.x))) + (_cosY * ((_sinX * ((((${p[11]} * ${p[3]}) * v.x) + ((${p[12]} * ${p[5]}) * pz_)) + (${p[4]} * v.y))) + (_cosX * ((((${p[13]} * ${p[3]}) * v.x) + ((${p[14]} * ${p[4]}) * v.y)) + (${p[5]} * pz_)))))) + ${p[2]}));
+  } else {
+    affineX = (${w} * (((_cosZ * (((_cosY * ${p[3]}) * v.x) + (_sinY * (((_cosX * ${p[5]}) * pz_) + ((_sinX * ${p[4]}) * v.y))))) - (_sinZ * (((_cosX * ${p[4]}) * v.y) - ((_sinX * ${p[5]}) * pz_)))) + ${p[0]}));
+    affineY = (${w} * (((_sinZ * (((_cosY * ${p[3]}) * v.x) + (_sinY * (((_cosX * ${p[5]}) * pz_) + ((_sinX * ${p[4]}) * v.y))))) + (_cosZ * (((_cosX * ${p[4]}) * v.y) - ((_sinX * ${p[5]}) * pz_)))) + ${p[1]}));
+    affineZ = (${w} * ((((-_sinY * ${p[3]}) * v.x) + (_cosY * (((_cosX * ${p[5]}) * pz_) + ((_sinX * ${p[4]}) * v.y)))) + ${p[2]}));
+  }
+  {
+    v.x = affineX;
+    v.y = affineY;
+    pz_ = affineZ;
+  }
+}
+}`,
+  },
   "mobius_dragon_3D": {
     params: [{ name: "re", def: 1 }, { name: "im", def: 0 }, { name: "x_spread", def: 1 }, { name: "y_spread", def: 0 }, { name: "z_spread", def: 0 }, { name: "x_add", def: 0 }, { name: "y_add", def: 0 }, { name: "log_spread", def: 2.71828 }, { name: "line_enable", def: 1 }, { name: "line_weight", def: 0.125 }, { name: "line_color_shift", def: 0.1 }, { name: "mag_color", def: 1 }, { name: "mag_color_scale", def: 0.5 }, { name: "iterations", def: 1 }],
     verified: true, priority: 0, flags: ["3d","dc","z"], types: ["3D","SIMULATION"],
@@ -36310,8 +43225,8 @@ switch i32(min(max(${p[0]}, 0.0), 15.0)) {
   },
   "tess_shape": {
     params: [{ name: "strength", def: 1 }, { name: "shapeSize", def: 0.8 }, { name: "shapeType", def: 0 }, { name: "shapeAspectRatio", def: 1 }, { name: "lrRadialAmp", def: 0.2 }, { name: "lrRadialWidthFreq", def: 0.6 }, { name: "tbAmp", def: 0.2 }, { name: "tbWidthFreq", def: 0.6 }, { name: "lrRadialPosPhaseDuty", def: 0 }, { name: "tbPosPhaseDuty", def: 0 }, { name: "lrRadialProfileType", def: 0 }, { name: "tbProfileType", def: 0 }, { name: "operationMode", def: 0 }],
-    verified: true, priority: 0, flags: ["hide","state","z"], types: ["2D","BASE_SHAPE"],
-    funcNames: ["jwx_tess_shape_inited_","jwx_tess_shape_TWO_PI","atan2j","tess_shape_isPointInTriangle","tess_shape_calculate_profile_offset"],
+    verified: true, priority: 0, flags: ["hide","z"], types: ["2D","BASE_SHAPE"],
+    funcNames: ["atan2j","tess_shape_isPointInTriangle","tess_shape_calculate_profile_offset"],
     funcs: `fn atan2j(y: f32, x: f32) -> f32 { if (x == 0.0 && y == 0.0) { return select(0.0, PI, (bitcast<u32>(x) >> 31u) == 1u) * select(1.0, -1.0, (bitcast<u32>(y) >> 31u) == 1u); } return atan2(y, x); }
 
 fn tess_shape_isPointInTriangle(px: f32, py: f32, v1x: f32, v1y: f32, v2x: f32, v2y: f32, v3x: f32, v3y: f32) -> bool {
@@ -36349,7 +43264,7 @@ fn tess_shape_calculate_profile_offset(v_input: f32, profile_type: i32, amplitud
       {
         var frequency: f32 = param_wf;
         var phase_norm: f32 = param_ppd;
-        return (amplitude * sin((((v_input * frequency) * jwx_tess_shape_TWO_PI) + (phase_norm * jwx_tess_shape_TWO_PI))));
+        return (amplitude * sin((((v_input * frequency) * (2.0 * PI)) + (phase_norm * (2.0 * PI)))));
       }
     }
     case 2: {
@@ -36384,19 +43299,8 @@ fn tess_shape_calculate_profile_offset(v_input: f32, profile_type: i32, amplitud
       return 0.0;
     }
   }
-}
-
-var<private> jwx_tess_shape_inited_: f32 = 0.0;
-
-var<private> jwx_tess_shape_TWO_PI: f32 = 0.0;`,
+}`,
     code: (w, p) => `{
-var SQRT3: f32 = sqrt(3.0);
-var MAX_REJECTION_SAMPLES: i32 = 100;
-if ((jwx_tess_shape_inited_ == 0.0)) {
-  jwx_tess_shape_inited_ = 1.0;
-  jwx_tess_shape_TWO_PI = (2.0 * PI);
-}
-jwx_tess_shape_TWO_PI = (2.0 * PI);
 var x_aff: f32 = t.x;
 var y_aff: f32 = t.y;
 var z_aff: f32 = z_;
@@ -36425,7 +43329,7 @@ if ((min(max(${p[12]}, 0.0), 1.0) == 1)) {
     case 2: {
       {
         var s: f32 = ${p[1]};
-        var h_tri: f32 = ((s * SQRT3) / 2.0);
+        var h_tri: f32 = ((s * sqrt(3.0)) / 2.0);
         var v1x: f32 = 0;
         var v1y: f32 = ((2.0 / 3.0) * h_tri);
         var v2x: f32 = (-s / 2.0);
@@ -36501,7 +43405,7 @@ if ((min(max(${p[12]}, 0.0), 1.0) == 1)) {
         var br: f32 = ${p[1]};
         var angle_aff: f32 = atan2j(py_test, px_test);
         var radius_aff: f32 = sqrt(((px_test * px_test) + (py_test * py_test)));
-        var ang_n01: f32 = (((angle_aff / jwx_tess_shape_TWO_PI) + 1.0) % 1.0);
+        var ang_n01: f32 = (((angle_aff / (2.0 * PI)) + 1.0) % 1.0);
         var vip: f32 = select(ang_n01, ((ang_n01 * 2) - 1), (min(max(${p[10]}, 0.0), 4.0) == 0));
         var rad_off: f32 = tess_shape_calculate_profile_offset(vip, i32(min(max(${p[10]}, 0.0), 4.0)), ${p[4]}, ${p[5]}, ${p[8]});
         var bound_r: f32 = max(0.0, (br + rad_off));
@@ -36544,7 +43448,7 @@ if ((min(max(${p[12]}, 0.0), 1.0) == 1)) {
     case 2: {
       {
         var s: f32 = ${p[1]};
-        var h_tri: f32 = ((s * SQRT3) / 2.0);
+        var h_tri: f32 = ((s * sqrt(3.0)) / 2.0);
         var v1x: f32 = 0;
         var v1y: f32 = ((2.0 / 3.0) * h_tri);
         var v2x: f32 = (-s / 2.0);
@@ -36590,7 +43494,7 @@ if ((min(max(${p[12]}, 0.0), 1.0) == 1)) {
         var sx: f32 = (half_w + max_lr_off);
         var sy: f32 = (half_h + max_tb_off);
         var pf: bool = false;
-        for (var i: i32 = 0; (i < MAX_REJECTION_SAMPLES); i++) {
+        for (var i: i32 = 0; (i < 100); i++) {
           var px: f32 = (((rnd(rs) * 2) - 1) * sx);
           var py: f32 = (((rnd(rs) * 2) - 1) * sy);
           var pyn: f32 = select(min(1, max(-1, (py / half_h))), 0, (half_h == 0));
@@ -36647,7 +43551,7 @@ if ((min(max(${p[12]}, 0.0), 1.0) == 1)) {
         var ymb: f32 = -half_h;
         var yab: f32 = (half_h + abs(t_amp));
         var pf6: bool = false;
-        for (var i: i32 = 0; (i < MAX_REJECTION_SAMPLES); i++) {
+        for (var i: i32 = 0; (i < 100); i++) {
           var px: f32 = (xmb + (rnd(rs) * (xab - xmb)));
           var py: f32 = (ymb + (rnd(rs) * (yab - ymb)));
           if (((px < -half_w) || (py < -half_h))) {
@@ -36684,8 +43588,8 @@ if ((min(max(${p[12]}, 0.0), 1.0) == 1)) {
         var current_radial_amp: f32 = ${p[4]};
         var current_radial_param_wf: f32 = ${p[5]};
         var current_radial_param_ppd: f32 = ${p[8]};
-        var random_angle_rad: f32 = (rnd(rs) * jwx_tess_shape_TWO_PI);
-        var angle_norm_01: f32 = (random_angle_rad / jwx_tess_shape_TWO_PI);
+        var random_angle_rad: f32 = (rnd(rs) * (2.0 * PI));
+        var angle_norm_01: f32 = (random_angle_rad / (2.0 * PI));
         var v_input_for_profile: f32;
         if ((current_radial_profile_type == 0)) {
           v_input_for_profile = ((angle_norm_01 * 2.0) - 1.0);
@@ -36712,6 +43616,535 @@ if ((min(max(${p[12]}, 0.0), 1.0) == 1)) {
   if (false) {
     pz_ += (${w} * z_);
   }
+}
+}`,
+  },
+  "kifs3d": {
+    params: [{ name: "max_iter", def: 7 }, { name: "bailout_radius", def: 1.1 }, { name: "kifs_scale_x", def: 1.4 }, { name: "kifs_scale_y", def: 1.4 }, { name: "kifs_scale_z", def: -1 }, { name: "scale_pivot", def: 0 }, { name: "center_x", def: 0 }, { name: "center_y", def: 0 }, { name: "center_z", def: 0 }, { name: "offset_x", def: -1 }, { name: "offset_y", def: -1 }, { name: "offset_z", def: 1 }, { name: "mirror_fold", def: 0 }, { name: "fold_type", def: 1 }, { name: "fold_plane1_nx", def: 1 }, { name: "fold_plane1_ny", def: 0 }, { name: "fold_plane1_nz", def: 0 }, { name: "fold_plane1_dist", def: 0 }, { name: "fold_plane1_intensity", def: 1 }, { name: "edge_x", def: 0 }, { name: "edge_y", def: 0 }, { name: "edge_z", def: 0 }, { name: "rot_x", def: 5 }, { name: "rot_y", def: 5 }, { name: "rot_z", def: 5 }, { name: "rot_order", def: 0 }, { name: "rot_pivot", def: 0 }, { name: "transform_order", def: 0 }, { name: "post_symmetry", def: 7 }, { name: "color_mode", def: 0 }, { name: "color_scale", def: 1 }],
+    verified: true, priority: 0, flags: ["3d","dc","state","z"], types: ["3D","SIMULATION"],
+    funcNames: ["jwx_kifs3d_mirror_fold_c","jwx_kifs3d_fold_type_c","jwx_kifs3d_fold_plane1_nx_c","jwx_kifs3d_fold_plane1_ny_c","jwx_kifs3d_fold_plane1_nz_c","jwx_kifs3d_fold_plane1_dist_c","jwx_kifs3d_fold_plane1_intensity_c","jwx_kifs3d_edge_x_c","jwx_kifs3d_edge_y_c","jwx_kifs3d_edge_z_c","jwx_kifs3d_rot_order_c","jwx_kifs3d_center_x_c","jwx_kifs3d_center_y_c","jwx_kifs3d_center_z_c","jwx_kifs3d_scale_pivot_c","jwx_kifs3d_offset_x_c","jwx_kifs3d_offset_y_c","jwx_kifs3d_offset_z_c","jwx_kifs3d_kifs_scale_x_c","jwx_kifs3d_kifs_scale_y_c","jwx_kifs3d_kifs_scale_z_c","jwx_kifs3d_inited_","jwx_kifs3d_fold_norm1_len_sq","jwx_kifs3d_rot_x_rad","jwx_kifs3d_rot_y_rad","jwx_kifs3d_rot_z_rad","kifs3d_Point3D","atan2j","kifs3d_Point3D_make","kifs3d_applyFolding","kifs3d_applyRotation","kifs3d_applyScaleTranslate"],
+    funcs: `struct kifs3d_Point3D {
+  x: f32,
+  y: f32,
+  z: f32,
+}
+
+fn atan2j(y: f32, x: f32) -> f32 { if (x == 0.0 && y == 0.0) { return select(0.0, PI, (bitcast<u32>(x) >> 31u) == 1u) * select(1.0, -1.0, (bitcast<u32>(y) >> 31u) == 1u); } return atan2(y, x); }
+
+fn kifs3d_Point3D_make(x: f32, y: f32, z: f32) -> kifs3d_Point3D {
+  var r_: kifs3d_Point3D;
+  r_.x = x;
+  r_.y = y;
+  r_.z = z;
+  return r_;
+}
+
+fn kifs3d_applyFolding(x: f32, y: f32, z: f32, rs: ptr<function, u32>) -> kifs3d_Point3D {
+  if ((jwx_kifs3d_mirror_fold_c <= 0)) {
+    switch i32(jwx_kifs3d_fold_type_c) {
+      case 1: {
+        return kifs3d_Point3D_make(abs(x), abs(y), abs(z));
+      }
+      case 2: {
+        if (((x + y) < 0.0)) {
+          return kifs3d_Point3D_make(-y, -x, z);
+        }
+        return kifs3d_Point3D_make(x, y, z);
+      }
+      case 3: {
+        if ((jwx_kifs3d_fold_norm1_len_sq > 1.0e-9)) {
+          var dot_p_n_minus_d: f32 = ((((x * jwx_kifs3d_fold_plane1_nx_c) + (y * jwx_kifs3d_fold_plane1_ny_c)) + (z * jwx_kifs3d_fold_plane1_nz_c)) - jwx_kifs3d_fold_plane1_dist_c);
+          if ((dot_p_n_minus_d < 0.0)) {
+            var scale_factor: f32 = (((1.0 + jwx_kifs3d_fold_plane1_intensity_c) * dot_p_n_minus_d) / jwx_kifs3d_fold_norm1_len_sq);
+            return kifs3d_Point3D_make((x - (scale_factor * jwx_kifs3d_fold_plane1_nx_c)), (y - (scale_factor * jwx_kifs3d_fold_plane1_ny_c)), (z - (scale_factor * jwx_kifs3d_fold_plane1_nz_c)));
+          }
+        }
+        return kifs3d_Point3D_make(x, y, z);
+      }
+      case 4: {
+        var foldedX: f32 = select(x, (jwx_kifs3d_edge_x_c - abs((jwx_kifs3d_edge_x_c - x))), (jwx_kifs3d_edge_x_c != 0.0));
+        var foldedY: f32 = select(y, (jwx_kifs3d_edge_y_c - abs((jwx_kifs3d_edge_y_c - y))), (jwx_kifs3d_edge_y_c != 0.0));
+        var foldedZ: f32 = select(z, (jwx_kifs3d_edge_z_c - abs((jwx_kifs3d_edge_z_c - z))), (jwx_kifs3d_edge_z_c != 0.0));
+        return kifs3d_Point3D_make(foldedX, foldedY, foldedZ);
+      }
+      case 0, default: {
+        return kifs3d_Point3D_make(x, y, z);
+      }
+    }
+  } else {
+    var signa: f32 = select(1.0, -1.0, (rnd(rs) < 0.5));
+    var signb: f32 = select(1.0, -1.0, (rnd(rs) < 0.5));
+    var signc: f32 = select(1.0, -1.0, (rnd(rs) < 0.5));
+    switch i32(jwx_kifs3d_fold_type_c) {
+      case 1: {
+        return kifs3d_Point3D_make((x * signa), (y * signb), (z * signc));
+      }
+      case 2: {
+        if ((signa < 0.0)) {
+          return kifs3d_Point3D_make(-y, -x, z);
+        }
+        return kifs3d_Point3D_make(x, y, z);
+      }
+      case 3: {
+        if ((jwx_kifs3d_fold_norm1_len_sq > 1.0e-9)) {
+          var dot_p_n_minus_d: f32 = ((((x * jwx_kifs3d_fold_plane1_nx_c) + (y * jwx_kifs3d_fold_plane1_ny_c)) + (z * jwx_kifs3d_fold_plane1_nz_c)) - jwx_kifs3d_fold_plane1_dist_c);
+          if ((signa < 0.0)) {
+            var scale_factor: f32 = (((1.0 + jwx_kifs3d_fold_plane1_intensity_c) * dot_p_n_minus_d) / jwx_kifs3d_fold_norm1_len_sq);
+            return kifs3d_Point3D_make((x - (scale_factor * jwx_kifs3d_fold_plane1_nx_c)), (y - (scale_factor * jwx_kifs3d_fold_plane1_ny_c)), (z - (scale_factor * jwx_kifs3d_fold_plane1_nz_c)));
+          }
+        }
+        return kifs3d_Point3D_make(x, y, z);
+      }
+      case 4: {
+        var foldedX: f32 = select(x, (jwx_kifs3d_edge_x_c - (signa * abs((jwx_kifs3d_edge_x_c - x)))), (jwx_kifs3d_edge_x_c != 0.0));
+        var foldedY: f32 = select(y, (jwx_kifs3d_edge_y_c - (signb * abs((jwx_kifs3d_edge_y_c - y)))), (jwx_kifs3d_edge_y_c != 0.0));
+        var foldedZ: f32 = select(z, (jwx_kifs3d_edge_z_c - (signc * abs((jwx_kifs3d_edge_z_c - z)))), (jwx_kifs3d_edge_z_c != 0.0));
+        return kifs3d_Point3D_make(foldedX, foldedY, foldedZ);
+      }
+      case 0, default: {
+        return kifs3d_Point3D_make(x, y, z);
+      }
+    }
+  }
+}
+
+fn kifs3d_applyRotation(x: f32, y: f32, z: f32, pivotX: f32, pivotY: f32, pivotZ: f32) -> kifs3d_Point3D {
+  if ((((jwx_kifs3d_rot_x_rad == 0.0) && (jwx_kifs3d_rot_y_rad == 0.0)) && (jwx_kifs3d_rot_z_rad == 0.0))) {
+    return kifs3d_Point3D_make(x, y, z);
+  }
+  var tx: f32 = (x - pivotX);
+  var ty: f32 = (y - pivotY);
+  var tz: f32 = (z - pivotZ);
+  var cosX: f32 = cos(jwx_kifs3d_rot_x_rad);
+  var sinX: f32 = sin(jwx_kifs3d_rot_x_rad);
+  var cosY: f32 = cos(jwx_kifs3d_rot_y_rad);
+  var sinY: f32 = sin(jwx_kifs3d_rot_y_rad);
+  var cosZ: f32 = cos(jwx_kifs3d_rot_z_rad);
+  var sinZ: f32 = sin(jwx_kifs3d_rot_z_rad);
+  var rx: f32 = tx;
+  var ry: f32 = ty;
+  var rz: f32 = tz;
+  var temp_x: f32;
+  var temp_y: f32;
+  var temp_z: f32;
+  if ((jwx_kifs3d_rot_order_c == 0)) {
+    temp_x = ((rx * cosZ) - (ry * sinZ));
+    temp_y = ((rx * sinZ) + (ry * cosZ));
+    rx = temp_x;
+    ry = temp_y;
+    temp_x = ((rx * cosY) + (rz * sinY));
+    temp_z = ((-rx * sinY) + (rz * cosY));
+    rx = temp_x;
+    rz = temp_z;
+    temp_y = ((ry * cosX) - (rz * sinX));
+    temp_z = ((ry * sinX) + (rz * cosX));
+    ry = temp_y;
+    rz = temp_z;
+  } else if ((jwx_kifs3d_rot_order_c == 1)) {
+    temp_y = ((ry * cosX) - (rz * sinX));
+    temp_z = ((ry * sinX) + (rz * cosX));
+    ry = temp_y;
+    rz = temp_z;
+    temp_x = ((rx * cosY) + (rz * sinY));
+    temp_z = ((-rx * sinY) + (rz * cosY));
+    rx = temp_x;
+    rz = temp_z;
+    temp_x = ((rx * cosZ) - (ry * sinZ));
+    temp_y = ((rx * sinZ) + (ry * cosZ));
+    rx = temp_x;
+    ry = temp_y;
+  }
+  rx += pivotX;
+  ry += pivotY;
+  rz += pivotZ;
+  return kifs3d_Point3D_make(rx, ry, rz);
+}
+
+fn kifs3d_applyScaleTranslate(x: f32, y: f32, z: f32) -> kifs3d_Point3D {
+  var pivotX: f32 = jwx_kifs3d_center_x_c;
+  var pivotY: f32 = jwx_kifs3d_center_y_c;
+  var pivotZ: f32 = jwx_kifs3d_center_z_c;
+  var pivotIsOffset: bool = false;
+  if ((jwx_kifs3d_scale_pivot_c == 1)) {
+    pivotX = jwx_kifs3d_offset_x_c;
+    pivotY = jwx_kifs3d_offset_y_c;
+    pivotZ = jwx_kifs3d_offset_z_c;
+    pivotIsOffset = true;
+  }
+  var sx: f32 = ((jwx_kifs3d_kifs_scale_x_c * (x - pivotX)) + pivotX);
+  var sy: f32 = ((jwx_kifs3d_kifs_scale_y_c * (y - pivotY)) + pivotY);
+  var sz: f32 = ((jwx_kifs3d_kifs_scale_z_c * (z - pivotZ)) + pivotZ);
+  if (!pivotIsOffset) {
+    sx += jwx_kifs3d_offset_x_c;
+    sy += jwx_kifs3d_offset_y_c;
+    sz += jwx_kifs3d_offset_z_c;
+  }
+  return kifs3d_Point3D_make(sx, sy, sz);
+}
+
+var<private> jwx_kifs3d_mirror_fold_c: f32 = 0.0;
+
+var<private> jwx_kifs3d_fold_type_c: f32 = 0.0;
+
+var<private> jwx_kifs3d_fold_plane1_nx_c: f32 = 0.0;
+
+var<private> jwx_kifs3d_fold_plane1_ny_c: f32 = 0.0;
+
+var<private> jwx_kifs3d_fold_plane1_nz_c: f32 = 0.0;
+
+var<private> jwx_kifs3d_fold_plane1_dist_c: f32 = 0.0;
+
+var<private> jwx_kifs3d_fold_plane1_intensity_c: f32 = 0.0;
+
+var<private> jwx_kifs3d_edge_x_c: f32 = 0.0;
+
+var<private> jwx_kifs3d_edge_y_c: f32 = 0.0;
+
+var<private> jwx_kifs3d_edge_z_c: f32 = 0.0;
+
+var<private> jwx_kifs3d_rot_order_c: f32 = 0.0;
+
+var<private> jwx_kifs3d_center_x_c: f32 = 0.0;
+
+var<private> jwx_kifs3d_center_y_c: f32 = 0.0;
+
+var<private> jwx_kifs3d_center_z_c: f32 = 0.0;
+
+var<private> jwx_kifs3d_scale_pivot_c: f32 = 0.0;
+
+var<private> jwx_kifs3d_offset_x_c: f32 = 0.0;
+
+var<private> jwx_kifs3d_offset_y_c: f32 = 0.0;
+
+var<private> jwx_kifs3d_offset_z_c: f32 = 0.0;
+
+var<private> jwx_kifs3d_kifs_scale_x_c: f32 = 0.0;
+
+var<private> jwx_kifs3d_kifs_scale_y_c: f32 = 0.0;
+
+var<private> jwx_kifs3d_kifs_scale_z_c: f32 = 0.0;
+
+var<private> jwx_kifs3d_inited_: f32 = 0.0;
+
+var<private> jwx_kifs3d_fold_norm1_len_sq: f32 = 0.0;
+
+var<private> jwx_kifs3d_rot_x_rad: f32 = 0.0;
+
+var<private> jwx_kifs3d_rot_y_rad: f32 = 0.0;
+
+var<private> jwx_kifs3d_rot_z_rad: f32 = 0.0;`,
+    code: (w, p) => `{
+var p18_: f32 = ${p[18]};
+jwx_kifs3d_mirror_fold_c = min(max(${p[12]}, 0.0), 1.0);
+jwx_kifs3d_fold_type_c = min(max(${p[13]}, 0.0), 4.0);
+jwx_kifs3d_fold_plane1_nx_c = ${p[14]};
+jwx_kifs3d_fold_plane1_ny_c = ${p[15]};
+jwx_kifs3d_fold_plane1_nz_c = ${p[16]};
+jwx_kifs3d_fold_plane1_dist_c = ${p[17]};
+jwx_kifs3d_fold_plane1_intensity_c = p18_;
+jwx_kifs3d_edge_x_c = ${p[19]};
+jwx_kifs3d_edge_y_c = ${p[20]};
+jwx_kifs3d_edge_z_c = ${p[21]};
+jwx_kifs3d_rot_order_c = min(max(${p[25]}, 0.0), 1.0);
+jwx_kifs3d_center_x_c = ${p[6]};
+jwx_kifs3d_center_y_c = ${p[7]};
+jwx_kifs3d_center_z_c = ${p[8]};
+jwx_kifs3d_scale_pivot_c = min(max(${p[5]}, 0.0), 1.0);
+jwx_kifs3d_offset_x_c = ${p[9]};
+jwx_kifs3d_offset_y_c = ${p[10]};
+jwx_kifs3d_offset_z_c = ${p[11]};
+jwx_kifs3d_kifs_scale_x_c = ${p[2]};
+jwx_kifs3d_kifs_scale_y_c = ${p[3]};
+jwx_kifs3d_kifs_scale_z_c = ${p[4]};
+var bailout_sq: f32 = 0;
+if ((jwx_kifs3d_inited_ == 0.0)) {
+  jwx_kifs3d_inited_ = 1.0;
+  jwx_kifs3d_rot_x_rad = 0;
+  jwx_kifs3d_rot_y_rad = 0;
+  jwx_kifs3d_rot_z_rad = 0;
+  jwx_kifs3d_fold_norm1_len_sq = 0;
+}
+{
+  bailout_sq = (${p[1]} * ${p[1]});
+  if ((bailout_sq <= 0)) {
+    bailout_sq = 0.000001;
+  }
+  jwx_kifs3d_rot_x_rad = radians(${p[22]});
+  jwx_kifs3d_rot_y_rad = radians(${p[23]});
+  jwx_kifs3d_rot_z_rad = radians(${p[24]});
+  jwx_kifs3d_fold_norm1_len_sq = (((${p[14]} * ${p[14]}) + (${p[15]} * ${p[15]})) + (${p[16]} * ${p[16]}));
+  if ((p18_ < 0)) {
+    p18_ = 0;
+  }
+}
+var x: f32 = t.x;
+var y: f32 = t.y;
+var z: f32 = z_;
+var iter_color: f32 = 0.0;
+var escaped: bool = false;
+for (var i: i32 = 0; (i < i32(${p[0]})); i++) {
+  var cur_x: f32 = x;
+  var cur_y: f32 = y;
+  var cur_z: f32 = z;
+  var folded: kifs3d_Point3D;
+  var rotated: kifs3d_Point3D;
+  var scaled: kifs3d_Point3D;
+  var rotPivotX: f32 = 0.0;
+  var rotPivotY: f32 = 0.0;
+  var rotPivotZ: f32 = 0.0;
+  if ((min(max(${p[26]}, 0.0), 2.0) == 1)) {
+    rotPivotX = ${p[6]};
+    rotPivotY = ${p[7]};
+    rotPivotZ = ${p[8]};
+  } else if ((min(max(${p[26]}, 0.0), 2.0) == 2)) {
+    rotPivotX = ${p[9]};
+    rotPivotY = ${p[10]};
+    rotPivotZ = ${p[11]};
+  }
+  if ((min(max(${p[27]}, 0.0), 2.0) == 0)) {
+    folded = kifs3d_applyFolding(cur_x, cur_y, cur_z, rs);
+    rotated = kifs3d_applyRotation(folded.x, folded.y, folded.z, rotPivotX, rotPivotY, rotPivotZ);
+    scaled = kifs3d_applyScaleTranslate(rotated.x, rotated.y, rotated.z);
+    x = scaled.x;
+    y = scaled.y;
+    z = scaled.z;
+  } else if ((min(max(${p[27]}, 0.0), 2.0) == 1)) {
+    rotated = kifs3d_applyRotation(cur_x, cur_y, cur_z, rotPivotX, rotPivotY, rotPivotZ);
+    folded = kifs3d_applyFolding(rotated.x, rotated.y, rotated.z, rs);
+    scaled = kifs3d_applyScaleTranslate(folded.x, folded.y, folded.z);
+    x = scaled.x;
+    y = scaled.y;
+    z = scaled.z;
+  } else if ((min(max(${p[27]}, 0.0), 2.0) == 2)) {
+    scaled = kifs3d_applyScaleTranslate(cur_x, cur_y, cur_z);
+    folded = kifs3d_applyFolding(scaled.x, scaled.y, scaled.z, rs);
+    rotated = kifs3d_applyRotation(folded.x, folded.y, folded.z, rotPivotX, rotPivotY, rotPivotZ);
+    x = rotated.x;
+    y = rotated.y;
+    z = rotated.z;
+  }
+  var r_sq: f32 = (((x * x) + (y * y)) + (z * z));
+  if ((r_sq > bailout_sq)) {
+    iter_color = (f32(i) / f32(i32(${p[0]})));
+    escaped = true;
+    break;
+  }
+}
+if (!escaped) {
+  iter_color = 1.0;
+}
+if ((min(max(${p[28]}, 0.0), 7.0) > 0)) {
+  var signX: f32 = select(1.0, -1.0, (rnd(rs) < 0.5));
+  var signY: f32 = select(1.0, -1.0, (rnd(rs) < 0.5));
+  var signZ: f32 = select(1.0, -1.0, (rnd(rs) < 0.5));
+  if (((i32(min(max(${p[28]}, 0.0), 7.0)) & 1) != 0)) {
+    x *= signX;
+  }
+  if (((i32(min(max(${p[28]}, 0.0), 7.0)) & 2) != 0)) {
+    y *= signY;
+  }
+  if (((i32(min(max(${p[28]}, 0.0), 7.0)) & 4) != 0)) {
+    z *= signZ;
+  }
+}
+var color_value: f32 = 0.0;
+var temp_val: f32 = 0.0;
+switch i32(min(max(${p[29]}, 0.0), 5.0)) {
+  case 1: {
+    temp_val = (sqrt((((x * x) + (y * y)) + (z * z))) * ${p[30]});
+    color_value = (temp_val - floor(temp_val));
+  }
+  case 2: {
+    temp_val = atan2j(y, x);
+    color_value = (((temp_val + PI) / (2.0 * PI)) * ${p[30]});
+    color_value = (color_value - floor(color_value));
+  }
+  case 3: {
+    temp_val = (x * ${p[30]});
+    color_value = (temp_val - floor(temp_val));
+  }
+  case 4: {
+    temp_val = (y * ${p[30]});
+    color_value = (temp_val - floor(temp_val));
+  }
+  case 5: {
+    temp_val = (z * ${p[30]});
+    color_value = (temp_val - floor(temp_val));
+  }
+  case 0, default: {
+    color_value = iter_color;
+  }
+}
+var finalX: f32 = (x * ${w});
+var finalY: f32 = (y * ${w});
+var finalZ: f32 = (z * ${w});
+v.x += finalX;
+v.y += finalY;
+pz_ += finalZ;
+(*cp) = color_value;
+}`,
+  },
+  "glynnSim2B": {
+    params: [{ name: "radius", def: 1 }, { name: "thickness", def: 0.1 }, { name: "contrast", def: 0.5 }, { name: "pow", def: 1.5 }, { name: "phi1", def: 110 }, { name: "phi2", def: 150 }, { name: "rotX", def: 0 }, { name: "rotY", def: 0 }, { name: "rotZ", def: 0 }, { name: "offsetZ", def: 0 }, { name: "scaleX", def: 1 }, { name: "scaleY", def: 1 }, { name: "scaleZ", def: 1 }, { name: "shearXY", def: 0 }, { name: "shearXZ", def: 0 }, { name: "shearYX", def: 0 }, { name: "shearYZ", def: 0 }, { name: "shearZX", def: 0 }, { name: "shearZY", def: 0 }, { name: "circleRotX", def: 0 }, { name: "circleRotY", def: 0 }, { name: "circleThicknessZ", def: 0 }, { name: "colorMode", def: 0 }, { name: "fixedHue", def: 0 }, { name: "zHueScale", def: 1 }, { name: "randomHueAmount", def: 0 }],
+    verified: true, priority: 0, flags: ["3d","dc","state","z"], types: ["3D","SIMULATION"],
+    funcNames: ["jwx_glynnSim2B_radius_c","jwx_glynnSim2B_thickness_c","jwx_glynnSim2B_circleThicknessZ_c","jwx_glynnSim2B_inited_","jwx_glynnSim2B__phi10","jwx_glynnSim2B__gamma","jwx_glynnSim2B__delta","jwx_glynnSim2B__circleRotXRad","jwx_glynnSim2B__circleRotYRad","glynnSim2B_Point","powc","atan2j","glynnSim2B_circle"],
+    funcs: `struct glynnSim2B_Point {
+  x: f32,
+  y: f32,
+  z: f32,
+}
+
+fn powc(x: f32, y: f32) -> f32 {
+  if (x >= 0.0) { return pow(x, y); }
+  let yi = round(y);
+  if (abs(y - yi) > 1e-6) { return pow(x, y); }
+  let m = pow(-x, y);
+  return select(m, -m, (i32(yi) & 1) != 0);
+}
+
+fn atan2j(y: f32, x: f32) -> f32 { if (x == 0.0 && y == 0.0) { return select(0.0, PI, (bitcast<u32>(x) >> 31u) == 1u) * select(1.0, -1.0, (bitcast<u32>(y) >> 31u) == 1u); } return atan2(y, x); }
+
+fn glynnSim2B_circle(p_: ptr<function, glynnSim2B_Point>, rs: ptr<function, u32>) {
+  var r_: f32 = ((jwx_glynnSim2B_radius_c + jwx_glynnSim2B_thickness_c) - (jwx_glynnSim2B__gamma * rnd(rs)));
+  var Phi: f32 = (jwx_glynnSim2B__phi10 + (jwx_glynnSim2B__delta * rnd(rs)));
+  var sinPhi: f32 = sin(Phi);
+  var cosPhi: f32 = cos(Phi);
+  var circX: f32 = (r_ * cosPhi);
+  var circY: f32 = (r_ * sinPhi);
+  var circZ: f32 = 0.0;
+  circZ += (((rnd(rs) - 0.5) * 2.0) * jwx_glynnSim2B_circleThicknessZ_c);
+  var sinCircleRotX: f32 = sin(jwx_glynnSim2B__circleRotXRad);
+  var cosCircleRotX: f32 = cos(jwx_glynnSim2B__circleRotXRad);
+  var sinCircleRotY: f32 = sin(jwx_glynnSim2B__circleRotYRad);
+  var cosCircleRotY: f32 = cos(jwx_glynnSim2B__circleRotYRad);
+  var tempY: f32 = ((circY * cosCircleRotX) - (circZ * sinCircleRotX));
+  var tempZ: f32 = ((circY * sinCircleRotX) + (circZ * cosCircleRotX));
+  circY = tempY;
+  circZ = tempZ;
+  var tempX: f32 = ((circX * cosCircleRotY) + (circZ * sinCircleRotY));
+  tempZ = ((-circX * sinCircleRotY) + (circZ * cosCircleRotY));
+  circX = tempX;
+  circZ = tempZ;
+  (*p_).x = circX;
+  (*p_).y = circY;
+  (*p_).z = circZ;
+}
+
+var<private> jwx_glynnSim2B_radius_c: f32 = 0.0;
+
+var<private> jwx_glynnSim2B_thickness_c: f32 = 0.0;
+
+var<private> jwx_glynnSim2B_circleThicknessZ_c: f32 = 0.0;
+
+var<private> jwx_glynnSim2B_inited_: f32 = 0.0;
+
+var<private> jwx_glynnSim2B__phi10: f32 = 0.0;
+
+var<private> jwx_glynnSim2B__gamma: f32 = 0.0;
+
+var<private> jwx_glynnSim2B__delta: f32 = 0.0;
+
+var<private> jwx_glynnSim2B__circleRotXRad: f32 = 0.0;
+
+var<private> jwx_glynnSim2B__circleRotYRad: f32 = 0.0;`,
+    code: (w, p) => `{
+jwx_glynnSim2B_radius_c = ${p[0]};
+jwx_glynnSim2B_thickness_c = min(max(${p[1]}, 0.0), 1.0);
+jwx_glynnSim2B_circleThicknessZ_c = ${p[21]};
+var toolPoint: glynnSim2B_Point;
+var _phi20: f32 = 0;
+var _absPow: f32 = 0;
+var _rotXRad: f32 = 0;
+var _rotYRad: f32 = 0;
+var _rotZRad: f32 = 0;
+if ((jwx_glynnSim2B_inited_ == 0.0)) {
+  jwx_glynnSim2B_inited_ = 1.0;
+  jwx_glynnSim2B__phi10 = 0;
+  jwx_glynnSim2B__gamma = 0;
+  jwx_glynnSim2B__delta = 0;
+  jwx_glynnSim2B__circleRotXRad = 0;
+  jwx_glynnSim2B__circleRotYRad = 0;
+}
+{
+  jwx_glynnSim2B__phi10 = ((PI * ${p[4]}) / 180.0);
+  _phi20 = ((PI * ${p[5]}) / 180.0);
+  jwx_glynnSim2B__gamma = ((min(max(${p[1]}, 0.0), 1.0) * ((2.0 * ${p[0]}) + min(max(${p[1]}, 0.0), 1.0))) / (${p[0]} + min(max(${p[1]}, 0.0), 1.0)));
+  jwx_glynnSim2B__delta = (_phi20 - jwx_glynnSim2B__phi10);
+  _absPow = abs(${p[3]});
+  _rotXRad = ((PI * ${p[6]}) / 180.0);
+  _rotYRad = ((PI * ${p[7]}) / 180.0);
+  _rotZRad = ((PI * ${p[8]}) / 180.0);
+  jwx_glynnSim2B__circleRotXRad = ((PI * ${p[19]}) / 180.0);
+  jwx_glynnSim2B__circleRotYRad = ((PI * ${p[20]}) / 180.0);
+}
+var x: f32 = t.x;
+var y: f32 = t.y;
+var z: f32 = z_;
+var r_: f32 = sqrt(((x * x) + (y * y)));
+var Alpha: f32 = (${p[0]} / r_);
+if ((r_ < ${p[0]})) {
+  glynnSim2B_circle(&(toolPoint), rs);
+  x = toolPoint.x;
+  y = toolPoint.y;
+  z = toolPoint.z;
+} else {
+  if ((rnd(rs) > (min(max(${p[2]}, 0.0), 1.0) * powc(Alpha, _absPow)))) {
+  } else {
+    x = ((Alpha * Alpha) * x);
+    y = ((Alpha * Alpha) * y);
+  }
+}
+x *= ${p[10]};
+y *= ${p[11]};
+z *= ${p[12]};
+var tempX: f32 = ((x + (${p[15]} * y)) + (${p[17]} * z));
+var tempY: f32 = ((y + (${p[13]} * x)) + (${p[18]} * z));
+var tempZ: f32 = ((z + (${p[14]} * x)) + (${p[16]} * y));
+x = tempX;
+y = tempY;
+z = tempZ;
+var sinRotX: f32 = sin(_rotXRad);
+var cosRotX: f32 = cos(_rotXRad);
+var sinRotY: f32 = sin(_rotYRad);
+var cosRotY: f32 = cos(_rotYRad);
+var sinRotZ: f32 = sin(_rotZRad);
+var cosRotZ: f32 = cos(_rotZRad);
+var rotatedY: f32 = ((y * cosRotX) - (z * sinRotX));
+var rotatedZ: f32 = ((y * sinRotX) + (z * cosRotX));
+y = rotatedY;
+z = rotatedZ;
+var rotatedX: f32 = ((x * cosRotY) + (z * sinRotY));
+rotatedZ = ((-x * sinRotY) + (z * cosRotY));
+x = rotatedX;
+z = rotatedZ;
+rotatedX = ((x * cosRotZ) - (y * sinRotZ));
+rotatedY = ((x * sinRotZ) + (y * cosRotZ));
+x = rotatedX;
+y = rotatedY;
+z += ${p[9]};
+v.x += (${w} * x);
+v.y += (${w} * y);
+pz_ += (${w} * z);
+if ((i32(${p[22]}) == 0)) {
+} else {
+  var hue: f32 = 0.0;
+  if (((i32(${p[22]}) == 1) || (i32(${p[22]}) == 3))) {
+    hue = ((z * ${p[24]}) % 1.0);
+    if ((hue < 0.0)) {
+      hue += 1.0;
+    }
+  }
+  if (((i32(${p[22]}) == 2) || (i32(${p[22]}) == 3))) {
+    var random_hue_shift: f32 = (((rnd(rs) - 0.5) * 2.0) * min(max(${p[25]}, 0.0), 1.0));
+    hue = ((hue + random_hue_shift) % 1.0);
+    if ((hue < 0.0)) {
+      hue += 1.0;
+    }
+  }
+  if ((i32(${p[22]}) == 4)) {
+    hue = min(max(${p[23]}, 0.0), 1.0);
+  }
+  (*cp) = hue;
 }
 }`,
   },
@@ -36772,6 +44205,680 @@ if ((min(max(${p[9]}, 0.0), 1.0) > 0)) {
     }
   }
   (*cp) = (abs(((colorDriver * ${p[11]}) + ${p[12]})) % 1.0);
+}
+}`,
+  },
+  "cell3D": {
+    params: [{ name: "size", def: 0.6 }, { name: "a", def: 1 }, { name: "grid_rot_x", def: 0 }, { name: "grid_rot_y", def: 0 }, { name: "grid_rot_z", def: 0 }, { name: "cell_idx_power_x", def: 1 }, { name: "cell_idx_power_y", def: 1 }, { name: "cell_idx_power_z", def: 1 }, { name: "dxdydz_mode", def: 0 }, { name: "cell_scale_x", def: 1 }, { name: "cell_scale_y", def: 1 }, { name: "cell_scale_z", def: 1 }, { name: "cell_power_x", def: 1 }, { name: "cell_power_y", def: 1 }, { name: "cell_power_z", def: 1 }, { name: "cell_rot_x", def: 0 }, { name: "cell_rot_y", def: 0 }, { name: "cell_rot_z", def: 0 }, { name: "space_xa", def: 2 }, { name: "space_ya", def: 2 }, { name: "space_xb", def: 2 }, { name: "space_yb", def: 2 }, { name: "move_xa", def: 1 }, { name: "space_xc", def: 2 }, { name: "space_yc", def: 2 }, { name: "move_ya", def: 1 }, { name: "space_xd", def: 2 }, { name: "space_yd", def: 2 }, { name: "move_xb", def: 1 }, { name: "move_yb", def: 1 }, { name: "move_tr_x", def: 0 }, { name: "move_tr_y", def: 0 }, { name: "move_br_x", def: 0 }, { name: "space_z", def: 1 }, { name: "move_z", def: 0 }, { name: "checker_mode", def: 0 }, { name: "checker_invert", def: 0 }, { name: "space_xa2", def: 2 }, { name: "space_ya2", def: 2 }, { name: "space_xb2", def: 2 }, { name: "space_yb2", def: 2 }, { name: "move_xa2", def: 1 }, { name: "space_xc2", def: 2 }, { name: "space_yc2", def: 2 }, { name: "move_ya2", def: 1 }, { name: "space_xd2", def: 2 }, { name: "space_yd2", def: 2 }, { name: "move_xb2", def: 1 }, { name: "move_yb2", def: 1 }, { name: "move_tr_x2", def: 0 }, { name: "move_tr_y2", def: 0 }, { name: "move_br_x2", def: 0 }, { name: "space_z2", def: 1 }, { name: "move_z2", def: 0 }, { name: "mirror_x", def: 0 }, { name: "mirror_y", def: 0 }, { name: "mirror_z", def: 0 }, { name: "invert_y", def: 1 }, { name: "invert_z", def: 0 }, { name: "offset_x", def: 0 }, { name: "offset_y", def: 0 }, { name: "offset_z", def: 0 }, { name: "color_mode", def: 0 }, { name: "cidx_scale_x", def: 0.05 }, { name: "cidx_scale_y", def: 0.05 }, { name: "cidx_scale_z", def: 0.05 }, { name: "cidx_offset", def: 0 }, { name: "cdist_scale", def: 1 }, { name: "color_q1", def: 0 }, { name: "color_q2", def: 0.25 }, { name: "color_q3", def: 0.5 }, { name: "color_q4", def: 0.75 }, { name: "color_use_z_sign", def: 0 }, { name: "color_z_neg_offset", def: 0.1 }, { name: "cz_scale", def: 0.05 }, { name: "cz_offset", def: 0 }],
+    verified: true, priority: 0, flags: ["3d","dc","z"], types: ["3D","DC"],
+    funcNames: ["powc","atan2j","cell3D_rotatePoint3D","cell3D_normalizeColor"],
+    funcs: `fn powc(x: f32, y: f32) -> f32 {
+  if (x >= 0.0) { return pow(x, y); }
+  let yi = round(y);
+  if (abs(y - yi) > 1e-6) { return pow(x, y); }
+  let m = pow(-x, y);
+  return select(m, -m, (i32(yi) & 1) != 0);
+}
+
+fn atan2j(y: f32, x: f32) -> f32 { if (x == 0.0 && y == 0.0) { return select(0.0, PI, (bitcast<u32>(x) >> 31u) == 1u) * select(1.0, -1.0, (bitcast<u32>(y) >> 31u) == 1u); } return atan2(y, x); }
+
+fn cell3D_rotatePoint3D(coords: ptr<function, array<f32, 3>>, angX: f32, angY: f32, angZ: f32) {
+  var x: f32 = (*coords)[0];
+  var y: f32 = (*coords)[1];
+  var z: f32 = (*coords)[2];
+  var temp_x: f32;
+  var temp_y: f32;
+  var temp_z: f32;
+  if ((abs(angZ) > 1.0e-9)) {
+    var radZ: f32 = radians(angZ);
+    var cosZ: f32 = cos(radZ);
+    var sinZ: f32 = sin(radZ);
+    temp_x = ((x * cosZ) - (y * sinZ));
+    temp_y = ((x * sinZ) + (y * cosZ));
+    x = temp_x;
+    y = temp_y;
+  }
+  if ((abs(angY) > 1.0e-9)) {
+    var radY: f32 = radians(angY);
+    var cosY: f32 = cos(radY);
+    var sinY: f32 = sin(radY);
+    temp_x = ((x * cosY) + (z * sinY));
+    temp_z = ((-x * sinY) + (z * cosY));
+    x = temp_x;
+    z = temp_z;
+  }
+  if ((abs(angX) > 1.0e-9)) {
+    var radX: f32 = radians(angX);
+    var cosX: f32 = cos(radX);
+    var sinX: f32 = sin(radX);
+    temp_y = ((y * cosX) - (z * sinX));
+    temp_z = ((y * sinX) + (z * cosX));
+    y = temp_y;
+    z = temp_z;
+  }
+  (*coords)[0] = x;
+  (*coords)[1] = y;
+  (*coords)[2] = z;
+}
+
+fn cell3D_normalizeColor(val: f32) -> f32 {
+  var normalized: f32 = abs(val);
+  return (normalized - floor(normalized));
+}`,
+    code: (w, p) => `{
+loop {
+var p_: array<f32, 3> = array<f32, 3>(t.x, t.y, z_);
+if ((((abs(${p[2]}) > 1.0e-9) || (abs(${p[3]}) > 1.0e-9)) || (abs(${p[4]}) > 1.0e-9))) {
+  cell3D_rotatePoint3D(&(p_), ${p[2]}, ${p[3]}, ${p[4]});
+}
+var p_x: f32 = p_[0];
+var p_y: f32 = p_[1];
+var p_z: f32 = p_[2];
+var actual_cell_size: f32;
+if ((abs(${p[1]}) < 1.0e-9)) {
+  actual_cell_size = select(${p[0]}, 1.0, (abs(${p[0]}) < 1.0e-9));
+} else {
+  actual_cell_size = (${p[0]} / ${p[1]});
+}
+if ((abs(actual_cell_size) < 1.0e-9)) {
+  v.x += (${w} * p_x);
+  v.y += (${w} * p_y);
+  pz_ += (${w} * p_z);
+  break;
+}
+var inv_actual_cell_size: f32 = (1.0 / actual_cell_size);
+var original_x_idx_raw: f32 = floor((p_x * inv_actual_cell_size));
+var original_y_idx_raw: f32 = floor((p_y * inv_actual_cell_size));
+var original_z_idx_raw: f32 = floor((p_z * inv_actual_cell_size));
+var processed_original_x_idx: f32 = original_x_idx_raw;
+if ((abs((${p[5]} - 1.0)) > 1.0e-9)) {
+  processed_original_x_idx = (sign(original_x_idx_raw) * powc(abs(original_x_idx_raw), ${p[5]}));
+}
+var processed_original_y_idx: f32 = original_y_idx_raw;
+if ((abs((${p[6]} - 1.0)) > 1.0e-9)) {
+  processed_original_y_idx = (sign(original_y_idx_raw) * powc(abs(original_y_idx_raw), ${p[6]}));
+}
+var processed_original_z_idx: f32 = original_z_idx_raw;
+if ((abs((${p[7]} - 1.0)) > 1.0e-9)) {
+  processed_original_z_idx = (sign(original_z_idx_raw) * powc(abs(original_z_idx_raw), ${p[7]}));
+}
+var dx: f32 = (p_x - (original_x_idx_raw * actual_cell_size));
+var dy: f32 = (p_y - (original_y_idx_raw * actual_cell_size));
+var dz: f32 = (p_z - (original_z_idx_raw * actual_cell_size));
+if ((min(max(${p[8]}, 0.0), 1.0) == 1)) {
+  dx = ((actual_cell_size / 2.0) - abs((dx - (actual_cell_size / 2.0))));
+  dy = ((actual_cell_size / 2.0) - abs((dy - (actual_cell_size / 2.0))));
+  dz = ((actual_cell_size / 2.0) - abs((dz - (actual_cell_size / 2.0))));
+}
+if ((min(max(${p[62]}, 0.0), 1.0) != 0)) {
+  var newColor: f32 = 0.0;
+  switch i32(min(max(${p[62]}, 0.0), 1.0)) {
+    case 1: {
+      newColor = ((((processed_original_x_idx * ${p[63]}) + (processed_original_y_idx * ${p[64]})) + (processed_original_z_idx * ${p[65]})) + ${p[66]});
+    }
+    case 2: {
+      var dist_sq: f32 = (((dx * dx) + (dy * dy)) + (dz * dz));
+      var norm_dist: f32 = select(0.0, (sqrt(dist_sq) / (actual_cell_size * sqrt(3.0))), (abs(actual_cell_size) > 1.0e-9));
+      newColor = (norm_dist * ${p[67]});
+    }
+    case 3: {
+      var baseColor: f32;
+      if ((original_y_idx_raw >= 0)) {
+        if ((original_x_idx_raw >= 0)) {
+          baseColor = ${p[68]};
+        } else {
+          baseColor = ${p[69]};
+        }
+      } else {
+        if ((original_x_idx_raw >= 0)) {
+          baseColor = ${p[70]};
+        } else {
+          baseColor = ${p[71]};
+        }
+      }
+      if (((${p[72]} == 1) && (original_z_idx_raw < 0))) {
+        newColor = (baseColor + ${p[73]});
+      } else {
+        newColor = baseColor;
+      }
+    }
+    case 4: {
+      newColor = ((original_z_idx_raw * ${p[74]}) + ${p[75]});
+    }
+    default: {}
+  }
+  (*cp) = cell3D_normalizeColor(newColor);
+}
+if ((abs(actual_cell_size) > 1.0e-9)) {
+  if ((abs((${p[12]} - 1.0)) > 1.0e-9)) {
+    dx = select(((sign(dx) * powc(abs((dx * inv_actual_cell_size)), ${p[12]})) * actual_cell_size), 0.0, (abs(dx) < 1.0e-9));
+  }
+  if ((abs((${p[13]} - 1.0)) > 1.0e-9)) {
+    dy = select(((sign(dy) * powc(abs((dy * inv_actual_cell_size)), ${p[13]})) * actual_cell_size), 0.0, (abs(dy) < 1.0e-9));
+  }
+  if ((abs((${p[14]} - 1.0)) > 1.0e-9)) {
+    dz = select(((sign(dz) * powc(abs((dz * inv_actual_cell_size)), ${p[14]})) * actual_cell_size), 0.0, (abs(dz) < 1.0e-9));
+  }
+}
+dx *= ${p[9]};
+dy *= ${p[10]};
+dz *= ${p[11]};
+if ((((abs(${p[15]}) > 1.0e-9) || (abs(${p[16]}) > 1.0e-9)) || (abs(${p[17]}) > 1.0e-9))) {
+  var center_offset: f32 = (actual_cell_size / 2.0);
+  var cell_content_coords: array<f32, 3> = array<f32, 3>((dx - center_offset), (dy - center_offset), (dz - center_offset));
+  cell3D_rotatePoint3D(&(cell_content_coords), ${p[15]}, ${p[16]}, ${p[17]});
+  dx = (cell_content_coords[0] + center_offset);
+  dy = (cell_content_coords[1] + center_offset);
+  dz = (cell_content_coords[2] + center_offset);
+}
+var use_alt_params: bool = false;
+if ((min(max(${p[35]}, 0.0), 1.0) == 1)) {
+  var ix_check: i32 = i32(floor(original_x_idx_raw));
+  var iy_check: i32 = i32(floor(original_y_idx_raw));
+  var is_odd_cell: bool = (((ix_check + iy_check) % 2) != 0);
+  if (((is_odd_cell && (min(max(${p[36]}, 0.0), 1.0) == 0)) || (!is_odd_cell && (min(max(${p[36]}, 0.0), 1.0) == 1)))) {
+    use_alt_params = true;
+  }
+}
+var cur_space_xa: f32 = select(${p[18]}, ${p[37]}, use_alt_params);
+var cur_space_ya: f32 = select(${p[19]}, ${p[38]}, use_alt_params);
+var cur_space_xb: f32 = select(${p[20]}, ${p[39]}, use_alt_params);
+var cur_space_yb: f32 = select(${p[21]}, ${p[40]}, use_alt_params);
+var cur_move_xa: f32 = select(${p[22]}, ${p[41]}, use_alt_params);
+var cur_space_xc: f32 = select(${p[23]}, ${p[42]}, use_alt_params);
+var cur_space_yc: f32 = select(${p[24]}, ${p[43]}, use_alt_params);
+var cur_move_ya: f32 = select(${p[25]}, ${p[44]}, use_alt_params);
+var cur_space_xd: f32 = select(${p[26]}, ${p[45]}, use_alt_params);
+var cur_space_yd: f32 = select(${p[27]}, ${p[46]}, use_alt_params);
+var cur_move_xb: f32 = select(${p[28]}, ${p[47]}, use_alt_params);
+var cur_move_yb: f32 = select(${p[29]}, ${p[48]}, use_alt_params);
+var cur_move_tr_x: f32 = select(${p[30]}, ${p[49]}, use_alt_params);
+var cur_move_tr_y: f32 = select(${p[31]}, ${p[50]}, use_alt_params);
+var cur_move_br_x: f32 = select(${p[32]}, ${p[51]}, use_alt_params);
+var cur_space_z: f32 = select(${p[33]}, ${p[52]}, use_alt_params);
+var cur_move_z: f32 = select(${p[34]}, ${p[53]}, use_alt_params);
+var modified_x_idx: f32 = processed_original_x_idx;
+var modified_y_idx: f32 = processed_original_y_idx;
+if ((processed_original_y_idx >= 0)) {
+  if ((processed_original_x_idx >= 0)) {
+    modified_y_idx = ((cur_space_ya * processed_original_y_idx) + cur_move_tr_y);
+    modified_x_idx = ((cur_space_xa * processed_original_x_idx) + cur_move_tr_x);
+  } else {
+    modified_y_idx = (cur_space_yb * processed_original_y_idx);
+    modified_x_idx = -((cur_space_xb * processed_original_x_idx) + cur_move_xa);
+  }
+} else {
+  if ((processed_original_x_idx >= 0)) {
+    modified_y_idx = -((cur_space_yc * processed_original_y_idx) + cur_move_ya);
+    modified_x_idx = ((cur_space_xc * processed_original_x_idx) + cur_move_br_x);
+  } else {
+    modified_y_idx = -((cur_space_yd * processed_original_y_idx) + cur_move_yb);
+    modified_x_idx = -((cur_space_xd * processed_original_x_idx) + cur_move_xb);
+  }
+}
+var modified_z_idx: f32 = ((processed_original_z_idx * cur_space_z) + cur_move_z);
+var final_x: f32 = (dx + (modified_x_idx * actual_cell_size));
+var final_y: f32 = (dy + (modified_y_idx * actual_cell_size));
+var final_z: f32 = (dz + (modified_z_idx * actual_cell_size));
+v.x += (${w} * final_x);
+v.y += (${w} * select(final_y, -final_y, (min(max(${p[57]}, 0.0), 1.0) == 1)));
+pz_ += (${w} * select(final_z, -final_z, (min(max(${p[58]}, 0.0), 1.0) == 1)));
+if (((min(max(${p[54]}, 0.0), 1.0) > 0) && (rnd(rs) < 0.5))) {
+  v.x = -v.x;
+}
+if (((min(max(${p[55]}, 0.0), 1.0) > 0) && (rnd(rs) < 0.5))) {
+  v.y = -v.y;
+}
+if (((min(max(${p[56]}, 0.0), 1.0) > 0) && (rnd(rs) < 0.5))) {
+  pz_ = -pz_;
+}
+v.x += ${p[59]};
+v.y += ${p[60]};
+pz_ += ${p[61]};
+break;
+}
+}`,
+  },
+  "juliascopePlus": {
+    params: [{ name: "power", def: 3 }, { name: "dist", def: 1 }, { name: "cx", def: 0 }, { name: "cy", def: 0 }, { name: "mixPowerSign", def: 0 }, { name: "colorMode", def: 0 }, { name: "colorSpeed", def: 1 }, { name: "thetaSignMode", def: 0 }, { name: "angularOffset", def: 0 }, { name: "swirlFactor", def: 0 }, { name: "fixedBranch", def: -1 }, { name: "radialOffset", def: 0 }, { name: "altPowerScale", def: 1 }, { name: "altPowerRotate", def: 0 }, { name: "rndTermMode", def: 0 }, { name: "mandelbrotLike", def: 0 }],
+    verified: true, priority: 0, flags: ["dc","z"], types: ["2D","DC"],
+    funcNames: ["roundc","atan2j","sqr","powc","fracf"],
+    funcs: `fn roundc(x: f32) -> f32 { return sign(x) * floor(abs(x) + 0.5); }
+
+fn atan2j(y: f32, x: f32) -> f32 { if (x == 0.0 && y == 0.0) { return select(0.0, PI, (bitcast<u32>(x) >> 31u) == 1u) * select(1.0, -1.0, (bitcast<u32>(y) >> 31u) == 1u); } return atan2(y, x); }
+
+fn sqr(x: f32) -> f32 { return x * x; }
+
+fn powc(x: f32, y: f32) -> f32 {
+  if (x >= 0.0) { return pow(x, y); }
+  let yi = round(y);
+  if (abs(y - yi) > 1e-6) { return pow(x, y); }
+  let m = pow(-x, y);
+  return select(m, -m, (i32(yi) & 1) != 0);
+}
+
+fn fracf(x: f32) -> f32 {
+  return (x - trunc(x));
+}`,
+    code: (w, p) => `{
+loop {
+var absPowerForRandomBranches: i32 = 0;
+{
+  if ((${p[0]} == 0)) {
+    absPowerForRandomBranches = 2;
+  } else {
+    absPowerForRandomBranches = max(1, abs(i32(roundc(${p[0]}))));
+  }
+}
+{
+  var effectivePower: i32 = i32(${p[0]});
+  var currentCPower: f32;
+  var applyAltTransform: bool = false;
+  var signWasFlippedForColor: bool = false;
+  var originalPowerSign: i32 = i32(select(sign(${p[0]}), 1, (${p[0]} == 0)));
+  if (((${p[0]} != 0) && (${p[4]} >= 0.5))) {
+    var baseAbsPower: i32 = absPowerForRandomBranches;
+    if ((i32((rnd(rs) * 2)) == 0)) {
+      effectivePower = (baseAbsPower * originalPowerSign);
+      signWasFlippedForColor = (effectivePower < 0);
+    } else {
+      effectivePower = (-baseAbsPower * originalPowerSign);
+      applyAltTransform = true;
+      signWasFlippedForColor = (effectivePower < 0);
+    }
+  } else {
+    effectivePower = i32(${p[0]});
+    signWasFlippedForColor = (effectivePower < 0);
+  }
+  if ((effectivePower == 0)) {
+    var addX: f32 = select(${p[2]}, t.x, (min(max(${p[15]}, 0.0), 1.0) >= 1));
+    var addY: f32 = select(${p[3]}, t.y, (min(max(${p[15]}, 0.0), 1.0) >= 1));
+    v.x += (${w} * (t.x + addX));
+    v.y += (${w} * (t.y + addY));
+    if (false) {
+      pz_ += (${w} * z_);
+    }
+    break;
+  }
+  currentCPower = ((${p[1]} / f32(effectivePower)) * 0.5);
+  var rnd_: i32;
+  var currentFixedBranchVal: i32 = i32(roundc(${p[10]}));
+  var numBranches: i32 = select(1, absPowerForRandomBranches, (absPowerForRandomBranches > 0));
+  if (((currentFixedBranchVal >= 0) && (currentFixedBranchVal < numBranches))) {
+    rnd_ = currentFixedBranchVal;
+  } else {
+    rnd_ = i32((rnd(rs) * f32(numBranches)));
+  }
+  var theta: f32 = atan2j(t.y, t.x);
+  var a: f32;
+  var thetaTermSign: f32 = 1.0;
+  if ((min(max(${p[7]}, 0.0), 3.0) == 0)) {
+    if (((rnd_ & 1) != 0)) {
+      thetaTermSign = -1.0;
+    }
+  } else if ((min(max(${p[7]}, 0.0), 3.0) == 1)) {
+    thetaTermSign = 1.0;
+  } else if ((min(max(${p[7]}, 0.0), 3.0) == 2)) {
+    thetaTermSign = -1.0;
+  } else if ((min(max(${p[7]}, 0.0), 3.0) == 3)) {
+    thetaTermSign = select(-1.0, 1.0, (i32((rnd(rs) * 2)) == 0));
+  }
+  var rndTermComponentSign: f32 = 1.0;
+  if ((min(max(${p[14]}, 0.0), 3.0) == 1)) {
+    rndTermComponentSign = -1.0;
+  } else if ((min(max(${p[14]}, 0.0), 3.0) == 2)) {
+    if (((rnd_ & 1) != 0)) {
+      rndTermComponentSign = -1.0;
+    }
+  } else if ((min(max(${p[14]}, 0.0), 3.0) == 3)) {
+    rndTermComponentSign = select(-1.0, 1.0, (i32((rnd(rs) * 2)) == 0));
+  }
+  a = (((((rndTermComponentSign * 2.0) * PI) * f32(rnd_)) + (thetaTermSign * theta)) / f32(effectivePower));
+  if ((${p[9]} != 0.0)) {
+    var original_r: f32 = sqrt((sqr(t.x) + sqr(t.y)));
+    if ((original_r > 0.00001)) {
+      a += (${p[9]} * log((1.0 + original_r)));
+    }
+  }
+  a += ${p[8]};
+  var sina: f32 = sin(a);
+  var cosa: f32 = cos(a);
+  var r_base_sq: f32 = (sqr(t.x) + sqr(t.y));
+  var r_component_magnitude: f32 = (powc(max(0.0, r_base_sq), currentCPower) + ${p[11]});
+  var dx_component: f32 = (r_component_magnitude * cosa);
+  var dy_component: f32 = (r_component_magnitude * sina);
+  if (applyAltTransform) {
+    dx_component *= ${p[12]};
+    dy_component *= ${p[12]};
+    if ((${p[13]} != 0.0)) {
+      var cosRot: f32 = cos(${p[13]});
+      var sinRot: f32 = sin(${p[13]});
+      var temp_dx: f32 = ((dx_component * cosRot) - (dy_component * sinRot));
+      dy_component = ((dx_component * sinRot) + (dy_component * cosRot));
+      dx_component = temp_dx;
+    }
+  }
+  var addX: f32;
+  var addY: f32;
+  if ((min(max(${p[15]}, 0.0), 1.0) >= 1)) {
+    addX = t.x;
+    addY = t.y;
+  } else {
+    addX = ${p[2]};
+    addY = ${p[3]};
+  }
+  v.x += (${w} * (dx_component + addX));
+  v.y += (${w} * (dy_component + addY));
+  if ((min(max(${p[5]}, 0.0), 5.0) != 0)) {
+    var calculatedColorValue: f32 = 0.0;
+    switch i32(min(max(${p[5]}, 0.0), 5.0)) {
+      case 1: {
+        calculatedColorValue = (a / (2.0 * PI));
+      }
+      case 2: {
+        calculatedColorValue = log((1.00001 + max(0, r_component_magnitude)));
+      }
+      case 3: {
+        calculatedColorValue = ((theta + PI) / (2.0 * PI));
+      }
+      case 4: {
+        if ((numBranches > 0)) {
+          calculatedColorValue = (f32(rnd_) / f32(numBranches));
+        } else {
+          calculatedColorValue = 0.0;
+        }
+      }
+      case 5: {
+        if (((${p[4]} >= 0.5) && (${p[0]} != 0))) {
+          calculatedColorValue = select(0.25, 0.75, signWasFlippedForColor);
+        } else {
+          calculatedColorValue = select(0.75, 0.25, (${p[0]} >= 0));
+        }
+      }
+      default: {}
+    }
+    (*cp) = fracf((calculatedColorValue * ${p[6]}));
+  }
+  if (false) {
+    pz_ += (${w} * z_);
+  }
+}
+break;
+}
+}`,
+  },
+  "romanesco": {
+    params: [{ name: "size", def: 0.5 }, { name: "recursion_depth", def: 7 }, { name: "num_arms", def: 1 }, { name: "arm_spread", def: 1 }, { name: "arm_elevation", def: 45 }, { name: "arm_twist", def: 0 }, { name: "floret_count", def: 100 }, { name: "floret_scale", def: 0.28 }, { name: "pattern_spread", def: 0.4 }, { name: "spiral_twist", def: 1 }, { name: "cone_steepness", def: 1 }, { name: "floret_detail_size", def: 0.1 }, { name: "floret_shape", def: 0 }, { name: "pitch", def: 180 }, { name: "yaw", def: 0 }, { name: "roll", def: 0 }, { name: "color_mode", def: 0 }, { name: "solid_color_idx", def: 0.5 }, { name: "color_range_min", def: 0 }, { name: "color_range_max", def: 9 }],
+    verified: true, priority: 0, flags: ["3d","dc","z"], types: ["3D","BASE_SHAPE","DC"],
+    funcNames: ["jxyz_","powc","atan2j","jxyz__zero","romanesco_cross","romanesco_normalize"],
+    funcs: `struct jxyz_ {
+  x: f32,
+  y: f32,
+  z: f32,
+  color: f32,
+}
+
+fn powc(x: f32, y: f32) -> f32 {
+  if (x >= 0.0) { return pow(x, y); }
+  let yi = round(y);
+  if (abs(y - yi) > 1e-6) { return pow(x, y); }
+  let m = pow(-x, y);
+  return select(m, -m, (i32(yi) & 1) != 0);
+}
+
+fn atan2j(y: f32, x: f32) -> f32 { if (x == 0.0 && y == 0.0) { return select(0.0, PI, (bitcast<u32>(x) >> 31u) == 1u) * select(1.0, -1.0, (bitcast<u32>(y) >> 31u) == 1u); } return atan2(y, x); }
+
+fn jxyz__zero() -> jxyz_ {
+  var r_: jxyz_;
+  return r_;
+}
+
+fn romanesco_cross(res: ptr<function, jxyz_>, v1: jxyz_, v2: jxyz_) {
+  (*res).x = ((v1.y * v2.z) - (v1.z * v2.y));
+  (*res).y = ((v1.z * v2.x) - (v1.x * v2.z));
+  (*res).z = ((v1.x * v2.y) - (v1.y * v2.x));
+}
+
+fn romanesco_normalize(v_: ptr<function, jxyz_>) {
+  var len: f32 = sqrt(((((*v_).x * (*v_).x) + ((*v_).y * (*v_).y)) + ((*v_).z * (*v_).z)));
+  if ((len > 1.0e-9)) {
+    (*v_).x /= len;
+    (*v_).y /= len;
+    (*v_).z /= len;
+  }
+}`,
+    code: (w, p) => `{
+var GOLDEN_ANGLE: f32 = (PI * (3.0 - sqrt(5.0)));
+var current_scale: f32 = ${p[0]};
+var pos: jxyz_ = jxyz__zero();
+var axis_x: jxyz_ = jxyz__zero();
+axis_x.x = 1;
+var axis_y: jxyz_ = jxyz__zero();
+axis_y.y = 1;
+var axis_z: jxyz_ = jxyz__zero();
+axis_z.z = 1;
+if ((i32(${p[2]}) > 1)) {
+  var arm_index: i32 = i32((rnd(rs) * f32(i32(${p[2]}))));
+  var arm_base_angle: f32 = (((f32(arm_index) / f32(i32(${p[2]}))) * 2.0) * PI);
+  pos.x = (${p[3]} * cos(arm_base_angle));
+  pos.y = (${p[3]} * sin(arm_base_angle));
+  pos.z = 0;
+  var elevation_rad: f32 = ((${p[4]} * PI) / 180.0);
+  var twist_rad: f32 = (pos.y * ${p[5]});
+  var arm_angle: f32 = (arm_base_angle + twist_rad);
+  axis_z.x = (cos(arm_angle) * cos(elevation_rad));
+  axis_z.y = (sin(arm_angle) * cos(elevation_rad));
+  axis_z.z = sin(elevation_rad);
+  var up_vec: jxyz_ = jxyz__zero();
+  up_vec.z = 1;
+  if ((abs(axis_z.z) > 0.999)) {
+    up_vec.x = 1;
+    up_vec.z = 0;
+  }
+  romanesco_cross(&(axis_x), axis_z, up_vec);
+  romanesco_normalize(&(axis_x));
+  romanesco_cross(&(axis_y), axis_z, axis_x);
+}
+for (var i: i32 = 0; (i < i32(${p[1]})); i++) {
+  var floret_index: i32 = i32((powc(rnd(rs), 1.5) * f32(i32(${p[6]}))));
+  var spiral_angle: f32 = ((f32(floret_index) * GOLDEN_ANGLE) * ${p[9]});
+  var r_: f32 = (${p[8]} * sqrt(f32(floret_index)));
+  var local_x: f32 = (r_ * cos(spiral_angle));
+  var local_y: f32 = (r_ * sin(spiral_angle));
+  var local_z: f32 = (r_ * ${p[10]});
+  pos.x += ((((axis_x.x * local_x) + (axis_y.x * local_y)) + (axis_z.x * local_z)) * current_scale);
+  pos.y += ((((axis_x.y * local_x) + (axis_y.y * local_y)) + (axis_z.y * local_z)) * current_scale);
+  pos.z += ((((axis_x.z * local_x) + (axis_y.z * local_y)) + (axis_z.z * local_z)) * current_scale);
+  var normal: jxyz_ = jxyz__zero();
+  normal.x = (-(${p[10]}) * cos(spiral_angle));
+  normal.y = (-(${p[10]}) * sin(spiral_angle));
+  normal.z = 1.0;
+  romanesco_normalize(&(normal));
+  var new_axis_z: jxyz_ = jxyz__zero();
+  new_axis_z.x = (((axis_x.x * normal.x) + (axis_y.x * normal.y)) + (axis_z.x * normal.z));
+  new_axis_z.y = (((axis_x.y * normal.x) + (axis_y.y * normal.y)) + (axis_z.y * normal.z));
+  new_axis_z.z = (((axis_x.z * normal.x) + (axis_y.z * normal.y)) + (axis_z.z * normal.z));
+  axis_z = new_axis_z;
+  romanesco_normalize(&(axis_z));
+  var up_vec: jxyz_ = jxyz__zero();
+  up_vec.y = 1;
+  if ((abs(axis_z.y) > 0.999)) {
+    up_vec.x = 1;
+    up_vec.y = 0;
+  }
+  romanesco_cross(&(axis_x), up_vec, axis_z);
+  romanesco_normalize(&(axis_x));
+  romanesco_cross(&(axis_y), axis_z, axis_x);
+  current_scale *= ${p[7]};
+}
+var local_x_final: f32 = 0;
+var local_y_final: f32 = 0;
+var local_z_final: f32 = 0;
+var shape_size: f32 = (${p[11]} * current_scale);
+switch i32(min(max(${p[12]}, 0.0), 3.0)) {
+  case 0: {
+    var r_x: f32 = (rnd(rs) - 0.5);
+    var r_y: f32 = (rnd(rs) - 0.5);
+    var r_z: f32 = (rnd(rs) - 0.5);
+    var r_len: f32 = sqrt((((r_x * r_x) + (r_y * r_y)) + (r_z * r_z)));
+    if ((r_len > 0.000001)) {
+      var bump_radius: f32 = (shape_size * rnd(rs));
+      local_x_final = ((r_x / r_len) * bump_radius);
+      local_y_final = ((r_y / r_len) * bump_radius);
+      local_z_final = ((r_z / r_len) * bump_radius);
+    }
+  }
+  case 1: {
+    local_x_final = ((rnd(rs) - 0.5) * shape_size);
+    local_y_final = ((rnd(rs) - 0.5) * shape_size);
+    local_z_final = ((rnd(rs) - 0.5) * shape_size);
+  }
+  case 2: {
+    local_z_final = (shape_size * rnd(rs));
+  }
+  case 3: {
+    var ring_angle: f32 = ((rnd(rs) * 2.0) * PI);
+    local_x_final = (shape_size * cos(ring_angle));
+    local_y_final = (shape_size * sin(ring_angle));
+  }
+  default: {}
+}
+var final_x: f32 = (pos.x + (((axis_x.x * local_x_final) + (axis_y.x * local_y_final)) + (axis_z.x * local_z_final)));
+var final_y: f32 = (pos.y + (((axis_x.y * local_x_final) + (axis_y.y * local_y_final)) + (axis_z.y * local_z_final)));
+var final_z: f32 = (pos.z + (((axis_x.z * local_x_final) + (axis_y.z * local_y_final)) + (axis_z.z * local_z_final)));
+if ((((${p[13]} != 0.0) || (${p[14]} != 0.0)) || (${p[15]} != 0.0))) {
+  var cos_p: f32 = cos(radians(${p[13]}));
+  var sin_p: f32 = sin(radians(${p[13]}));
+  var cos_y: f32 = cos(radians(${p[14]}));
+  var sin_y: f32 = sin(radians(${p[14]}));
+  var cos_r: f32 = cos(radians(${p[15]}));
+  var sin_r: f32 = sin(radians(${p[15]}));
+  var tempX: f32 = ((final_x * cos_y) - (final_z * sin_y));
+  var tempZ: f32 = ((final_x * sin_y) + (final_z * cos_y));
+  final_x = tempX;
+  final_z = tempZ;
+  var tempY: f32 = ((final_y * cos_p) - (final_z * sin_p));
+  tempZ = ((final_y * sin_p) + (final_z * cos_p));
+  final_y = tempY;
+  final_z = tempZ;
+  tempX = ((final_x * cos_r) - (final_y * sin_r));
+  tempY = ((final_x * sin_r) + (final_y * cos_r));
+  final_x = tempX;
+  final_y = tempY;
+}
+var color_index: f32 = 0.5;
+var range: f32 = (${p[19]} - ${p[18]});
+switch i32(min(max(${p[16]}, 0.0), 3.0)) {
+  case 0: {
+    color_index = ${p[17]};
+  }
+  case 1: {
+    var dist_from_center: f32 = sqrt((((final_x * final_x) + (final_y * final_y)) + (final_z * final_z)));
+    if ((range > 0.000001)) {
+      color_index = ((dist_from_center - ${p[18]}) / range);
+    }
+  }
+  case 2: {
+    var radius: f32 = sqrt(((final_x * final_x) + (final_y * final_y)));
+    if ((range > 0.000001)) {
+      color_index = ((radius - ${p[18]}) / range);
+    }
+  }
+  case 3: {
+    if ((range > 0.000001)) {
+      color_index = ((final_z - ${p[18]}) / range);
+    }
+  }
+  default: {}
+}
+(*cp) = max(0.0, min(1.0, color_index));
+v.x += (final_x * ${w});
+v.y += (final_y * ${w});
+pz_ += (final_z * ${w});
+}`,
+  },
+  "de_stijl": {
+    params: [{ name: "max_size", def: 0.5 }, { name: "min_size", def: 0.1 }, { name: "chaos", def: 5 }, { name: "line_thickness", def: 0.02 }, { name: "seed", def: 12345 }],
+    verified: true, priority: 0, flags: ["dc","state","z"], types: ["2D","DC"],
+    funcNames: ["jwx_de_stijl_seed_c","jmrg_","roundc","atan2j","de_stijl_hash","jmrg_randomize","jmrg_random"],
+    funcs: `struct jmrg_ {
+  u: i32,
+  v_: i32,
+}
+
+fn roundc(x: f32) -> f32 { return sign(x) * floor(abs(x) + 0.5); }
+
+fn atan2j(y: f32, x: f32) -> f32 { if (x == 0.0 && y == 0.0) { return select(0.0, PI, (bitcast<u32>(x) >> 31u) == 1u) * select(1.0, -1.0, (bitcast<u32>(y) >> 31u) == 1u); } return atan2(y, x); }
+
+fn de_stijl_hash(n: i32) -> f32 {
+  var h: i32 = i32((jwx_de_stijl_seed_c + f32(n)));
+  h = ((h ^ 61) ^ (h >> 16));
+  h = (h + (h << 3));
+  h = (h ^ (h >> 4));
+  h = (h * 668265261);
+  h = (h ^ (h >> 15));
+  return (f32((h & 2147483647)) / 2147483647);
+}
+
+fn jmrg_randomize(g: ptr<function, jmrg_>, seed: i32) {
+  (*g).u = (seed << 16);
+  (*g).v_ = ((seed << 16) >> 16);
+}
+
+fn jmrg_random(g: ptr<function, jmrg_>) -> f32 {
+  var v_: u32 = u32((*g).v_);
+  var u: u32 = u32((*g).u);
+  v_ = ((36969 * (v_ & 65535)) + u32(((*g).v_ >> 16)));
+  u = ((18000 * (u & 65535)) + u32(((*g).u >> 16)));
+  (*g).v_ = i32(v_);
+  (*g).u = i32(u);
+  var rnd_: i32 = i32(((v_ << 16) + u));
+  var res: f32 = (f32(rnd_) * (1.0 / 2147483647.0));
+  return select(res, -res, (res < 0.0));
+}
+
+var<private> jwx_de_stijl_seed_c: f32 = 0.0;`,
+    code: (w, p) => `{
+jwx_de_stijl_seed_c = f32(i32(${p[4]}));
+var cell_rand: jmrg_;
+var x: f32 = t.x;
+var y: f32 = t.y;
+var region_ix: i32 = i32(floor((x / ${p[2]})));
+var region_iy: i32 = i32(floor((y / ${p[2]})));
+var size_hash: f32 = de_stijl_hash(((region_ix * 31337) ^ (region_iy * 8191)));
+var local_grid_size: f32 = (${p[1]} + ((${p[0]} - ${p[1]}) * size_hash));
+if ((local_grid_size < 0.000001)) {
+  local_grid_size = 0.000001;
+}
+var snapped_x: f32 = (roundc((x / local_grid_size)) * local_grid_size);
+var snapped_y: f32 = (roundc((y / local_grid_size)) * local_grid_size);
+var dist_to_line_x: f32 = abs((x - snapped_x));
+var dist_to_line_y: f32 = abs((y - snapped_y));
+var half_thickness: f32 = (${p[3]} * 0.025);
+if (((dist_to_line_x < half_thickness) || (dist_to_line_y < half_thickness))) {
+  (*cp) = 0.0;
+  if ((dist_to_line_x < dist_to_line_y)) {
+    v.x += (x * ${w});
+    v.y += (y * ${w});
+  } else {
+    v.x += (x * ${w});
+    v.y += (y * ${w});
+  }
+  if (false) {
+    pz_ += (z_ * ${w});
+  }
+} else {
+  var ix: i32 = i32(roundc((x / local_grid_size)));
+  var iy: i32 = i32(roundc((y / local_grid_size)));
+  var cell_seed: i32 = ((i32(${p[4]}) + (ix * 73856093)) ^ (iy * 19349663));
+  jmrg_randomize(&(cell_rand), cell_seed);
+  var rand_val: f32 = jmrg_random(&(cell_rand));
+  (*cp) = rand_val;
+  v.x += (x * ${w});
+  v.y += (y * ${w});
+  if (false) {
+    pz_ += (z_ * ${w});
+  }
 }
 }`,
   },
@@ -37004,6 +45111,370 @@ if (false) {
 }
 }`,
   },
+  "chaosCubes": {
+    params: [{ name: "mode", def: 0 }, { name: "mode7_A", def: 0 }, { name: "mode7_B", def: 1 }, { name: "depth", def: 5 }, { name: "twistX", def: 0 }, { name: "twistY", def: 0 }, { name: "twistZ", def: 0 }, { name: "scaleX", def: 0.3333333 }, { name: "scaleY", def: 0.3333333 }, { name: "scaleZ", def: 0.3333333 }, { name: "offset", def: 1 }, { name: "rotX", def: 0 }, { name: "rotY", def: 0 }, { name: "rotZ", def: 0 }, { name: "invert", def: 0 }, { name: "julia", def: 0 }, { name: "colorMode", def: 0 }, { name: "colorSpeed", def: 1 }, { name: "sphereInvert", def: 0 }, { name: "sphereRadius", def: 1 }],
+    verified: true, priority: 0, flags: ["3d","dc","z"], types: ["3D","DC"],
+    funcNames: ["jxyz_","atan2j","jxyz__zero","chaosCubes_rotateX","chaosCubes_rotateY","chaosCubes_rotateZ"],
+    funcs: `struct jxyz_ {
+  x: f32,
+  y: f32,
+  z: f32,
+  color: f32,
+}
+
+fn atan2j(y: f32, x: f32) -> f32 { if (x == 0.0 && y == 0.0) { return select(0.0, PI, (bitcast<u32>(x) >> 31u) == 1u) * select(1.0, -1.0, (bitcast<u32>(y) >> 31u) == 1u); } return atan2(y, x); }
+
+fn jxyz__zero() -> jxyz_ {
+  var r_: jxyz_;
+  return r_;
+}
+
+fn chaosCubes_rotateX(p_: ptr<function, jxyz_>, angle: f32) {
+  var y: f32 = (*p_).y;
+  var z: f32 = (*p_).z;
+  (*p_).y = ((cos(angle) * y) - (sin(angle) * z));
+  (*p_).z = ((sin(angle) * y) + (cos(angle) * z));
+}
+
+fn chaosCubes_rotateY(p_: ptr<function, jxyz_>, angle: f32) {
+  var x: f32 = (*p_).x;
+  var z: f32 = (*p_).z;
+  (*p_).x = ((cos(angle) * x) + (sin(angle) * z));
+  (*p_).z = ((-(sin(angle)) * x) + (cos(angle) * z));
+}
+
+fn chaosCubes_rotateZ(p_: ptr<function, jxyz_>, angle: f32) {
+  var x: f32 = (*p_).x;
+  var y: f32 = (*p_).y;
+  (*p_).x = ((cos(angle) * x) - (sin(angle) * y));
+  (*p_).y = ((sin(angle) * x) + (cos(angle) * y));
+}`,
+    code: (w, p) => `{
+var p_: jxyz_ = jxyz__zero();
+p_.x = t.x;
+p_.y = t.y;
+p_.z = z_;
+var rX: f32 = radians(${p[11]});
+var rY: f32 = radians(${p[12]});
+var rZ: f32 = radians(${p[13]});
+if ((rX != 0)) {
+  chaosCubes_rotateX(&(p_), rX);
+}
+if ((rY != 0)) {
+  chaosCubes_rotateY(&(p_), rY);
+}
+if ((rZ != 0)) {
+  chaosCubes_rotateZ(&(p_), rZ);
+}
+var c: jxyz_ = jxyz__zero();
+c.x = p_.x;
+c.y = p_.y;
+c.z = p_.z;
+var last_ix: i32 = 0;
+var last_iy: i32 = 0;
+var last_iz: i32 = 0;
+var last_v_index: i32 = 0;
+var pathLength: f32 = 0.0;
+for (var i: i32 = 0; (f32(i) < ${p[3]}); i++) {
+  var current_mode: i32 = i32(${p[0]});
+  if ((current_mode == 7)) {
+    current_mode = i32(select(${p[2]}, ${p[1]}, (rnd(rs) < 0.5)));
+  }
+  switch current_mode {
+    case 0, 1, 2, 3, 4, 5: {
+      {
+        var ix: i32;
+        var iy: i32;
+        var iz: i32;
+        loop {
+          ix = (i32((rnd(rs) * 3)) - 1);
+          iy = (i32((rnd(rs) * 3)) - 1);
+          iz = (i32((rnd(rs) * 3)) - 1);
+          var is_valid_cube: bool = false;
+          switch current_mode {
+            case 0: {
+              var hcm: i32 = ((select(0, 1, (ix == 0)) + select(0, 1, (iy == 0))) + select(0, 1, (iz == 0)));
+              is_valid_cube = (select(select(0, 1, (hcm >= 2)), select(0, 1, (hcm < 2)), (${p[14]} == 0)) != 0);
+            }
+            case 1: {
+              var hcv: i32 = i32(((abs(f32(ix)) + abs(f32(iy))) + abs(f32(iz))));
+              is_valid_cube = (select(select(0, 1, (hcv > 1)), select(0, 1, (hcv <= 1)), (${p[14]} == 0)) != 0);
+            }
+            case 2: {
+              var icc: bool = (((ix == 0) && (iy == 0)) && (iz == 0));
+              is_valid_cube = (select(select(0, 1, icc), select(0, 1, !icc), (${p[14]} == 0)) != 0);
+            }
+            case 3: {
+              var z: i32 = ((select(0, 1, (ix == 0)) + select(0, 1, (iy == 0))) + select(0, 1, (iz == 0)));
+              is_valid_cube = (select(select(0, 1, ((z >= 2) && !(((ix == 0) && (iy == 0)) && (iz == 0)))), select(0, 1, ((z < 2) || (((ix == 0) && (iy == 0)) && (iz == 0)))), (${p[14]} == 0)) != 0);
+            }
+            case 4: {
+              is_valid_cube = (select(select(0, 1, (((abs(f32(ix)) + abs(f32(iy))) + abs(f32(iz))) != 3)), select(0, 1, (((abs(f32(ix)) + abs(f32(iy))) + abs(f32(iz))) == 3)), (${p[14]} == 0)) != 0);
+            }
+            case 5: {
+              var nz: i32 = ((select(0, 1, (ix != 0)) + select(0, 1, (iy != 0))) + select(0, 1, (iz != 0)));
+              is_valid_cube = (select(select(0, 1, (nz != 2)), select(0, 1, (nz == 2)), (${p[14]} == 0)) != 0);
+            }
+            default: {}
+          }
+          if (is_valid_cube) {
+            last_ix = ix;
+            last_iy = iy;
+            last_iz = iz;
+            break;
+          }
+          if (!true) { break; }
+        }
+        p_.x = ((p_.x * ${p[7]}) - ((f32(ix) * ${p[10]}) * (1.0 - ${p[7]})));
+        p_.y = ((p_.y * ${p[8]}) - ((f32(iy) * ${p[10]}) * (1.0 - ${p[8]})));
+        p_.z = ((p_.z * ${p[9]}) - ((f32(iz) * ${p[10]}) * (1.0 - ${p[9]})));
+        if ((${p[15]} > 0)) {
+          p_.x += c.x;
+          p_.y += c.y;
+          p_.z += c.z;
+        }
+        break;
+      }
+    }
+    case 6: {
+      {
+        var vertices: array<jxyz_, 5>;
+        vertices[0].x = ${p[10]};
+        vertices[0].y = ${p[10]};
+        vertices[0].z = 0;
+        vertices[1].x = ${p[10]};
+        vertices[1].y = -(${p[10]});
+        vertices[1].z = 0;
+        vertices[2].x = -(${p[10]});
+        vertices[2].y = -(${p[10]});
+        vertices[2].z = 0;
+        vertices[3].x = -(${p[10]});
+        vertices[3].y = ${p[10]};
+        vertices[3].z = 0;
+        vertices[4].x = 0;
+        vertices[4].y = 0;
+        vertices[4].z = ((${p[10]} * ${p[8]}) * 0.5);
+        last_v_index = i32((rnd(rs) * 5));
+        var v_: jxyz_ = vertices[last_v_index];
+        p_.x = ((p_.x + v_.x) * 0.5);
+        p_.y = ((p_.y + v_.y) * 0.5);
+        p_.z = ((p_.z + v_.z) * 0.5);
+        break;
+      }
+    }
+    default: {}
+  }
+  if ((${p[4]} != 0.0)) {
+    chaosCubes_rotateX(&(p_), (p_.x * ${p[4]}));
+  }
+  if ((${p[5]} != 0.0)) {
+    chaosCubes_rotateY(&(p_), (p_.y * ${p[5]}));
+  }
+  if ((${p[6]} != 0.0)) {
+    chaosCubes_rotateZ(&(p_), (p_.z * ${p[6]}));
+  }
+  pathLength += sqrt((((p_.x * p_.x) + (p_.y * p_.y)) + (p_.z * p_.z)));
+}
+if ((${p[18]} > 0)) {
+  var r2_: f32 = (((p_.x * p_.x) + (p_.y * p_.y)) + (p_.z * p_.z));
+  if ((r2_ > 0.000001)) {
+    var factor: f32 = ((${p[19]} * ${p[19]}) / r2_);
+    p_.x *= factor;
+    p_.y *= factor;
+    p_.z *= factor;
+  }
+}
+v.x += (p_.x * ${w});
+v.y += (p_.y * ${w});
+pz_ += (p_.z * ${w});
+if ((${p[16]} > 0)) {
+  var calculatedColor: f32 = 0.0;
+  switch i32(${p[16]}) {
+    case 1: {
+      calculatedColor = ((((p_.x / ${p[10]}) + (p_.y / ${p[10]})) + (p_.z / ${p[10]})) / 3.0);
+    }
+    case 2: {
+      if ((${p[0]} == 6)) {
+        calculatedColor = (f32(last_v_index) / 4.0);
+      } else {
+        calculatedColor = (f32((((last_ix + 1) + ((last_iy + 1) * 3)) + ((last_iz + 1) * 9))) / 26.0);
+      }
+    }
+    case 3: {
+      calculatedColor = (sqrt((((p_.x * p_.x) + (p_.y * p_.y)) + (p_.z * p_.z))) / ${p[10]});
+    }
+    case 4: {
+      calculatedColor = (pathLength / (${p[3]} * ${p[10]}));
+    }
+    case 5: {
+      var angleXY: f32 = atan2j(p_.y, p_.x);
+      var angleXZ: f32 = atan2j(p_.z, p_.x);
+      calculatedColor = (((angleXY + angleXZ) + (2.0 * PI)) / (4.0 * PI));
+    }
+    default: {}
+  }
+  calculatedColor *= ${p[17]};
+  calculatedColor = (((calculatedColor % 1.0) + 1.0) % 1.0);
+  (*cp) += ((calculatedColor - (*cp)) * ${w});
+}
+}`,
+  },
+  "camouflage": {
+    params: [{ name: "seed", def: 1000 }, { name: "scale", def: 2 }, { name: "noiseType", def: 0 }, { name: "levels", def: 4 }, { name: "octaves", def: 5 }, { name: "persistence", def: 0.5 }, { name: "lacunarity", def: 2 }, { name: "stretch", def: 1 }, { name: "rotation", def: 0.5 }, { name: "displacement", def: 0.1 }, { name: "zOffset", def: 0.1 }, { name: "colorize", def: 1 }],
+    verified: true, priority: 0, flags: ["3d","dc","state","z"], types: ["3D"],
+    funcNames: ["jwx_camouflage_inited_","jwx_camouflage_i","atan2j","camouflage_fade","camouflage_permutation","camouflage_grad","camouflage_lerp","camouflage_perlinNoise","camouflage_hash","camouflage_cellularNoise","camouflage_smoothstep","camouflage_valueNoise"],
+    funcs: `fn atan2j(y: f32, x: f32) -> f32 { if (x == 0.0 && y == 0.0) { return select(0.0, PI, (bitcast<u32>(x) >> 31u) == 1u) * select(1.0, -1.0, (bitcast<u32>(y) >> 31u) == 1u); } return atan2(y, x); }
+
+fn camouflage_fade(t_: f32) -> f32 {
+  return (((t_ * t_) * t_) * ((t_ * ((t_ * 6) - 15)) + 10));
+}
+
+const camouflage_permutation: array<i32, 256> = array<i32, 256>(151, 160, 137, 91, 90, 15, 131, 13, 201, 95, 96, 53, 194, 233, 7, 225, 140, 36, 103, 30, 69, 142, 8, 99, 37, 240, 21, 10, 23, 190, 6, 148, 247, 120, 234, 75, 0, 26, 197, 62, 94, 252, 219, 203, 117, 35, 11, 32, 57, 177, 33, 88, 237, 149, 56, 87, 174, 20, 125, 136, 171, 168, 68, 175, 74, 165, 71, 134, 139, 48, 27, 166, 77, 146, 158, 231, 83, 111, 229, 122, 60, 211, 133, 230, 220, 105, 92, 41, 55, 46, 245, 40, 244, 102, 143, 54, 65, 25, 63, 161, 1, 216, 80, 73, 209, 76, 132, 187, 208, 89, 18, 169, 200, 196, 135, 130, 116, 188, 159, 86, 164, 100, 109, 198, 173, 186, 3, 64, 52, 217, 226, 250, 124, 123, 5, 202, 38, 147, 118, 126, 255, 82, 85, 212, 207, 206, 59, 227, 47, 16, 58, 17, 182, 189, 28, 42, 223, 183, 170, 213, 119, 248, 152, 2, 44, 154, 163, 70, 221, 153, 101, 155, 167, 43, 172, 9, 129, 22, 39, 253, 19, 98, 108, 110, 79, 113, 224, 232, 178, 185, 112, 104, 218, 246, 97, 228, 251, 34, 242, 193, 238, 210, 144, 12, 191, 179, 162, 241, 81, 51, 145, 235, 249, 14, 239, 107, 49, 192, 214, 31, 181, 199, 106, 157, 184, 84, 204, 176, 115, 121, 50, 45, 127, 4, 150, 254, 138, 236, 205, 93, 222, 114, 67, 29, 24, 72, 243, 141, 128, 195, 78, 66, 215, 61, 156, 180);
+
+fn camouflage_grad(hash: i32, x: f32, y: f32, z: f32) -> f32 {
+  var h: i32 = (hash & 15);
+  var u: f32 = select(y, x, (h < 8));
+  var v_: f32 = select(select(z, x, ((h == 12) || (h == 14))), y, (h < 4));
+  return (select(-u, u, ((h & 1) == 0)) + select(-v_, v_, ((h & 2) == 0)));
+}
+
+fn camouflage_lerp(a: f32, b: f32, t_: f32) -> f32 {
+  return (a + (t_ * (b - a)));
+}
+
+fn camouflage_perlinNoise(x_in: f32, y_in: f32, z_in: f32) -> f32 {
+  var x: f32 = x_in;
+  var y: f32 = y_in;
+  var z: f32 = z_in;
+  var X: i32 = (i32(floor(x)) & 255);
+  var Y: i32 = (i32(floor(y)) & 255);
+  var Z: i32 = (i32(floor(z)) & 255);
+  x -= floor(x);
+  y -= floor(y);
+  z -= floor(z);
+  var u: f32 = camouflage_fade(x);
+  var v_: f32 = camouflage_fade(y);
+  var w_: f32 = camouflage_fade(z);
+  var A_: i32 = (camouflage_permutation[(X & 255)] + Y);
+  var AA: i32 = (camouflage_permutation[(A_ & 255)] + Z);
+  var AB: i32 = (camouflage_permutation[((A_ + 1) & 255)] + Z);
+  var B: i32 = (camouflage_permutation[((X + 1) & 255)] + Y);
+  var BA: i32 = (camouflage_permutation[(B & 255)] + Z);
+  var BB: i32 = (camouflage_permutation[((B + 1) & 255)] + Z);
+  return camouflage_lerp(w_, camouflage_lerp(v_, camouflage_lerp(u, camouflage_grad(camouflage_permutation[(AA & 255)], x, y, z), camouflage_grad(camouflage_permutation[(BA & 255)], (x - 1), y, z)), camouflage_lerp(u, camouflage_grad(camouflage_permutation[(AB & 255)], x, (y - 1), z), camouflage_grad(camouflage_permutation[(BB & 255)], (x - 1), (y - 1), z))), camouflage_lerp(v_, camouflage_lerp(u, camouflage_grad(camouflage_permutation[((AA + 1) & 255)], x, y, (z - 1)), camouflage_grad(camouflage_permutation[((BA + 1) & 255)], (x - 1), y, (z - 1))), camouflage_lerp(u, camouflage_grad(camouflage_permutation[((AB + 1) & 255)], x, (y - 1), (z - 1)), camouflage_grad(camouflage_permutation[((BB + 1) & 255)], (x - 1), (y - 1), (z - 1)))));
+}
+
+fn camouflage_hash(x: i32, y: i32, z: i32) -> f32 {
+  var h: i32 = (((x * 374761393) + (y * 668265263)) + (z * 1103515245));
+  h = ((h ^ (h >> 13)) * 1274126177);
+  h = (h ^ (h >> 16));
+  return ((f32((h & 2147483647)) / 1073741823.5) - 1.0);
+}
+
+fn camouflage_cellularNoise(x: f32, y: f32, z: f32) -> f32 {
+  var ix: i32 = i32(floor(x));
+  var iy: i32 = i32(floor(y));
+  var iz: i32 = i32(floor(z));
+  var minDist: f32 = 3.0e+38;
+  for (var dz: i32 = -1; (dz <= 1); dz++) {
+    for (var dy: i32 = -1; (dy <= 1); dy++) {
+      for (var dx: i32 = -1; (dx <= 1); dx++) {
+        var cellX: i32 = (ix + dx);
+        var cellY: i32 = (iy + dy);
+        var cellZ: i32 = (iz + dz);
+        var pointX: f32 = (f32(cellX) + (0.5 * (1.0 + camouflage_hash(cellX, cellY, cellZ))));
+        var pointY: f32 = (f32(cellY) + (0.5 * (1.0 + camouflage_hash(cellY, cellZ, cellX))));
+        var pointZ: f32 = (f32(cellZ) + (0.5 * (1.0 + camouflage_hash(cellZ, cellX, cellY))));
+        var distSq: f32 = ((((x - pointX) * (x - pointX)) + ((y - pointY) * (y - pointY))) + ((z - pointZ) * (z - pointZ)));
+        if ((distSq < minDist)) {
+          minDist = distSq;
+        }
+      }
+    }
+  }
+  return ((sqrt(minDist) * 2.0) - 1.0);
+}
+
+fn camouflage_smoothstep(t_: f32) -> f32 {
+  return ((t_ * t_) * (3.0 - (2.0 * t_)));
+}
+
+fn camouflage_valueNoise(x: f32, y: f32, z: f32) -> f32 {
+  var ix: i32 = i32(floor(x));
+  var iy: i32 = i32(floor(y));
+  var iz: i32 = i32(floor(z));
+  var fx: f32 = (x - f32(ix));
+  var fy: f32 = (y - f32(iy));
+  var fz: f32 = (z - f32(iz));
+  var u: f32 = camouflage_smoothstep(fx);
+  var v_: f32 = camouflage_smoothstep(fy);
+  var w_: f32 = camouflage_smoothstep(fz);
+  var n000: f32 = camouflage_hash(ix, iy, iz);
+  var n100: f32 = camouflage_hash((ix + 1), iy, iz);
+  var n010: f32 = camouflage_hash(ix, (iy + 1), iz);
+  var n110: f32 = camouflage_hash((ix + 1), (iy + 1), iz);
+  var n001: f32 = camouflage_hash(ix, iy, (iz + 1));
+  var n101: f32 = camouflage_hash((ix + 1), iy, (iz + 1));
+  var n011: f32 = camouflage_hash(ix, (iy + 1), (iz + 1));
+  var n111: f32 = camouflage_hash((ix + 1), (iy + 1), (iz + 1));
+  var nx00: f32 = camouflage_lerp(n000, n100, u);
+  var nx10: f32 = camouflage_lerp(n010, n110, u);
+  var nx01: f32 = camouflage_lerp(n001, n101, u);
+  var nx11: f32 = camouflage_lerp(n011, n111, u);
+  var nxy0: f32 = camouflage_lerp(nx00, nx10, v_);
+  var nxy1: f32 = camouflage_lerp(nx01, nx11, v_);
+  return camouflage_lerp(nxy0, nxy1, w_);
+}
+
+var<private> jwx_camouflage_inited_: f32 = 0.0;
+
+var<private> jwx_camouflage_i: i32 = 0;`,
+    code: (w, p) => `{
+if ((jwx_camouflage_inited_ == 0.0)) {
+  jwx_camouflage_inited_ = 1.0;
+  jwx_camouflage_i = 0;
+}
+var x: f32 = (t.x * ${p[1]});
+var y: f32 = ((t.y * ${p[1]}) * ${p[7]});
+var z: f32 = (z_ * ${p[1]});
+var noiseValue: f32 = 0.0;
+var freq: f32 = 1.0;
+var amp: f32 = 1.0;
+for (var i: i32 = 0; (f32(i) < ${p[4]}); i++) {
+  var n: f32;
+  switch i32(${p[2]}) {
+    case 1: {
+      n = camouflage_perlinNoise(((x * freq) + ${p[0]}), ((y * freq) + ${p[0]}), ((z * freq) + ${p[0]}));
+    }
+    case 2: {
+      n = camouflage_cellularNoise(((x * freq) + ${p[0]}), ((y * freq) + ${p[0]}), ((z * freq) + ${p[0]}));
+    }
+    case default: {
+      n = camouflage_valueNoise((x * freq), (y * freq), ((z * freq) + ${p[0]}));
+    }
+  }
+  noiseValue += (n * amp);
+  freq *= ${p[6]};
+  amp *= ${p[5]};
+}
+var quantizedNoise: f32 = floor((noiseValue * ${p[3]}));
+if ((${p[11]} == 1)) {
+  var colorIndex: f32 = (((quantizedNoise % ${p[3]}) + ${p[3]}) % ${p[3]});
+  (*cp) = (colorIndex / ${p[3]});
+}
+var angle: f32 = ((((quantizedNoise * PI) * 2.0) * ${p[8]}) / ${p[3]});
+var mag: f32 = ((quantizedNoise * ${p[9]}) / ${p[3]});
+var z_offset_val: f32 = ((quantizedNoise * ${p[10]}) / ${p[3]});
+var sin_a: f32 = sin(angle);
+var cos_a: f32 = cos(angle);
+var x_new: f32 = (((t.x * cos_a) - (t.y * sin_a)) + mag);
+var y_new: f32 = (((t.x * sin_a) + (t.y * cos_a)) + mag);
+var z_new: f32 = (z_ + z_offset_val);
+v.x += ((x_new - t.x) * ${w});
+v.y += ((y_new - t.y) * ${w});
+pz_ += ((z_new - z_) * ${w});
+}`,
+  },
   "mandelbox2D": {
     params: [{ name: "mandelboxMode", def: 0 }, { name: "iterations", def: 10 }, { name: "scale", def: -1.5 }, { name: "foldLimit", def: 1 }, { name: "minRadius", def: 0.5 }, { name: "fixedRadius", def: 1 }, { name: "rotation", def: 0 }, { name: "juliaMode", def: 0 }, { name: "juliaX", def: 0.4 }, { name: "juliaY", def: 0.6 }, { name: "coloringMode", def: 0 }, { name: "colorSpeed", def: 0.5 }],
     verified: true, priority: 0, flags: ["dc","z"], types: ["2D"],
@@ -37130,7 +45601,6 @@ if (false) {
     funcNames: ["atan2j"],
     funcs: `fn atan2j(y: f32, x: f32) -> f32 { if (x == 0.0 && y == 0.0) { return select(0.0, PI, (bitcast<u32>(x) >> 31u) == 1u) * select(1.0, -1.0, (bitcast<u32>(y) >> 31u) == 1u); } return atan2(y, x); }`,
     code: (w, p) => `{
-var S3D2: f32 = 0.4330127018922193;
 var x: f32 = t.x;
 var y: f32 = t.y;
 var nx: f32 = 0.0;
@@ -37144,16 +45614,16 @@ switch i32(min(max(${p[0]}, 0.0), 73.0)) {
       ny = (0.5 * y);
       newColor = ${p[3]};
     } else if ((rand < 0.5)) {
-      nx = (((-0.25 * x) - (S3D2 * y)) + 0.25);
-      ny = (((S3D2 * x) - (0.25 * y)) + S3D2);
+      nx = (((-0.25 * x) - (0.4330127018922193 * y)) + 0.25);
+      ny = (((0.4330127018922193 * x) - (0.25 * y)) + 0.4330127018922193);
       newColor = ${p[4]};
     } else if ((rand < 0.75)) {
-      nx = (((-0.25 * x) + (S3D2 * y)) - 0.5);
-      ny = ((-S3D2 * x) - (0.25 * y));
+      nx = (((-0.25 * x) + (0.4330127018922193 * y)) - 0.5);
+      ny = ((-0.4330127018922193 * x) - (0.25 * y));
       newColor = ${p[5]};
     } else {
       nx = ((-0.5 * x) - 0.25);
-      ny = ((-0.5 * y) + S3D2);
+      ny = ((-0.5 * y) + 0.4330127018922193);
       newColor = ${p[6]};
     }
   }
@@ -37186,12 +45656,12 @@ switch i32(min(max(${p[0]}, 0.0), 73.0)) {
       ny = (0.5 * y);
       newColor = ${p[4]};
     } else if ((rand < 0.75)) {
-      nx = (((-0.25 * x) - (S3D2 * y)) + 0.25);
-      ny = (((-S3D2 * x) + (0.25 * y)) + S3D2);
+      nx = (((-0.25 * x) - (0.4330127018922193 * y)) + 0.25);
+      ny = (((-0.4330127018922193 * x) + (0.25 * y)) + 0.4330127018922193);
       newColor = ${p[5]};
     } else {
-      nx = (((-0.25 * x) + (S3D2 * y)) + 0.25);
-      ny = (((-S3D2 * x) - (0.25 * y)) + S3D2);
+      nx = (((-0.25 * x) + (0.4330127018922193 * y)) + 0.25);
+      ny = (((-0.4330127018922193 * x) - (0.25 * y)) + 0.4330127018922193);
       newColor = ${p[6]};
     }
   }
@@ -38745,8 +47215,8 @@ for (var i: i32 = 0; (i < iter); i++) {
     z_res = (((((nz_num * dt_den) - (nx_num * dy_den)) + (ny_num * dx_den)) - (nt_num * dz_den)) * inv_denom);
   } else {
     z_res = 0.0;
+    t_res_quat = z_res;
     x_res = z_res;
-    t_res_quat = x_res;
     y_res = z_res;
   }
 }
@@ -38812,6 +47282,133 @@ switch i32(${p[18]}) {
 v.x += (${w} * final_x);
 v.y += (${w} * final_y);
 pz_ += (${w} * final_z);
+}`,
+  },
+  "flame_bulb": {
+    params: [{ name: "root_power", def: 8 }, { name: "radius_pow", def: 1 }, { name: "add C", def: 1 }, { name: "color mode 1-4", def: 1 }, { name: "color scale", def: 1 }],
+    verified: true, priority: 0, flags: ["3d","dc","z"], types: ["3D"],
+    funcNames: ["jrand_","powc","atan2j","rndi","jrand_make","jrand__zero","jrand_next","jrand_nextInt"],
+    funcs: `struct jrand_ {
+  s0: i32,
+  s1: i32,
+  s2: i32,
+}
+
+fn powc(x: f32, y: f32) -> f32 {
+  if (x >= 0.0) { return pow(x, y); }
+  let yi = round(y);
+  if (abs(y - yi) > 1e-6) { return pow(x, y); }
+  let m = pow(-x, y);
+  return select(m, -m, (i32(yi) & 1) != 0);
+}
+
+fn atan2j(y: f32, x: f32) -> f32 { if (x == 0.0 && y == 0.0) { return select(0.0, PI, (bitcast<u32>(x) >> 31u) == 1u) * select(1.0, -1.0, (bitcast<u32>(y) >> 31u) == 1u); } return atan2(y, x); }
+
+fn rndi(state: ptr<function, u32>) -> u32 { var x = *state; x ^= x << 13u; x ^= x >> 17u; x ^= x << 5u; *state = x; return x; }
+
+fn jrand_make(seed: i32) -> jrand_ {
+  var r_: jrand_;
+  r_.s0 = ((seed & 65535) ^ 58989);
+  r_.s1 = (((seed >> 16) & 65535) ^ 57068);
+  r_.s2 = (select(0, 65535, (seed < 0)) ^ 5);
+  return r_;
+}
+
+fn jrand__zero(rs: ptr<function, u32>) -> jrand_ {
+  return jrand_make(i32((rndi(rs) >> 1)));
+}
+
+fn jrand_next(r_: ptr<function, jrand_>, bits: i32) -> i32 {
+  var a0: u32 = u32((*r_).s0);
+  var a1: u32 = u32((*r_).s1);
+  var a2: u32 = u32((*r_).s2);
+  var t0: u32 = ((a0 * 58989) + 11);
+  var r0: u32 = (t0 & 65535);
+  var c0: u32 = (t0 >> 16);
+  var t1a: u32 = ((a0 * 57068) + c0);
+  var c1a: u32 = (t1a >> 16);
+  var t1b: u32 = ((a1 * 58989) + (t1a & 65535));
+  var r1: u32 = (t1b & 65535);
+  var c1: u32 = (c1a + (t1b >> 16));
+  var r2_: u32 = (((((a0 * 5) + (a1 * 57068)) + (a2 * 58989)) + c1) & 65535);
+  (*r_).s0 = i32(r0);
+  (*r_).s1 = i32(r1);
+  (*r_).s2 = i32(r2_);
+  var hi: u32 = ((r2_ << 16) | r1);
+  return i32((hi >> u32((32 - bits))));
+}
+
+fn jrand_nextInt(r_: ptr<function, jrand_>, n: i32) -> i32 {
+  if ((n <= 0)) {
+    return 0;
+  }
+  if (((n & -n) == n)) {
+    var k: i32 = 0;
+    var m: i32 = n;
+    while ((m > 1)) {
+      m = (m >> 1);
+      k = (k + 1);
+    }
+    return (jrand_next(r_, 31) >> u32((31 - k)));
+  }
+  var bits: i32;
+  var val: i32;
+  loop {
+    bits = jrand_next(r_, 31);
+    val = (bits % n);
+    if (!(((bits - val) + (n - 1)) < 0)) { break; }
+  }
+  return val;
+}`,
+    code: (w, p) => `{
+var Power_: f32 = (1 / ${p[0]});
+var x: f32 = (${w} * t.x);
+var y: f32 = (${w} * t.y);
+var z: f32 = (${w} * z_);
+var xo: f32 = x;
+var yo: f32 = y;
+var zo: f32 = z;
+var mag1: f32 = ((sqrt((((x * x) + (y * y)) + (z * z))) / 2) * ${p[2]});
+if ((${p[2]} != 0)) {
+  x += mag1;
+  y += mag1;
+  z += mag1;
+}
+var rand: jrand_ = jrand__zero(rs);
+var k: i32 = jrand_nextInt(&(rand), (i32(${p[0]}) + 1));
+var k2: i32 = jrand_nextInt(&(rand), (i32(${p[0]}) + 1));
+for (var i: i32 = 0; (i < 2); i++) {
+  x -= xo;
+  y -= yo;
+  z -= zo;
+  var sq_r: f32 = sqrt((((x * x) + (y * y)) + (z * z)));
+  var r_: f32 = powc(sq_r, Power_);
+  var theta: f32 = ((acos((z / sq_r)) + (f32((2 * k)) * PI)) * Power_);
+  var zangle: f32 = ((atan2j(y, x) + (f32(((i * 2) * k2)) * PI)) * Power_);
+  x = ((sin(theta) * cos(zangle)) * powc(r_, ${p[1]}));
+  y = ((sin(theta) * sin(zangle)) * powc(r_, ${p[1]}));
+  z = (cos(theta) * powc(r_, ${p[1]}));
+}
+v.x = x;
+v.y = y;
+pz_ = z;
+var mag2: f32 = (mag1 / ${p[4]});
+if ((${p[3]} == 1)) {
+  (*cp) = mag2;
+} else if ((${p[3]} == 2)) {
+  (*cp) += mag2;
+} else if ((${p[3]} == 3)) {
+  (*cp) = sin((sqrt((((x * x) + (y * y)) + (z * z))) + (mag2 * 2)));
+} else if ((${p[3]} == 4)) {
+  (*cp) += sin((sqrt((((x * x) + (y * y)) + (z * z))) + (mag2 * 2)));
+} else if ((${p[3]} == 5)) {
+  (*cp) = log((sqrt((((x * x) + (y * y)) + (z * z))) + (mag2 * 2)));
+} else if ((${p[3]} == 6)) {
+  (*cp) += log((sqrt((((x * x) + (y * y)) + (z * z))) + (mag2 * 2)));
+}
+if (false) {
+  pz_ = (${w} * z_);
+}
 }`,
   },
   "attractor_flow": {
@@ -39015,6 +47612,305 @@ v.x += ((cellCenterX + transformedX) - ${p[2]});
 v.y += ((cellCenterY + transformedY) + ${p[3]});
 if (false) {
   pz_ += (${w} * z_);
+}
+}`,
+  },
+  "greebles": {
+    params: [{ name: "mode", def: 0 }, { name: "base_shape", def: 1 }, { name: "size", def: 2 }, { name: "subdivisions", def: 10 }, { name: "greeble_shape", def: 0 }, { name: "greeble_height", def: 0.2 }, { name: "seed", def: 12345 }],
+    verified: true, priority: 0, flags: ["3d","dc","hide","z"], types: ["3D","BASE_SHAPE"],
+    funcNames: ["jmrg_","jxyz_","atan2j","powc","jxyz__zero","jxyz_assign","greebles_normalize","jmrg_randomize","jmrg_random","greebles_cross","greebles_frac"],
+    funcs: `struct jmrg_ {
+  u: i32,
+  v_: i32,
+}
+
+struct jxyz_ {
+  x: f32,
+  y: f32,
+  z: f32,
+  color: f32,
+}
+
+fn atan2j(y: f32, x: f32) -> f32 { if (x == 0.0 && y == 0.0) { return select(0.0, PI, (bitcast<u32>(x) >> 31u) == 1u) * select(1.0, -1.0, (bitcast<u32>(y) >> 31u) == 1u); } return atan2(y, x); }
+
+fn powc(x: f32, y: f32) -> f32 {
+  if (x >= 0.0) { return pow(x, y); }
+  let yi = round(y);
+  if (abs(y - yi) > 1e-6) { return pow(x, y); }
+  let m = pow(-x, y);
+  return select(m, -m, (i32(yi) & 1) != 0);
+}
+
+fn jxyz__zero() -> jxyz_ {
+  var r_: jxyz_;
+  return r_;
+}
+
+fn jxyz_assign(a: ptr<function, jxyz_>, b: jxyz_) {
+  (*a).x = b.x;
+  (*a).y = b.y;
+  (*a).z = b.z;
+  (*a).color = b.color;
+}
+
+fn greebles_normalize(v_: ptr<function, jxyz_>) {
+  var len: f32 = sqrt(((((*v_).x * (*v_).x) + ((*v_).y * (*v_).y)) + ((*v_).z * (*v_).z)));
+  if ((len > 1.0e-9)) {
+    (*v_).x /= len;
+    (*v_).y /= len;
+    (*v_).z /= len;
+  }
+}
+
+fn jmrg_randomize(g: ptr<function, jmrg_>, seed: i32) {
+  (*g).u = (seed << 16);
+  (*g).v_ = ((seed << 16) >> 16);
+}
+
+fn jmrg_random(g: ptr<function, jmrg_>) -> f32 {
+  var v_: u32 = u32((*g).v_);
+  var u: u32 = u32((*g).u);
+  v_ = ((36969 * (v_ & 65535)) + u32(((*g).v_ >> 16)));
+  u = ((18000 * (u & 65535)) + u32(((*g).u >> 16)));
+  (*g).v_ = i32(v_);
+  (*g).u = i32(u);
+  var rnd_: i32 = i32(((v_ << 16) + u));
+  var res: f32 = (f32(rnd_) * (1.0 / 2147483647.0));
+  return select(res, -res, (res < 0.0));
+}
+
+fn greebles_cross(res: ptr<function, jxyz_>, v1: jxyz_, v2: jxyz_) {
+  (*res).x = ((v1.y * v2.z) - (v1.z * v2.y));
+  (*res).y = ((v1.z * v2.x) - (v1.x * v2.z));
+  (*res).z = ((v1.x * v2.y) - (v1.y * v2.x));
+}
+
+fn greebles_frac(n: f32) -> f32 {
+  return (n - floor(n));
+}`,
+    code: (w, p) => `{
+loop {
+var cell_rand: jmrg_;
+var p_greeble_base: jxyz_ = jxyz__zero();
+var p_normal: jxyz_ = jxyz__zero();
+var greeble_base_size: f32;
+if ((i32(${p[1]}) == 0)) {
+  var halfSize: f32 = (${p[2]} * 0.5);
+  var u_angle: f32;
+  var v_angle: f32;
+  if ((i32(${p[0]}) == 1)) {
+    u_angle = atan2j(t.y, t.x);
+    var r_xy: f32 = sqrt(((t.x * t.x) + (t.y * t.y)));
+    v_angle = atan2j(z_, r_xy);
+  } else {
+    u_angle = ((rnd(rs) * 2.0) * PI);
+    v_angle = acos(((2.0 * rnd(rs)) - 1.0));
+  }
+  var u_divs: i32 = max(1, (i32(${p[3]}) * 2));
+  var v_divs: i32 = max(1, i32(${p[3]}));
+  var u_cell_size: f32 = ((2.0 * PI) / f32(u_divs));
+  var v_cell_size: f32 = (PI / f32(v_divs));
+  var u_quantized: f32 = ((floor((u_angle / u_cell_size)) * u_cell_size) + (u_cell_size * 0.5));
+  var v_quantized: f32 = ((floor((v_angle / v_cell_size)) * v_cell_size) + (v_cell_size * 0.5));
+  p_greeble_base.x = ((halfSize * sin(v_quantized)) * cos(u_quantized));
+  p_greeble_base.y = ((halfSize * sin(v_quantized)) * sin(u_quantized));
+  p_greeble_base.z = (halfSize * cos(v_quantized));
+  jxyz_assign(&(p_normal), p_greeble_base);
+  greebles_normalize(&(p_normal));
+  greeble_base_size = ((PI * ${p[2]}) / f32(i32(${p[3]})));
+} else {
+  var p_on_surface: jxyz_ = jxyz__zero();
+  if ((i32(${p[0]}) == 1)) {
+    p_on_surface.x = t.x;
+    p_on_surface.y = t.y;
+    p_on_surface.z = z_;
+    p_on_surface.color = (*cp);
+  } else {
+    if ((i32(${p[1]}) == 2)) {
+      p_on_surface.x = ((rnd(rs) - 0.5) * ${p[2]});
+      p_on_surface.y = ((rnd(rs) - 0.5) * ${p[2]});
+      p_on_surface.z = 0.0;
+    } else {
+      var face: i32 = i32((rnd(rs) * 6));
+      var u_r: f32 = ((rnd(rs) - 0.5) * ${p[2]});
+      var v_r: f32 = ((rnd(rs) - 0.5) * ${p[2]});
+      var hs: f32 = (${p[2]} * 0.5);
+      switch face {
+        case 0: {
+          p_on_surface.x = hs;
+          p_on_surface.y = u_r;
+          p_on_surface.z = v_r;
+        }
+        case 1: {
+          p_on_surface.x = -hs;
+          p_on_surface.y = u_r;
+          p_on_surface.z = v_r;
+        }
+        case 2: {
+          p_on_surface.x = u_r;
+          p_on_surface.y = hs;
+          p_on_surface.z = v_r;
+        }
+        case 3: {
+          p_on_surface.x = u_r;
+          p_on_surface.y = -hs;
+          p_on_surface.z = v_r;
+        }
+        case 4: {
+          p_on_surface.x = u_r;
+          p_on_surface.y = v_r;
+          p_on_surface.z = hs;
+        }
+        case 5: {
+          p_on_surface.x = u_r;
+          p_on_surface.y = v_r;
+          p_on_surface.z = -hs;
+        }
+        default: {}
+      }
+    }
+  }
+  var halfSize: f32 = (${p[2]} * 0.5);
+  if ((i32(${p[1]}) == 2)) {
+    p_on_surface.z = 0;
+    p_normal.x = 0;
+    p_normal.y = 0;
+    p_normal.z = 1;
+  } else {
+    var absX: f32 = abs(p_on_surface.x);
+    var absY: f32 = abs(p_on_surface.y);
+    var absZ: f32 = abs(p_on_surface.z);
+    if (((absX >= absY) && (absX >= absZ))) {
+      p_on_surface.x = select(-halfSize, halfSize, (p_on_surface.x > 0));
+      p_normal.x = f32(select(-1, 1, (p_on_surface.x > 0)));
+      p_normal.y = 0;
+      p_normal.z = 0;
+    } else if (((absY >= absX) && (absY >= absZ))) {
+      p_on_surface.y = select(-halfSize, halfSize, (p_on_surface.y > 0));
+      p_normal.x = 0;
+      p_normal.y = f32(select(-1, 1, (p_on_surface.y > 0)));
+      p_normal.z = 0;
+    } else {
+      p_on_surface.z = select(-halfSize, halfSize, (p_on_surface.z > 0));
+      p_normal.x = 0;
+      p_normal.y = 0;
+      p_normal.z = f32(select(-1, 1, (p_on_surface.z > 0)));
+    }
+  }
+  greeble_base_size = select(${p[2]}, (${p[2]} / f32(i32(${p[3]}))), (i32(${p[3]}) > 0));
+  if ((greeble_base_size < 0.000001)) {
+    (*hd) = true;
+    break;
+  }
+  var ix: i32 = i32(floor((p_on_surface.x / greeble_base_size)));
+  var iy: i32 = i32(floor((p_on_surface.y / greeble_base_size)));
+  var iz: i32 = i32(floor((p_on_surface.z / greeble_base_size)));
+  p_greeble_base.x = ((f32(ix) * greeble_base_size) + (greeble_base_size * 0.5));
+  p_greeble_base.y = ((f32(iy) * greeble_base_size) + (greeble_base_size * 0.5));
+  p_greeble_base.z = ((f32(iz) * greeble_base_size) + (greeble_base_size * 0.5));
+}
+var cell_seed: i32 = (((i32(${p[6]}) + (i32((p_greeble_base.x * 100)) * 73856093)) ^ (i32((p_greeble_base.y * 100)) * 19349663)) ^ (i32((p_greeble_base.z * 100)) * 83492791));
+jmrg_randomize(&(cell_rand), cell_seed);
+var height: f32 = (${p[5]} * jmrg_random(&(cell_rand)));
+var tangent: jxyz_ = jxyz__zero();
+var bitangent: jxyz_ = jxyz__zero();
+var up_vec: jxyz_ = jxyz__zero();
+up_vec.y = 1.0;
+if ((abs(p_normal.y) > 0.999)) {
+  up_vec.y = 0.0;
+  up_vec.x = 1.0;
+}
+greebles_cross(&(tangent), p_normal, up_vec);
+greebles_normalize(&(tangent));
+greebles_cross(&(bitangent), p_normal, tangent);
+greebles_normalize(&(bitangent));
+var u: f32 = 0;
+var v_: f32 = 0;
+var w_: f32 = 0;
+if ((i32(${p[0]}) == 0)) {
+  switch i32(${p[4]}) {
+    case 1: {
+      var angle_cyl: f32 = ((rnd(rs) * 2.0) * PI);
+      var radius_cyl: f32 = ((greeble_base_size * 0.5) * sqrt(rnd(rs)));
+      u = (cos(angle_cyl) * radius_cyl);
+      v_ = (sin(angle_cyl) * radius_cyl);
+      w_ = (rnd(rs) * height);
+    }
+    case 2: {
+      var r_x: f32 = (rnd(rs) - 0.5);
+      var r_y: f32 = (rnd(rs) - 0.5);
+      var r_z: f32 = (rnd(rs) - 0.5);
+      var r_len: f32 = sqrt((((r_x * r_x) + (r_y * r_y)) + (r_z * r_z)));
+      if ((r_len > 1.0e-9)) {
+        var radius: f32 = powc(rnd(rs), (1.0 / 3.0));
+        u = (((r_x / r_len) * radius) * (greeble_base_size * 0.5));
+        v_ = (((r_y / r_len) * radius) * (greeble_base_size * 0.5));
+        w_ = (((r_z / r_len) * radius) * height);
+      }
+    }
+    case 3: {
+      var angle_cone: f32 = ((rnd(rs) * 2.0) * PI);
+      w_ = (rnd(rs) * height);
+      var taper_factor: f32 = select(1.0, (1.0 - (w_ / height)), (height > 1.0e-9));
+      var radius_cone: f32 = (((greeble_base_size * 0.5) * sqrt(rnd(rs))) * taper_factor);
+      u = (cos(angle_cone) * radius_cone);
+      v_ = (sin(angle_cone) * radius_cone);
+    }
+    case 0, default: {
+      u = ((rnd(rs) - 0.5) * greeble_base_size);
+      v_ = ((rnd(rs) - 0.5) * greeble_base_size);
+      w_ = (rnd(rs) * height);
+    }
+  }
+} else {
+  var relative_p: jxyz_ = jxyz__zero();
+  relative_p.x = (t.x - p_greeble_base.x);
+  relative_p.y = (t.y - p_greeble_base.y);
+  relative_p.z = (z_ - p_greeble_base.z);
+  var local_u: f32 = (((relative_p.x * tangent.x) + (relative_p.y * tangent.y)) + (relative_p.z * tangent.z));
+  var local_v: f32 = (((relative_p.x * bitangent.x) + (relative_p.y * bitangent.y)) + (relative_p.z * bitangent.z));
+  var local_w: f32 = (((relative_p.x * p_normal.x) + (relative_p.y * p_normal.y)) + (relative_p.z * p_normal.z));
+  switch i32(${p[4]}) {
+    case 1: {
+      var angle_cyl: f32 = atan2j(local_v, local_u);
+      var radius_cyl_base: f32 = sqrt(((local_u * local_u) + (local_v * local_v)));
+      var radius_cyl: f32 = ((greeble_base_size * 0.5) * greebles_frac(radius_cyl_base));
+      u = (cos(angle_cyl) * radius_cyl);
+      v_ = (sin(angle_cyl) * radius_cyl);
+      w_ = (greebles_frac(local_w) * height);
+    }
+    case 2: {
+      var r_len_flame: f32 = sqrt((((local_u * local_u) + (local_v * local_v)) + (local_w * local_w)));
+      var radius_sphere: f32 = ((greeble_base_size * 0.5) * greebles_frac(r_len_flame));
+      if ((r_len_flame > 1.0e-9)) {
+        u = ((local_u / r_len_flame) * radius_sphere);
+        v_ = ((local_v / r_len_flame) * radius_sphere);
+        w_ = ((local_w / r_len_flame) * radius_sphere);
+      }
+    }
+    case 3: {
+      var angle_cone: f32 = atan2j(local_v, local_u);
+      var radius_cone_base: f32 = sqrt(((local_u * local_u) + (local_v * local_v)));
+      w_ = (greebles_frac(local_w) * height);
+      var taper_factor: f32 = select(1.0, (1.0 - (w_ / height)), (height > 1.0e-9));
+      var radius_cone: f32 = (((greeble_base_size * 0.5) * greebles_frac(radius_cone_base)) * taper_factor);
+      u = (cos(angle_cone) * radius_cone);
+      v_ = (sin(angle_cone) * radius_cone);
+    }
+    case 0, default: {
+      u = ((greebles_frac(local_u) - 0.5) * greeble_base_size);
+      v_ = ((greebles_frac(local_v) - 0.5) * greeble_base_size);
+      w_ = (greebles_frac(local_w) * height);
+    }
+  }
+}
+var final_x: f32 = (((p_greeble_base.x + (tangent.x * u)) + (bitangent.x * v_)) + (p_normal.x * w_));
+var final_y: f32 = (((p_greeble_base.y + (tangent.y * u)) + (bitangent.y * v_)) + (p_normal.y * w_));
+var final_z: f32 = (((p_greeble_base.z + (tangent.z * u)) + (bitangent.z * v_)) + (p_normal.z * w_));
+v.x += (final_x * ${w});
+v.y += (final_y * ${w});
+pz_ += (final_z * ${w});
+break;
 }
 }`,
   },

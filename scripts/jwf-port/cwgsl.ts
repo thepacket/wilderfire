@@ -686,7 +686,7 @@ export interface Env {
 }
 
 interface Sym { ty: Ty; wname: string; isParam?: boolean }
-interface FnSig { name: string; wname: string; ret: Ty; params: { ty: Ty; name: string; ptrInferred: boolean }[]; def: FuncDef | null; used: boolean; body?: string; deps: Set<string>; assignsParams: Set<string> }
+interface FnSig { name: string; wname: string; ret: Ty; params: { ty: Ty; name: string; ptrInferred: boolean }[]; def: FuncDef | null; used: boolean; body?: string; deps: Set<string>; assignsParams: Set<string>; usesRs?: boolean }
 
 // WGSL reserved words + builtin names + our prelude names — C identifiers matching these get a suffix.
 const RESERVED = new Set(`alias break case const const_assert continue continuing default diagnostic discard else enable false fn for if let loop override requires return struct switch true var while
@@ -855,11 +855,20 @@ BUILTINS.double = BUILTINS.float;
 BUILTINS.int = (a, em) => ({ c: em.toI32(a[0], true), ty: I32 });
 BUILTINS.uint = (a, em) => ({ c: em.toU32(a[0], true), ty: U32 });
 BUILTINS.bool = (a, em) => ({ c: em.toBool(a[0]), ty: BOOL });
-BUILTINS.RANDFLOAT = () => ({ c: 'rnd(rs)', ty: F32 });
+// A helper that draws randoms gets the RNG state as a trailing `rs` parameter (callers pass theirs on);
+// the emitter re-runs until every signature is settled (usesRs is discovered while emitting bodies).
+const markRs = (em: Emitter) => { if (em.curFn && !em.curFn.usesRs) { em.curFn.usesRs = true; em.prog.flags.add('reinfer'); } };
+BUILTINS.RANDFLOAT = (_a, em) => { markRs(em); return { c: 'rnd(rs)', ty: F32 }; };
 // JWildfire GPU palette read (dc_* direct-colour variations): `palette` binds to the
 // layer's palette base index, `numColors` to 256; helper defined in HELPER_FUNCS.
 BUILTINS.read_imageStepMode = (a, em) => ({ c: `read_imageStepMode(${em.toU32(a[0])}, ${em.toI32(a[1])}, ${em.toF32(a[2])})`, ty: vec(4, 'f32') });
-BUILTINS.RANDINT = () => ({ c: 'rndi(rs)', ty: U32 });
+BUILTINS.RANDINT = (_a, em) => { markRs(em); return { c: 'rndi(rs)', ty: U32 }; };
+// jpostinc(&i): C `i++` used inside an expression (loop conditions) — returns the old value, advances the variable
+BUILTINS.jpostinc = (a, em) => {
+  if (a[0].ty.k !== 'ptr') throw new Error('jpostinc expects a pointer to an int');
+  em.prog.helpersUsed.add('h:jpostinc');
+  return { c: `jpostinc(${a[0].c})`, ty: I32 };
+};
 // HSIN2(a1, c1, a2, c2, add_a, add_b, K): the classic shader hash `sin(a1*c1 + a2*c2 + add) * K`
 // (then fract / x-trunc(x) by the caller) evaluated in double-float (two f32) arithmetic so the
 // fractional part matches JWildfire's f64 Java for integer-valued a1/a2 (cell ids). c1, c2, K
@@ -910,6 +919,7 @@ export const HELPER_FUNCS: Record<string, string> = {
   mmod4: `fn mmod4(a: vec4f, b: vec4f) -> vec4f { return a - b * floor(a / b); }`,
   cbrt: `fn cbrt(x: f32) -> f32 { return sign(x) * pow(abs(x), 1.0 / 3.0); }`,
   copysign: `fn copysign(a: f32, b: f32) -> f32 { return select(-abs(a), abs(a), b >= 0.0); }`,
+  jpostinc: `fn jpostinc(t: ptr<function, i32>) -> i32 { let v = *t; *t = v + 1; return v; }`,
   rndi: `fn rndi(state: ptr<function, u32>) -> u32 { var x = *state; x ^= x << 13u; x ^= x >> 17u; x ^= x << 5u; *state = x; return x; }`,
   erf: `fn erf(x: f32) -> f32 { let s = sign(x); let a = abs(x); let t = 1.0 / (1.0 + 0.3275911 * a);
   let y = 1.0 - (((((1.061405429 * t - 1.453152027) * t) + 1.421413741) * t - 0.284496736) * t + 0.254829592) * t * exp(-a * a);
@@ -1332,6 +1342,7 @@ class Emitter {
           parts.push(this.convTo(a, p.ty));
         }
       });
+      if (fn.usesRs) { parts.push('rs'); markRs(this); }
       return { c: `${fn.wname}(${parts.join(', ')})`, ty: fn.ret };
     }
     const b = BUILTINS[name];
@@ -1899,6 +1910,7 @@ function emitFunction(em: Emitter, f: FnSig): string {
     }
   });
   const body = em.stmts(def.body.stmts, sc, '  ');
+  if (f.usesRs) params.push('rs: ptr<function, u32>');
   const ret = f.ret.k === 'void' ? '' : ` -> ${tyStr(f.ret)}`;
   return `fn ${f.wname}(${params.join(', ')})${ret} {\n${prologue}${body}}`;
 }

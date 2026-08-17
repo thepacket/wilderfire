@@ -35,7 +35,7 @@ for (let i = 0; i < args.length; i++) {
 const varDir = path.join(jwfRoot, 'src/org/jwildfire/create/tina/variation');
 if (!fs.existsSync(varDir)) { console.error(`JWildfire sources not found at ${varDir} (use --jwf)`); process.exit(1); }
 
-interface DumpVar { name: string; params: { name: string; def: number; int: boolean }[]; gpuCode?: string; gpu?: boolean; resources?: number }
+interface DumpVar { name: string; params: { name: string; def: number; int: boolean }[]; gpuCode?: string; gpu?: boolean; resources?: number; priority?: number }
 const dump: DumpVar[] = fs.readFileSync(path.join(here, 'data/jwf-variations.jsonl'), 'utf8').split('\n').filter(Boolean).map((l) => JSON.parse(l));
 const dumpByName = new Map(dump.map((d) => [d.name, d]));
 
@@ -45,7 +45,7 @@ const fileByName = new Map<string, string>();
 for (const f of files) {
   const s = fs.readFileSync(f, 'latin1');
   const m = /public String getName\(\)\s*\{\s*return\s+"([A-Za-z0-9_]+)"\s*;/.exec(s);
-  if (m && !fileByName.has(m[1])) fileByName.set(m[1], f);
+  if (m && (!fileByName.has(m[1]) || /public\s+abstract\s+class/.test(fs.readFileSync(fileByName.get(m[1])!, 'latin1')))) fileByName.set(m[1], f); // a concrete class beats an abstract one with the same name
 }
 function walk(d: string): string[] { return fs.readdirSync(d, { withFileTypes: true }).flatMap((e) => e.isDirectory() ? walk(path.join(d, e.name)) : [path.join(d, e.name)]); }
 
@@ -77,8 +77,65 @@ const KNOWN_METHODS = new Set(['transform', 'init', 'initOnce', 'getName', 'getP
 interface Method { name: string; ret: string; params: string; body: string; static: boolean }
 interface Field { type: string; name: string; init: string | null; array: number | null }
 
+// ---------------------------------------------------------------- plain-data inner classes → structs
+// `private static class Point { double x, y; }` (optionally with a constructor that only assigns
+// fields, and setter methods `void setXy(double x, double y)`) → CUDA `struct <Var>_Point { float x; float y; };`
+// plus a maker function for the constructor; setters become helper functions taking a pointer.
+interface Pod { name: string; fields: { type: string; name: string }[]; ctor: { params: string[]; assigns: [string, string][] } | null; setters: { name: string; params: string; body: string }[]; builtin?: { cuda: string; lib: string; methods: Record<string, string>; ctorFn?: string } }
+// library classes used like plain data: struct + functions come from LIB, methods map to `fn(&obj, …)`
+const BUILTIN_PODS: Pod[] = [
+  { name: 'MarsagliaRandomGenerator', fields: [{ type: 'int', name: 'u' }, { type: 'int', name: 'v' }], ctor: null, setters: [], builtin: { cuda: 'jmrg_', lib: 'jmrg', methods: { randomize: 'jmrg_randomize', random: 'jmrg_random' } } },
+  { name: 'XYZPoint', fields: [{ type: 'float', name: 'x' }, { type: 'float', name: 'y' }, { type: 'float', name: 'z' }, { type: 'float', name: 'color' }], ctor: null, setters: [], builtin: { cuda: 'jxyz_', lib: 'jxyz', methods: { assign: 'jxyz_assign' } } },
+  { name: 'DoubleWrapperWF', fields: [{ type: 'float', name: 'value' }], ctor: null, setters: [], builtin: { cuda: 'jdw_', lib: 'jdw', methods: {} } },
+  { name: 'Random', fields: [{ type: 'int', name: 's0' }, { type: 'int', name: 's1' }, { type: 'int', name: 's2' }], ctor: { params: ['int seed'], assigns: [] }, setters: [], builtin: { cuda: 'jrand_', lib: 'jrand', methods: { nextDouble: 'jrand_nextDouble', nextInt: 'jrand_nextInt', setSeed: 'jrand_setSeed', nextFloat: 'jrand_nextDouble' }, ctorFn: 'jrand_make' } },
+];
+const POD_TYPE: Record<string, string> = { double: 'float', float: 'float', long: 'int', int: 'int', short: 'int', boolean: 'bool' };
+export function parsePod(name: string, body: string): Pod | null {
+  const fields: Pod['fields'] = [];
+  const setters: Pod['setters'] = [];
+  let ctor: Pod['ctor'] = null;
+  // methods (constructors, setters, anything else → not plain data)
+  const mre = /(?:public|private|protected)?\s*(?:static\s+)?(?:final\s+)?(?:([\w<>\[\]]+)\s+)?(\w+)\s*\(([^)]*)\)\s*\{/g;
+  let m: RegExpExecArray | null;
+  const ranges: [number, number][] = [];
+  while ((m = mre.exec(body))) {
+    const b = braceBody(body, m.index + m[0].length - 1);
+    if (!b) { if (process.env.PODDBG) console.log('nobody', m[0]); return null; }
+    ranges.push([m.index, b.end]);
+    mre.lastIndex = b.end;
+    const ret = m[1] && /^(public|private|protected|static|final)$/.test(m[1]) ? undefined : m[1], mn = m[2], params = m[3].trim(), mb = b.body.trim();
+    if (mn === name && !ret) {
+      // constructor: only `this.f = expr;` / `f = expr;` statements
+      const assigns: [string, string][] = [];
+      for (const st of mb.split(';').map((x) => x.trim()).filter(Boolean)) {
+        const am = /^(?:this\.)?(\w+)\s*=\s*([\s\S]+)$/.exec(st);
+        if (!am) { if (process.env.PODDBG) console.log('ctor stmt', st); return null; }
+        assigns.push([am[1], am[2]]);
+      }
+      if (!params && !assigns.length) continue; // empty default constructor
+      if (ctor) { if (process.env.PODDBG) console.log('overload'); return null; } // overloaded constructors: not handled
+      ctor = { params: params ? params.split(',').map((x) => x.trim()) : [], assigns };
+      continue;
+    }
+    if (ret === 'void' && /^set/.test(mn)) { setters.push({ name: mn, params, body: mb }); continue; }
+    if (process.env.PODDBG) console.log('method', ret, mn);
+    return null;
+  }
+  const outside = (pos: number) => !ranges.some(([a, b]) => pos >= a && pos < b);
+  for (const fm of body.matchAll(/(?:public|private|protected)?\s*(?:final\s+)?(double|float|int|long|short|boolean)\s+([\w\s,]+?)\s*;/g)) {
+    if (!outside(fm.index!)) continue;
+    for (const part of fm[2].split(',')) { const nm = part.trim(); if (/^\w+$/.test(nm)) fields.push({ type: POD_TYPE[fm[1]], name: nm }); }
+  }
+  if (!fields.length) return null;
+  // anything else in the body (static final serialVersionUID is fine)
+  const stripped = ranges.reduceRight((acc, [a, b]) => acc.slice(0, a) + acc.slice(b), body)
+    .replace(/(?:private|public|protected)?\s*static\s+final\s+long\s+serialVersionUID\s*=\s*[^;]+;/g, '');
+  if (/\bnew\b|\[\s*\]|String\b|Object\b/.test(stripped)) { if (process.env.PODDBG) console.log('stripped', stripped); return null; }
+  return { name, fields, ctor, setters };
+}
+
 // ---------------------------------------------------------------- Java class model
-function parseClass(src0: string) {
+export function parseClass(src0: string) {
   const src = stripComments(src0);
   const cls = /public\s+(?:abstract\s+)?class\s+(\w+)\s+extends\s+([\w.]+)/.exec(src);
   if (!cls) throw new Error('no class');
@@ -87,12 +144,26 @@ function parseClass(src0: string) {
   const methods: Method[] = [];
   const fields: Field[] = [];
   const consts = new Map<string, string>(); // PARAM_X → "x"
+  const numConsts = new Map<string, string>(); // static final numeric constants (raw Java initialiser)
   let i = 0;
   const skipRanges: [number, number][] = [];
+  // nested class / enum / interface ranges first: their methods/fields are not the variation's
+  const pods: Pod[] = [];
+  const nestedRanges: [number, number][] = [];
+  for (const cm of body.matchAll(/(?:public|private|protected)?\s*(?:static\s+)?(?:final\s+)?(class|enum|interface)\s+(\w+)([^{]*)\{/g)) {
+    const b = braceBody(body, cm.index! + cm[0].length - 1);
+    if (!b) continue;
+    nestedRanges.push([cm.index!, b.end]);
+    if (cm[1] === 'class' && !/\bextends\b/.test(cm[3])) { const pod = parsePod(cm[2], b.body); if (pod) pods.push(pod); }
+  }
+  skipRanges.push(...nestedRanges);
+  const inNested = (pos: number) => nestedRanges.some(([a, b]) => pos >= a && pos < b);
   const mre = /(?:public|private|protected)?\s*(static\s+)?(?:final\s+)?(?:synchronized\s+)?([\w<>\[\],. ]+?)\s+(\w+)\s*\(([^)]*)\)\s*(?:throws [\w., ]+)?\s*\{/g;
   let m: RegExpExecArray | null;
   while ((m = mre.exec(body))) {
     if (['if', 'for', 'while', 'switch', 'catch', 'return', 'new', 'else'].includes(m[3])) continue;
+    if (inNested(m.index)) continue;
+    if (m[3] === cls[1]) { const b0 = braceBody(body, m.index + m[0].length - 1); if (b0) { skipRanges.push([m.index, b0.end]); mre.lastIndex = b0.end; } continue; } // constructor
     const b = braceBody(body, m.index + m[0].length - 1);
     if (!b) break;
     let ret = m[2].trim(); let isStatic = !!m[1];
@@ -100,11 +171,6 @@ function parseClass(src0: string) {
     methods.push({ name: m[3], ret, params: m[4], body: b.body, static: isStatic });
     skipRanges.push([m.index, b.end]);
     mre.lastIndex = b.end;
-  }
-  // nested class / enum / static blocks
-  for (const cm of body.matchAll(/(?:public|private|protected)?\s*(?:static\s+)?(?:final\s+)?(?:class|enum|interface)\s+\w+[^{]*\{/g)) {
-    const b = braceBody(body, cm.index! + cm[0].length - 1);
-    if (b) skipRanges.push([cm.index!, b.end]);
   }
   const outside = (pos: number) => !skipRanges.some(([a, b]) => pos >= a && pos < b);
   // fields (top-level statements ending with ';' outside methods)
@@ -126,7 +192,8 @@ function parseClass(src0: string) {
   for (const dcl of decls) {
     const { st, fin, type0, name, arrSuffix, init } = dcl;
     if (type0 === 'String' && st && fin && init) { const q = /^"([^"]*)"$/.exec(init.trim()); if (q) consts.set(name, q[1]); continue; }
-    if (type0.startsWith('String') || /^(Random|MersenneTwister|Object|Layer|XForm|Flame|AbstractRandomGenerator|RandomGeneratorType|Vec\w*)$/.test(type0)) continue;
+    if (st && fin && init && !arrSuffix && /^(double|int|float|long|short|boolean)$/.test(type0)) { numConsts.set(name, init.trim()); continue; }
+    if (type0.startsWith('String') || /^(MersenneTwister|Object|Layer|XForm|Flame|AbstractRandomGenerator|RandomGeneratorType|Vec\w*)$/.test(type0)) continue;
     if (name === 'serialVersionUID') continue;
     let type = type0; let array: number | null = null;
     if (type.endsWith('[]') || arrSuffix) {
@@ -139,7 +206,8 @@ function parseClass(src0: string) {
     }
     fields.push({ type, name, init: init?.trim() ?? null, array: null });
   }
-  return { className: cls[1], parent: cls[2], methods, fields, consts, body };
+  for (const bp of BUILTIN_PODS) if (new RegExp(`\\b${bp.name}\\b`).test(body) && !pods.some((x) => x.name === bp.name)) pods.push(bp);
+  return { className: cls[1], parent: cls[2], methods, fields, consts, numConsts, pods, body };
 }
 
 // ---------------------------------------------------------------- Java expression → CUDA dialect
@@ -161,19 +229,57 @@ const BARE_MAP: Record<string, string> = { fabs: 'fabsf', iabs: 'abs', sqrt: 'sq
   acosh: 'acoshf', asinh: 'asinhf', atanh: 'atanhf', toRadians: 'radians', toDegrees: 'degrees' };
 const RESERVED_LOCALS = new Set(['x', 'y', 'z']);
 
-interface Ctx { name: string; params: Set<string>; fieldMap: Map<string, string>; state: Set<string>; helperNames: Set<string>; usedHelperParams: Set<string>; inHelper: boolean }
+interface Ctx { name: string; params: Set<string>; fieldMap: Map<string, string>; state: Set<string>; helperNames: Set<string>; usedHelperParams: Set<string>; inHelper: boolean; consts: Map<string, string>; usedLib: Set<string>; pods: Map<string, string>; podMethods: Map<string, string>; podFields: Map<string, Set<string>>; podValue: boolean }
+// small device helpers some conversions need (appended to gpuFunctions when used)
+const LIB: Record<string, string> = {
+  jgcd: '__device__ int jgcd(int a, int b) { a = abs(a); b = abs(b); while (b != 0) { int t = a % b; a = b; b = t; } return a; }',
+  G_Kscope: '__device__ float2 G_Kscope(float2 uv, float k) { float angle = fabsf(mod(atan2f(uv.y, uv.x), 2.0f * k) - k); return make_float2(length(uv) * cosf(angle), length(uv) * sinf(angle)); }',
+  G_rot: '__device__ mat3_ G_rot(float3 s) { float sa = sinf(s.x), ca = cosf(s.x), sb = sinf(s.y), cb = cosf(s.y), sc = sinf(s.z), cc = cosf(s.z); return mat3_make(cb*cc, -cb*sc, sb, sa*sb*cc+ca*sc, -sa*sb*sc+ca*cc, -sa*cb, -ca*sb*cc+sa*sc, ca*sb*sc+sa*cc, ca*cb); }',
+  G_app: '__device__ float3 G_app(float3 v, float k, mat3_ m) { for (int i = 0; i < 50; i++) { float3 mv = make_float3(m.a00 * v.x + m.a01 * v.y + m.a02 * v.z, m.a10 * v.x + m.a11 * v.y + m.a12 * v.z, m.a20 * v.x + m.a21 * v.y + m.a22 * v.z) * k; v = abs(mv / dot(v, v) * 0.5f - 0.5f) * 2.0f - 1.0f; } return v; }',
+  // JWildfire's MarsagliaRandomGenerator (per-cell seeded randoms in de_stijl/greebles/quad): exact 32-bit port
+  jmrg: 'struct jmrg_ { int u; int v; };\n__device__ jmrg_ jmrg__zero() { jmrg_ r_; r_.u = 12244355; r_.v = 34384; return r_; }\n__device__ void jmrg_randomize(jmrg_ *g, int seed) { g->u = seed << 16; g->v = (seed << 16) >> 16; }\n__device__ float jmrg_random(jmrg_ *g) { unsigned int v = (unsigned int)g->v; unsigned int u = (unsigned int)g->u; v = 36969u * (v & 65535u) + (unsigned int)(g->v >> 16); u = 18000u * (u & 65535u) + (unsigned int)(g->u >> 16); g->v = (int)v; g->u = (int)u; int rnd = (int)((v << 16) + u); float res = (float)rnd * (1.0f / 2147483647.0f); return res < 0.0f ? -res : res; }',
+  // java.util.Random (48-bit LCG) on 16-bit limbs: exact seeding + nextDouble/nextInt sequences (seeded per parameter in cut_*truchet, curliecue2)
+  jrand: 'struct jrand_ { int s0; int s1; int s2; };\n__device__ jrand_ jrand__zero() { return jrand_make((int)(RANDINT() >> 1)); }\n__device__ void jrand_setSeed(jrand_ *r, int seed) { jrand_ n = jrand_make(seed); r->s0 = n.s0; r->s1 = n.s1; r->s2 = n.s2; }\n__device__ jrand_ jrand_make(int seed) { jrand_ r; r.s0 = (seed & 0xFFFF) ^ 0xE66D; r.s1 = ((seed >> 16) & 0xFFFF) ^ 0xDEEC; r.s2 = (seed < 0 ? 0xFFFF : 0) ^ 0x5; return r; }\n'
+    + '__device__ int jrand_next(jrand_ *r, int bits) { unsigned int a0 = (unsigned int)r->s0, a1 = (unsigned int)r->s1, a2 = (unsigned int)r->s2; unsigned int t0 = a0 * 58989u + 11u; unsigned int r0 = t0 & 65535u; unsigned int c0 = t0 >> 16; unsigned int t1a = a0 * 57068u + c0; unsigned int c1a = t1a >> 16; unsigned int t1b = a1 * 58989u + (t1a & 65535u); unsigned int r1 = t1b & 65535u; unsigned int c1 = c1a + (t1b >> 16); unsigned int r2 = (a0 * 5u + a1 * 57068u + a2 * 58989u + c1) & 65535u; r->s0 = (int)r0; r->s1 = (int)r1; r->s2 = (int)r2; unsigned int hi = (r2 << 16) | r1; return (int)(hi >> (32 - bits)); }\n'
+    + '__device__ float jrand_nextDouble(jrand_ *r) { return (float)jrand_next(r, 26) * (1.0f / 67108864.0f) + (float)jrand_next(r, 27) * (1.0f / 9007199254740992.0f); }\n'
+    + '__device__ int jrand_nextInt(jrand_ *r, int n) { if (n <= 0) return 0; if ((n & -n) == n) { int k = 0; int m = n; while (m > 1) { m = m >> 1; k = k + 1; } return jrand_next(r, 31) >> (31 - k); } int bits; int val; do { bits = jrand_next(r, 31); val = bits % n; } while (bits - val + (n - 1) < 0); return val; }',
+  jxyz: 'struct jxyz_ { float x; float y; float z; float color; };\n__device__ jxyz_ jxyz__zero() { jxyz_ r_; return r_; }\n__device__ void jxyz_assign(jxyz_ *a, jxyz_ b) { a->x = b.x; a->y = b.y; a->z = b.z; a->color = b.color; }',
+  jdw: 'struct jdw_ { float value; };\n__device__ jdw_ jdw__zero() { jdw_ r_; return r_; }',
+  mat3: 'struct mat3_ { float a00; float a10; float a20; float a01; float a11; float a21; float a02; float a12; float a22; };\n__device__ mat3_ mat3_make(float a00, float a10, float a20, float a01, float a11, float a21, float a02, float a12, float a22) { mat3_ m; m.a00 = a00; m.a10 = a10; m.a20 = a20; m.a01 = a01; m.a11 = a11; m.a21 = a21; m.a02 = a02; m.a12 = a12; m.a22 = a22; return m; }\n__device__ mat3_ mat3_scale(mat3_ m, float f) { return mat3_make(m.a00 * f, m.a10 * f, m.a20 * f, m.a01 * f, m.a11 * f, m.a21 * f, m.a02 * f, m.a12 * f, m.a22 * f); }',
+};
 
 function convertJava(code: string, ctx: Ctx, extraLocals: Iterable<string> = []): string {
   let s = code;
-  if (/\b(vec[234]|G\.|mat2)\b/.test(s)) s = convertGlsl(s);
+  if (/\b(vec[234]|G\.|mat[23])\b/.test(s) || /\.(multiply|plus|minus|division|add|times|dot|length)\s*\(/.test(s)) s = convertGlsl(s).replace(/\bMAT2_\(/g, 'make_float4(');
+  if (/\bmat3_/.test(s)) ctx.usedLib.add('mat3');
+  if (/\bG_Kscope\(/.test(s)) ctx.usedLib.add('G_Kscope');
+  if (/\bG_rot\(/.test(s)) { ctx.usedLib.add('mat3'); ctx.usedLib.add('G_rot'); }
+  if (/\bG_app\(/.test(s)) { ctx.usedLib.add('mat3'); ctx.usedLib.add('G_app'); }
   s = s.replace(/\bfinal\s+/g, '').replace(/\bthis\.(\w)/g, 'THISF_$1');
-  s = s.replace(/\b(?:double|long|short)\b/g, 'float').replace(/\bboolean\b/g, 'bool');
+  // plain-data inner classes: `P v = new P();` → `VAR_P v;`, `new P(a, b)` → `VAR_P_make(a, b)`, `v.setXy(a)` → `VAR_P_setXy(&v, a)`, type names prefixed
+  for (const [jn, cn] of ctx.pods) {
+    const podVars = new Set<string>([...ctx.podFields.get(jn) ?? []]);
+    s = s.replace(new RegExp(`\\b${jn}\\s*\\[\\s*\\]\\s*(\\w+)\\s*=\\s*new\\s+${jn}\\s*\\[([^\\]]+)\\]\\s*;`, 'g'), `${cn} $1[$2];`); // arrays of objects
+    s = s.replace(new RegExp(`(?<![\\w.])(\\w+(?:\\[[^\\]]*\\])?)\\.assign\\(\\s*pAffineTP\\s*\\)\\s*;`, 'g'), '$1.x = pAffineTP.x; $1.y = pAffineTP.y; $1.z = pAffineTP.z; $1.color = pAffineTP.color;');
+    s = s.replace(new RegExp(`(?<![\\w.])(\\w+(?:\\[[^\\]]*\\])?)\\.assign\\(\\s*pVarTP\\s*\\)\\s*;`, 'g'), '$1.x = pVarTP.x; $1.y = pVarTP.y; $1.z = pVarTP.z; $1.color = pVarTP.color;');
+    for (const dm of s.matchAll(new RegExp(`\\b${jn}\\s+(\\w+)`, 'g'))) podVars.add(dm[1]);
+    for (const dm of s.matchAll(new RegExp(`\\b${jn}\\s+(\\w+)\\s*[,)]`, 'g'))) podVars.add(dm[1]);
+    s = s.replace(new RegExp(`\\b${jn}\\s+(\\w+)\\s*=\\s*new\\s+${jn}\\s*\\(\\s*\\)\\s*;`, 'g'), `${cn} $1 = ${cn}_zero();`);
+    s = s.replace(new RegExp(`(?<=[;{}]\\s*)(\\w+(?:\\[[^\\]]*\\])?)\\s*=\\s*new\\s+${jn}\\s*\\(\\s*\\)\\s*;`, 'g'), ''); // re-creating an empty object (statement): already zero-initialised
+    s = s.replace(new RegExp(`\\bnew\\s+${jn}\\s*\\(\\s*\\)`, 'g'), `${cn}_zero()`);
+    s = s.replace(new RegExp(`\\bnew\\s+${jn}\\s*\\(`, 'g'), `${cls_ctorFn(jn, cn)}(`);
+    s = s.replace(new RegExp(`(?<![\\w.])(\\w+)\\.(\\w+)\\s*\\(`, 'g'), (m0, obj: string, fn: string) => (ctx.podMethods.has(`${jn}.${fn}`) && podVars.has(obj) ? `${ctx.podMethods.get(`${jn}.${fn}`)}(&${obj}, ` : m0)).replace(/, \)/g, ')');
+    s = s.replace(new RegExp(`\\b${jn}\\b`, 'g'), cn);
+  }
+  s = s.replace(/\bdouble\b/g, 'float').replace(/\b(?:long|short)\b/g, 'int').replace(/\bboolean\b/g, 'bool'); // long → int: Java longs in variations are seeds/hashes where the low 32 bits carry the meaning
   // locals declared in this body shadow fields of the same name (`double x = …` in dc_cube)
   const locals = new Set<string>(extraLocals);
   for (const dm of s.matchAll(/(?<![\w.])(?:float|int|bool)\s*(?:\[\s*\])?\s+([^;{}()]*?)(?:;|\)\s*\{|=\s*\{)/g)) {
     for (const part of dm[1].split(',')) { const nm = /^\s*(\w+)/.exec(part); if (nm) locals.add(nm[1]); }
   }
+  for (const cn of ctx.pods.values()) for (const dm of s.matchAll(new RegExp(`(?<![\\w.])${cn}\\s+(\\w+)`, 'g'))) locals.add(dm[1]);
   for (const dm of s.matchAll(/for\s*\(\s*(?:float|int)\s+(\w+)/g)) locals.add(dm[1]);
+  for (const dm of s.matchAll(/(?<![\w.])(?:float|int|bool)\s*(?:\[\s*\])?\s+(\w+)\s*(?:\[[^\]]*\])?\s*(?:=(?!=)|,|;|\))/g)) locals.add(dm[1]);
   // pContext
   s = s.replace(/pContext\.random\(\s*\)/g, 'RANDFLOAT()');
   // random(Integer.MAX_VALUE): a 31-bit uniform int (its low bits are used as coin flips — RANDFLOAT()*2^31 in f32 has none)
@@ -182,13 +288,18 @@ function convertJava(code: string, ctx: Ctx, extraLocals: Iterable<string> = [])
   s = s.replace(/pContext\.isPreserveZCoordinate\(\)/g, 'false');
   s = s.replace(/randGen\.random\(\)|randomize\.nextDouble\(\)|rand\.nextDouble\(\)|_random\.random\(\)/g, 'RANDFLOAT()');
   if (!ctx.helperNames.has('random')) s = s.replace(/(?<![\w.])random\(\s*\)/g, 'RANDFLOAT()'); // static import of Math.random
+  // xform affine coefficients (JWildfire coeffXY: x' = c00 x + c10 y + c20, y' = c01 x + c11 y + c21 → flam3 a b c / d e f)
+  s = s.replace(/pXForm\.getXYCoeff00\(\)/g, 'xform->a').replace(/pXForm\.getXYCoeff10\(\)/g, 'xform->b').replace(/pXForm\.getXYCoeff20\(\)/g, 'xform->c')
+    .replace(/pXForm\.getXYCoeff01\(\)/g, 'xform->d').replace(/pXForm\.getXYCoeff11\(\)/g, 'xform->e').replace(/pXForm\.getXYCoeff21\(\)/g, 'xform->f');
   // points
   s = s.replace(/pAffineTP\.getPrecalcSumsq\(\)/g, '__r2').replace(/pAffineTP\.getPrecalcSqrt\(\)/g, '__r')
     .replace(/pAffineTP\.getPrecalcAtan\(\)/g, '__phi').replace(/pAffineTP\.getPrecalcAtanYX\(\)/g, '__theta')
     .replace(/pAffineTP\.getPrecalcSinA\(\)/g, '(__x / __r)').replace(/pAffineTP\.getPrecalcCosA\(\)/g, '(__y / __r)');
   s = s.replace(/pAffineTP\.x\b/g, '__x').replace(/pAffineTP\.y\b/g, '__y').replace(/pAffineTP\.z\b/g, '__z').replace(/pAffineTP\.color\b/g, '__pal').replace(/pAffineTP\.doHide\b/g, '__doHide');
   // chained assignment `a = b = c;` → `b = c; a = b;`
-  s = s.replace(/(?<![=!<>])\b([\w.>-]+)\s*=(?!=)\s*([\w.>-]+)\s*=(?!=)\s*([^;=]+);/g, '$2 = $3; $1 = $2;');
+  // (a single-statement if/else body keeps its shape by getting braces)
+  s = s.replace(/(?<=(?:\)|\belse)\s*)([\w.>-]+)\s*=(?!=)\s*([\w.>-]+)\s*=(?!=)\s*([^;=]+);/g, '{ $2 = $3; $1 = $2; }');
+  for (let guard = 0; guard < 4; guard++) { const s2 = s.replace(/(?<![=!<>])\b([\w.>-]+)\s*=(?!=)\s*([\w.>-]+)\s*=(?!=)\s*([^;=]+);/g, '$2 = $3; $1 = $2;'); if (s2 === s) break; s = s2; }
   // helper calls that pass the context along: drop the argument (the helper body uses RANDFLOAT())
   s = s.replace(/\bpContext\s*,\s*/g, '').replace(/\(\s*pContext\s*\)/g, '()');
   s = s.replace(/pVarTP\.x\b/g, '__px').replace(/pVarTP\.y\b/g, '__py').replace(/pVarTP\.z\b/g, '__pz').replace(/pVarTP\.color\b/g, '__pal')
@@ -201,16 +312,30 @@ function convertJava(code: string, ctx: Ctx, extraLocals: Iterable<string> = [])
   s = s.replace(/\.r\b(?!\w)/g, '.x').replace(/\.g\b(?!\w)/g, '.y').replace(/\.b\b(?!\w)/g, '.z');
   s = s.replace(/\bpAmount\b/g, '__amount_'); // gen.ts binds __amount_ to the weight (`__x` would clash with the input point for the variation named x)
   // sinAndCos(a, sina, cosa) → sina_v = sinf(a); cosa_v = cosf(a)   (declared by the caller prelude)
-  s = s.replace(/sinAndCos\(([^;]*?),\s*(\w+),\s*(\w+)\)\s*;/g, (_m, a: string, sn: string, cs: string) => `${sn}_v = sinf(${a}); ${cs}_v = cosf(${a});`);
-  s = s.replace(/\b(\w+)\.value\b/g, '$1_v');
+  s = s.replace(/sinAndCos\(([^;]*?),\s*(\w+),\s*(\w+)\)\s*;/g, (_m, a: string, sn: string, cs: string) => `${sn}.value = sinf(${a}); ${cs}.value = cosf(${a});`);
+  if (!ctx.podValue) s = s.replace(/\b(\w+)\.value\b/g, '$1_v');
+  s = s.replace(/(?<![\w.])TRUE\b/g, '1').replace(/(?<![\w.])FALSE\b/g, '0'); // MathLib.TRUE/FALSE
+  s = s.replace(/\bsuper\.init\s*\([^;]*\)\s*;/g, ''); // VariationFunc.init is a no-op
+  s = s.replace(/(?<![\w.])\w+\.invalidate\(\)\s*;/g, ''); // XYZPoint precalc cache: no equivalent
+  s = s.replace(/if\s*\(\s*\w+\s*==\s*null\s*\)\s*\w+\s*=\s*new\s+\w+\s*\([^;]*\)\s*;/g, '') // lazy creation of a value object
+    .replace(/if\s*\(\s*\w+\s*==\s*null\s*\)\s*\{[^{}]*\}\s*(?:else\s*)?/g, '').replace(/(?<![\w.])\w+\s*==\s*null\s*\|\|\s*/g, '').replace(/\|\|\s*\w+\s*==\s*null\b/g, ''); // null guards on value objects
+  s = s.replace(/\bthrow\s+new\s+\w+\s*\((?:[^()]*|\([^()]*\))*\)\s*;/g, ''); // unreachable-parameter guards
   // Math.* / Tools.* / Integer.*
   s = s.replace(/\bFastMath\./g, 'Math.');
-  s = s.replace(/\b(Math|MathLib|Tools|Integer|Double|Float)\.(\w+)/g, (m0) => MATH_MAP[m0] ?? m0);
+  s = s.replace(/\b(Math|MathLib|Tools|Integer|Double|Float)\.(\w+)/g, (m0) => (Object.hasOwn(MATH_MAP, m0) ? MATH_MAP[m0] : m0));
   // qualified statics not mapped → leave (transpiler will report)
   // bare MathLib names
-  s = s.replace(/\b([a-z]\w*)\s*\(/g, (m0, fn: string) => (BARE_MAP[fn] && !ctx.helperNames.has(fn) ? BARE_MAP[fn] + '(' : m0));
+  s = s.replace(/\b([a-z]\w*)\s*\(/g, (m0, fn: string) => (Object.hasOwn(BARE_MAP, fn) && !ctx.helperNames.has(fn) ? BARE_MAP[fn] + '(' : m0));
+  // BigInteger gcd idiom (rhodonea): `BigInteger a = BigInteger.valueOf((long) kn); BigInteger b = …; int gcd = a.gcd(b).intValue();`
+  s = s.replace(/BigInteger\s+(\w+)\s*=\s*BigInteger\.valueOf\(\s*\((?:int|float)\)\s*(\w+)\s*\)\s*;\s*BigInteger\s+(\w+)\s*=\s*BigInteger\.valueOf\(\s*\((?:int|float)\)\s*(\w+)\s*\)\s*;\s*int\s+(\w+)\s*=\s*\1\.gcd\(\3\)\.intValue\(\)\s*;/g,
+    (_m, _a, x: string, _b, y: string, g: string) => { ctx.usedLib.add('jgcd'); return `int ${g} = jgcd((int)(${x}), (int)(${y}));`; });
+  // `t++ < n` / `i++ == 0` inside an expression (loop conditions): the transpiler only takes ++ as a statement
+  s = s.replace(/(?<![\w.])(\w+)\+\+(?=\s*(?:<=?|>=?|==|!=)\s*[^;])/g, (_m, id: string) => `jpostinc(&${id})`);
+  // static final numeric constants of the class → inlined
+  s = s.replace(/(?<![\w.])([A-Za-z_]\w*)\b/g, (m0, id: string) => (ctx.consts.has(id) && !locals.has(id) ? `(${ctx.consts.get(id)})` : m0));
   // casts: (int) fine; (float) fine; (long)→(int)
   s = s.replace(/\(\s*(?:long|short)\s*\)/g, '(int)');
+  s = s.replace(/\b(\d+)[lL]\b/g, '$1'); // long literals
   // arrays: `float[] a = new float[6];` / `float a[] = new float[6];`
   s = s.replace(/\b(float|int|bool)\s*\[\s*\]\s*(\w+)\s*=\s*new\s+\w+\s*\[([^\]]+)\]\s*;/g, '$1 $2[$3];');
   s = s.replace(/\b(float|int|bool)\s+(\w+)\s*\[\s*\]\s*=\s*new\s+\w+\s*\[([^\]]+)\]\s*;/g, '$1 $2[$3];');
@@ -239,6 +364,10 @@ function convertJava(code: string, ctx: Ctx, extraLocals: Iterable<string> = [])
 }
 
 // Hand patches on the converted text (Java idioms that do not survive f32 literally).
+// Patches on the Java text before conversion (constructs the GLSL parser cannot express)
+const PRE_PATCHES: Record<string, [string | RegExp, string][]> = {
+  glsl_mandelbox2D: [['double b = (O.a = G.length(I)) < .5 ? 4. : O.a < 1. ? 1. / O.a : 1.;', 'O.a = G.length(I); double b = O.a < .5 ? 4. : O.a < 1. ? 1. / O.a : 1.;']],
+};
 const JAVA_PATCHES: Record<string, [string | RegExp, string][]> = {
   // random(Integer.MAX_VALUE) * 2π/power: only k mod |power| matters, and k·2π/power in f32 is noise
   // elliptic coordinates: cosh(mu) − 1 cancels near the real axis in f32; compute it stably
@@ -246,6 +375,11 @@ const JAVA_PATCHES: Record<string, [string | RegExp, string][]> = {
   dc_cylinder2: [['float rr = __dc_cylinder2_blur * (r[0] + r[1] + r[2] + r[3] - 2.0);', 'float rr = __dc_cylinder2_blur * (RANDFLOAT() + RANDFLOAT() + RANDFLOAT() + RANDFLOAT() - 2.0);'],
     [/r\[varpar->dc_cylinder2_n\] = RANDFLOAT\(\);\s*varpar->dc_cylinder2_n = varpar->dc_cylinder2_n \+ 1 & 3;/, '']],
   rosoni: [['cerc ^= (r2 <= 0.0);', 'cerc = cerc != (r2 <= 0.0);']],
+  // Ken Perlin's doubled permutation table p[512] (filled from `permutation` in a static block) → index the 256 table modulo 256
+  camouflage: [[/int p\[512\];\s*/, ''], [/(?<![\w.])p\[([^\[\]]*)\]/g, 'camouflage_permutation[($1) & 255]']],
+  // gauss_rnd ring buffer advanced with `& 5` (indices 2,3 never refresh: per-instance constants) → four fresh uniforms + the constants' mean
+  pre_blur3D: [['(gauss_rnd[0] + gauss_rnd[1] + gauss_rnd[2] + gauss_rnd[3] + gauss_rnd[4] + gauss_rnd[5] - 3)', '(RANDFLOAT() + RANDFLOAT() + RANDFLOAT() + RANDFLOAT() - 2.0)'],
+    [/gauss_rnd\[[^\]]*gauss_N\] = RANDFLOAT\(\);\s*[^;]*gauss_N = \([^;]*gauss_N \+ 1\) & 5;/, '']],
   eSwirl: [
     ['float xmax = (eSwirl_sqrt_safe(tmp + tmp2) + eSwirl_sqrt_safe(tmp - tmp2)) * 0.5;', 'float ea = eSwirl_sqrt_safe(tmp + tmp2); float eb = eSwirl_sqrt_safe(tmp - tmp2); float xmax = (ea + eb) * 0.5;\n    float ed = (__y * __y / (ea + fabsf(__x + 1.0)) + __y * __y / (eb + fabsf(__x - 1.0))) * 0.5 + fmaxf(fabsf(__x) - 1.0, 0.0);'],
     ['float mu = acoshf(xmax);', 'float mu = (ed < 1.0e-4) ? sqrtf(2.0 * ed) * (1.0 - ed / 12.0) : logf(1.0 + ed + sqrtf(ed * (2.0 + ed)));'],
@@ -255,8 +389,10 @@ const JAVA_PATCHES: Record<string, [string | RegExp, string][]> = {
 
 // ---------------------------------------------------------------- per-variation conversion
 interface Port { name: string; gpuCode: string; gpuFunctions: string; extraParams: string[]; note: string; javaFile: string }
-const MERGE_PARENTS: Record<string, string> = { GLSLFunc: 'GLSLFunc.java' };
-function convertVariation(d: DumpVar, src: string, javaFile: string): Port {
+const MERGE_PARENTS: Record<string, string> = { GLSLFunc: 'GLSLFunc.java', AbstractFalloff3Func: 'AbstractFalloff3Func.java', AbstractAffine3DFunc: 'AbstractAffine3DFunc.java' };
+function convertVariation(d: DumpVar, src0: string, javaFile: string): Port {
+  let src = src0;
+  for (const [from, to] of PRE_PATCHES[d.name] ?? []) { const s2 = src.replace(from, to); if (s2 === src) throw new Error(`pre-patch did not match: ${from}`); src = s2; }
   const cls = parseClass(src);
   // known abstract parents whose fields/params/setParameter the subclass relies on (GLSLFunc: resolution, gradient)
   if (MERGE_PARENTS[cls.parent]) {
@@ -264,9 +400,12 @@ function convertVariation(d: DumpVar, src: string, javaFile: string): Port {
     if (!pf) throw new Error(`parent source ${cls.parent} not found`);
     const par = parseClass(fs.readFileSync(pf, 'latin1'));
     for (const [k, v] of par.consts) if (!cls.consts.has(k)) cls.consts.set(k, v);
+    for (const [k, v] of par.numConsts) if (!cls.numConsts.has(k)) cls.numConsts.set(k, v);
+    for (const pd of par.pods) if (!cls.pods.some((x) => x.name === pd.name)) cls.pods.push(pd);
     for (const f of par.fields) if (!cls.fields.some((x) => x.name === f.name)) cls.fields.push(f);
     for (const m of par.methods) {
-      if (m.name === 'transform' || m.name === 'init' || m.name === 'initOnce' || m.name === 'dbl2int') continue;
+      if (m.name === 'initOnce' || m.name === 'dbl2int') continue;
+      if ((m.name === 'transform' || m.name === 'init') && cls.methods.some((x) => x.name === m.name)) continue;
       const own = cls.methods.find((x) => x.name === m.name);
       if (!own) cls.methods.push(m);
       else if (m.name === 'setParameter') own.body = own.body + '\n' + m.body; // subclass falls through to super.setParameter
@@ -275,6 +414,7 @@ function convertVariation(d: DumpVar, src: string, javaFile: string): Port {
   }
   const transform = cls.methods.find((m) => m.name === 'transform');
   if (!transform) throw new Error('no transform()');
+  if (cls.methods.some((m) => m.name === 'invtransform')) throw new Error('prepost (invtransform)'); // TODO prepost: inverse as pre + transform as post
   if (!/^(VariationFunc|SimpleVariationFunc)$/.test(cls.parent)) throw new Error(`extends ${cls.parent}`);
   const s = cls.body;
   if (/RessourceType|getRessourceNames|SubFlame|subflame|Flame\b|Layer\s+\w+\s*=|getOwner\(\)|RGBPalette|SimpleImage|WFImage|BufferedImage|String\s+\w+\s*=/.test(transform.body + (cls.methods.find((m) => m.name === 'init')?.body ?? '')))
@@ -300,16 +440,43 @@ function convertVariation(d: DumpVar, src: string, javaFile: string): Port {
   const paramFields = new Set(fieldMap.keys());
   for (const pn of paramNames) if (![...fieldMap.values()].includes(pn)) throw new Error(`param ${pn}: field not found`);
   // helper methods (non-static and static), other than the framework ones
-  const helpers = cls.methods.filter((m) => !KNOWN_METHODS.has(m.name));
+  let helpers = cls.methods.filter((m) => !KNOWN_METHODS.has(m.name));
+  // void helpers that take the affine/var points (`fillVIn(pAffineTP, pVarTP, v_in)`) cannot become device
+  // functions (the points are snippet-scope bindings) → inline them textually at their call sites
+  const inlineHelpers = helpers.filter((h) => h.ret === 'void' && /\bXYZPoint\s+(pAffineTP|pVarTP)\b/.test(h.params));
+  if (inlineHelpers.length) {
+    helpers = helpers.filter((h) => !inlineHelpers.includes(h));
+    const inlineInto = (body: string): string => {
+      for (let guard = 0; guard < 8; guard++) {
+        let changed = false;
+        for (const h of inlineHelpers) {
+          const pn = h.params.split(',').map((x) => x.trim().split(/\s+/).pop()!);
+          body = body.replace(new RegExp(`(?<![\\w.])${h.name}\\s*\\(([^;]*)\\)\\s*;`, 'g'), (_m, argText: string) => {
+            const args = argText.split(',').map((x) => x.trim());
+            if (args.length !== pn.length) throw new Error(`inline ${h.name}: argument count`);
+            let b = h.body;
+            pn.forEach((pname, i) => { b = b.replace(new RegExp(`(?<![\\w.])${pname}\\b`, 'g'), /^\w+$/.test(args[i]) ? args[i] : `(${args[i]})`); });
+            changed = true;
+            return `{\n${b}\n}`;
+          });
+        }
+        if (!changed) break;
+      }
+      return body;
+    };
+    transform.body = inlineInto(transform.body);
+    for (const h of helpers) h.body = inlineInto(h.body);
+  }
   const init = cls.methods.find((m) => m.name === 'init');
   const initOnce = cls.methods.find((m) => m.name === 'initOnce');
   if (initOnce && /\S/.test(initOnce.body) && !/super\.initOnce/.test(initOnce.body)) throw new Error('initOnce');
   // which non-param fields are written in transform() (state) vs only in init() (precalc)
   const localsOf = (body: string) => {
-    const b = body.replace(/\b(?:double|long|short)\b/g, 'float').replace(/\bboolean\b/g, 'bool');
+    const b = body.replace(/\bdouble\b/g, 'float').replace(/\b(?:long|short)\b/g, 'int').replace(/\bboolean\b/g, 'bool');
     const out = new Set<string>();
     for (const dm of b.matchAll(/(?<![\w.])(?:float|int|bool)\s*(?:\[\s*\])?\s+([^;{}()]*?)(?:;|\)\s*\{|=\s*\{)/g)) for (const part of dm[1].split(',')) { const nm = /^\s*(\w+)/.exec(part); if (nm) out.add(nm[1]); }
     for (const dm of b.matchAll(/for\s*\(\s*(?:float|int)\s+(\w+)/g)) out.add(dm[1]);
+    for (const dm of b.matchAll(/(?<![\w.])(?:float|int|bool)\s*(?:\[\s*\])?\s+(\w+)\s*(?:\[[^\]]*\])?\s*(?:=(?!=)|,|;|\))/g)) out.add(dm[1]); // initialisers with calls
     return out;
   };
   const assignedIn = (body: string) => {
@@ -327,31 +494,95 @@ function convertVariation(d: DumpVar, src: string, javaFile: string): Port {
     if (tAssigned.has(f.name) || hAssigned.has(f.name)) state.add(f.name);
   }
   // fields read inside helper methods cannot be snippet locals → make them state
-  for (const h of helpers) for (const f of nonParamFields) if (f.array === null && new RegExp(`(?<![\\w.])${f.name}\\b`).test(h.body)) state.add(f.name);
+  const helperParamNames = (h: Method) => new Set(h.params.split(',').map((x) => x.trim().split(/\s+/).pop()!.replace(/\[\]/g, '')).filter(Boolean));
+  const podScratch = new Map<string, Set<string>>(); // helper name → pod-typed fields it uses as scratch objects
+  for (const h of helpers) {
+    const hp = helperParamNames(h);
+    for (const f of nonParamFields) {
+      if (f.array !== null || hp.has(f.name) || !new RegExp(`(?<![\\w.])${f.name}\\b`).test(h.body.replace(/\bthis\./g, ''))) continue;
+      // a plain-data object only touched inside helpers is a scratch object: give each helper its own local copy
+      if (cls.pods.some((pd) => pd.name === f.type) && !new RegExp(`(?<![\\w.])${f.name}\\b`).test(transform.body + (init?.body ?? ''))) { podScratch.set(h.name, (podScratch.get(h.name) ?? new Set()).add(f.name)); continue; }
+      state.add(f.name);
+    }
+  }
+  // fields initialised from a random draw (`int k = rand.nextInt(n)`: fixed per JWildfire instance) → per-thread state, drawn once
+  for (const f of nonParamFields) if (f.array === null && f.init && /\bnextInt\(|\bnextDouble\(|\brandom\(\)|Math\.random/.test(f.init)) state.add(f.name);
   // params written in transform → also state (initialised from the param)
   const paramState: string[] = [];
   for (const f of paramFields) if (tAssigned.has(f)) { state.add(f); paramState.push(f); }
   // init() that writes state (attractor start values) runs once → inside the first-call block; the
   // other fields it writes must then persist too
   const initAssigned = init ? assignedIn(init.body) : new Set<string>();
-  const initTouchesState = [...initAssigned].some((f) => state.has(f));
-  if (initTouchesState) for (const f of nonParamFields) if (f.array === null && initAssigned.has(f.name)) state.add(f.name);
+  // only real per-point state (written by transform/helpers) makes init() a first-call block; fields that are
+  // state merely because a helper reads them are derived values and keep the plain (per-call) init replay
+  const trueState = new Set([...state].filter((f) => tAssigned.has(f) || hAssigned.has(f)));
+  const initTouchesState = [...initAssigned].some((f) => trueState.has(f));
+  const usedOutsideInit = (n: string) => new RegExp(`(?<![\\w.])${n}\\b`).test(transform.body.replace(/\bthis\./g, '') + helpers.map((h) => h.body.replace(/\bthis\./g, '')).join(''));
+  if (initTouchesState) for (const f of nonParamFields) if (f.array === null && initAssigned.has(f.name) && !(cls.pods.some((pd) => pd.name === f.type) && !usedOutsideInit(f.name))) state.add(f.name);
   const arrayFields = nonParamFields.filter((f) => f.array !== null);
   for (const f of arrayFields) if (f.array === -1) throw new Error(`array field ${f.name} of unknown size`);
-  if (state.size > 8) throw new Error(`too much state (${[...state].join(',')})`);
+  for (const f of nonParamFields) if (state.has(f.name) && cls.pods.some((pd) => pd.name === f.type)) {
+    // an object re-created inside transform() (`rand = new Random(seed)`) is a per-call scratch object: keep it a local
+    if (new RegExp(`(?<![\\w.])${f.name}\\s*=\\s*new\\s+${f.type}\\b`).test(transform.body)) { state.delete(f.name); continue; }
+    throw new Error(`object field ${f.name} reassigned per point`);
+  }
+  if (state.size > 40) throw new Error(`too much state (${[...state].join(',')})`);
   const helperNames = new Set(helpers.map((h) => h.name));
-  const ctx: Ctx = { name: d.name, params: new Set([...paramFields].filter((f) => !state.has(f))), fieldMap, state, helperNames, usedHelperParams: new Set(), inHelper: false };
+  const ctx: Ctx = { name: d.name, params: new Set([...paramFields].filter((f) => !state.has(f))), fieldMap, state, helperNames, usedHelperParams: new Set(), inHelper: false, consts: new Map(), usedLib: new Set(), podFields: new Map(), pods: new Map(cls.pods.map((pd) => [pd.name, pd.builtin ? pd.builtin.cuda : `${d.name}_${pd.name}`])), podMethods: new Map(cls.pods.flatMap((pd) => pd.builtin ? Object.entries(pd.builtin.methods).map(([m, fn]) => [`${pd.name}.${m}`, fn] as [string, string]) : pd.setters.map((st) => [`${pd.name}.${st.name}`, `${d.name}_${pd.name}_${st.name}`] as [string, string]))), podValue: cls.pods.some((pd) => pd.fields.some((f) => f.name === 'value')) };
+  for (const pd of cls.pods) if (pd.builtin) ctx.usedLib.add(pd.builtin.lib);
+  ctx.podFields = new Map(cls.pods.map((pd) => [pd.name, new Set(cls.fields.filter((f) => f.type === pd.name).map((f) => f.name))]));
+  for (const [k, v] of cls.numConsts) ctx.consts.set(k, convertJava(v, ctx));
+  glslKinds.clear();
+  for (const m of cls.methods) if (/^(mat2|mat3|vec[234])$/.test(m.ret)) glslKinds.set(m.name, m.ret === 'mat2' ? 'mat2' : m.ret === 'mat3' ? 'mat3' : 'vec');
+  for (const f of cls.fields) if (/^(mat2|mat3|vec[234])$/.test(f.type)) glslKinds.set(f.name, f.type === 'mat2' ? 'mat2' : f.type === 'mat3' ? 'mat3' : 'vec');
   const others = new Set(['pContext', 'pXForm', 'pLayer', 'pAffineTP', 'pVarTP', 'pAmount']);
-  // --- helpers
+  // --- plain-data inner classes → structs (+ maker / setter functions)
   let funcs = '';
+  for (const pd of cls.pods) {
+    if (pd.builtin) continue;
+    const cn = ctx.pods.get(pd.name)!;
+    funcs += `struct ${cn} { ${pd.fields.map((f) => `${f.type} ${f.name};`).join(' ')} };\n__device__ ${cn} ${cn}_zero() { ${cn} r_; return r_; }\n`;
+    if (pd.ctor) {
+      const ps = pd.ctor.params.map((pp) => convertJava(pp, ctx));
+      const pn = pd.ctor.params.map((pp) => pp.split(/\s+/).pop()!);
+      funcs += `__device__ ${cn} ${cn}_make(${ps.join(', ')}) { ${cn} r_; ${pd.ctor.assigns.map(([f, e]) => `r_.${f} = ${convertJava(e, ctx, pn)};`).join(' ')} return r_; }\n`;
+    }
+    for (const st of pd.setters) {
+      const ps = st.params ? st.params.split(',').map((pp) => convertJava(pp.trim(), ctx)) : [];
+      const pn = st.params ? st.params.split(',').map((pp) => pp.trim().split(/\s+/).pop()!) : [];
+      const bodyStmts = st.body.split(';').map((x) => x.trim()).filter(Boolean).map((x) => {
+        const am = /^(?:this\.)?(\w+)\s*=\s*([\s\S]+)$/.exec(x);
+        if (!am || !pd.fields.some((f) => f.name === am[1])) throw new Error(`setter ${pd.name}.${st.name}: ${x}`);
+        return `self_->${am[1]} = ${convertJava(am[2], ctx, pn)};`;
+      });
+      funcs += `__device__ void ${cn}_${st.name}(${cn} *self_${ps.length ? ', ' + ps.join(', ') : ''}) { ${bodyStmts.join(' ')} }\n`;
+    }
+  }
+  // --- helpers
   for (const h of helpers) {
     ctx.inHelper = true;
     const hparams = h.params.trim() ? h.params.split(',').map((p) => p.trim()).filter((p) => !/^(FlameTransformationContext|XForm|Layer)\b/.test(p)) : [];
     const pnames = hparams.map((p) => p.split(/\s+/).pop()!.replace(/\[\]/g, ''));
-    const params = hparams.map((p) => convertJava(p, ctx, pnames).replace(/\bfloat\s+/, 'float ')).join(', ');
-    const ret = h.ret === 'double' || h.ret === 'long' ? 'float' : h.ret === 'boolean' ? 'bool' : (VEC_TYPES[h.ret] ?? h.ret);
-    if (!/^(float|int|bool|void|float2|float3|float4)$/.test(ret)) throw new Error(`helper ${h.name} returns ${h.ret}`);
-    const body = convertJava(h.body, ctx, pnames);
+    for (const p of hparams) { const pm = /^(mat2|mat3|vec[234])\s+(\w+)$/.exec(p); if (pm) glslKinds.set(pm[2], pm[1] === 'mat2' ? 'mat2' : pm[1] === 'mat3' ? 'mat3' : 'vec'); }
+    let body = convertJava(h.body, ctx, pnames);
+    for (const sn of podScratch.get(h.name) ?? []) { const sf = cls.fields.find((x) => x.name === sn)!; body = `${ctx.pods.get(sf.type)} ${sn};\n` + body; }
+    const params = hparams.map((p, i) => {
+      let q = convertJava(p, ctx, pnames).replace(/\bfloat\s+/, 'float ');
+      // Java arrays are references: `float[] a` → `float a[]` (pointer param, pointee inferred from the argument)
+      const am = /^(\w+)\s*\[\s*\]\s*(\w+)$/.exec(q) ?? /^(\w+)\s+(\w+)\s*\[\s*\]$/.exec(q);
+      if (am) return `${am[1]} ${am[2]}[]`;
+      // vec/struct objects are references too: a helper that assigns `p.x = …` mutates the caller's object → pointer param
+      const vm = /^(float[234]|\w+)\s+(\w+)$/.exec(q);
+      if (vm && !/^(float[234])$/.test(vm[1]) && ![...ctx.pods.values()].includes(vm[1])) return q;
+      if (vm && (new RegExp(`(?<![\\w.])${vm[2]}\\.\\w+\\s*(?:=(?!=)|[-+*\\/]=)`).test(body) || new RegExp(`\\(&${vm[2]}\\b`).test(body))) {
+        body = body.replace(new RegExp(`(?<![\\w.])${vm[2]}\\.`, 'g'), `${vm[2]}->`);
+        return `${vm[1]} *${vm[2]}`;
+      }
+      return q;
+    }).join(', ');
+    const ret = h.ret === 'double' ? 'float' : h.ret === 'long' || h.ret === 'short' ? 'int' : h.ret === 'boolean' ? 'bool' : (VEC_TYPES[h.ret] ?? ctx.pods.get(h.ret) ?? h.ret);
+    if (!/^(float|int|bool|void|float2|float3|float4|mat3_)$/.test(ret) && ![...ctx.pods.values()].includes(ret)) throw new Error(`helper ${h.name} returns ${h.ret}`);
+    if (ret === 'mat3_') ctx.usedLib.add('mat3');
     if (/\b(pXForm|pLayer|pAffineTP|pVarTP)\b/.test(body)) throw new Error(`helper ${h.name} uses context`);
     funcs += `__device__ ${ret} ${d.name}_${h.name}(${params}) {${body}}\n`;
     ctx.inHelper = false;
@@ -367,16 +598,31 @@ function convertVariation(d: DumpVar, src: string, javaFile: string): Port {
   // non-param, non-state, non-array fields → locals with their initialisers
   for (const f of nonParamFields) {
     if (state.has(f.name) || f.array !== null) continue;
-    const t = f.type === 'double' || f.type === 'long' ? 'float' : f.type === 'boolean' ? 'bool' : (VEC_TYPES[f.type] ?? f.type);
-    if (!/^(float|int|bool|float2|float3|float4)$/.test(t)) throw new Error(`field ${f.name}: ${f.type}`);
+    if (ctx.pods.has(f.type)) {
+      if ([...podScratch.values()].some((st) => st.has(f.name))) continue;
+      const cn = ctx.pods.get(f.type)!;
+      const im = f.init ? new RegExp(`^new\\s+${f.type}\\s*\\(([\\s\\S]*)\\)$`).exec(f.init.trim()) : null;
+      code += im && im[1].trim() ? `${cn} ${f.name} = ${cls_ctorFn(f.type, cn)}(${convertJava(im[1], ctx)});\n` : `${cn} ${f.name};\n`;
+      continue;
+    }
+    const t = f.type === 'double' ? 'float' : f.type === 'long' || f.type === 'short' ? 'int' : f.type === 'boolean' ? 'bool' : (VEC_TYPES[f.type] ?? f.type);
+    if (!/^(float|int|bool|float2|float3|float4|mat3_)$/.test(t)) throw new Error(`field ${f.name}: ${f.type}`);
     code += `${t} ${f.name}${f.init !== null ? ' = ' + convertJava(f.init, ctx) : ' = 0'};\n`;
   }
+  // constant tables (array fields with a literal initialiser that nothing writes) → module-scope constants,
+  // shared by helpers and free per thread; other arrays stay per-call locals
+  let globalsCode = '';
+  const tableRename = new Map<string, string>();
   for (const f of arrayFields) {
     const t = f.type === 'double' ? 'float' : f.type === 'boolean' ? 'bool' : f.type;
+    const written = tAssigned.has(f.name) || hAssigned.has(f.name) || initAssigned.has(f.name) || new RegExp(`(?<![\\w.])${f.name}\\s*\\[[^\\]]*\\]\\s*(?:=(?!=)|[-+*\\/]=|\\+\\+|--)`).test(transform.body + helpers.map((h) => h.body).join('') + (init?.body ?? ''));
+    if (f.init && !written) { globalsCode += `${t} ${d.name}_${f.name}[${f.array}] = ${f.init};\n`; tableRename.set(f.name, `${d.name}_${f.name}`); continue; }
     code += `${t} ${f.name}[${f.array}]${f.init ? ' = ' + f.init : ''};\n`;
   }
+  const renameTables = (t: string) => { for (const [from, to] of tableRename) t = t.replace(new RegExp(`(?<![\\w.])${from}\\b`, 'g'), to); return t; };
+  funcs = renameTables(funcs);
   // state: first-call init from Java initialiser (or param value)
-  const stateType = (n: string) => { const f = cls.fields.find((x) => x.name === n); const t = f?.type ?? 'double'; return t in VEC_TYPES ? ':' + VEC_TYPES[t] : t === 'int' ? ':int' : ''; };
+  const stateType = (n: string) => { const f = cls.fields.find((x) => x.name === n); const t = f?.type ?? 'double'; return t in VEC_TYPES ? ':' + VEC_TYPES[t] : t === 'int' || t === 'long' || t === 'short' ? ':int' : ''; };
   if (state.size) {
     extra.push('inited_', ...[...state].map((n) => n + stateType(n)));
     code += `if (varpar->${d.name}_inited_ == 0.0f) {\n  varpar->${d.name}_inited_ = 1.0f;\n`;
@@ -424,12 +670,12 @@ function convertVariation(d: DumpVar, src: string, javaFile: string): Port {
     code += extraCode;
   }
   if (init && /\S/.test(init.body) && !initTouchesState) {
-    if (/super\.init/.test(init.body)) throw new Error('init calls super');
     code += '{\n' + convertJava(init.body, ctx) + '\n}\n';
   }
   code += convertJava(transform.body, ctx);
-  code = prefixHelpers(code);
-  for (const [from, to] of JAVA_PATCHES[d.name] ?? []) { const c2 = code.replace(from, to); if (c2 === code) throw new Error(`patch did not match: ${from}`); code = c2; }
+  if ((d.priority ?? 0) < 0) code += '\n__r2 = __x*__x+__y*__y; __r = sqrtf(__r2); __rinv = 1.0f/__r; __phi = atan2f(__x,__y); __theta = 0.5f*M_PI-__phi; if (__theta > M_PI) __theta -= 2.0f*M_PI;\n';
+  code = prefixHelpers(renameTables(code));
+  for (const [from, to] of JAVA_PATCHES[d.name] ?? []) { const c2 = code.replace(from, to), f2 = funcs.replace(from, to); if (c2 === code && f2 === funcs) throw new Error(`patch did not match: ${from}`); code = c2; funcs = f2; }
   // sinAndCos locals
   const scv = new Set([...(code + funcs).matchAll(/\b(\w+)_v\b/g)].map((m) => m[1]));
   const declV = [...scv].filter((n) => /^(sina?|cosa?|sin\w*|cos\w*|s|c)$/.test(n) || /_v = (sinf|cosf)\(/.test(code)).map((n) => `float ${n}_v = 0.0f;`).join(' ');
@@ -437,8 +683,12 @@ function convertVariation(d: DumpVar, src: string, javaFile: string): Port {
   // sanity: leftovers the transpiler cannot know
   const bad = /\b(pContext|pXForm|pLayer|new\s+\w+|super\.|Random\b|String\b|\.length\b|Object\b|throw\b|try\b|catch\b|instanceof|\bnull\b|Complex\b|vec[234]\b|mat[234]\b|MAT2\()\b/.exec(code + funcs);
   if (bad) throw new Error(`unsupported construct: ${bad[0]}`);
-  for (const o of others) if (new RegExp(`\\b${o}\\b`).test(code + funcs)) throw new Error(`leftover ${o}`);
-  return { name: d.name, gpuCode: code, gpuFunctions: funcs, extraParams: extra, note: `java port of ${javaFile}`, javaFile };
+  const knownTypes = new Set(['M_PI', 'M_2PI', 'M_E', 'M_PI_2', 'M_PI_4', 'M_1_PI', 'M_2_PI', 'M_SQRT2', 'M_SQRT1_2', 'RANDFLOAT', 'RANDINT', 'EPSILON', 'HSIN2', 'mat3_', ...ctx.pods.values()]);
+  const tm = [...(code + funcs).matchAll(/(?<![\w.])([A-Z]\w*)\s+[a-z_]\w*\s*(?:=|;|,|\))/g)].find((x) => !knownTypes.has(x[1]) && !/^[A-Z0-9_]+$/.test(x[1]));
+  if (tm) throw new Error(`type ${tm[1]}`);
+  for (const o of others) if (new RegExp(`\\b${o}\\b`).test(code + funcs)) { if (process.env.JAVA2CU_DEBUG) console.error(code + funcs); throw new Error(`leftover ${o}`); }
+  const lib = [...ctx.usedLib].map((k) => LIB[k]).join('\n');
+  return { name: d.name, gpuCode: code, gpuFunctions: (lib ? lib + '\n' : '') + globalsCode + funcs, extraParams: extra, note: `java port of ${javaFile}`, javaFile };
 }
 
 // ---------------------------------------------------------------- GLSL-style Java (js.glsl vec2/vec3/G) → CUDA dialect
@@ -462,11 +712,32 @@ function glslTokenize(s: string): Tok[] {
   }
   return out;
 }
-const VEC_TYPES: Record<string, string> = { vec2: 'float2', vec3: 'float3', vec4: 'float4' };
+const VEC_TYPES: Record<string, string> = { vec2: 'float2', vec3: 'float3', vec4: 'float4', mat2: 'float4', mat3: 'mat3_' };
 const G_MAP: Record<string, string> = { abs: 'abs', mod: 'mod', mix: 'mix', smoothstep: 'smoothstep', floor: 'floor', fract: 'fract', clamp: 'clamp', sin: 'sin', cos: 'cos', tan: 'tan',
   step: 'step', normalize: 'normalize', min: 'min', max: 'max', pow: 'pow', exp: 'exp', exp2: 'exp2', log2: 'log2', sign: 'sign', cross: 'cross', sqrt: 'sqrt', length: 'length', dot: 'dot', distance: 'distance',
   trunc: 'trunc', round: 'round', ceil: 'ceil', reflect: 'reflect', tanh: 'tanh', sinh: 'sinh', cosh: 'cosh', invSqrt: 'rsqrtf', atan2: 'atan2f' };
 const VEC_BINOPS: Record<string, string> = { plus: '+', add: '+', minus: '-', multiply: '*', division: '/' };
+// js.glsl matrices: mat2 travels as float4 (a00, a10, a01, a11 — the constructor order), mat3 as the
+// struct mat3_ (LIB.mat3). `.times()` needs to know which operand is the matrix, so declared variable /
+// field / helper-return kinds are tracked here (set per variation by convertVariation, per body by convertGlsl).
+const glslKinds = new Map<string, 'mat2' | 'mat3' | 'vec'>();
+const cls_ctorFn = (jn: string, cn: string) => BUILTIN_PODS.find((b) => b.name === jn)?.builtin?.ctorFn ?? `${cn}_make`;
+function glslKindOf(e: string): 'mat2' | 'mat3' | 'vec' | 'scalar' {
+  let x = e.trim();
+  while (/^\(.*\)$/.test(x) && splitTop(x.slice(1, -1)).length === 1 && balanced(x.slice(1, -1))) x = x.slice(1, -1).trim();
+  if (/^MAT2_\(/.test(x)) return 'mat2';
+  if (/^mat3_(make|scale)\(/.test(x) || /^G_rot\(/.test(x)) return 'mat3';
+  if (/^make_float[234]\(/.test(x)) return 'vec';
+  const id = /^([A-Za-z_]\w*)\s*(\(|$)/.exec(x);
+  if (id) { const k = glslKinds.get(id[1]); if (k) return k; if (id[2]) return 'vec'; return 'scalar'; }
+  if (/^[\d.]/.test(x)) return 'scalar';
+  return 'vec';
+}
+function balanced(x: string): boolean { let d = 0; for (const ch of x) { if (ch === '(') d++; else if (ch === ')') { d--; if (d < 0) return false; } } return d === 0; }
+const MAT2_MUL_VEC = (m: string, v: string) => `make_float2((${m}).x * (${v}).x + (${m}).z * (${v}).y, (${m}).y * (${v}).x + (${m}).w * (${v}).y)`;
+const VEC_MUL_MAT2 = (v: string, m: string) => `make_float2((${m}).x * (${v}).x + (${m}).y * (${v}).y, (${m}).z * (${v}).x + (${m}).w * (${v}).y)`;
+const MAT3_MUL_VEC = (m: string, v: string) => `make_float3((${m}).a00 * (${v}).x + (${m}).a01 * (${v}).y + (${m}).a02 * (${v}).z, (${m}).a10 * (${v}).x + (${m}).a11 * (${v}).y + (${m}).a12 * (${v}).z, (${m}).a20 * (${v}).x + (${m}).a21 * (${v}).y + (${m}).a22 * (${v}).z)`;
+const VEC_MUL_MAT3 = (v: string, m: string) => `make_float3((${v}).x * (${m}).a00 + (${v}).y * (${m}).a10 + (${v}).z * (${m}).a20, (${v}).x * (${m}).a01 + (${v}).y * (${m}).a11 + (${v}).z * (${m}).a21, (${v}).x * (${m}).a02 + (${v}).y * (${m}).a12 + (${v}).z * (${m}).a22)`;
 const PREC: Record<string, number> = { '||': 1, '&&': 2, '|': 3, '^': 4, '&': 5, '==': 6, '!=': 6, '<': 7, '>': 7, '<=': 7, '>=': 7, '<<': 8, '>>': 8, '>>>': 8, '+': 9, '-': 9, '*': 10, '/': 10, '%': 10 };
 class GlslExpr {
   i = 0;
@@ -498,7 +769,7 @@ class GlslExpr {
     // cast: ( type ) unary
     if (t && t.v === '(' && this.peek(1)?.t === 'id' && this.peek(2)?.v === ')' && /^(int|double|float|long|short|byte|boolean)$/.test(this.peek(1)!.v)) {
       this.eat('('); const ty = this.eat().v; this.eat(')');
-      const tt = ty === 'double' || ty === 'long' ? 'float' : ty === 'boolean' ? 'bool' : ty;
+      const tt = ty === 'double' ? 'float' : ty === 'long' || ty === 'short' ? 'int' : ty === 'boolean' ? 'bool' : ty;
       return `((${tt})${this.unary()})`;
     }
     return this.postfix(this.primary());
@@ -514,6 +785,19 @@ class GlslExpr {
     }
     if (t.v === 'new') {
       const ty = this.eat().v;
+      if (ty === 'mat2') { // float4 after conversion (see convertJava); mat2(vec4) is the same layout, mat2(vec2, vec2) two columns
+        const a = this.args();
+        if (a.length === 4) return `MAT2_(${a.join(', ')})`;
+        if (a.length === 1) return `MAT2_((${a[0]}).x, (${a[0]}).y, (${a[0]}).z, (${a[0]}).w)`;
+        if (a.length === 2) return `MAT2_((${a[0]}).x, (${a[0]}).y, (${a[1]}).x, (${a[1]}).y)`;
+        throw new Error('glsl: mat2 args');
+      }
+      if (ty === 'mat3') {
+        const a = this.args();
+        if (a.length === 9) return `mat3_make(${a.join(', ')})`;
+        if (a.length === 3) return `mat3_make(${a.map((c) => `(${c}).x, (${c}).y, (${c}).z`).join(', ')})`;
+        throw new Error('glsl: mat3 args');
+      }
       if (ty in VEC_TYPES) {
         const a = this.args();
         const n = Number(ty[3]);
@@ -521,17 +805,20 @@ class GlslExpr {
         if (ty === 'vec3' && a.length === 2) return `make_float3((${a[0]}).x, (${a[0]}).y, ${a[1]})`;
         return `make_${VEC_TYPES[ty]}(${a.join(', ')})`;
       }
-      if (ty === 'mat2') { const a = this.args(); return `MAT2(${a.join(', ')})`; } // consumed by .times() below
       if (/^(int|double|float|boolean|long)$/.test(ty) && this.at('[')) { // new int[3] / new double[]{…}: left for the array regexes
         this.eat('['); let n = ''; if (!this.at(']')) n = this.expr(); this.eat(']');
         if (this.at('{')) { let d = 0, lit = ''; for (;;) { const t2 = this.eat(); lit += t2.v; if (t2.v === '{') d++; if (t2.v === '}') { d--; if (d === 0) break; } if (t2.t === 'op' && t2.v === ',') lit += ' '; } return `new ${ty}[]${lit}`; }
         return `new ${ty}[${n}]`;
       }
+      if (/^[A-Z]\w*$/.test(ty) && this.at('(')) { const a = this.args(); return `new ${ty}(${a.join(', ')})`; } // objects: handled by the pod pass afterwards
       throw new Error(`glsl: new ${ty}`);
     }
     if (t.v === 'G' && this.at('.')) {
       this.eat('.'); const fn = this.eat().v; const a = this.args();
       if (fn === 'atan') return a.length === 2 ? `atan2f(${a[0]}, ${a[1]})` : `atanf(${a[0]})`;
+      if (fn === 'Kscope') return `G_Kscope(${a.join(', ')})`;
+      if (fn === 'rot') return `G_rot(${a[0]})`;
+      if (fn === 'app') return `G_app(${a.join(', ')})`;
       const m = G_MAP[fn]; if (!m) throw new Error(`glsl: G.${fn}`);
       return `${m}(${a.join(', ')})`;
     }
@@ -547,13 +834,17 @@ class GlslExpr {
         if (this.at('(')) {
           const a = this.args();
           if (name in VEC_BINOPS) { recv = `(${recv} ${VEC_BINOPS[name]} ${a[0]})`; continue; }
-          if (name === 'times') {
-            const mm = /^MAT2\((.*)\)$/.exec(a[0]);
-            if (mm) { // vec2 · mat2(a00,a10,a01,a11) = (a00 x + a10 y, a01 x + a11 y)
-              const p = splitTop(mm[1]); if (p.length !== 4) throw new Error('glsl: mat2 args');
-              recv = `make_float2((${p[0]}) * (${recv}).x + (${p[1]}) * (${recv}).y, (${p[2]}) * (${recv}).x + (${p[3]}) * (${recv}).y)`; continue;
-            }
-            throw new Error('glsl: times() with a matrix variable');
+          if (name === 'times' || ((name === 'add' || name === 'minus' || name === 'division') && glslKindOf(recv) === 'mat2')) {
+            const rk = glslKindOf(recv), ak = glslKindOf(a[0]);
+            if (name !== 'times') { recv = `(${recv} ${VEC_BINOPS[name]} ${a[0]})`; continue; } // mat2 ± scalar, componentwise on the float4
+            if (rk === 'vec' && ak === 'mat2') { recv = VEC_MUL_MAT2(recv, a[0]); continue; }
+            if (rk === 'mat2' && ak === 'vec') { recv = MAT2_MUL_VEC(recv, a[0]); continue; }
+            if (rk === 'vec' && ak === 'mat3') { recv = VEC_MUL_MAT3(recv, a[0]); continue; }
+            if (rk === 'mat3' && ak === 'vec') { recv = MAT3_MUL_VEC(recv, a[0]); continue; }
+            if (rk === 'mat2' && ak === 'scalar') { recv = `(${recv} * ${a[0]})`; continue; }
+            if (rk === 'mat3' && ak === 'scalar') { recv = `mat3_scale(${recv}, ${a[0]})`; continue; }
+            if (rk === 'mat3' || ak === 'mat3') throw new Error('glsl: mat3 product');
+            recv = `(${recv} * ${a[0]})`; continue; // vec.times(scalar)
           }
           if (name === 'dot') { recv = `dot(${recv}, ${a[0]})`; continue; }
           if (name === 'length') { recv = `length(${recv})`; continue; }
@@ -572,13 +863,32 @@ function splitTop(s: string): string[] { const out: string[] = []; let d = 0, cu
 function glslExpr(toks: Tok[]): string { const p = new GlslExpr(toks); const e = p.expr(); if (p.i !== toks.length) throw new Error(`glsl: trailing ${toks[p.i]?.v}`); return e; }
 
 /** Re-emit a Java body: statement structure kept, every expression parsed and re-emitted. */
+let pendingArray: { ty: string; name: string } | null = null;
 export function convertGlsl(code: string): string {
   const toks = glslTokenize(code);
   let out = '';
   let seg: Tok[] = [];
   let depth = 0;
+  pendingArray = null;
   const flush = (term: string) => { out += convertSegment(seg) + term + '\n'; seg = []; };
-  for (const t of toks) {
+  for (let ti = 0; ti < toks.length; ti++) {
+    const t = toks[ti];
+    if (t.t === 'op' && t.v === '{' && depth === 0 && seg.length >= 5 && seg[seg.length - 1].v === '=' && seg[seg.length - 3].v === ']' && seg[seg.length - 4].v === '[') {
+      const tyTok = seg[seg.length - 5].v;
+      pendingArray = { ty: VEC_TYPES[tyTok] ?? (tyTok === 'double' ? 'float' : tyTok === 'long' ? 'int' : tyTok === 'boolean' ? 'bool' : tyTok), name: seg[seg.length - 2].v };
+      glslKinds.set(pendingArray.name, tyTok === 'mat2' ? 'mat2' : tyTok === 'mat3' ? 'mat3' : 'vec');
+      seg = seg.slice(0, seg.length - 5);
+      if (seg.length && seg[seg.length - 1].v !== 'final') { out += convertSegment(seg) + '\n'; }
+      seg = [];
+    }
+    if (pendingArray && t.t === 'op' && t.v === '{' && depth === 0) {
+      // collect the literal up to the matching '}' and emit the whole array declaration
+      let d = 0, j = ti; const items: Tok[][] = [[]];
+      for (; j < toks.length; j++) { const u = toks[j]; if (u.v === '{' || u.v === '(' || u.v === '[') d++; else if (u.v === '}' || u.v === ')' || u.v === ']') { d--; if (d === 0) break; } if (u.v === ',' && d === 1) items.push([]); else if (!(u.v === '{' && d === 1)) items[items.length - 1].push(u); }
+      const its = items.filter((x) => x.length).map((x) => glslExpr(x));
+      out += `${pendingArray.ty} ${pendingArray.name}[${its.length}] = { ${its.join(', ')} };\n`;
+      pendingArray = null; ti = j; if (toks[ti + 1]?.v === ';') ti++; seg = []; continue;
+    }
     if (t.t === 'op' && (t.v === '(' || t.v === '[')) depth++;
     if (t.t === 'op' && (t.v === ')' || t.v === ']')) depth--;
     if (t.t === 'op' && depth === 0 && (t.v === ';' || t.v === '{' || t.v === '}')) { flush(t.v); continue; }
@@ -609,25 +919,39 @@ function convertSegment(seg: Tok[]): string {
     const head = `for (${parts.map((p) => convertSegment(p)).join('; ')})`;
     return c === seg.length - 1 ? head : head + ' ' + convertSegment(seg.slice(c + 1));
   }
-  if (first === 'return') return 'return' + (seg.length > 1 ? ' ' + exprOf(seg.slice(1)) : '');
+  if (first === 'return') {
+    const ra = seg.findIndex((t, i) => i > 1 && t.t === 'op' && t.v === '=');
+    if (ra > 1 && seg.slice(1, ra).every((t) => t.t === 'id' || t.v === '.')) { const lhs = seg.slice(1, ra).map((t) => t.v).join(''); return `${lhs} = ${exprOf(seg.slice(ra + 1))};\nreturn ${lhs}`; } // return v = expr;
+    return 'return' + (seg.length > 1 ? ' ' + exprOf(seg.slice(1)) : '');
+  }
   if (first === 'case') return 'case ' + exprOf(seg.slice(1));
   if (first === 'default' || first === 'break' || first === 'continue') return raw();
   // declaration: [final] type [ [] ] name [= expr] {, name [= expr]}
   let k = 0;
   if (seg[k]?.v === 'final') k++;
   const typeTok = seg[k];
-  const isType = typeTok?.t === 'id' && (typeTok.v in VEC_TYPES || /^(double|int|float|boolean|long|short|mat2)$/.test(typeTok.v)) && seg[k + 1] && (seg[k + 1].t === 'id' || seg[k + 1].v === '[');
+  const isType = typeTok?.t === 'id' && (typeTok.v in VEC_TYPES || /^(double|int|float|boolean|long|short|mat2|mat3)$/.test(typeTok.v) || (/^[A-Z]\w*$/.test(typeTok.v) && !/^(Math|G|Integer|Double|Float|Tools|MathLib|M_\w+|PI)$/.test(typeTok.v))) && seg[k + 1] && (seg[k + 1].t === 'id' || seg[k + 1].v === '[');
   if (isType) {
     let ty = typeTok.v; k++;
     let arr = '';
     if (seg[k]?.v === '[' && seg[k + 1]?.v === ']') { arr = '[]'; k += 2; }
-    ty = VEC_TYPES[ty] ?? (ty === 'double' || ty === 'long' ? 'float' : ty === 'boolean' ? 'bool' : ty);
-    if (ty === 'mat2') throw new Error('glsl: mat2 variable');
+    const jty = ty;
+    ty = VEC_TYPES[ty] ?? (ty === 'double' ? 'float' : ty === 'long' || ty === 'short' ? 'int' : ty === 'boolean' ? 'bool' : ty === 'mat2' ? 'float4' : ty === 'mat3' ? 'mat3_' : ty);
     const rest = seg.slice(k);
+    // `vec2[] a = { new vec2(…), … };` → `float2 a[N] = { … }` (the '{' ends the segment in convertGlsl, so the
+    // literal arrives as its own segments; handled by convertGlsl's arrayLiteral state instead)
     // split declarators on top-level commas
     const decls: Tok[][] = [[]]; let d = 0;
     for (const t of rest) { if ('([{'.includes(t.v)) d++; if (')]}'.includes(t.v)) d--; if (t.v === ',' && d === 0) decls.push([]); else decls[decls.length - 1].push(t); }
-    return `${ty}${arr} ` + decls.map((dc) => { const eq = dc.findIndex((t) => t.v === '='); if (eq < 0) return dc.map((t) => t.v).join(''); return `${dc.slice(0, eq).map((t) => t.v).join('')} = ${exprOf(dc.slice(eq + 1))}`; }).join(', ');
+    for (const dc of decls) if (dc[0]?.t === 'id') { if (jty === 'mat2' || jty === 'mat3') glslKinds.set(dc[0].v, jty); else if (jty in VEC_TYPES) glslKinds.set(dc[0].v, 'vec'); else glslKinds.delete(dc[0].v); }
+    const after: string[] = []; // `double o, ot2, ot = ot2 = 1000.0;` → declare ot = 1000.0, then ot2 = ot
+    const decl = `${ty}${arr} ` + decls.map((dc) => {
+      const eq = dc.findIndex((t) => t.v === '='); if (eq < 0) return dc.map((t) => t.v).join('');
+      let rhs = dc.slice(eq + 1); const nm = dc.slice(0, eq).map((t) => t.v).join('');
+      for (;;) { const eq2 = rhs.findIndex((t) => t.t === 'op' && t.v === '='); if (eq2 <= 0 || !rhs.slice(0, eq2).every((t) => t.t === 'id' || t.v === '.')) break; after.push(`${rhs.slice(0, eq2).map((t) => t.v).join('')} = ${nm}`); rhs = rhs.slice(eq2 + 1); }
+      return `${nm} = ${exprOf(rhs)}`;
+    }).join(', ');
+    return after.length ? decl + ';\n' + after.join(';\n') : decl;
   }
   // assignment: lvalue op= expr
   const asg = seg.findIndex((t) => t.t === 'op' && /^(=|\+=|-=|\*=|\/=|%=|&=|\|=|\^=)$/.test(t.v));
@@ -667,6 +991,7 @@ console.log(`java2cu: ${ports.length} converted, ${failures.length} skipped → 
 const byReason = new Map<string, string[]>();
 for (const [n, r] of failures) { const k = r.replace(/\b\w+:/, '').slice(0, 40); byReason.set(k, [...(byReason.get(k) ?? []), n]); }
 for (const [r, ns] of [...byReason.entries()].sort((a, b) => b[1].length - a[1].length)) console.log(`  ${ns.length.toString().padStart(3)}  ${r}  [${ns.slice(0, 8).join(' ')}${ns.length > 8 ? ' …' : ''}]`);
+if (process.env.JAVA2CU_FAILS) fs.writeFileSync(process.env.JAVA2CU_FAILS, failures.map(([n, r]) => `${n}\t${r}`).join('\n') + '\n');
 
 }
 if (!process.env.JAVA2CU_LIB) main();

@@ -47,9 +47,13 @@ const FORCE_VERIFIED: Record<string, string> = {
   arch: 'same formula as the CPU (v·sin, v·sin²/cos); the 1/cos tail makes per-point mean/std statistics meaningless',
   rays: 'same formula as the CPU (v²·tan(rnd·π·v)/r²); the tan tail makes per-point mean/std statistics meaningless',
   starfractal: 'CPU keeps x,y across calls (a chaos game with its own RNG); the GPU iterates the same IFS 500× per point — same attractor, but the per-point statistics of the heavy-tailed inversions do not compare',
+  curliecue2: 'a curlicue walk (x0,y0,phi,theta advance once per call, independent of the input point) kept as per-thread state; a trajectory, so per-point statistics do not compare',
   ...Object.fromEntries(['hopalong', 'macmillan', 'threeply', 'gumowski_mira', 'gingerbread_man'].map((n) => [n, 'chaotic attractor iterated as per-thread state (Java port, line by line); f32 and f64 trajectories decorrelate after a few hundred steps and the spread of these maps keeps evolving, so per-segment statistics do not compare'])),
   circular: 'the jitter is a sin(x·12.9898+y·78.233+seed)·43758 hash of the continuous input point: identical in distribution, but the value at a given point depends on the f64/f32 rounding of that point, so the per-point oracle cannot compare it',
   circular2: 'see circular',
+  iconattractor_js: 'JWildfire GPU snippet; the Java re-applies the presetId table (a/b/g/o/l) at init, so only oracle sets whose explicit params contradict their presetId differ — a flame file always carries the preset values',
+  recurrenceplot: 'stateful (a rejected sample re-emits the previous accepted point): JWildfire\'s GPU snippet had dropped that state (and never set ldcs); restored as per-thread state — the sequence-dependent per-point means do not compare, the spread and colouring do',
+  pre_blur3D: 'gaussian pre-blur whose 6-entry ring buffer is advanced with `& 5` in the Java (entries 2,3 never refresh: per-instance constants); ported as four fresh uniforms plus the constants\' mean — same distribution up to the per-instance offset',
   minkQM: 'Minkowski ?-function: at e near 1 the sum is dominated by late Stern–Brocot branches, which flip when a grid coordinate is (nearly) a small rational — an f32 boundary artefact of the test grid, not a port difference (f32 CPU model matches the Java)',
 };
 for (const n of Object.keys(FORCE_VERIFIED)) verified.add(n);
@@ -176,10 +180,32 @@ for (let v0 of dump) {
       mandelbrot: (c, f) => [c
         .replace(/while \(\(k\+\+<10\) && \(([\s\S]*?)\)\) \{\n/, 'while (true) { int ci_ = k; k = k + 1; if (!((ci_ < 10) && ($1))) break;\n')
         .replace(/x1=y1=50000\.0-RANDFLOAT\(\)\*100000;/, 'y1 = 50000.0 - RANDFLOAT() * 100000; x1 = y1;'), f],
+      // `t++` inside the do-while condition; the 2050-int permutation and 1024×3 gradient tables are
+      // function locals in JWildfire's CUDA (20 KB per thread) → module-scope constants; `float *U = grad3[g]` alias inlined
+      dc_perlin: (c, f) => {
+        const pm = /int p\[2050\] = \{[\s\S]*?\};/.exec(f)!, gm = /float grad3\[1024\]\[3\] = \{[\s\S]*?\}\s*\};/.exec(f)!;
+        f = f.replace(pm[0], '').replace(gm[0], '');
+        const s0 = f.indexOf('dc_perlin_simplexNoise3D('), s1 = f.indexOf('__device__', s0 + 1);
+        f = f.slice(0, s0) + f.slice(s0, s1).replace(/float \*U;/, '').replace(/U = grad3\[gi\[corner\]\];/, '')
+          .replace(/U\[_x_\]/g, 'grad3[gi[corner]][_x_]').replace(/U\[_y_\]/g, 'grad3[gi[corner]][_y_]').replace(/U\[_z_\]/g, 'grad3[gi[corner]][_z_]') + f.slice(s1);
+        f = pm[0].replace(/^int p/, 'int dc_perlin_p') + '\n' + gm[0].replace(/^float grad3/, 'float dc_perlin_grad3') + '\n' + f.replace(/\bp\[/g, 'dc_perlin_p[').replace(/\bgrad3\[/g, 'dc_perlin_grad3[');
+        return [c.replace(/&& t\+\+ < __dc_perlin_select_bailout\)/, '&& jpostinc(&t) < __dc_perlin_select_bailout)'), f];
+      },
+      // JWildfire's snippet never assigns ldcs (the Java sets it in init) — and its oldx/oldy state is restored by EXTRA_STATE above
+      recurrenceplot: (c, f) => [c.replace(/float ldcs;/, 'float ldcs = 1.0 / (__recurrenceplot_scale == 0.0 ? 10E-6 : __recurrenceplot_scale);'), f],
       dc_circuits: (c, f) => [c, f.replace(/float o,ot2,ot=ot2=1000\.0;/, 'float o; float ot2 = 1000.0; float ot = 1000.0;')],
       sym_ng13: (c, f) => [c.replace(/Mathc Tx\[6\]=/, 'Mathc Tx[8]='), f],
       dc_moebiuslog: (c, f) => [c, f.replace(/\(logf\(length\(U=U\+\.5\)\)\)/, '(logf(length(U + .5)))').replace(/if\(Log==1\.0\)(\s*)U =/, 'if(Log==1.0) { U = U + .5; }\n if(Log==1.0)$1U =')],
     };
+    // JWildfire GPU snippets that declare per-instance Java state as locals (a JWildfire GPU bug) → per-thread state
+    const EXTRA_STATE: Record<string, string[]> = { recurrenceplot: ['oldx', 'oldy'] };
+    if (EXTRA_STATE[v0.name]) {
+      const c0 = (ovCode ?? v0.gpuCode ?? '');
+      const c1 = EXTRA_STATE[v0.name].reduce((c, n) => c.replace(new RegExp(`(?<![\\w.>])${n}\\b`, 'g'), `varpar->${v0.name}_${n}`), c0.replace(new RegExp(`float ${EXTRA_STATE[v0.name].map((n) => `${n} = 0\\.0`).join(', ')};`), ''));
+      if (c1 === c0) throw new Error(`EXTRA_STATE ${v0.name}: pattern not found`);
+      ovCode = c1;
+      v0 = { ...v0, extraParams: [...(v0.extraParams ?? []), ...EXTRA_STATE[v0.name]], stateful: true };
+    }
     const fx = fix[v0.name];
     if (fx) {
       const [c, f] = fx((ovCode ?? v0.gpuCode ?? '').replace(/varpar->/g, '__'), v0.gpuFunctions ?? '');
@@ -408,6 +434,18 @@ ts += `};\n`;
 tsU += `};\n`;
 writeFileSync(outFile, ts);
 writeFileSync(outFileUnverified, tsU);
+// the deliberately-unported list (data/unportable.json) → src/core/variations.unportable.ts, so the importer can say why a variation is skipped
+{
+  const up = JSON.parse(readFileSync(join(here, 'data', 'unportable.json'), 'utf8')) as { categories: Record<string, string>; variations: Record<string, string> };
+  const SHORT: Record<string, string> = { 'user-code': 'runs user code / a formula at render time', 'external-content': 'renders external content (flame, image, mesh, SVG, text)', 'point-set': 'CPU-built point set', engine: 'JWildfire pre+post inverse pair / nested variation', 'resource-params': 'colour ressources', 'not-yet': 'not ported yet' };
+  const bad = Object.keys(up.variations).filter((n) => entries.some((e) => e.name === n));
+  if (bad.length) throw new Error(`unportable.json lists ported variations: ${bad.join(' ')}`);
+  const missing = dump.filter((d) => !entries.some((e) => e.name === d.name) && !up.variations[d.name]).map((d) => d.name);
+  if (missing.length) console.warn(`unportable.json is missing: ${missing.join(' ')}`);
+  let tsN = '// AUTO-GENERATED by scripts/jwf-port/gen.ts from data/unportable.json — do not edit by hand.\n// JWildfire variations WilderFire deliberately does not implement, with the reason shown by the importer.\n\n';
+  tsN += 'export const UNPORTABLE: Record<string, string> = {\n' + Object.entries(up.variations).map(([n, c]) => `  ${JSON.stringify(n)}: ${JSON.stringify(SHORT[c] ?? c)},`).join('\n') + '\n};\n';
+  writeFileSync(join(here, '..', '..', 'src', 'core', 'variations.unportable.ts'), tsN);
+}
 
 // ---- summary ----
 const ok = report.filter((r) => r.status === 'ok').length;

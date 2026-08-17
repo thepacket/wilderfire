@@ -107,8 +107,12 @@ public class Dump {
         for (int i = 0; i < alt.length; i++) { if (i > 0) sb.append(','); sb.append(q(alt[i])); }
         sb.append("]");
       }
+      // resources = things the variation reads at run time (images, code, text); a REFERENCE
+      // ressource is only a link to the author's page and does not make it unportable
       String[] rn = f.getRessourceNames();
-      sb.append(",\"resources\":").append(rn == null ? 0 : rn.length);
+      int nres = 0;
+      if (rn != null) for (String r : rn) { RessourceType rt = null; try { rt = f.getRessourceType(r); } catch (Throwable t) { } if (rt != RessourceType.REFERENCE) nres++; }
+      sb.append(",\"resources\":").append(nres);
       sb.append(",\"defaultsStable\":").append(stable);
       boolean gpu = f instanceof SupportsGPU;
       sb.append(",\"gpu\":").append(gpu);
