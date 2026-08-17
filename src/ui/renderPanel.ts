@@ -146,6 +146,17 @@ export function buildRenderPanel(app: App, root: HTMLElement) {
 
   const perf = el('div', 'section');
   perf.append(el('h3', '', 'Engine'));
+  // Draft / Final presets over the engine knobs below (the flame's own DE/filter settings are untouched)
+  const modeRow = el('div', 'row');
+  modeRow.append(el('label', '', 'Mode'));
+  const modeSel = el('select') as HTMLSelectElement;
+  for (const [label, v] of [['Draft', 'draft'], ['Final', 'final'], ['Custom', 'custom']] as const) {
+    const o = el('option', '', label) as HTMLOptionElement;
+    o.value = v;
+    modeSel.append(o);
+  }
+  modeSel.title = 'Draft: responsive editing (balanced speed, DE r ≤ 6, no oversampling, quality cap 4000). Final: full quality on screen (fast speed, full DE radius, 2× oversampling, cap 10000). Custom: your own settings below.';
+  modeRow.append(modeSel);
   const speedRow = el('div', 'row');
   speedRow.append(el('label', '', 'Speed'));
   const speedSel = el('select') as HTMLSelectElement;
@@ -232,7 +243,36 @@ export function buildRenderPanel(app: App, root: HTMLElement) {
   restartBtn.onclick = () => app.renderer.resetAccumulation();
   const pRow = el('div', 'btn-row');
   pRow.append(pauseBtn, restartBtn);
-  perf.append(speedRow, holdS.root, deS.root, deCurveS.root, deLiveRow, osRow, qRow, pRow);
+  perf.append(modeRow, speedRow, holdS.root, deS.root, deCurveS.root, deLiveRow, osRow, qRow, pRow);
+
+  const LS_MODE = 'wilderfire.render.mode';
+  const MODES: Record<string, { speed: string; hold: number; deLive: string; os: string; q: string }> = {
+    draft: { speed: '2', hold: 10, deLive: '6', os: '1', q: '4000' }, // = the long-standing defaults
+    final: { speed: '4', hold: 10, deLive: '-1', os: '2', q: '10000' },
+  };
+  let applyingMode = false;
+  const applyMode = (mode: string) => {
+    const m = MODES[mode];
+    localStorage.setItem(LS_MODE, mode);
+    if (!m) return;
+    applyingMode = true;
+    speedSel.value = m.speed; speedSel.onchange!(new Event('change'));
+    holdS.set(m.hold); app.renderer.minDisplaySpp = m.hold;
+    deLiveSel.value = m.deLive; deLiveSel.onchange!(new Event('change'));
+    osSel.value = String(app.renderer.setOversample(parseInt(m.os))); // silently falls back to 1× without buffer headroom
+    qSel.value = m.q; qSel.onchange!(new Event('change'));
+    applyingMode = false;
+  };
+  modeSel.onchange = () => applyMode(modeSel.value);
+  // touching any knob by hand switches the mode to Custom
+  const toCustom = () => { if (!applyingMode && modeSel.value !== 'custom') { modeSel.value = 'custom'; localStorage.setItem(LS_MODE, 'custom'); } };
+  for (const sel of [speedSel, deLiveSel, osSel, qSel]) sel.addEventListener('change', toCustom);
+  holdS.root.addEventListener('input', toCustom);
+  {
+    const saved = localStorage.getItem(LS_MODE) ?? 'draft';
+    modeSel.value = saved in MODES || saved === 'custom' ? saved : 'draft';
+    if (saved !== 'custom') applyMode(modeSel.value);
+  }
 
   const io = el('div', 'section');
   io.append(el('h3', '', 'Export / Import'));
