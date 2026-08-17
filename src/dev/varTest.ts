@@ -49,7 +49,9 @@ fn rnd(state: ptr<function, u32>) -> f32 {
 fn mmod(a: f32, b: f32) -> f32 { return a - b * floor(a / b); }
 `;
 
-function buildShader(def: VariationDef, funcs: string, priority: number): string {
+/** Stateful variations (per-thread `jwx_` state, e.g. attractors) are evaluated as one
+ *  sequential trajectory per point — S steps in one thread — like a JWildfire render. */
+function buildShader(def: VariationDef, funcs: string, priority: number, seq = false): string {
   const nP = def.params?.length ?? 0;
   const w = 'xd[0]';
   const p = Array.from({ length: nP }, (_, k) => `xd[${1 + k}]`);
@@ -64,17 +66,9 @@ ${funcs}
 @group(0) @binding(1) var<storage, read_write> outp: array<vec4f>;
 @group(0) @binding(2) var<storage, read> xd: array<f32>;
 
-@compute @workgroup_size(64)
-fn main(@builtin(global_invocation_id) gid: vec3u) {
-  let i = gid.x;
-  df_zero = bitcast<u32>(xd[${base + 6}]) >> 31u;
-  let S = u32(xd[${base + 6}]);
-  if (i >= arrayLength(&inp) * S) { return; }
-  let pi = i / S;
-  var rsv: u32 = ((i + 1u) * 2654435761u) ^ u32(xd[${base + 7}]);
-  if (rsv == 0u) { rsv = 1u; }
-  let rs = &rsv;
-  _ = rnd(rs); _ = rnd(rs);
+// the variation body lives in its own function (like the kernel's xform functions) so an early
+// return in the snippet ends the variation, not the shader; returns (x, y, z, colour+hide)
+fn snip_(pin: vec4f, rs: ptr<function, u32>) -> vec4f {
   var c: f32 = 0.5;
   var hide: bool = false;
   let cp = &c;
@@ -82,9 +76,9 @@ fn main(@builtin(global_invocation_id) gid: vec3u) {
   var rgbo = vec4f(0.0);
   let rgb = &rgbo;
   let PALB_: u32 = 0u;
-  var t0 = inp[pi].xy;
+  var t0 = pin.xy;
   var t = t0;
-  var z_ = inp[pi].z;
+  var z_ = pin.z;
   var pz_ = ${priority === 1 ? 'z_' : '0.0'};
   var r2 = max(dot(t, t), 1e-12);
   var r = sqrt(r2);
@@ -93,7 +87,28 @@ fn main(@builtin(global_invocation_id) gid: vec3u) {
   var v = ${priority === 1 ? 't' : 'vec2f(0.0, 0.0)'};
   ${snippet}
   // color + hide packed: c in [0,1], +10 when hidden
-  outp[i] = vec4f(${priority === -1 ? 't' : 'v'}, ${priority === -1 ? 'z_' : 'pz_'}, c + select(0.0, 10.0, hide));
+  return vec4f(${priority === -1 ? 't' : 'v'}, ${priority === -1 ? 'z_' : 'pz_'}, c + select(0.0, 10.0, hide));
+}
+
+@compute @workgroup_size(64)
+fn main(@builtin(global_invocation_id) gid: vec3u) {
+  df_zero = bitcast<u32>(xd[${base + 6}]) >> 31u;
+  let S = u32(xd[${base + 6}]);
+  ${seq ? `let pi = gid.x; if (pi >= arrayLength(&inp)) { return; }
+  var rsv: u32 = ((pi + 1u) * 2654435761u) ^ u32(xd[${base + 7}]);
+  if (rsv == 0u) { rsv = 1u; }
+  _ = rnd(&rsv); _ = rnd(&rsv);
+  // warm-up: the oracle runs one instance over all points in order, so point pi's samples are
+  // steps [pi*S, (pi+1)*S) of one trajectory — replay the earlier steps first (state only)
+  for (var s_ = 0u; s_ < pi * S; s_++) { _ = snip_(inp[pi], &rsv); }
+  for (var s_ = 0u; s_ < S; s_++) { let i = pi * S + s_;` : `let i = gid.x;
+  if (i >= arrayLength(&inp) * S) { return; }
+  let pi = i / S;
+  var rsv: u32 = ((i + 1u) * 2654435761u) ^ u32(xd[${base + 7}]);
+  if (rsv == 0u) { rsv = 1u; }
+  _ = rnd(&rsv); _ = rnd(&rsv);`}
+  outp[i] = snip_(inp[pi], &rsv);
+${seq ? '  }' : ''}
 }
 `;
 }
@@ -122,8 +137,9 @@ function contextLines(code: string, line: number): string {
   return ls.slice(Math.max(0, line - 2), line + 1).map((l, i) => `${Math.max(0, line - 2) + i + 1}: ${l}`).join('\n');
 }
 
-async function run(device: GPUDevice, pipeline: GPUComputePipeline, points: number[][], xd: Float32Array<ArrayBuffer>, samples: number): Promise<Float32Array> {
+async function run(device: GPUDevice, pipeline: GPUComputePipeline, points: number[][], xd: Float32Array<ArrayBuffer>, samples: number, seq = false): Promise<Float32Array> {
   const n = points.length * samples;
+  const threads = seq ? points.length : n;
   const inp = device.createBuffer({ size: points.length * 16, usage: GPUBufferUsage.STORAGE | GPUBufferUsage.COPY_DST });
   device.queue.writeBuffer(inp, 0, new Float32Array(points.flatMap((p) => [p[0], p[1], p[2] ?? 0, 0])));
   const outp = device.createBuffer({ size: n * 16, usage: GPUBufferUsage.STORAGE | GPUBufferUsage.COPY_SRC });
@@ -138,7 +154,7 @@ async function run(device: GPUDevice, pipeline: GPUComputePipeline, points: numb
   const pass = enc.beginComputePass();
   pass.setPipeline(pipeline);
   pass.setBindGroup(0, bg);
-  pass.dispatchWorkgroups(Math.ceil(n / 64));
+  pass.dispatchWorkgroups(Math.ceil(threads / 64));
   pass.end();
   enc.copyBufferToBuffer(outp, 0, staging, 0, n * 16);
   device.queue.submit([enc.finish()]);
@@ -184,7 +200,7 @@ export async function runVarTest(device: GPUDevice, opts: { only?: string[]; ver
       if (rows.every((r) => r.error && !r.out)) { res.status = 'oracle-error'; res.msg = rows[0].error; continue; }
       let shader: string;
       try {
-        shader = buildShader(def, jdef?.funcs ?? '', priority);
+        shader = buildShader(def, jdef?.funcs ?? '', priority, !!(jdef?.flags?.includes('state') || jdef?.flags?.includes('stateful')));
       } catch (err) { res.status = 'compile-error'; res.msg = 'build: ' + String(err); continue; }
       const c = await compile(device, shader);
       if ('error' in c) { res.status = 'compile-error'; res.msg = c.error; continue; }
@@ -209,7 +225,7 @@ export async function runVarTest(device: GPUDevice, opts: { only?: string[]; ver
         xd[base + 6] = samples;
         xd[base + 7] = 7919 * (row.set + 1);
         let out: Float32Array;
-        try { out = await run(device, c.pipeline, spec.points, xd, samples); }
+        try { out = await run(device, c.pipeline, spec.points, xd, samples, !!(jdef?.flags?.includes('state') || jdef?.flags?.includes('stateful'))); }
         catch (err) { res.status = 'runtime-error'; res.msg = String(err); break; }
         for (let pi = 0; pi < spec.points.length; pi++) {
           const theirs = row.out[pi];

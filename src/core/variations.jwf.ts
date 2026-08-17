@@ -2,7 +2,7 @@
 // Variations ported from JWildfire (https://github.com/thargor6/JWildfire, LGPL-2.1,
 // (c) Andreas Maschke and contributors) by transpiling each variation's CUDA GPU
 // snippet to WGSL and verifying it against JWildfire's Java implementation.
-// 784 verified of 786 transpiled (1026 in JWildfire).
+// 846 verified of 848 transpiled (1026 in JWildfire).
 //
 // Snippet scope: t (input point, var), z_ (input z), r2, r, th = atan2(x,y), ph = atan2(y,x),
 // v (output accumulator), pz_ (output z), rs (rng), cp (palette coord ptr), hd (hide-flag ptr).
@@ -27,6 +27,8 @@ export const JWF_VARIATIONS: Record<string, JwfVariationDef> = {
   "linear": {
     params: [],
     verified: true, priority: 0, flags: [], types: ["2D"],
+    funcNames: ["atan2j"],
+    funcs: `fn atan2j(y: f32, x: f32) -> f32 { if (x == 0.0 && y == 0.0) { return select(0.0, PI, (bitcast<u32>(x) >> 31u) == 1u) * select(1.0, -1.0, (bitcast<u32>(y) >> 31u) == 1u); } return atan2(y, x); }`,
     code: (w, _p) => `{
 v.x += (${w} * t.x);
 v.y += (${w} * t.y);
@@ -35,6 +37,8 @@ v.y += (${w} * t.y);
   "spherical": {
     params: [],
     verified: true, priority: 0, flags: [], types: ["2D"],
+    funcNames: ["atan2j"],
+    funcs: `fn atan2j(y: f32, x: f32) -> f32 { if (x == 0.0 && y == 0.0) { return select(0.0, PI, (bitcast<u32>(x) >> 31u) == 1u) * select(1.0, -1.0, (bitcast<u32>(y) >> 31u) == 1u); } return atan2(y, x); }`,
     code: (w, _p) => `{
 var r2inv_eps: f32 = (1.0 / (r2 + 1.0e-20));
 v.x += ((${w} * t.x) * r2inv_eps);
@@ -44,6 +48,8 @@ v.y += ((${w} * t.y) * r2inv_eps);
   "waves": {
     params: [],
     verified: true, priority: 0, flags: ["affine"], types: ["2D"],
+    funcNames: ["atan2j"],
+    funcs: `fn atan2j(y: f32, x: f32) -> f32 { if (x == 0.0 && y == 0.0) { return select(0.0, PI, (bitcast<u32>(x) >> 31u) == 1u) * select(1.0, -1.0, (bitcast<u32>(y) >> 31u) == 1u); } return atan2(y, x); }`,
     code: (w, _p, A) => `{
 v.x += (${w} * (t.x + (${A(1)} * sin((t.y / ((${A(2)} * ${A(2)}) + 1.0e-20))))));
 v.y += (${w} * (t.y + (${A(4)} * sin((t.x / ((${A(5)} * ${A(5)}) + 1.0e-20))))));
@@ -52,6 +58,8 @@ v.y += (${w} * (t.y + (${A(4)} * sin((t.x / ((${A(5)} * ${A(5)}) + 1.0e-20))))))
   "swirl": {
     params: [],
     verified: true, priority: 0, flags: [], types: ["2D"],
+    funcNames: ["atan2j"],
+    funcs: `fn atan2j(y: f32, x: f32) -> f32 { if (x == 0.0 && y == 0.0) { return select(0.0, PI, (bitcast<u32>(x) >> 31u) == 1u) * select(1.0, -1.0, (bitcast<u32>(y) >> 31u) == 1u); } return atan2(y, x); }`,
     code: (w, _p) => `{
 var c1: f32;
 var s1: f32;
@@ -64,6 +72,8 @@ v.y += (${w} * ((t.x * c1) + (t.y * s1)));
   "spiral": {
     params: [],
     verified: true, priority: 0, flags: [], types: ["2D"],
+    funcNames: ["atan2j"],
+    funcs: `fn atan2j(y: f32, x: f32) -> f32 { if (x == 0.0 && y == 0.0) { return select(0.0, PI, (bitcast<u32>(x) >> 31u) == 1u) * select(1.0, -1.0, (bitcast<u32>(y) >> 31u) == 1u); } return atan2(y, x); }`,
     code: (w, _p) => `{
 var rinv_: f32 = 1.0 / r;
 var r_eps: f32 = sqrt((r2 + 1.0e-20));
@@ -74,6 +84,8 @@ v.y += ((${w} * rinv_) * ((t.x * rinv_) - cos(r_eps)));
   "curl": {
     params: [{ name: "c1", def: 0.1 }, { name: "c2", def: 0 }],
     verified: true, priority: 0, flags: [], types: ["2D"],
+    funcNames: ["atan2j"],
+    funcs: `fn atan2j(y: f32, x: f32) -> f32 { if (x == 0.0 && y == 0.0) { return select(0.0, PI, (bitcast<u32>(x) >> 31u) == 1u) * select(1.0, -1.0, (bitcast<u32>(y) >> 31u) == 1u); } return atan2(y, x); }`,
     code: (w, p) => `{
 var re: f32 = ((1.0 + (${p[0]} * t.x)) + (${p[1]} * ((t.x * t.x) - (t.y * t.y))));
 var im: f32 = ((${p[0]} * t.y) + (((2.0 * ${p[1]}) * t.x) * t.y));
@@ -85,6 +97,8 @@ v.y += (((t.y * re) - (t.x * im)) * r_);
   "heart": {
     params: [],
     verified: true, priority: 0, flags: [], types: ["2D"],
+    funcNames: ["atan2j"],
+    funcs: `fn atan2j(y: f32, x: f32) -> f32 { if (x == 0.0 && y == 0.0) { return select(0.0, PI, (bitcast<u32>(x) >> 31u) == 1u) * select(1.0, -1.0, (bitcast<u32>(y) >> 31u) == 1u); } return atan2(y, x); }`,
     code: (w, _p) => `{
 v.x += ((${w} * r) * sin((th * r)));
 v.y += ((-(${w}) * r) * cos((th * r)));
@@ -93,6 +107,8 @@ v.y += ((-(${w}) * r) * cos((th * r)));
   "linear3D": {
     params: [],
     verified: true, priority: 0, flags: ["3d","z"], types: ["3D"],
+    funcNames: ["atan2j"],
+    funcs: `fn atan2j(y: f32, x: f32) -> f32 { if (x == 0.0 && y == 0.0) { return select(0.0, PI, (bitcast<u32>(x) >> 31u) == 1u) * select(1.0, -1.0, (bitcast<u32>(y) >> 31u) == 1u); } return atan2(y, x); }`,
     code: (w, _p) => `{
 v.x += (${w} * t.x);
 v.y += (${w} * t.y);
@@ -102,6 +118,8 @@ pz_ += (${w} * z_);
   "curl3D": {
     params: [{ name: "cx", def: 0 }, { name: "cy", def: 0.05 }, { name: "cz", def: 0.05 }],
     verified: true, priority: 0, flags: ["3d","z"], types: ["3D"],
+    funcNames: ["atan2j"],
+    funcs: `fn atan2j(y: f32, x: f32) -> f32 { if (x == 0.0 && y == 0.0) { return select(0.0, PI, (bitcast<u32>(x) >> 31u) == 1u) * select(1.0, -1.0, (bitcast<u32>(y) >> 31u) == 1u); } return atan2(y, x); }`,
     code: (w, p) => `{
 var c2: f32 = (((${p[0]} * ${p[0]}) + (${p[1]} * ${p[1]})) + (${p[2]} * ${p[2]}));
 var r2_: f32 = (((t.x * t.x) + (t.y * t.y)) + (z_ * z_));
@@ -114,6 +132,8 @@ pz_ += (r_ * (z_ + (${p[2]} * r2_)));
   "ztranslate": {
     params: [],
     verified: true, priority: 0, flags: ["z"], types: ["ZTRANSFORM"],
+    funcNames: ["atan2j"],
+    funcs: `fn atan2j(y: f32, x: f32) -> f32 { if (x == 0.0 && y == 0.0) { return select(0.0, PI, (bitcast<u32>(x) >> 31u) == 1u) * select(1.0, -1.0, (bitcast<u32>(y) >> 31u) == 1u); } return atan2(y, x); }`,
     code: (w, _p) => `{
 pz_ += ${w};
 }`,
@@ -121,6 +141,8 @@ pz_ += ${w};
   "zscale": {
     params: [],
     verified: true, priority: 0, flags: ["z"], types: ["ZTRANSFORM"],
+    funcNames: ["atan2j"],
+    funcs: `fn atan2j(y: f32, x: f32) -> f32 { if (x == 0.0 && y == 0.0) { return select(0.0, PI, (bitcast<u32>(x) >> 31u) == 1u) * select(1.0, -1.0, (bitcast<u32>(y) >> 31u) == 1u); } return atan2(y, x); }`,
     code: (w, _p) => `{
 pz_ += (${w} * z_);
 }`,
@@ -128,14 +150,16 @@ pz_ += (${w} * z_);
   "julian": {
     params: [{ name: "power", def: 3 }, { name: "dist", def: 1 }],
     verified: true, priority: 0, flags: [], types: ["2D"],
-    funcNames: ["powc"],
+    funcNames: ["powc","atan2j"],
     funcs: `fn powc(x: f32, y: f32) -> f32 {
   if (x >= 0.0) { return pow(x, y); }
   let yi = round(y);
   if (abs(y - yi) > 1e-6) { return pow(x, y); }
   let m = pow(-x, y);
   return select(m, -m, (i32(yi) & 1) != 0);
-}`,
+}
+
+fn atan2j(y: f32, x: f32) -> f32 { if (x == 0.0 && y == 0.0) { return select(0.0, PI, (bitcast<u32>(x) >> 31u) == 1u) * select(1.0, -1.0, (bitcast<u32>(y) >> 31u) == 1u); } return atan2(y, x); }`,
     code: (w, p) => `{
 var rn: f32;
 rn = rnd(rs);
@@ -148,6 +172,8 @@ v.y += ((${w} * rnew) * sin(t_));
   "sinusoidal": {
     params: [],
     verified: true, priority: 0, flags: [], types: ["2D"],
+    funcNames: ["atan2j"],
+    funcs: `fn atan2j(y: f32, x: f32) -> f32 { if (x == 0.0 && y == 0.0) { return select(0.0, PI, (bitcast<u32>(x) >> 31u) == 1u) * select(1.0, -1.0, (bitcast<u32>(y) >> 31u) == 1u); } return atan2(y, x); }`,
     code: (w, _p) => `{
 v.x += (${w} * sin(t.x));
 v.y += (${w} * sin(t.y));
@@ -156,6 +182,8 @@ v.y += (${w} * sin(t.y));
   "horseshoe": {
     params: [],
     verified: true, priority: 0, flags: [], types: ["2D"],
+    funcNames: ["atan2j"],
+    funcs: `fn atan2j(y: f32, x: f32) -> f32 { if (x == 0.0 && y == 0.0) { return select(0.0, PI, (bitcast<u32>(x) >> 31u) == 1u) * select(1.0, -1.0, (bitcast<u32>(y) >> 31u) == 1u); } return atan2(y, x); }`,
     code: (w, _p) => `{
 var rinv_eps: f32 = (1.0 / sqrt((r2 + 1.0e-20)));
 v.x += (((${w} * (t.x - t.y)) * (t.x + t.y)) * rinv_eps);
@@ -165,6 +193,8 @@ v.y += ((((${w} * 2.0) * t.x) * t.y) * rinv_eps);
   "polar": {
     params: [],
     verified: true, priority: 0, flags: [], types: ["2D"],
+    funcNames: ["atan2j"],
+    funcs: `fn atan2j(y: f32, x: f32) -> f32 { if (x == 0.0 && y == 0.0) { return select(0.0, PI, (bitcast<u32>(x) >> 31u) == 1u) * select(1.0, -1.0, (bitcast<u32>(y) >> 31u) == 1u); } return atan2(y, x); }`,
     code: (w, _p) => `{
 v.x += ((${w} * th) / PI);
 v.y += (${w} * (r - 1.0));
@@ -173,6 +203,8 @@ v.y += (${w} * (r - 1.0));
   "handkerchief": {
     params: [],
     verified: true, priority: 0, flags: [], types: ["2D"],
+    funcNames: ["atan2j"],
+    funcs: `fn atan2j(y: f32, x: f32) -> f32 { if (x == 0.0 && y == 0.0) { return select(0.0, PI, (bitcast<u32>(x) >> 31u) == 1u) * select(1.0, -1.0, (bitcast<u32>(y) >> 31u) == 1u); } return atan2(y, x); }`,
     code: (w, _p) => `{
 v.x += ((${w} * r) * sin((th + r)));
 v.y += ((${w} * r) * cos((th - r)));
@@ -181,6 +213,8 @@ v.y += ((${w} * r) * cos((th - r)));
   "disc": {
     params: [],
     verified: true, priority: 0, flags: [], types: ["2D"],
+    funcNames: ["atan2j"],
+    funcs: `fn atan2j(y: f32, x: f32) -> f32 { if (x == 0.0 && y == 0.0) { return select(0.0, PI, (bitcast<u32>(x) >> 31u) == 1u) * select(1.0, -1.0, (bitcast<u32>(y) >> 31u) == 1u); } return atan2(y, x); }`,
     code: (w, _p) => `{
 v.x += ((${w} * (th / PI)) * sin((PI * r)));
 v.y += ((${w} * (th / PI)) * cos((PI * r)));
@@ -189,6 +223,8 @@ v.y += ((${w} * (th / PI)) * cos((PI * r)));
   "hyperbolic": {
     params: [],
     verified: true, priority: 0, flags: [], types: ["2D"],
+    funcNames: ["atan2j"],
+    funcs: `fn atan2j(y: f32, x: f32) -> f32 { if (x == 0.0 && y == 0.0) { return select(0.0, PI, (bitcast<u32>(x) >> 31u) == 1u) * select(1.0, -1.0, (bitcast<u32>(y) >> 31u) == 1u); } return atan2(y, x); }`,
     code: (w, _p) => `{
 var r2inv_eps: f32 = (1.0 / (r2 + 1.0e-20));
 v.x += ((${w} * t.x) * r2inv_eps);
@@ -198,6 +234,8 @@ v.y += (${w} * t.y);
   "diamond": {
     params: [],
     verified: true, priority: 0, flags: [], types: ["2D"],
+    funcNames: ["atan2j"],
+    funcs: `fn atan2j(y: f32, x: f32) -> f32 { if (x == 0.0 && y == 0.0) { return select(0.0, PI, (bitcast<u32>(x) >> 31u) == 1u) * select(1.0, -1.0, (bitcast<u32>(y) >> 31u) == 1u); } return atan2(y, x); }`,
     code: (w, _p) => `{
 var rinv_: f32 = 1.0 / r;
 v.x += (((${w} * t.x) * rinv_) * cos(r));
@@ -207,6 +245,8 @@ v.y += (((${w} * t.y) * rinv_) * sin(r));
   "blur": {
     params: [],
     verified: true, priority: 0, flags: [], types: ["BLUR"],
+    funcNames: ["atan2j"],
+    funcs: `fn atan2j(y: f32, x: f32) -> f32 { if (x == 0.0 && y == 0.0) { return select(0.0, PI, (bitcast<u32>(x) >> 31u) == 1u) * select(1.0, -1.0, (bitcast<u32>(y) >> 31u) == 1u); } return atan2(y, x); }`,
     code: (w, _p) => `{
 var r_: f32 = (rnd(rs) * (PI + PI));
 var sina: f32;
@@ -221,6 +261,8 @@ v.y += (r2_ * sina);
   "ex": {
     params: [],
     verified: true, priority: 0, flags: [], types: ["2D"],
+    funcNames: ["atan2j"],
+    funcs: `fn atan2j(y: f32, x: f32) -> f32 { if (x == 0.0 && y == 0.0) { return select(0.0, PI, (bitcast<u32>(x) >> 31u) == 1u) * select(1.0, -1.0, (bitcast<u32>(y) >> 31u) == 1u); } return atan2(y, x); }`,
     code: (w, _p) => `{
 var m0: f32 = sin((th + r));
 var m1: f32 = cos((th - r));
@@ -233,6 +275,8 @@ v.y += (${w} * (m0 - m1));
   "julia": {
     params: [],
     verified: true, priority: 0, flags: [], types: ["2D"],
+    funcNames: ["atan2j"],
+    funcs: `fn atan2j(y: f32, x: f32) -> f32 { if (x == 0.0 && y == 0.0) { return select(0.0, PI, (bitcast<u32>(x) >> 31u) == 1u) * select(1.0, -1.0, (bitcast<u32>(y) >> 31u) == 1u); } return atan2(y, x); }`,
     code: (w, _p) => `{
 var rn: f32;
 rn = rnd(rs);
@@ -244,6 +288,8 @@ v.y += ((${w} * sqrt(r)) * sin(((0.5 * th) + omega)));
   "bent": {
     params: [],
     verified: true, priority: 0, flags: [], types: ["2D"],
+    funcNames: ["atan2j"],
+    funcs: `fn atan2j(y: f32, x: f32) -> f32 { if (x == 0.0 && y == 0.0) { return select(0.0, PI, (bitcast<u32>(x) >> 31u) == 1u) * select(1.0, -1.0, (bitcast<u32>(y) >> 31u) == 1u); } return atan2(y, x); }`,
     code: (w, _p) => `{
 if ((t.x < 0.0)) {
   v.x += ((${w} * 2.0) * t.x);
@@ -260,6 +306,8 @@ if ((t.y < 0.0)) {
   "fisheye": {
     params: [],
     verified: true, priority: 0, flags: [], types: ["2D"],
+    funcNames: ["atan2j"],
+    funcs: `fn atan2j(y: f32, x: f32) -> f32 { if (x == 0.0 && y == 0.0) { return select(0.0, PI, (bitcast<u32>(x) >> 31u) == 1u) * select(1.0, -1.0, (bitcast<u32>(y) >> 31u) == 1u); } return atan2(y, x); }`,
     code: (w, _p) => `{
 v.x += (((${w} * t.y) * 2.0) / (r + 1.0));
 v.y += (((${w} * t.x) * 2.0) / (r + 1.0));
@@ -268,6 +316,8 @@ v.y += (((${w} * t.x) * 2.0) / (r + 1.0));
   "popcorn": {
     params: [],
     verified: true, priority: 0, flags: ["affine"], types: ["2D"],
+    funcNames: ["atan2j"],
+    funcs: `fn atan2j(y: f32, x: f32) -> f32 { if (x == 0.0 && y == 0.0) { return select(0.0, PI, (bitcast<u32>(x) >> 31u) == 1u) * select(1.0, -1.0, (bitcast<u32>(y) >> 31u) == 1u); } return atan2(y, x); }`,
     code: (w, _p, A) => `{
 v.x += (${w} * (t.x + (${A(2)} * sin(tan((3.0 * t.y))))));
 v.y += (${w} * (t.y + (${A(5)} * sin(tan((3.0 * t.x))))));
@@ -276,6 +326,8 @@ v.y += (${w} * (t.y + (${A(5)} * sin(tan((3.0 * t.x))))));
   "exponential": {
     params: [],
     verified: true, priority: 0, flags: [], types: ["2D"],
+    funcNames: ["atan2j"],
+    funcs: `fn atan2j(y: f32, x: f32) -> f32 { if (x == 0.0 && y == 0.0) { return select(0.0, PI, (bitcast<u32>(x) >> 31u) == 1u) * select(1.0, -1.0, (bitcast<u32>(y) >> 31u) == 1u); } return atan2(y, x); }`,
     code: (w, _p) => `{
 v.x += ((${w} * exp((t.x - 1.0))) * cos((PI * t.y)));
 v.y += ((${w} * exp((t.x - 1.0))) * sin((PI * t.y)));
@@ -284,14 +336,16 @@ v.y += ((${w} * exp((t.x - 1.0))) * sin((PI * t.y)));
   "power": {
     params: [],
     verified: true, priority: 0, flags: [], types: ["2D"],
-    funcNames: ["powc"],
+    funcNames: ["powc","atan2j"],
     funcs: `fn powc(x: f32, y: f32) -> f32 {
   if (x >= 0.0) { return pow(x, y); }
   let yi = round(y);
   if (abs(y - yi) > 1e-6) { return pow(x, y); }
   let m = pow(-x, y);
   return select(m, -m, (i32(yi) & 1) != 0);
-}`,
+}
+
+fn atan2j(y: f32, x: f32) -> f32 { if (x == 0.0 && y == 0.0) { return select(0.0, PI, (bitcast<u32>(x) >> 31u) == 1u) * select(1.0, -1.0, (bitcast<u32>(y) >> 31u) == 1u); } return atan2(y, x); }`,
     code: (w, _p) => `{
 var rinv_: f32 = 1.0 / r;
 v.x += (((${w} * t.y) * rinv_) * powc(r, (t.x * rinv_)));
@@ -301,6 +355,8 @@ v.y += (((${w} * t.x) * rinv_) * powc(r, (t.x * rinv_)));
   "cosine": {
     params: [],
     verified: true, priority: 0, flags: [], types: ["2D"],
+    funcNames: ["atan2j"],
+    funcs: `fn atan2j(y: f32, x: f32) -> f32 { if (x == 0.0 && y == 0.0) { return select(0.0, PI, (bitcast<u32>(x) >> 31u) == 1u) * select(1.0, -1.0, (bitcast<u32>(y) >> 31u) == 1u); } return atan2(y, x); }`,
     code: (w, _p) => `{
 v.x += ((${w} * cos((PI * t.x))) * cosh(t.y));
 v.y += ((-(${w}) * sin((PI * t.x))) * sinh(t.y));
@@ -309,6 +365,8 @@ v.y += ((-(${w}) * sin((PI * t.x))) * sinh(t.y));
   "rings": {
     params: [],
     verified: true, priority: 0, flags: ["affine"], types: ["2D"],
+    funcNames: ["atan2j"],
+    funcs: `fn atan2j(y: f32, x: f32) -> f32 { if (x == 0.0 && y == 0.0) { return select(0.0, PI, (bitcast<u32>(x) >> 31u) == 1u) * select(1.0, -1.0, (bitcast<u32>(y) >> 31u) == 1u); } return atan2(y, x); }`,
     code: (_w, _p, A) => `{
 var dx: f32 = ((${A(2)} * ${A(2)}) + 1.0e-20);
 var r_: f32 = (sqrt(((t.x * t.x) + (t.y * t.y))) + 1.0e-20);
@@ -320,6 +378,8 @@ v.y += ((d * t.x) / r_);
   "fan": {
     params: [],
     verified: true, priority: 0, flags: ["affine"], types: ["2D"],
+    funcNames: ["atan2j"],
+    funcs: `fn atan2j(y: f32, x: f32) -> f32 { if (x == 0.0 && y == 0.0) { return select(0.0, PI, (bitcast<u32>(x) >> 31u) == 1u) * select(1.0, -1.0, (bitcast<u32>(y) >> 31u) == 1u); } return atan2(y, x); }`,
     code: (w, _p, A) => `{
 var t_: f32 = (((PI * ${A(2)}) * ${A(2)}) + 1.0e-20);
 var dx: f32 = select((r * cos((th + (0.5 * t_)))), (r * cos((th - (0.5 * t_)))), (((th + ${A(5)}) % t_) > (0.5 * t_)));
@@ -331,6 +391,8 @@ v.y += (${w} * dy);
   "eyefish": {
     params: [],
     verified: true, priority: 0, flags: [], types: ["2D"],
+    funcNames: ["atan2j"],
+    funcs: `fn atan2j(y: f32, x: f32) -> f32 { if (x == 0.0 && y == 0.0) { return select(0.0, PI, (bitcast<u32>(x) >> 31u) == 1u) * select(1.0, -1.0, (bitcast<u32>(y) >> 31u) == 1u); } return atan2(y, x); }`,
     code: (w, _p) => `{
 v.x += ((${w} * (2.0 / (r + 1.0))) * t.x);
 v.y += ((${w} * (2.0 / (r + 1.0))) * t.y);
@@ -339,6 +401,8 @@ v.y += ((${w} * (2.0 / (r + 1.0))) * t.y);
   "bubble": {
     params: [],
     verified: true, priority: 0, flags: ["3d","z"], types: ["3D"],
+    funcNames: ["atan2j"],
+    funcs: `fn atan2j(y: f32, x: f32) -> f32 { if (x == 0.0 && y == 0.0) { return select(0.0, PI, (bitcast<u32>(x) >> 31u) == 1u) * select(1.0, -1.0, (bitcast<u32>(y) >> 31u) == 1u); } return atan2(y, x); }`,
     code: (w, _p) => `{
 v.x += ((${w} * (4.0 / (r2 + 4.0))) * t.x);
 v.y += ((${w} * (4.0 / (r2 + 4.0))) * t.y);
@@ -348,6 +412,8 @@ pz_ += (${w} * ((8.0 / (r2 + 4.0)) - 1.0));
   "cylinder": {
     params: [],
     verified: true, priority: 0, flags: [], types: ["2D"],
+    funcNames: ["atan2j"],
+    funcs: `fn atan2j(y: f32, x: f32) -> f32 { if (x == 0.0 && y == 0.0) { return select(0.0, PI, (bitcast<u32>(x) >> 31u) == 1u) * select(1.0, -1.0, (bitcast<u32>(y) >> 31u) == 1u); } return atan2(y, x); }`,
     code: (w, _p) => `{
 v.x += (${w} * sin(t.x));
 v.y += (${w} * t.y);
@@ -356,6 +422,8 @@ v.y += (${w} * t.y);
   "noise": {
     params: [],
     verified: true, priority: 0, flags: [], types: ["2D","BLUR"],
+    funcNames: ["atan2j"],
+    funcs: `fn atan2j(y: f32, x: f32) -> f32 { if (x == 0.0 && y == 0.0) { return select(0.0, PI, (bitcast<u32>(x) >> 31u) == 1u) * select(1.0, -1.0, (bitcast<u32>(y) >> 31u) == 1u); } return atan2(y, x); }`,
     code: (w, _p) => `{
 var rn1: f32;
 var rn2: f32;
@@ -368,6 +436,8 @@ v.y += (((${w} * rn1) * t.y) * sin(((2.0 * PI) * rn2)));
   "gaussian_blur": {
     params: [],
     verified: true, priority: 0, flags: [], types: ["BLUR"],
+    funcNames: ["atan2j"],
+    funcs: `fn atan2j(y: f32, x: f32) -> f32 { if (x == 0.0 && y == 0.0) { return select(0.0, PI, (bitcast<u32>(x) >> 31u) == 1u) * select(1.0, -1.0, (bitcast<u32>(y) >> 31u) == 1u); } return atan2(y, x); }`,
     code: (w, _p) => `{
 var rn1: f32;
 rn1 = ((((rnd(rs) + rnd(rs)) + rnd(rs)) + rnd(rs)) - 2.0);
@@ -380,6 +450,8 @@ v.y += ((${w} * rn1) * sin(((2.0 * PI) * rn2)));
   "pre_blur": {
     params: [],
     verified: true, priority: -1, flags: [], types: ["BLUR","PRE"],
+    funcNames: ["atan2j"],
+    funcs: `fn atan2j(y: f32, x: f32) -> f32 { if (x == 0.0 && y == 0.0) { return select(0.0, PI, (bitcast<u32>(x) >> 31u) == 1u) * select(1.0, -1.0, (bitcast<u32>(y) >> 31u) == 1u); } return atan2(y, x); }`,
     code: (w, _p) => `{
 var rinv_: f32 = 1.0 / r;
 var rndG: f32 = (${w} * ((((((rnd(rs) + rnd(rs)) + rnd(rs)) + rnd(rs)) + rnd(rs)) + rnd(rs)) - 3.0));
@@ -389,7 +461,7 @@ t.y += (rndG * sin(rndA));
 r2 = ((t.x * t.x) + (t.y * t.y));
 r = sqrt(r2);
 rinv_ = (1.0 / r);
-th = atan2(t.x, t.y);
+th = atan2j(t.x, t.y);
 ph = ((0.5 * PI) - th);
 if ((ph > PI)) {
   ph -= (2.0 * PI);
@@ -399,6 +471,8 @@ if ((ph > PI)) {
   "zblur": {
     params: [],
     verified: true, priority: 0, flags: ["z"], types: ["ZTRANSFORM","BLUR"],
+    funcNames: ["atan2j"],
+    funcs: `fn atan2j(y: f32, x: f32) -> f32 { if (x == 0.0 && y == 0.0) { return select(0.0, PI, (bitcast<u32>(x) >> 31u) == 1u) * select(1.0, -1.0, (bitcast<u32>(y) >> 31u) == 1u); } return atan2(y, x); }`,
     code: (w, _p) => `{
 pz_ += (${w} * ((((rnd(rs) + rnd(rs)) + rnd(rs)) + rnd(rs)) - 2.0));
 }`,
@@ -406,6 +480,8 @@ pz_ += (${w} * ((((rnd(rs) + rnd(rs)) + rnd(rs)) + rnd(rs)) - 2.0));
   "blur3D": {
     params: [],
     verified: true, priority: 0, flags: ["z"], types: ["BLUR"],
+    funcNames: ["atan2j"],
+    funcs: `fn atan2j(y: f32, x: f32) -> f32 { if (x == 0.0 && y == 0.0) { return select(0.0, PI, (bitcast<u32>(x) >> 31u) == 1u) * select(1.0, -1.0, (bitcast<u32>(y) >> 31u) == 1u); } return atan2(y, x); }`,
     code: (w, _p) => `{
 var cosa: f32;
 var sina: f32;
@@ -424,6 +500,8 @@ pz_ += (rndG * cosb);
   "pre_zscale": {
     params: [],
     verified: true, priority: -1, flags: ["z"], types: ["ZTRANSFORM","PRE"],
+    funcNames: ["atan2j"],
+    funcs: `fn atan2j(y: f32, x: f32) -> f32 { if (x == 0.0 && y == 0.0) { return select(0.0, PI, (bitcast<u32>(x) >> 31u) == 1u) * select(1.0, -1.0, (bitcast<u32>(y) >> 31u) == 1u); } return atan2(y, x); }`,
     code: (w, _p) => `{
 z_ *= ${w};
 }`,
@@ -431,6 +509,8 @@ z_ *= ${w};
   "pre_ztranslate": {
     params: [],
     verified: true, priority: -1, flags: ["z"], types: ["ZTRANSFORM","PRE"],
+    funcNames: ["atan2j"],
+    funcs: `fn atan2j(y: f32, x: f32) -> f32 { if (x == 0.0 && y == 0.0) { return select(0.0, PI, (bitcast<u32>(x) >> 31u) == 1u) * select(1.0, -1.0, (bitcast<u32>(y) >> 31u) == 1u); } return atan2(y, x); }`,
     code: (w, _p) => `{
 z_ += ${w};
 }`,
@@ -438,6 +518,8 @@ z_ += ${w};
   "pre_rotate_x": {
     params: [],
     verified: true, priority: -1, flags: ["3d","z"], types: ["3D","PRE"],
+    funcNames: ["atan2j"],
+    funcs: `fn atan2j(y: f32, x: f32) -> f32 { if (x == 0.0 && y == 0.0) { return select(0.0, PI, (bitcast<u32>(x) >> 31u) == 1u) * select(1.0, -1.0, (bitcast<u32>(y) >> 31u) == 1u); } return atan2(y, x); }`,
     code: (w, _p) => `{
 var rinv_: f32 = 1.0 / r;
 var rx_cos: f32;
@@ -450,7 +532,7 @@ z_ = _z;
 r2 = ((t.x * t.x) + (t.y * t.y));
 r = sqrt(r2);
 rinv_ = (1.0 / r);
-th = atan2(t.x, t.y);
+th = atan2j(t.x, t.y);
 ph = ((0.5 * PI) - th);
 if ((ph > PI)) {
   ph -= (2.0 * PI);
@@ -460,6 +542,8 @@ if ((ph > PI)) {
   "pre_rotate_y": {
     params: [],
     verified: true, priority: -1, flags: ["z"], types: ["2D","PRE"],
+    funcNames: ["atan2j"],
+    funcs: `fn atan2j(y: f32, x: f32) -> f32 { if (x == 0.0 && y == 0.0) { return select(0.0, PI, (bitcast<u32>(x) >> 31u) == 1u) * select(1.0, -1.0, (bitcast<u32>(y) >> 31u) == 1u); } return atan2(y, x); }`,
     code: (w, _p) => `{
 var rinv_: f32 = 1.0 / r;
 var ry_cos: f32;
@@ -472,7 +556,7 @@ t.x = x;
 r2 = ((t.x * t.x) + (t.y * t.y));
 r = sqrt(r2);
 rinv_ = (1.0 / r);
-th = atan2(t.x, t.y);
+th = atan2j(t.x, t.y);
 ph = ((0.5 * PI) - th);
 if ((ph > PI)) {
   ph -= (2.0 * PI);
@@ -482,6 +566,8 @@ if ((ph > PI)) {
   "post_rotate_x": {
     params: [],
     verified: true, priority: 1, flags: ["3d","z"], types: ["3D","POST"],
+    funcNames: ["atan2j"],
+    funcs: `fn atan2j(y: f32, x: f32) -> f32 { if (x == 0.0 && y == 0.0) { return select(0.0, PI, (bitcast<u32>(x) >> 31u) == 1u) * select(1.0, -1.0, (bitcast<u32>(y) >> 31u) == 1u); } return atan2(y, x); }`,
     code: (w, _p) => `{
 var px_cos: f32;
 var px_sin: f32;
@@ -495,6 +581,8 @@ pz_ = _z;
   "post_rotate_y": {
     params: [],
     verified: true, priority: 1, flags: ["3d","z"], types: ["3D","POST"],
+    funcNames: ["atan2j"],
+    funcs: `fn atan2j(y: f32, x: f32) -> f32 { if (x == 0.0 && y == 0.0) { return select(0.0, PI, (bitcast<u32>(x) >> 31u) == 1u) * select(1.0, -1.0, (bitcast<u32>(y) >> 31u) == 1u); } return atan2(y, x); }`,
     code: (w, _p) => `{
 var py_cos: f32;
 var py_sin: f32;
@@ -508,6 +596,8 @@ v.x = x;
   "zcone": {
     params: [],
     verified: true, priority: 0, flags: ["z"], types: ["ZTRANSFORM"],
+    funcNames: ["atan2j"],
+    funcs: `fn atan2j(y: f32, x: f32) -> f32 { if (x == 0.0 && y == 0.0) { return select(0.0, PI, (bitcast<u32>(x) >> 31u) == 1u) * select(1.0, -1.0, (bitcast<u32>(y) >> 31u) == 1u); } return atan2(y, x); }`,
     code: (w, _p) => `{
 pz_ += (${w} * r);
 }`,
@@ -515,6 +605,8 @@ pz_ += (${w} * r);
   "hemisphere": {
     params: [],
     verified: true, priority: 0, flags: ["3d","z"], types: ["3D"],
+    funcNames: ["atan2j"],
+    funcs: `fn atan2j(y: f32, x: f32) -> f32 { if (x == 0.0 && y == 0.0) { return select(0.0, PI, (bitcast<u32>(x) >> 31u) == 1u) * select(1.0, -1.0, (bitcast<u32>(y) >> 31u) == 1u); } return atan2(y, x); }`,
     code: (w, _p) => `{
 var r_: f32 = (${w} / sqrt((((t.x * t.x) + (t.y * t.y)) + 1.0)));
 v.x += (r_ * t.x);
@@ -525,36 +617,48 @@ pz_ += r_;
   "rings2": {
     params: [{ name: "val", def: 0.01 }],
     verified: true, priority: 0, flags: [], types: ["2D"],
+    funcNames: ["atan2j"],
+    funcs: `fn atan2j(y: f32, x: f32) -> f32 { if (x == 0.0 && y == 0.0) { return select(0.0, PI, (bitcast<u32>(x) >> 31u) == 1u) * select(1.0, -1.0, (bitcast<u32>(y) >> 31u) == 1u); } return atan2(y, x); }`,
     code: (w, p) => `{
+loop {
 var l: f32 = sqrt(((t.x * t.x) + (t.y * t.y)));
 var _dx: f32 = ((${p[0]} * ${p[0]}) + 1.0e-20);
 if (((_dx == 0.0) || (l == 0.0))) {
-  return;
+  break;
 }
 var r_: f32 = (${w} * (2.0 - (_dx * (((f32(i32((((l / _dx) + 1.0) / 2.0))) * 2.0) / l) + 1.0))));
 v.x += (r_ * t.x);
 v.y += (r_ * t.y);
+break;
+}
 }`,
   },
   "rings3": {
     params: [{ name: "val", def: 0.01 }, { name: "n", def: 0 }],
     verified: true, priority: 0, flags: [], types: ["2D"],
+    funcNames: ["atan2j"],
+    funcs: `fn atan2j(y: f32, x: f32) -> f32 { if (x == 0.0 && y == 0.0) { return select(0.0, PI, (bitcast<u32>(x) >> 31u) == 1u) * select(1.0, -1.0, (bitcast<u32>(y) >> 31u) == 1u); } return atan2(y, x); }`,
     code: (w, p) => `{
+loop {
 var l: f32 = sqrt(((t.x * t.x) + (t.y * t.y)));
 var _dx: f32 = ((${p[0]} * ${p[0]}) + 1.0e-20);
 var c: f32 = (2.0 * (_dx - (_dx * _dx)));
 if (((_dx == 0.0) || (l == 0.0))) {
-  return;
+  break;
 }
 var k: f32 = f32(i32((((l / _dx) + 1.0) / 2.0)));
 var r_: f32 = (${w} * ((2.0 - (_dx * (((k * 2.0) / l) + 1.0))) - ((${p[1]} * ((k * c) - 1.0)) / l)));
 v.x += (r_ * t.x);
 v.y += (r_ * t.y);
+break;
+}
 }`,
   },
   "rectangles": {
     params: [{ name: "x", def: 0.3 }, { name: "y", def: 0.2 }],
     verified: true, priority: 0, flags: [], types: ["2D"],
+    funcNames: ["atan2j"],
+    funcs: `fn atan2j(y: f32, x: f32) -> f32 { if (x == 0.0 && y == 0.0) { return select(0.0, PI, (bitcast<u32>(x) >> 31u) == 1u) * select(1.0, -1.0, (bitcast<u32>(y) >> 31u) == 1u); } return atan2(y, x); }`,
     code: (w, p) => `{
 v.x += select((${w} * ((((2.0 * floor((t.x / ${p[0]}))) + 1.0) * ${p[0]}) - t.x)), (${w} * t.x), (${p[0]} == 0.0));
 v.y += select((${w} * ((((2.0 * floor((t.y / ${p[1]}))) + 1.0) * ${p[1]}) - t.y)), (${w} * t.y), (${p[1]} == 0.0));
@@ -563,6 +667,8 @@ v.y += select((${w} * ((((2.0 * floor((t.y / ${p[1]}))) + 1.0) * ${p[1]}) - t.y)
   "pdj": {
     params: [{ name: "a", def: 1 }, { name: "b", def: 2 }, { name: "c", def: 3 }, { name: "d", def: 4 }],
     verified: true, priority: 0, flags: [], types: ["2D"],
+    funcNames: ["atan2j"],
+    funcs: `fn atan2j(y: f32, x: f32) -> f32 { if (x == 0.0 && y == 0.0) { return select(0.0, PI, (bitcast<u32>(x) >> 31u) == 1u) * select(1.0, -1.0, (bitcast<u32>(y) >> 31u) == 1u); } return atan2(y, x); }`,
     code: (w, p) => `{
 v.x += (${w} * (sin((${p[0]} * t.y)) - cos((${p[1]} * t.x))));
 v.y += (${w} * (sin((${p[2]} * t.x)) - cos((${p[3]} * t.y))));
@@ -571,14 +677,16 @@ v.y += (${w} * (sin((${p[2]} * t.x)) - cos((${p[3]} * t.y))));
   "juliascope": {
     params: [{ name: "power", def: 3 }, { name: "dist", def: 1 }],
     verified: true, priority: 0, flags: [], types: ["2D"],
-    funcNames: ["powc"],
+    funcNames: ["powc","atan2j"],
     funcs: `fn powc(x: f32, y: f32) -> f32 {
   if (x >= 0.0) { return pow(x, y); }
   let yi = round(y);
   if (abs(y - yi) > 1e-6) { return pow(x, y); }
   let m = pow(-x, y);
   return select(m, -m, (i32(yi) & 1) != 0);
-}`,
+}
+
+fn atan2j(y: f32, x: f32) -> f32 { if (x == 0.0 && y == 0.0) { return select(0.0, PI, (bitcast<u32>(x) >> 31u) == 1u) * select(1.0, -1.0, (bitcast<u32>(y) >> 31u) == 1u); } return atan2(y, x); }`,
     code: (w, p) => `{
 var rn1: f32;
 rn1 = rnd(rs);
@@ -593,7 +701,7 @@ v.y += ((${w} * rnew) * sin(t_));
   "julia3D": {
     params: [{ name: "power", def: 3 }],
     verified: true, priority: 0, flags: ["3d","z"], types: ["3D"],
-    funcNames: ["roundc","powc"],
+    funcNames: ["roundc","powc","atan2j"],
     funcs: `fn roundc(x: f32) -> f32 { return sign(x) * floor(abs(x) + 0.5); }
 
 fn powc(x: f32, y: f32) -> f32 {
@@ -602,7 +710,9 @@ fn powc(x: f32, y: f32) -> f32 {
   if (abs(y - yi) > 1e-6) { return pow(x, y); }
   let m = pow(-x, y);
   return select(m, -m, (i32(yi) & 1) != 0);
-}`,
+}
+
+fn atan2j(y: f32, x: f32) -> f32 { if (x == 0.0 && y == 0.0) { return select(0.0, PI, (bitcast<u32>(x) >> 31u) == 1u) * select(1.0, -1.0, (bitcast<u32>(y) >> 31u) == 1u); } return atan2(y, x); }`,
     code: (w, p) => `{
 var n: f32 = f32(i32(roundc(f32(i32(${p[0]})))));
 n = select(n, 1.0, (n == 0.0));
@@ -613,8 +723,8 @@ var r_: f32 = (${w} * powc((r2 + (_z * _z)), cn));
 var tmp: f32 = (r_ * r);
 var cosa: f32;
 var sina: f32;
-sina = sin(((atan2(t.y, t.x) + ((2.0 * PI) * f32(i32(roundc(((rnd(rs) * absn) - 0.5)))))) / n));
-cosa = cos(((atan2(t.y, t.x) + ((2.0 * PI) * f32(i32(roundc(((rnd(rs) * absn) - 0.5)))))) / n));
+sina = sin(((atan2j(t.y, t.x) + ((2.0 * PI) * f32(i32(roundc(((rnd(rs) * absn) - 0.5)))))) / n));
+cosa = cos(((atan2j(t.y, t.x) + ((2.0 * PI) * f32(i32(roundc(((rnd(rs) * absn) - 0.5)))))) / n));
 v.x += (tmp * cosa);
 v.y += (tmp * sina);
 pz_ += (r_ * _z);
@@ -623,7 +733,7 @@ pz_ += (r_ * _z);
   "julia3Dz": {
     params: [{ name: "power", def: 3 }],
     verified: true, priority: 0, flags: ["3d","z"], types: ["3D"],
-    funcNames: ["roundc","powc"],
+    funcNames: ["roundc","powc","atan2j"],
     funcs: `fn roundc(x: f32) -> f32 { return sign(x) * floor(abs(x) + 0.5); }
 
 fn powc(x: f32, y: f32) -> f32 {
@@ -632,7 +742,9 @@ fn powc(x: f32, y: f32) -> f32 {
   if (abs(y - yi) > 1e-6) { return pow(x, y); }
   let m = pow(-x, y);
   return select(m, -m, (i32(yi) & 1) != 0);
-}`,
+}
+
+fn atan2j(y: f32, x: f32) -> f32 { if (x == 0.0 && y == 0.0) { return select(0.0, PI, (bitcast<u32>(x) >> 31u) == 1u) * select(1.0, -1.0, (bitcast<u32>(y) >> 31u) == 1u); } return atan2(y, x); }`,
     code: (w, p) => `{
 var power: i32 = i32(roundc(f32(i32(${p[0]}))));
 var absPower: f32;
@@ -642,7 +754,7 @@ cPower = ((1.0 / f32(power)) * 0.5);
 var r2d: f32 = ((t.x * t.x) + (t.y * t.y));
 var r_: f32 = (${w} * powc(r2d, cPower));
 var rnd_: i32 = i32((rnd(rs) * absPower));
-var angle: f32 = ((atan2(t.y, t.x) + ((2.0 * PI) * f32(rnd_))) / f32(power));
+var angle: f32 = ((atan2j(t.y, t.x) + ((2.0 * PI) * f32(rnd_))) / f32(power));
 var sina: f32 = sin(angle);
 var cosa: f32 = cos(angle);
 v.x += (r_ * cosa);
@@ -653,11 +765,13 @@ pz_ += ((r_ * z_) / (sqrt(r2d) * absPower));
   "fan2": {
     params: [{ name: "x", def: 0.5 }, { name: "y", def: 1.2 }],
     verified: true, priority: 0, flags: [], types: ["2D"],
+    funcNames: ["atan2j"],
+    funcs: `fn atan2j(y: f32, x: f32) -> f32 { if (x == 0.0 && y == 0.0) { return select(0.0, PI, (bitcast<u32>(x) >> 31u) == 1u) * select(1.0, -1.0, (bitcast<u32>(y) >> 31u) == 1u); } return atan2(y, x); }`,
     code: (w, p) => `{
 var r_: f32 = sqrt(((t.x * t.x) + (t.y * t.y)));
 var angle: f32;
 if (((((t.x < -0.000001) || (t.x > 0.000001)) || (t.y < -0.000001)) || (t.y > 0.000001))) {
-  angle = atan2(t.x, t.y);
+  angle = atan2j(t.x, t.y);
 } else {
   angle = 0.0;
 }
@@ -678,6 +792,8 @@ v.y += ((${w} * r_) * cos(a));
   "radial_blur": {
     params: [{ name: "angle", def: 0.5 }],
     verified: true, priority: 0, flags: [], types: ["BLUR"],
+    funcNames: ["atan2j"],
+    funcs: `fn atan2j(y: f32, x: f32) -> f32 { if (x == 0.0 && y == 0.0) { return select(0.0, PI, (bitcast<u32>(x) >> 31u) == 1u) * select(1.0, -1.0, (bitcast<u32>(y) >> 31u) == 1u); } return atan2(y, x); }`,
     code: (w, p) => `{
 var rndG: f32 = ((((rnd(rs) + rnd(rs)) + rnd(rs)) + rnd(rs)) - 2.0);
 var sina: f32;
@@ -687,7 +803,7 @@ cosa = cos(((${p[0]} * PI) * 0.5));
 var spin: f32 = (${w} * sina);
 var zoom: f32 = (${w} * cosa);
 var ra: f32 = sqrt(((t.x * t.x) + (t.y * t.y)));
-var alpha: f32 = (atan2(t.y, t.x) + (spin * rndG));
+var alpha: f32 = (atan2j(t.y, t.x) + (spin * rndG));
 sina = sin(alpha);
 cosa = cos(alpha);
 var rz: f32 = ((zoom * rndG) - 1.0);
@@ -698,6 +814,8 @@ v.y += ((ra * sina) + (rz * t.y));
   "spherical3D": {
     params: [],
     verified: true, priority: 0, flags: ["3d","z"], types: ["3D"],
+    funcNames: ["atan2j"],
+    funcs: `fn atan2j(y: f32, x: f32) -> f32 { if (x == 0.0 && y == 0.0) { return select(0.0, PI, (bitcast<u32>(x) >> 31u) == 1u) * select(1.0, -1.0, (bitcast<u32>(y) >> 31u) == 1u); } return atan2(y, x); }`,
     code: (w, _p) => `{
 var T: f32 = (((t.x * t.x) + (t.y * t.y)) + (z_ * z_));
 var r_: f32 = (${w} / T);
@@ -709,6 +827,8 @@ pz_ += (r_ * z_);
   "blob": {
     params: [{ name: "low", def: 0.3 }, { name: "high", def: 1.2 }, { name: "waves", def: 6 }],
     verified: true, priority: 0, flags: [], types: ["2D"],
+    funcNames: ["atan2j"],
+    funcs: `fn atan2j(y: f32, x: f32) -> f32 { if (x == 0.0 && y == 0.0) { return select(0.0, PI, (bitcast<u32>(x) >> 31u) == 1u) * select(1.0, -1.0, (bitcast<u32>(y) >> 31u) == 1u); } return atan2(y, x); }`,
     code: (w, p) => `{
 v.x += ((${w} * (${p[0]} + (((${p[1]} - ${p[0]}) * 0.5) * (sin((${p[2]} * th)) + 1.0)))) * t.x);
 v.y += ((${w} * (${p[0]} + (((${p[1]} - ${p[0]}) * 0.5) * (sin((${p[2]} * th)) + 1.0)))) * t.y);
@@ -717,8 +837,10 @@ v.y += ((${w} * (${p[0]} + (((${p[1]} - ${p[0]}) * 0.5) * (sin((${p[2]} * th)) +
   "blob3D": {
     params: [{ name: "low", def: 0.3 }, { name: "high", def: 1.2 }, { name: "waves", def: 6 }],
     verified: true, priority: 0, flags: ["3d","z"], types: ["3D"],
+    funcNames: ["atan2j"],
+    funcs: `fn atan2j(y: f32, x: f32) -> f32 { if (x == 0.0 && y == 0.0) { return select(0.0, PI, (bitcast<u32>(x) >> 31u) == 1u) * select(1.0, -1.0, (bitcast<u32>(y) >> 31u) == 1u); } return atan2(y, x); }`,
     code: (w, p) => `{
-var a: f32 = atan2(t.x, t.y);
+var a: f32 = atan2j(t.x, t.y);
 var r_: f32 = sqrt(((t.x * t.x) + (t.y * t.y)));
 r_ = (r_ * (${p[0]} + ((${p[1]} - ${p[0]}) * (0.5 + (0.5 * sin((${p[2]} * a)))))));
 var nx: f32 = (sin(a) * r_);
@@ -732,6 +854,8 @@ pz_ += (${w} * nz);
   "perspective": {
     params: [{ name: "angle", def: 0.62 }, { name: "dist", def: 2.2 }],
     verified: true, priority: 0, flags: [], types: ["2D"],
+    funcNames: ["atan2j"],
+    funcs: `fn atan2j(y: f32, x: f32) -> f32 { if (x == 0.0 && y == 0.0) { return select(0.0, PI, (bitcast<u32>(x) >> 31u) == 1u) * select(1.0, -1.0, (bitcast<u32>(y) >> 31u) == 1u); } return atan2(y, x); }`,
     code: (w, p) => `{
 var _vsin: f32 = sin(((${p[0]} * PI) / 2.0));
 var _vfcos: f32 = (${p[1]} * cos(((${p[0]} * PI) / 2.0)));
@@ -746,6 +870,8 @@ if ((_d != 0.0)) {
   "pie": {
     params: [{ name: "slices", def: 6 }, { name: "rotation", def: 0 }, { name: "thickness", def: 0.5 }],
     verified: true, priority: 0, flags: [], types: ["BASE_SHAPE"],
+    funcNames: ["atan2j"],
+    funcs: `fn atan2j(y: f32, x: f32) -> f32 { if (x == 0.0 && y == 0.0) { return select(0.0, PI, (bitcast<u32>(x) >> 31u) == 1u) * select(1.0, -1.0, (bitcast<u32>(y) >> 31u) == 1u); } return atan2(y, x); }`,
     code: (w, p) => `{
 var t1: i32 = i32(((rnd(rs) * ${p[0]}) + 0.5));
 var t2: f32 = (${p[1]} + (((2.0 * PI) * (f32(t1) + (rnd(rs) * ${p[2]}))) / ${p[0]}));
@@ -757,6 +883,8 @@ v.y += (rn * sin(t2));
   "pie3D": {
     params: [{ name: "slices", def: 7 }, { name: "rotation", def: 0 }, { name: "thickness", def: 0.5 }],
     verified: true, priority: 0, flags: ["z"], types: ["BASE_SHAPE"],
+    funcNames: ["atan2j"],
+    funcs: `fn atan2j(y: f32, x: f32) -> f32 { if (x == 0.0 && y == 0.0) { return select(0.0, PI, (bitcast<u32>(x) >> 31u) == 1u) * select(1.0, -1.0, (bitcast<u32>(y) >> 31u) == 1u); } return atan2(y, x); }`,
     code: (w, p) => `{
 var slices: f32 = ${p[0]};
 var sl: i32 = i32(((rnd(rs) * slices) + 0.5));
@@ -774,6 +902,8 @@ pz_ += (r_ * sin(r_));
   "butterfly": {
     params: [],
     verified: true, priority: 0, flags: [], types: ["2D"],
+    funcNames: ["atan2j"],
+    funcs: `fn atan2j(y: f32, x: f32) -> f32 { if (x == 0.0 && y == 0.0) { return select(0.0, PI, (bitcast<u32>(x) >> 31u) == 1u) * select(1.0, -1.0, (bitcast<u32>(y) >> 31u) == 1u); } return atan2(y, x); }`,
     code: (w, _p) => `{
 var wx: f32 = (${w} * (4.0 * inverseSqrt((3.0 * PI))));
 var r0: f32 = (wx * sqrt((abs((t.y * t.x)) / (((t.x * t.x) + ((4.0 * t.y) * t.y)) + 1.0e-20))));
@@ -784,6 +914,8 @@ v.y += ((r0 * 2.0) * t.y);
   "butterfly3D": {
     params: [],
     verified: true, priority: 0, flags: ["3d","z"], types: ["3D"],
+    funcNames: ["atan2j"],
+    funcs: `fn atan2j(y: f32, x: f32) -> f32 { if (x == 0.0 && y == 0.0) { return select(0.0, PI, (bitcast<u32>(x) >> 31u) == 1u) * select(1.0, -1.0, (bitcast<u32>(y) >> 31u) == 1u); } return atan2(y, x); }`,
     code: (w, _p) => `{
 var wx: f32 = (${w} * 1.3029400317411197);
 var y2: f32 = (t.y * 2.0);
@@ -796,6 +928,8 @@ pz_ += (((r_ * abs(y2)) * sqrt(((t.x * t.x) + (t.y * t.y)))) / 4.0);
   "arch": {
     params: [],
     verified: true, priority: 0, flags: [], types: ["2D"],
+    funcNames: ["atan2j"],
+    funcs: `fn atan2j(y: f32, x: f32) -> f32 { if (x == 0.0 && y == 0.0) { return select(0.0, PI, (bitcast<u32>(x) >> 31u) == 1u) * select(1.0, -1.0, (bitcast<u32>(y) >> 31u) == 1u); } return atan2(y, x); }`,
     code: (w, _p) => `{
 var rn: f32;
 rn = rnd(rs);
@@ -807,6 +941,8 @@ v.y += ((v_ * sin(((rn * PI) * v_))) * tan(((rn * PI) * v_)));
   "square": {
     params: [],
     verified: true, priority: 0, flags: [], types: ["BASE_SHAPE"],
+    funcNames: ["atan2j"],
+    funcs: `fn atan2j(y: f32, x: f32) -> f32 { if (x == 0.0 && y == 0.0) { return select(0.0, PI, (bitcast<u32>(x) >> 31u) == 1u) * select(1.0, -1.0, (bitcast<u32>(y) >> 31u) == 1u); } return atan2(y, x); }`,
     code: (w, _p) => `{
 var rn1: f32;
 var rn2: f32;
@@ -819,6 +955,8 @@ v.y += (${w} * (rn2 - 0.5));
   "square3D": {
     params: [],
     verified: true, priority: 0, flags: ["z"], types: ["BASE_SHAPE"],
+    funcNames: ["atan2j"],
+    funcs: `fn atan2j(y: f32, x: f32) -> f32 { if (x == 0.0 && y == 0.0) { return select(0.0, PI, (bitcast<u32>(x) >> 31u) == 1u) * select(1.0, -1.0, (bitcast<u32>(y) >> 31u) == 1u); } return atan2(y, x); }`,
     code: (w, _p) => `{
 v.x += (${w} * (rnd(rs) - 0.5));
 v.y += (${w} * (rnd(rs) - 0.5));
@@ -828,6 +966,8 @@ pz_ += (${w} * (rnd(rs) - 0.5));
   "tangent": {
     params: [],
     verified: true, priority: 0, flags: [], types: ["2D"],
+    funcNames: ["atan2j"],
+    funcs: `fn atan2j(y: f32, x: f32) -> f32 { if (x == 0.0 && y == 0.0) { return select(0.0, PI, (bitcast<u32>(x) >> 31u) == 1u) * select(1.0, -1.0, (bitcast<u32>(y) >> 31u) == 1u); } return atan2(y, x); }`,
     code: (w, _p) => `{
 v.x += (${w} * (sin(t.x) / cos(t.y)));
 v.y += (${w} * tan(t.y));
@@ -836,6 +976,8 @@ v.y += (${w} * tan(t.y));
   "tangent3D": {
     params: [],
     verified: true, priority: 0, flags: ["3d","z"], types: ["3D"],
+    funcNames: ["atan2j"],
+    funcs: `fn atan2j(y: f32, x: f32) -> f32 { if (x == 0.0 && y == 0.0) { return select(0.0, PI, (bitcast<u32>(x) >> 31u) == 1u) * select(1.0, -1.0, (bitcast<u32>(y) >> 31u) == 1u); } return atan2(y, x); }`,
     code: (w, _p) => `{
 v.x += ((${w} * sin(t.x)) / cos(t.y));
 v.y += (${w} * tan(t.y));
@@ -845,6 +987,8 @@ pz_ += (${w} * tan(t.x));
   "blade": {
     params: [],
     verified: true, priority: 0, flags: [], types: ["2D"],
+    funcNames: ["atan2j"],
+    funcs: `fn atan2j(y: f32, x: f32) -> f32 { if (x == 0.0 && y == 0.0) { return select(0.0, PI, (bitcast<u32>(x) >> 31u) == 1u) * select(1.0, -1.0, (bitcast<u32>(y) >> 31u) == 1u); } return atan2(y, x); }`,
     code: (w, _p) => `{
 var rn: f32;
 rn = rnd(rs);
@@ -856,6 +1000,8 @@ v.y += ((v_ * t.x) * (cos(((rn * r) * v_)) - sin(((rn * r) * v_))));
   "blade3D": {
     params: [],
     verified: true, priority: 0, flags: ["3d","z"], types: ["3D"],
+    funcNames: ["atan2j"],
+    funcs: `fn atan2j(y: f32, x: f32) -> f32 { if (x == 0.0 && y == 0.0) { return select(0.0, PI, (bitcast<u32>(x) >> 31u) == 1u) * select(1.0, -1.0, (bitcast<u32>(y) >> 31u) == 1u); } return atan2(y, x); }`,
     code: (w, _p) => `{
 var r_: f32 = ((rnd(rs) * ${w}) * r);
 var cosr: f32;
@@ -870,6 +1016,8 @@ pz_ += ((${w} * t.y) * (sinr - cosr));
   "cross": {
     params: [],
     verified: true, priority: 0, flags: [], types: ["2D"],
+    funcNames: ["atan2j"],
+    funcs: `fn atan2j(y: f32, x: f32) -> f32 { if (x == 0.0 && y == 0.0) { return select(0.0, PI, (bitcast<u32>(x) >> 31u) == 1u) * select(1.0, -1.0, (bitcast<u32>(y) >> 31u) == 1u); } return atan2(y, x); }`,
     code: (w, _p) => `{
 var oddr: f32 = ((t.x * t.x) - (t.y * t.y));
 oddr *= oddr;
@@ -881,8 +1029,10 @@ v.y += ((${w} * sqrt((1.0 / oddr))) * t.y);
   "bipolar": {
     params: [{ name: "shift", def: 0 }],
     verified: true, priority: 0, flags: [], types: ["2D"],
+    funcNames: ["atan2j"],
+    funcs: `fn atan2j(y: f32, x: f32) -> f32 { if (x == 0.0 && y == 0.0) { return select(0.0, PI, (bitcast<u32>(x) >> 31u) == 1u) * select(1.0, -1.0, (bitcast<u32>(y) >> 31u) == 1u); } return atan2(y, x); }`,
     code: (w, p) => `{
-var y0: f32 = ((0.5 * atan2((2.0 * t.y), (r2 - 1.0))) - ((0.5 * PI) * ${p[0]}));
+var y0: f32 = ((0.5 * atan2j((2.0 * t.y), (r2 - 1.0))) - ((0.5 * PI) * ${p[0]}));
 if ((y0 > (0.5 * PI))) {
   y0 = ((-0.5 * PI) + ((y0 + (0.5 * PI)) % PI));
 } else if ((y0 < (-0.5 * PI))) {
@@ -895,6 +1045,8 @@ v.y += (((${w} * y0) * 2.0) / PI);
   "wedge": {
     params: [{ name: "angle", def: 1.5707963267948966 }, { name: "hole", def: 0 }, { name: "count", def: 1 }, { name: "swirl", def: 0.1 }],
     verified: true, priority: 0, flags: [], types: ["2D"],
+    funcNames: ["atan2j"],
+    funcs: `fn atan2j(y: f32, x: f32) -> f32 { if (x == 0.0 && y == 0.0) { return select(0.0, PI, (bitcast<u32>(x) >> 31u) == 1u) * select(1.0, -1.0, (bitcast<u32>(y) >> 31u) == 1u); } return atan2(y, x); }`,
     code: (w, p) => `{
 var a: f32 = (ph + (${p[3]} * r));
 var c: f32 = floor(((((f32(i32(${p[2]})) * a) + PI) * 0.5) / PI));
@@ -907,6 +1059,8 @@ v.y += ((${w} * (r + ${p[1]})) * sin(a));
   "scry": {
     params: [],
     verified: true, priority: 0, flags: [], types: ["2D"],
+    funcNames: ["atan2j"],
+    funcs: `fn atan2j(y: f32, x: f32) -> f32 { if (x == 0.0 && y == 0.0) { return select(0.0, PI, (bitcast<u32>(x) >> 31u) == 1u) * select(1.0, -1.0, (bitcast<u32>(y) >> 31u) == 1u); } return atan2(y, x); }`,
     code: (w, _p) => `{
 var r0: f32 = (1.0 / (r * (r2 + (1.0 / (${w} + 1.0e-20)))));
 v.x += (t.x * r0);
@@ -916,6 +1070,8 @@ v.y += (t.y * r0);
   "waves2": {
     params: [{ name: "scalex", def: 0.25 }, { name: "scaley", def: 0.5 }, { name: "freqx", def: 1.5707963267948966 }, { name: "freqy", def: 0.7853981633974483 }],
     verified: true, priority: 0, flags: [], types: ["2D"],
+    funcNames: ["atan2j"],
+    funcs: `fn atan2j(y: f32, x: f32) -> f32 { if (x == 0.0 && y == 0.0) { return select(0.0, PI, (bitcast<u32>(x) >> 31u) == 1u) * select(1.0, -1.0, (bitcast<u32>(y) >> 31u) == 1u); } return atan2(y, x); }`,
     code: (w, p) => `{
 v.x += (${w} * (t.x + (${p[0]} * sin((t.y * ${p[2]})))));
 v.y += (${w} * (t.y + (${p[1]} * sin((t.x * ${p[3]})))));
@@ -924,6 +1080,8 @@ v.y += (${w} * (t.y + (${p[1]} * sin((t.x * ${p[3]})))));
   "polar2": {
     params: [],
     verified: true, priority: 0, flags: [], types: ["2D"],
+    funcNames: ["atan2j"],
+    funcs: `fn atan2j(y: f32, x: f32) -> f32 { if (x == 0.0 && y == 0.0) { return select(0.0, PI, (bitcast<u32>(x) >> 31u) == 1u) * select(1.0, -1.0, (bitcast<u32>(y) >> 31u) == 1u); } return atan2(y, x); }`,
     code: (w, _p) => `{
 var p2v: f32 = (${w} / PI);
 v.x += (p2v * th);
@@ -933,6 +1091,8 @@ v.y += ((p2v / 2.0) * log(r2));
   "popcorn2": {
     params: [{ name: "x", def: 1 }, { name: "y", def: 0.5 }, { name: "c", def: 1.5 }],
     verified: true, priority: 0, flags: [], types: ["2D"],
+    funcNames: ["atan2j"],
+    funcs: `fn atan2j(y: f32, x: f32) -> f32 { if (x == 0.0 && y == 0.0) { return select(0.0, PI, (bitcast<u32>(x) >> 31u) == 1u) * select(1.0, -1.0, (bitcast<u32>(y) >> 31u) == 1u); } return atan2(y, x); }`,
     code: (w, p) => `{
 v.x += (${w} * (t.x + (${p[0]} * sin(tan((t.y * ${p[2]}))))));
 v.y += (${w} * (t.y + (${p[1]} * sin(tan((t.x * ${p[2]}))))));
@@ -941,6 +1101,8 @@ v.y += (${w} * (t.y + (${p[1]} * sin(tan((t.x * ${p[2]}))))));
   "secant2": {
     params: [],
     verified: true, priority: 0, flags: [], types: ["2D"],
+    funcNames: ["atan2j"],
+    funcs: `fn atan2j(y: f32, x: f32) -> f32 { if (x == 0.0 && y == 0.0) { return select(0.0, PI, (bitcast<u32>(x) >> 31u) == 1u) * select(1.0, -1.0, (bitcast<u32>(y) >> 31u) == 1u); } return atan2(y, x); }`,
     code: (w, _p) => `{
 v.x += (${w} * t.x);
 var icosr: f32 = (1.0 / cos((${w} * r)));
@@ -950,14 +1112,16 @@ v.y += (${w} * (icosr + select(-1.0, 1.0, (icosr < 0.0))));
   "ngon": {
     params: [{ name: "circle", def: 1 }, { name: "corners", def: 2 }, { name: "power", def: 3 }, { name: "sides", def: 5 }],
     verified: true, priority: 0, flags: [], types: ["2D"],
-    funcNames: ["powc"],
+    funcNames: ["powc","atan2j"],
     funcs: `fn powc(x: f32, y: f32) -> f32 {
   if (x >= 0.0) { return pow(x, y); }
   let yi = round(y);
   if (abs(y - yi) > 1e-6) { return pow(x, y); }
   let m = pow(-x, y);
   return select(m, -m, (i32(yi) & 1) != 0);
-}`,
+}
+
+fn atan2j(y: f32, x: f32) -> f32 { if (x == 0.0 && y == 0.0) { return select(0.0, PI, (bitcast<u32>(x) >> 31u) == 1u) * select(1.0, -1.0, (bitcast<u32>(y) >> 31u) == 1u); } return atan2(y, x); }`,
     code: (w, p) => `{
 var rf: f32 = powc(r, ${p[2]});
 var b: f32 = ((2.0 * PI) / ${p[3]});
@@ -973,6 +1137,8 @@ v.y += ((${w} * t.y) * amp);
   "epispiral_wf": {
     params: [{ name: "waves", def: 4 }],
     verified: true, priority: 0, flags: [], types: ["2D"],
+    funcNames: ["atan2j"],
+    funcs: `fn atan2j(y: f32, x: f32) -> f32 { if (x == 0.0 && y == 0.0) { return select(0.0, PI, (bitcast<u32>(x) >> 31u) == 1u) * select(1.0, -1.0, (bitcast<u32>(y) >> 31u) == 1u); } return atan2(y, x); }`,
     code: (w, p) => `{
 var d: f32 = cos((${p[0]} * th));
 if ((d != 0.0)) {
@@ -991,8 +1157,10 @@ if ((d != 0.0)) {
   "rose_wf": {
     params: [{ name: "amp", def: 0.5 }, { name: "waves", def: 4 }, { name: "filled", def: 0.85 }],
     verified: true, priority: 0, flags: [], types: ["BASE_SHAPE"],
-    funcNames: ["roundc"],
-    funcs: `fn roundc(x: f32) -> f32 { return sign(x) * floor(abs(x) + 0.5); }`,
+    funcNames: ["roundc","atan2j"],
+    funcs: `fn roundc(x: f32) -> f32 { return sign(x) * floor(abs(x) + 0.5); }
+
+fn atan2j(y: f32, x: f32) -> f32 { if (x == 0.0 && y == 0.0) { return select(0.0, PI, (bitcast<u32>(x) >> 31u) == 1u) * select(1.0, -1.0, (bitcast<u32>(y) >> 31u) == 1u); } return atan2(y, x); }`,
     code: (w, p) => `{
 var a: f32 = th;
 var r_: f32 = (${p[0]} * cos((f32(i32(roundc(f32(i32(${p[1]}))))) * a)));
@@ -1008,6 +1176,8 @@ v.y += (${w} * ny);
   "rays": {
     params: [],
     verified: true, priority: 0, flags: [], types: ["2D"],
+    funcNames: ["atan2j"],
+    funcs: `fn atan2j(y: f32, x: f32) -> f32 { if (x == 0.0 && y == 0.0) { return select(0.0, PI, (bitcast<u32>(x) >> 31u) == 1u) * select(1.0, -1.0, (bitcast<u32>(y) >> 31u) == 1u); } return atan2(y, x); }`,
     code: (w, _p) => `{
 var rn: f32;
 rn = rnd(rs);
@@ -1021,6 +1191,8 @@ v.y += ((v_ * front) * sin(t.y));
   "twintrian": {
     params: [],
     verified: true, priority: 0, flags: [], types: ["2D"],
+    funcNames: ["atan2j"],
+    funcs: `fn atan2j(y: f32, x: f32) -> f32 { if (x == 0.0 && y == 0.0) { return select(0.0, PI, (bitcast<u32>(x) >> 31u) == 1u) * select(1.0, -1.0, (bitcast<u32>(y) >> 31u) == 1u); } return atan2(y, x); }`,
     code: (w, _p) => `{
 var rn: f32;
 rn = rnd(rs);
@@ -1033,6 +1205,8 @@ v.y += ((v_ * t.x) * (t_ - (PI * sin(((rn * r) * v_)))));
   "foci": {
     params: [],
     verified: true, priority: 0, flags: [], types: ["2D"],
+    funcNames: ["atan2j"],
+    funcs: `fn atan2j(y: f32, x: f32) -> f32 { if (x == 0.0 && y == 0.0) { return select(0.0, PI, (bitcast<u32>(x) >> 31u) == 1u) * select(1.0, -1.0, (bitcast<u32>(y) >> 31u) == 1u); } return atan2(y, x); }`,
     code: (w, _p) => `{
 var expx: f32 = (exp(t.x) * 0.5);
 var expnx: f32 = (0.25 / expx);
@@ -1044,6 +1218,8 @@ v.y += (tmp * sin(t.y));
   "disc2": {
     params: [{ name: "rot", def: 2 }, { name: "twist", def: 0.5 }],
     verified: true, priority: 0, flags: [], types: ["2D"],
+    funcNames: ["atan2j"],
+    funcs: `fn atan2j(y: f32, x: f32) -> f32 { if (x == 0.0 && y == 0.0) { return select(0.0, PI, (bitcast<u32>(x) >> 31u) == 1u) * select(1.0, -1.0, (bitcast<u32>(y) >> 31u) == 1u); } return atan2(y, x); }`,
     code: (w, p) => `{
 var sinadd: f32;
 var cosadd: f32;
@@ -1064,14 +1240,16 @@ v.y += (((${w} * th) * (cos(t_) + sinadd)) / PI);
   "super_shape": {
     params: [{ name: "rnd", def: 3 }, { name: "m", def: 1 }, { name: "n1", def: 1 }, { name: "n2", def: 1 }, { name: "n3", def: 1 }, { name: "holes", def: 0 }],
     verified: true, priority: 0, flags: [], types: ["2D","BASE_SHAPE"],
-    funcNames: ["powc"],
+    funcNames: ["powc","atan2j"],
     funcs: `fn powc(x: f32, y: f32) -> f32 {
   if (x >= 0.0) { return pow(x, y); }
   let yi = round(y);
   if (abs(y - yi) > 1e-6) { return pow(x, y); }
   let m = pow(-x, y);
   return select(m, -m, (i32(yi) & 1) != 0);
-}`,
+}
+
+fn atan2j(y: f32, x: f32) -> f32 { if (x == 0.0 && y == 0.0) { return select(0.0, PI, (bitcast<u32>(x) >> 31u) == 1u) * select(1.0, -1.0, (bitcast<u32>(y) >> 31u) == 1u); } return atan2(y, x); }`,
     code: (w, p) => `{
 var rinv_: f32 = 1.0 / r;
 var t1: f32 = abs(cos((((${p[1]} * ph) + PI) * 0.25)));
@@ -1088,6 +1266,8 @@ v.y += (rnew * t.y);
   "flower": {
     params: [{ name: "holes", def: 0.4 }, { name: "petals", def: 7 }],
     verified: true, priority: 0, flags: [], types: ["BASE_SHAPE"],
+    funcNames: ["atan2j"],
+    funcs: `fn atan2j(y: f32, x: f32) -> f32 { if (x == 0.0 && y == 0.0) { return select(0.0, PI, (bitcast<u32>(x) >> 31u) == 1u) * select(1.0, -1.0, (bitcast<u32>(y) >> 31u) == 1u); } return atan2(y, x); }`,
     code: (w, p) => `{
 var rinv_: f32 = 1.0 / r;
 var rn: f32;
@@ -1100,6 +1280,8 @@ v.y += (rnew * t.y);
   "conic": {
     params: [{ name: "eccentricity", def: 1 }, { name: "holes", def: 0 }],
     verified: true, priority: 0, flags: [], types: ["2D"],
+    funcNames: ["atan2j"],
+    funcs: `fn atan2j(y: f32, x: f32) -> f32 { if (x == 0.0 && y == 0.0) { return select(0.0, PI, (bitcast<u32>(x) >> 31u) == 1u) * select(1.0, -1.0, (bitcast<u32>(y) >> 31u) == 1u); } return atan2(y, x); }`,
     code: (w, p) => `{
 var rinv_: f32 = 1.0 / r;
 var rn: f32;
@@ -1112,6 +1294,8 @@ v.y += (rnew * t.y);
   "parabola": {
     params: [{ name: "width", def: 1 }, { name: "height", def: 0.5 }],
     verified: true, priority: 0, flags: [], types: ["BLUR"],
+    funcNames: ["atan2j"],
+    funcs: `fn atan2j(y: f32, x: f32) -> f32 { if (x == 0.0 && y == 0.0) { return select(0.0, PI, (bitcast<u32>(x) >> 31u) == 1u) * select(1.0, -1.0, (bitcast<u32>(y) >> 31u) == 1u); } return atan2(y, x); }`,
     code: (w, p) => `{
 var rn: f32;
 rn = rnd(rs);
@@ -1123,6 +1307,8 @@ v.y += (((${w} * ${p[0]}) * cos(r)) * rn);
   "bent2": {
     params: [{ name: "x", def: 1 }, { name: "y", def: 1 }],
     verified: true, priority: 0, flags: [], types: ["2D"],
+    funcNames: ["atan2j"],
+    funcs: `fn atan2j(y: f32, x: f32) -> f32 { if (x == 0.0 && y == 0.0) { return select(0.0, PI, (bitcast<u32>(x) >> 31u) == 1u) * select(1.0, -1.0, (bitcast<u32>(y) >> 31u) == 1u); } return atan2(y, x); }`,
     code: (w, p) => `{
 v.x += (${w} * select(t.x, (t.x * ${p[0]}), (t.x < 0.0)));
 v.y += (${w} * select(t.y, (t.y * ${p[1]}), (t.y < 0.0)));
@@ -1131,6 +1317,8 @@ v.y += (${w} * select(t.y, (t.y * ${p[1]}), (t.y < 0.0)));
   "boarders": {
     params: [],
     verified: true, priority: 0, flags: [], types: ["2D"],
+    funcNames: ["atan2j"],
+    funcs: `fn atan2j(y: f32, x: f32) -> f32 { if (x == 0.0 && y == 0.0) { return select(0.0, PI, (bitcast<u32>(x) >> 31u) == 1u) * select(1.0, -1.0, (bitcast<u32>(y) >> 31u) == 1u); } return atan2(y, x); }`,
     code: (w, _p) => `{
 var roundX: f32 = round(t.x);
 var roundY: f32 = round(t.y);
@@ -1155,6 +1343,8 @@ if ((rnd(rs) >= 0.75)) {
   "cell": {
     params: [{ name: "size", def: 0.6 }],
     verified: true, priority: 0, flags: [], types: ["2D"],
+    funcNames: ["atan2j"],
+    funcs: `fn atan2j(y: f32, x: f32) -> f32 { if (x == 0.0 && y == 0.0) { return select(0.0, PI, (bitcast<u32>(x) >> 31u) == 1u) * select(1.0, -1.0, (bitcast<u32>(y) >> 31u) == 1u); } return atan2(y, x); }`,
     code: (w, p) => `{
 var inv_cell_size: f32 = (1.0 / ${p[0]});
 var x: i32 = i32(floor((t.x * inv_cell_size)));
@@ -1185,6 +1375,8 @@ v.y -= (${w} * (dy + (f32(y) * ${p[0]})));
   "cpow": {
     params: [{ name: "r", def: 1 }, { name: "i", def: 0.1 }, { name: "power", def: 1.5 }],
     verified: true, priority: 0, flags: [], types: ["2D"],
+    funcNames: ["atan2j"],
+    funcs: `fn atan2j(y: f32, x: f32) -> f32 { if (x == 0.0 && y == 0.0) { return select(0.0, PI, (bitcast<u32>(x) >> 31u) == 1u) * select(1.0, -1.0, (bitcast<u32>(y) >> 31u) == 1u); } return atan2(y, x); }`,
     code: (w, p) => `{
 var lnr: f32 = (0.5 * log(r2));
 var va: f32 = ((2.0 * PI) / ${p[2]});
@@ -1199,6 +1391,8 @@ v.y += (m * sin(ang));
   "curve": {
     params: [{ name: "xamp", def: 0.25 }, { name: "yamp", def: 0.5 }, { name: "xlength", def: 1 }, { name: "ylength", def: 1 }],
     verified: true, priority: 0, flags: [], types: ["2D"],
+    funcNames: ["atan2j"],
+    funcs: `fn atan2j(y: f32, x: f32) -> f32 { if (x == 0.0 && y == 0.0) { return select(0.0, PI, (bitcast<u32>(x) >> 31u) == 1u) * select(1.0, -1.0, (bitcast<u32>(y) >> 31u) == 1u); } return atan2(y, x); }`,
     code: (w, p) => `{
 var pc_xlen: f32 = (${p[2]} * ${p[2]});
 var pc_ylen: f32 = (${p[3]} * ${p[3]});
@@ -1209,6 +1403,8 @@ v.y += (${w} * (t.y + (${p[1]} * exp(((-t.x * t.x) / pc_ylen)))));
   "edisc": {
     params: [],
     verified: true, priority: 0, flags: [], types: ["2D"],
+    funcNames: ["atan2j"],
+    funcs: `fn atan2j(y: f32, x: f32) -> f32 { if (x == 0.0 && y == 0.0) { return select(0.0, PI, (bitcast<u32>(x) >> 31u) == 1u) * select(1.0, -1.0, (bitcast<u32>(y) >> 31u) == 1u); } return atan2(y, x); }`,
     code: (w, _p) => `{
 var tmp: f32 = (r2 + 1.0);
 var tmp2: f32 = (2.0 * t.x);
@@ -1232,6 +1428,8 @@ v.y += ((w_ * snhu) * snv);
   "escher": {
     params: [{ name: "beta", def: 0.3 }],
     verified: true, priority: 0, flags: [], types: ["2D"],
+    funcNames: ["atan2j"],
+    funcs: `fn atan2j(y: f32, x: f32) -> f32 { if (x == 0.0 && y == 0.0) { return select(0.0, PI, (bitcast<u32>(x) >> 31u) == 1u) * select(1.0, -1.0, (bitcast<u32>(y) >> 31u) == 1u); } return atan2(y, x); }`,
     code: (w, p) => `{
 var vc: f32 = (0.5 * (1.0 + cos(${p[0]})));
 var vd: f32 = (0.5 * sin(${p[0]}));
@@ -1244,12 +1442,14 @@ v.y += (m * sin(n));
   "lazysusan": {
     params: [{ name: "space", def: 0.4 }, { name: "twist", def: 0.2 }, { name: "spin", def: 0.1 }, { name: "x", def: 0.1 }, { name: "y", def: 0.2 }],
     verified: true, priority: 0, flags: [], types: ["2D"],
+    funcNames: ["atan2j"],
+    funcs: `fn atan2j(y: f32, x: f32) -> f32 { if (x == 0.0 && y == 0.0) { return select(0.0, PI, (bitcast<u32>(x) >> 31u) == 1u) * select(1.0, -1.0, (bitcast<u32>(y) >> 31u) == 1u); } return atan2(y, x); }`,
     code: (w, p) => `{
 var x0: f32 = (t.x - ${p[3]});
 var y0: f32 = (t.y + ${p[4]});
 var r0: f32 = sqrt(((x0 * x0) + (y0 * y0)));
 if ((r0 < ${w})) {
-  var a: f32 = ((atan2(y0, x0) + ${p[2]}) + (${p[1]} * (${w} - r0)));
+  var a: f32 = ((atan2j(y0, x0) + ${p[2]}) + (${p[1]} * (${w} - r0)));
   r0 = (${w} * r0);
   v.x += ((r0 * cos(a)) + ${p[3]});
   v.y += ((r0 * sin(a)) - ${p[4]});
@@ -1263,6 +1463,8 @@ if ((r0 < ${w})) {
   "exp": {
     params: [],
     verified: true, priority: 0, flags: [], types: ["2D"],
+    funcNames: ["atan2j"],
+    funcs: `fn atan2j(y: f32, x: f32) -> f32 { if (x == 0.0 && y == 0.0) { return select(0.0, PI, (bitcast<u32>(x) >> 31u) == 1u) * select(1.0, -1.0, (bitcast<u32>(y) >> 31u) == 1u); } return atan2(y, x); }`,
     code: (w, _p) => `{
 var expe: f32 = exp(t.x);
 var expsin: f32 = sin(t.y);
@@ -1274,6 +1476,8 @@ v.y += ((${w} * expe) * expsin);
   "log": {
     params: [],
     verified: true, priority: 0, flags: [], types: ["2D"],
+    funcNames: ["atan2j"],
+    funcs: `fn atan2j(y: f32, x: f32) -> f32 { if (x == 0.0 && y == 0.0) { return select(0.0, PI, (bitcast<u32>(x) >> 31u) == 1u) * select(1.0, -1.0, (bitcast<u32>(y) >> 31u) == 1u); } return atan2(y, x); }`,
     code: (w, _p) => `{
 v.x += ((${w} * 0.5) * log(r2));
 v.y += (${w} * ph);
@@ -1282,6 +1486,8 @@ v.y += (${w} * ph);
   "sin": {
     params: [],
     verified: true, priority: 0, flags: [], types: ["2D"],
+    funcNames: ["atan2j"],
+    funcs: `fn atan2j(y: f32, x: f32) -> f32 { if (x == 0.0 && y == 0.0) { return select(0.0, PI, (bitcast<u32>(x) >> 31u) == 1u) * select(1.0, -1.0, (bitcast<u32>(y) >> 31u) == 1u); } return atan2(y, x); }`,
     code: (w, _p) => `{
 v.x += ((${w} * sin(t.x)) * cosh(t.y));
 v.y += ((${w} * cos(t.x)) * sinh(t.y));
@@ -1290,6 +1496,8 @@ v.y += ((${w} * cos(t.x)) * sinh(t.y));
   "cos": {
     params: [],
     verified: true, priority: 0, flags: [], types: ["2D"],
+    funcNames: ["atan2j"],
+    funcs: `fn atan2j(y: f32, x: f32) -> f32 { if (x == 0.0 && y == 0.0) { return select(0.0, PI, (bitcast<u32>(x) >> 31u) == 1u) * select(1.0, -1.0, (bitcast<u32>(y) >> 31u) == 1u); } return atan2(y, x); }`,
     code: (w, _p) => `{
 v.x += ((${w} * cos(t.x)) * cosh(t.y));
 v.y -= ((${w} * sin(t.x)) * sinh(t.y));
@@ -1298,6 +1506,8 @@ v.y -= ((${w} * sin(t.x)) * sinh(t.y));
   "tan": {
     params: [],
     verified: true, priority: 0, flags: [], types: ["2D"],
+    funcNames: ["atan2j"],
+    funcs: `fn atan2j(y: f32, x: f32) -> f32 { if (x == 0.0 && y == 0.0) { return select(0.0, PI, (bitcast<u32>(x) >> 31u) == 1u) * select(1.0, -1.0, (bitcast<u32>(y) >> 31u) == 1u); } return atan2(y, x); }`,
     code: (w, _p) => `{
 v.x += ((${w} * sin((2.0 * t.x))) / (cos((2.0 * t.x)) + cosh((2.0 * t.y))));
 v.y += ((${w} * sinh((2.0 * t.y))) / (cos((2.0 * t.x)) + cosh((2.0 * t.y))));
@@ -1306,6 +1516,8 @@ v.y += ((${w} * sinh((2.0 * t.y))) / (cos((2.0 * t.x)) + cosh((2.0 * t.y))));
   "sec": {
     params: [],
     verified: true, priority: 0, flags: [], types: ["2D"],
+    funcNames: ["atan2j"],
+    funcs: `fn atan2j(y: f32, x: f32) -> f32 { if (x == 0.0 && y == 0.0) { return select(0.0, PI, (bitcast<u32>(x) >> 31u) == 1u) * select(1.0, -1.0, (bitcast<u32>(y) >> 31u) == 1u); } return atan2(y, x); }`,
     code: (w, _p) => `{
 var secden: f32 = (2.0 / (cos((2.0 * t.x)) + cosh((2.0 * t.y))));
 v.x += (((${w} * secden) * cos(t.x)) * cosh(t.y));
@@ -1315,6 +1527,8 @@ v.y += (((${w} * secden) * sin(t.x)) * sinh(t.y));
   "csc": {
     params: [],
     verified: true, priority: 0, flags: [], types: ["2D"],
+    funcNames: ["atan2j"],
+    funcs: `fn atan2j(y: f32, x: f32) -> f32 { if (x == 0.0 && y == 0.0) { return select(0.0, PI, (bitcast<u32>(x) >> 31u) == 1u) * select(1.0, -1.0, (bitcast<u32>(y) >> 31u) == 1u); } return atan2(y, x); }`,
     code: (w, _p) => `{
 var cscden: f32 = (2.0 / (cosh((2.0 * t.y)) - cos((2.0 * t.x))));
 v.x += (((${w} * cscden) * sin(t.x)) * cosh(t.y));
@@ -1324,6 +1538,8 @@ v.y -= (((${w} * cscden) * cos(t.x)) * sinh(t.y));
   "cot": {
     params: [],
     verified: true, priority: 0, flags: [], types: ["2D"],
+    funcNames: ["atan2j"],
+    funcs: `fn atan2j(y: f32, x: f32) -> f32 { if (x == 0.0 && y == 0.0) { return select(0.0, PI, (bitcast<u32>(x) >> 31u) == 1u) * select(1.0, -1.0, (bitcast<u32>(y) >> 31u) == 1u); } return atan2(y, x); }`,
     code: (w, _p) => `{
 var cotden: f32 = (1.0 / (cosh((2.0 * t.y)) - cos((2.0 * t.x))));
 v.x += ((${w} * cotden) * sin((2.0 * t.x)));
@@ -1333,6 +1549,8 @@ v.y -= ((${w} * cotden) * sinh((2.0 * t.y)));
   "sinh": {
     params: [],
     verified: true, priority: 0, flags: [], types: ["2D"],
+    funcNames: ["atan2j"],
+    funcs: `fn atan2j(y: f32, x: f32) -> f32 { if (x == 0.0 && y == 0.0) { return select(0.0, PI, (bitcast<u32>(x) >> 31u) == 1u) * select(1.0, -1.0, (bitcast<u32>(y) >> 31u) == 1u); } return atan2(y, x); }`,
     code: (w, _p) => `{
 v.x += ((${w} * sinh(t.x)) * cos(t.y));
 v.y += ((${w} * cosh(t.x)) * sin(t.y));
@@ -1341,6 +1559,8 @@ v.y += ((${w} * cosh(t.x)) * sin(t.y));
   "cosh": {
     params: [],
     verified: true, priority: 0, flags: [], types: ["2D"],
+    funcNames: ["atan2j"],
+    funcs: `fn atan2j(y: f32, x: f32) -> f32 { if (x == 0.0 && y == 0.0) { return select(0.0, PI, (bitcast<u32>(x) >> 31u) == 1u) * select(1.0, -1.0, (bitcast<u32>(y) >> 31u) == 1u); } return atan2(y, x); }`,
     code: (w, _p) => `{
 v.x += ((${w} * cosh(t.x)) * cos(t.y));
 v.y += ((${w} * sinh(t.x)) * sin(t.y));
@@ -1349,32 +1569,44 @@ v.y += ((${w} * sinh(t.x)) * sin(t.y));
   "tanh": {
     params: [],
     verified: true, priority: 0, flags: [], types: ["2D"],
+    funcNames: ["atan2j"],
+    funcs: `fn atan2j(y: f32, x: f32) -> f32 { if (x == 0.0 && y == 0.0) { return select(0.0, PI, (bitcast<u32>(x) >> 31u) == 1u) * select(1.0, -1.0, (bitcast<u32>(y) >> 31u) == 1u); } return atan2(y, x); }`,
     code: (w, _p) => `{
+loop {
 var d: f32 = (cos((2.0 * t.y)) + cosh((2.0 * t.x)));
 if ((d == 0.0)) {
-  return;
+  break;
 }
 var tanhden: f32 = (1.0 / d);
 v.x += ((${w} * tanhden) * sinh((2.0 * t.x)));
 v.y += ((${w} * tanhden) * sin((2.0 * t.y)));
+break;
+}
 }`,
   },
   "sech": {
     params: [],
     verified: true, priority: 0, flags: [], types: ["2D"],
+    funcNames: ["atan2j"],
+    funcs: `fn atan2j(y: f32, x: f32) -> f32 { if (x == 0.0 && y == 0.0) { return select(0.0, PI, (bitcast<u32>(x) >> 31u) == 1u) * select(1.0, -1.0, (bitcast<u32>(y) >> 31u) == 1u); } return atan2(y, x); }`,
     code: (w, _p) => `{
+loop {
 var d: f32 = (cos((2.0 * t.y)) + cosh((2.0 * t.x)));
 if ((d == 0)) {
-  return;
+  break;
 }
 var sechden: f32 = (2.0 / d);
 v.x += (((${w} * sechden) * cos(t.y)) * cosh(t.x));
 v.y -= (((${w} * sechden) * sin(t.y)) * sinh(t.x));
+break;
+}
 }`,
   },
   "csch": {
     params: [],
     verified: true, priority: 0, flags: [], types: ["2D"],
+    funcNames: ["atan2j"],
+    funcs: `fn atan2j(y: f32, x: f32) -> f32 { if (x == 0.0 && y == 0.0) { return select(0.0, PI, (bitcast<u32>(x) >> 31u) == 1u) * select(1.0, -1.0, (bitcast<u32>(y) >> 31u) == 1u); } return atan2(y, x); }`,
     code: (w, _p) => `{
 var cschden: f32 = (2.0 / (cosh((2.0 * t.x)) - cos((2.0 * t.y))));
 v.x += (((${w} * cschden) * sinh(t.x)) * cos(t.y));
@@ -1384,6 +1616,8 @@ v.y -= (((${w} * cschden) * cosh(t.x)) * sin(t.y));
   "coth": {
     params: [],
     verified: true, priority: 0, flags: [], types: ["2D"],
+    funcNames: ["atan2j"],
+    funcs: `fn atan2j(y: f32, x: f32) -> f32 { if (x == 0.0 && y == 0.0) { return select(0.0, PI, (bitcast<u32>(x) >> 31u) == 1u) * select(1.0, -1.0, (bitcast<u32>(y) >> 31u) == 1u); } return atan2(y, x); }`,
     code: (w, _p) => `{
 var cothden: f32 = (1.0 / (cosh((2.0 * t.x)) - cos((2.0 * t.y))));
 v.x += ((${w} * cothden) * sinh((2.0 * t.x)));
@@ -1393,6 +1627,8 @@ v.y += ((${w} * cothden) * sin((2.0 * t.y)));
   "modulus": {
     params: [{ name: "x", def: 0.2 }, { name: "y", def: 0.5 }],
     verified: true, priority: 0, flags: [], types: ["2D"],
+    funcNames: ["atan2j"],
+    funcs: `fn atan2j(y: f32, x: f32) -> f32 { if (x == 0.0 && y == 0.0) { return select(0.0, PI, (bitcast<u32>(x) >> 31u) == 1u) * select(1.0, -1.0, (bitcast<u32>(y) >> 31u) == 1u); } return atan2(y, x); }`,
     code: (w, p) => `{
 var xr: f32 = (2.0 * ${p[0]});
 var yr: f32 = (2.0 * ${p[1]});
@@ -1415,6 +1651,8 @@ if ((t.y > ${p[1]})) {
   "loonie": {
     params: [],
     verified: true, priority: 0, flags: [], types: ["2D"],
+    funcNames: ["atan2j"],
+    funcs: `fn atan2j(y: f32, x: f32) -> f32 { if (x == 0.0 && y == 0.0) { return select(0.0, PI, (bitcast<u32>(x) >> 31u) == 1u) * select(1.0, -1.0, (bitcast<u32>(y) >> 31u) == 1u); } return atan2(y, x); }`,
     code: (w, _p) => `{
 var w2: f32 = (${w} * ${w});
 var q: f32 = select(${w}, (${w} * sqrt(((w2 / r2) - 1.0))), (r2 < w2));
@@ -1425,6 +1663,8 @@ v.y += (q * t.y);
   "oscilloscope": {
     params: [{ name: "separation", def: 1 }, { name: "frequency", def: 3.141592653589793 }, { name: "amplitude", def: 1 }, { name: "damping", def: 0 }],
     verified: true, priority: 0, flags: [], types: ["2D"],
+    funcNames: ["atan2j"],
+    funcs: `fn atan2j(y: f32, x: f32) -> f32 { if (x == 0.0 && y == 0.0) { return select(0.0, PI, (bitcast<u32>(x) >> 31u) == 1u) * select(1.0, -1.0, (bitcast<u32>(y) >> 31u) == 1u); } return atan2(y, x); }`,
     code: (w, p) => `{
 var tpf: f32 = ((2.0 * PI) * ${p[1]});
 var t_: f32 = (((${p[2]} * exp((-(abs(t.x)) * ${p[3]}))) * cos((tpf * t.x))) + ${p[0]});
@@ -1439,6 +1679,8 @@ if ((abs(t.y) <= t_)) {
   "separation": {
     params: [{ name: "x", def: 0.5 }, { name: "xinside", def: 0.05 }, { name: "y", def: 0.25 }, { name: "yinside", def: 0.025 }],
     verified: true, priority: 0, flags: [], types: ["2D"],
+    funcNames: ["atan2j"],
+    funcs: `fn atan2j(y: f32, x: f32) -> f32 { if (x == 0.0 && y == 0.0) { return select(0.0, PI, (bitcast<u32>(x) >> 31u) == 1u) * select(1.0, -1.0, (bitcast<u32>(y) >> 31u) == 1u); } return atan2(y, x); }`,
     code: (w, p) => `{
 var sx2: f32 = (${p[0]} * ${p[0]});
 var sy2: f32 = (${p[2]} * ${p[2]});
@@ -1451,6 +1693,8 @@ v.y += (${w} * ((signY * sqrt(((t.y * t.y) + sy2))) - (t.y * ${p[3]})));
   "split": {
     params: [{ name: "xsize", def: 0.4 }, { name: "ysize", def: 0.6 }],
     verified: true, priority: 0, flags: [], types: ["2D"],
+    funcNames: ["atan2j"],
+    funcs: `fn atan2j(y: f32, x: f32) -> f32 { if (x == 0.0 && y == 0.0) { return select(0.0, PI, (bitcast<u32>(x) >> 31u) == 1u) * select(1.0, -1.0, (bitcast<u32>(y) >> 31u) == 1u); } return atan2(y, x); }`,
     code: (w, p) => `{
 var signX: f32 = select(-1.0, 1.0, (cos(((t.x * ${p[0]}) * PI)) >= 0.0));
 var signY: f32 = select(-1.0, 1.0, (cos(((t.y * ${p[1]}) * PI)) >= 0.0));
@@ -1461,6 +1705,8 @@ v.y += ((${w} * t.y) * signX);
   "splits": {
     params: [{ name: "x", def: 0.4 }, { name: "y", def: 0.6 }, { name: "lshear", def: 0 }, { name: "rshear", def: 0 }, { name: "ushear", def: 0 }, { name: "dshear", def: 0 }],
     verified: true, priority: 0, flags: [], types: ["2D"],
+    funcNames: ["atan2j"],
+    funcs: `fn atan2j(y: f32, x: f32) -> f32 { if (x == 0.0 && y == 0.0) { return select(0.0, PI, (bitcast<u32>(x) >> 31u) == 1u) * select(1.0, -1.0, (bitcast<u32>(y) >> 31u) == 1u); } return atan2(y, x); }`,
     code: (w, p) => `{
 if ((t.x >= 0.0)) {
   v.x += (${w} * (t.x + ${p[0]}));
@@ -1481,8 +1727,10 @@ if ((t.y >= 0.0)) {
   "stripes": {
     params: [{ name: "space", def: 0.2 }, { name: "warp", def: 0.6 }],
     verified: true, priority: 0, flags: [], types: ["2D"],
-    funcNames: ["roundc"],
-    funcs: `fn roundc(x: f32) -> f32 { return sign(x) * floor(abs(x) + 0.5); }`,
+    funcNames: ["roundc","atan2j"],
+    funcs: `fn roundc(x: f32) -> f32 { return sign(x) * floor(abs(x) + 0.5); }
+
+fn atan2j(y: f32, x: f32) -> f32 { if (x == 0.0 && y == 0.0) { return select(0.0, PI, (bitcast<u32>(x) >> 31u) == 1u) * select(1.0, -1.0, (bitcast<u32>(y) >> 31u) == 1u); } return atan2(y, x); }`,
     code: (w, p) => `{
 v.x += (${w} * (((t.x - f32(i32(roundc(t.x)))) * (1.0 - ${p[0]})) + f32(i32(roundc(t.x)))));
 v.y += (${w} * (t.y + (((t.x - f32(i32(roundc(t.x)))) * (t.x - f32(i32(roundc(t.x))))) * ${p[1]})));
@@ -1491,14 +1739,16 @@ v.y += (${w} * (t.y + (((t.x - f32(i32(roundc(t.x)))) * (t.x - f32(i32(roundc(t.
   "wedge_julia": {
     params: [{ name: "power", def: 7 }, { name: "dist", def: 0.2 }, { name: "count", def: 2 }, { name: "angle", def: 0.3 }],
     verified: true, priority: 0, flags: [], types: ["2D"],
-    funcNames: ["powc"],
+    funcNames: ["powc","atan2j"],
     funcs: `fn powc(x: f32, y: f32) -> f32 {
   if (x >= 0.0) { return pow(x, y); }
   let yi = round(y);
   if (abs(y - yi) > 1e-6) { return pow(x, y); }
   let m = pow(-x, y);
   return select(m, -m, (i32(yi) & 1) != 0);
-}`,
+}
+
+fn atan2j(y: f32, x: f32) -> f32 { if (x == 0.0 && y == 0.0) { return select(0.0, PI, (bitcast<u32>(x) >> 31u) == 1u) * select(1.0, -1.0, (bitcast<u32>(y) >> 31u) == 1u); } return atan2(y, x); }`,
     code: (w, p) => `{
 var wedgeJulia_cf: f32 = (1.0 - (((${p[3]} * ${p[2]}) * 0.5) / PI));
 var wedgeJulia_rN: f32 = abs(${p[0]});
@@ -1517,6 +1767,8 @@ v.y += (r_ * sa);
   "wedge_sph": {
     params: [{ name: "angle", def: 0.2 }, { name: "hole", def: 0.2 }, { name: "count", def: 2 }, { name: "swirl", def: 0.3 }],
     verified: true, priority: 0, flags: [], types: ["2D"],
+    funcNames: ["atan2j"],
+    funcs: `fn atan2j(y: f32, x: f32) -> f32 { if (x == 0.0 && y == 0.0) { return select(0.0, PI, (bitcast<u32>(x) >> 31u) == 1u) * select(1.0, -1.0, (bitcast<u32>(y) >> 31u) == 1u); } return atan2(y, x); }`,
     code: (w, p) => `{
 var rinv_eps: f32 = (1.0 / sqrt((r2 + 1.0e-20)));
 var a: f32 = (ph + (${p[3]} * rinv_eps));
@@ -1530,6 +1782,8 @@ v.y += ((${w} * (rinv_eps + ${p[1]})) * sin(a));
   "whorl": {
     params: [{ name: "inside", def: 0.1 }, { name: "outside", def: 0.2 }],
     verified: true, priority: 0, flags: [], types: ["2D"],
+    funcNames: ["atan2j"],
+    funcs: `fn atan2j(y: f32, x: f32) -> f32 { if (x == 0.0 && y == 0.0) { return select(0.0, PI, (bitcast<u32>(x) >> 31u) == 1u) * select(1.0, -1.0, (bitcast<u32>(y) >> 31u) == 1u); } return atan2(y, x); }`,
     code: (w, p) => `{
 var a: f32 = (ph + (select(${p[1]}, ${p[0]}, (r < ${w})) / (${w} - r)));
 v.x += ((${w} * r) * cos(a));
@@ -1539,11 +1793,13 @@ v.y += ((${w} * r) * sin(a));
   "flux": {
     params: [{ name: "spread", def: 0.3 }],
     verified: true, priority: 0, flags: [], types: ["2D"],
+    funcNames: ["atan2j"],
+    funcs: `fn atan2j(y: f32, x: f32) -> f32 { if (x == 0.0 && y == 0.0) { return select(0.0, PI, (bitcast<u32>(x) >> 31u) == 1u) * select(1.0, -1.0, (bitcast<u32>(y) >> 31u) == 1u); } return atan2(y, x); }`,
     code: (w, p) => `{
 var xpw: f32 = (t.x + ${w});
 var xmw: f32 = (t.x - ${w});
 var avgr: f32 = ((${w} * (2.0 + ${p[0]})) * sqrt((sqrt(((t.y * t.y) + (xpw * xpw))) / sqrt(((t.y * t.y) + (xmw * xmw))))));
-var avga: f32 = ((atan2(t.y, xmw) - atan2(t.y, xpw)) * 0.5);
+var avga: f32 = ((atan2j(t.y, xmw) - atan2j(t.y, xpw)) * 0.5);
 v.x += (avgr * cos(avga));
 v.y += (avgr * sin(avga));
 }`,
@@ -1551,6 +1807,8 @@ v.y += (avgr * sin(avga));
   "mobius": {
     params: [{ name: "re_a", def: 0.1 }, { name: "re_b", def: 0.2 }, { name: "re_c", def: -0.15 }, { name: "re_d", def: 0.21 }, { name: "im_a", def: 0.2 }, { name: "im_b", def: -0.12 }, { name: "im_c", def: -0.15 }, { name: "im_d", def: 0.1 }],
     verified: true, priority: 0, flags: [], types: ["2D"],
+    funcNames: ["atan2j"],
+    funcs: `fn atan2j(y: f32, x: f32) -> f32 { if (x == 0.0 && y == 0.0) { return select(0.0, PI, (bitcast<u32>(x) >> 31u) == 1u) * select(1.0, -1.0, (bitcast<u32>(y) >> 31u) == 1u); } return atan2(y, x); }`,
     code: (w, p) => `{
 var re_u: f32 = (((${p[0]} * t.x) - (${p[4]} * t.y)) + ${p[1]});
 var im_u: f32 = (((${p[0]} * t.y) + (${p[4]} * t.x)) + ${p[5]});
@@ -1565,6 +1823,8 @@ v.y += (rad_v * ((im_u * re_v) - (re_u * im_v)));
   "circlize": {
     params: [{ name: "hole", def: 0.4 }],
     verified: true, priority: 0, flags: [], types: ["2D"],
+    funcNames: ["atan2j"],
+    funcs: `fn atan2j(y: f32, x: f32) -> f32 { if (x == 0.0 && y == 0.0) { return select(0.0, PI, (bitcast<u32>(x) >> 31u) == 1u) * select(1.0, -1.0, (bitcast<u32>(y) >> 31u) == 1u); } return atan2(y, x); }`,
     code: (w, p) => `{
 var weight_4_pi: f32 = (${w} * 1.27323954);
 var absx: f32 = abs(t.x);
@@ -1590,6 +1850,8 @@ v.y += (r_ * sina);
   "post_mirror_wf": {
     params: [{ name: "xaxis", def: 1 }, { name: "yaxis", def: 0 }, { name: "zaxis", def: 0 }, { name: "xshift", def: 0 }, { name: "yshift", def: 0 }, { name: "zshift", def: 0 }, { name: "xscale", def: 1 }, { name: "yscale", def: 1 }, { name: "xcolorshift", def: 0 }, { name: "ycolorshift", def: 0 }, { name: "zcolorshift", def: 0 }],
     verified: true, priority: 1, flags: ["dc","z"], types: ["2D","DC","POST"],
+    funcNames: ["atan2j"],
+    funcs: `fn atan2j(y: f32, x: f32) -> f32 { if (x == 0.0 && y == 0.0) { return select(0.0, PI, (bitcast<u32>(x) >> 31u) == 1u) * select(1.0, -1.0, (bitcast<u32>(y) >> 31u) == 1u); } return atan2(y, x); }`,
     code: (w, p) => `{
 if ((abs(${w}) > 1.0e-8)) {
   if (((f32(i32(${p[0]})) > 0.0) && (rnd(rs) < 0.5))) {
@@ -1612,6 +1874,8 @@ if ((abs(${w}) > 1.0e-8)) {
   "bwraps7": {
     params: [{ name: "cellsize", def: 1 }, { name: "space", def: 0 }, { name: "gain", def: 2 }, { name: "inner_twist", def: 0 }, { name: "outer_twist", def: 0 }],
     verified: true, priority: 0, flags: [], types: ["2D"],
+    funcNames: ["atan2j"],
+    funcs: `fn atan2j(y: f32, x: f32) -> f32 { if (x == 0.0 && y == 0.0) { return select(0.0, PI, (bitcast<u32>(x) >> 31u) == 1u) * select(1.0, -1.0, (bitcast<u32>(y) >> 31u) == 1u); } return atan2(y, x); }`,
     code: (w, p) => `{
 var radius: f32 = (0.5 * (${p[0]} / (1.0 + (${p[1]} * ${p[1]}))));
 var _g2: f32 = ((${p[2]} * ${p[2]}) + 1.0e-20);
@@ -1667,6 +1931,8 @@ if ((abs(${p[0]}) < 1.0e-8)) {
   "colorscale_wf": {
     params: [{ name: "scale_x", def: 0 }, { name: "scale_y", def: 0 }, { name: "scale_z", def: 0.5 }, { name: "offset_z", def: 0 }, { name: "reset_z", def: 0 }, { name: "sides", def: 0 }],
     verified: true, priority: 0, flags: ["3d","dc","z"], types: ["3D","DC"],
+    funcNames: ["atan2j"],
+    funcs: `fn atan2j(y: f32, x: f32) -> f32 { if (x == 0.0 && y == 0.0) { return select(0.0, PI, (bitcast<u32>(x) >> 31u) == 1u) * select(1.0, -1.0, (bitcast<u32>(y) >> 31u) == 1u); } return atan2(y, x); }`,
     code: (w, p) => `{
 v.x += ((${w} * ${p[0]}) * t.x);
 v.y += ((${w} * ${p[1]}) * t.y);
@@ -1685,6 +1951,8 @@ if ((${p[4]} > 0)) {
   "heart_wf": {
     params: [{ name: "scale_x", def: 1 }, { name: "shift_t", def: 0 }, { name: "scale_r_left", def: 1 }, { name: "scale_r_right", def: 1 }],
     verified: true, priority: 0, flags: [], types: ["2D"],
+    funcNames: ["atan2j"],
+    funcs: `fn atan2j(y: f32, x: f32) -> f32 { if (x == 0.0 && y == 0.0) { return select(0.0, PI, (bitcast<u32>(x) >> 31u) == 1u) * select(1.0, -1.0, (bitcast<u32>(y) >> 31u) == 1u); } return atan2(y, x); }`,
     code: (w, p) => `{
 var nx: f32;
 var t_: f32;
@@ -1710,8 +1978,10 @@ v.y += (${w} * ny);
   "elliptic": {
     params: [{ name: "mode", def: 1 }],
     verified: true, priority: 0, flags: [], types: ["2D"],
-    funcNames: ["roundc","elliptic_sqrt1pm1","elliptic_sqrt_safe"],
+    funcNames: ["roundc","atan2j","elliptic_sqrt1pm1","elliptic_sqrt_safe"],
     funcs: `fn roundc(x: f32) -> f32 { return sign(x) * floor(abs(x) + 0.5); }
+
+fn atan2j(y: f32, x: f32) -> f32 { if (x == 0.0 && y == 0.0) { return select(0.0, PI, (bitcast<u32>(x) >> 31u) == 1u) * select(1.0, -1.0, (bitcast<u32>(y) >> 31u) == 1u); } return atan2(y, x); }
 
 fn elliptic_sqrt1pm1(x: f32) -> f32 {
   if (((-0.0625 < x) && (x < 0.0625))) {
@@ -1764,7 +2034,7 @@ if ((mode == 2)) {
   if ((mode == 1)) {
     sign_ = select(-1, 1, (rnd(rs) < 0.5));
   }
-  v.x += (_v * atan2(a, b));
+  v.x += (_v * atan2j(a, b));
   v.y += ((f32(sign_) * _v) * log((xmax + elliptic_sqrt_safe((xmax - 1.0)))));
 }
 }`,
@@ -1772,6 +2042,8 @@ if ((mode == 2)) {
   "waves2_wf": {
     params: [{ name: "scalex", def: 0.25 }, { name: "scaley", def: 0.5 }, { name: "freqx", def: 1.5707963267948966 }, { name: "freqy", def: 0.7853981633974483 }, { name: "use_cos_x", def: 1 }, { name: "use_cos_y", def: 0 }, { name: "dampx", def: 0 }, { name: "dampy", def: 0 }],
     verified: true, priority: 0, flags: [], types: ["2D"],
+    funcNames: ["atan2j"],
+    funcs: `fn atan2j(y: f32, x: f32) -> f32 { if (x == 0.0 && y == 0.0) { return select(0.0, PI, (bitcast<u32>(x) >> 31u) == 1u) * select(1.0, -1.0, (bitcast<u32>(y) >> 31u) == 1u); } return atan2(y, x); }`,
     code: (w, p) => `{
 var use_cos_x: bool = (i32(${p[4]}) != 0);
 var use_cos_y: bool = (i32(${p[5]}) != 0);
@@ -1792,8 +2064,10 @@ if (use_cos_y) {
   "crop": {
     params: [{ name: "left", def: -1 }, { name: "right", def: 1 }, { name: "top", def: -1 }, { name: "bottom", def: 1 }, { name: "scatter_area", def: 0 }, { name: "zero", def: 0 }],
     verified: true, priority: 0, flags: ["hide"], types: ["CROP"],
-    funcNames: ["roundc"],
-    funcs: `fn roundc(x: f32) -> f32 { return sign(x) * floor(abs(x) + 0.5); }`,
+    funcNames: ["roundc","atan2j"],
+    funcs: `fn roundc(x: f32) -> f32 { return sign(x) * floor(abs(x) + 0.5); }
+
+fn atan2j(y: f32, x: f32) -> f32 { if (x == 0.0 && y == 0.0) { return select(0.0, PI, (bitcast<u32>(x) >> 31u) == 1u) * select(1.0, -1.0, (bitcast<u32>(y) >> 31u) == 1u); } return atan2(y, x); }`,
     code: (w, p) => `{
 var xmin: f32;
 var xmax: f32;
@@ -1833,6 +2107,8 @@ if ((((((x < xmin) || (x > xmax)) || (y < ymin)) || (y > ymax)) && (i32(roundc(m
   "post_crop": {
     params: [{ name: "left", def: -1 }, { name: "right", def: 1 }, { name: "top", def: -1 }, { name: "bottom", def: 1 }, { name: "scatter_area", def: 0 }, { name: "zero", def: 0 }],
     verified: true, priority: 1, flags: ["hide"], types: ["CROP","POST"],
+    funcNames: ["atan2j"],
+    funcs: `fn atan2j(y: f32, x: f32) -> f32 { if (x == 0.0 && y == 0.0) { return select(0.0, PI, (bitcast<u32>(x) >> 31u) == 1u) * select(1.0, -1.0, (bitcast<u32>(y) >> 31u) == 1u); } return atan2(y, x); }`,
     code: (w, p) => `{
 var xmin: f32 = min(${p[0]}, ${p[1]});
 var ymin: f32 = min(${p[2]}, ${p[3]});
@@ -1866,8 +2142,10 @@ if ((((((x < xmin) || (x > xmax)) || (y < ymin)) || (y > ymax)) && (min(max(${p[
   "circlecrop": {
     params: [{ name: "radius", def: 1 }, { name: "x", def: 0 }, { name: "y", def: 0 }, { name: "scatter_area", def: 0 }, { name: "zero", def: 1 }],
     verified: true, priority: 0, flags: ["hide"], types: ["CROP"],
-    funcNames: ["roundc"],
-    funcs: `fn roundc(x: f32) -> f32 { return sign(x) * floor(abs(x) + 0.5); }`,
+    funcNames: ["atan2j","roundc"],
+    funcs: `fn atan2j(y: f32, x: f32) -> f32 { if (x == 0.0 && y == 0.0) { return select(0.0, PI, (bitcast<u32>(x) >> 31u) == 1u) * select(1.0, -1.0, (bitcast<u32>(y) >> 31u) == 1u); } return atan2(y, x); }
+
+fn roundc(x: f32) -> f32 { return sign(x) * floor(abs(x) + 0.5); }`,
     code: (w, p) => `{
 var cA: f32 = max(-1.0, min(${p[3]}, 1.0));
 var x0: f32 = ${p[1]};
@@ -1878,7 +2156,7 @@ var vv: f32 = ${w};
 t.x -= x0;
 t.y -= y0;
 var rad: f32 = sqrt(((t.x * t.x) + (t.y * t.y)));
-var ang: f32 = atan2(t.y, t.x);
+var ang: f32 = atan2j(t.y, t.x);
 var rdc: f32 = (cr + ((rnd(rs) * 0.5) * ca));
 var esc: i32 = select(0, 1, (rad > cr));
 var cr0: i32 = select(0, 1, (i32(roundc(f32(i32(${p[4]})))) == 1));
@@ -1904,8 +2182,10 @@ if (((cr0 != 0) && (esc != 0))) {
   "pre_circlecrop": {
     params: [{ name: "radius", def: 1 }, { name: "x", def: 0 }, { name: "y", def: 0 }, { name: "scatter_area", def: 0 }, { name: "zero", def: 1 }],
     verified: true, priority: -1, flags: ["hide"], types: ["CROP","PRE"],
-    funcNames: ["roundc"],
-    funcs: `fn roundc(x: f32) -> f32 { return sign(x) * floor(abs(x) + 0.5); }`,
+    funcNames: ["atan2j","roundc"],
+    funcs: `fn atan2j(y: f32, x: f32) -> f32 { if (x == 0.0 && y == 0.0) { return select(0.0, PI, (bitcast<u32>(x) >> 31u) == 1u) * select(1.0, -1.0, (bitcast<u32>(y) >> 31u) == 1u); } return atan2(y, x); }
+
+fn roundc(x: f32) -> f32 { return sign(x) * floor(abs(x) + 0.5); }`,
     code: (w, p) => `{
 var rinv_: f32 = 1.0 / r;
 var ca: f32 = max(-1.0, min(${p[3]}, 1.0));
@@ -1916,7 +2196,7 @@ var vv: f32 = ${w};
 t.x -= x0;
 t.y -= y0;
 var rad: f32 = sqrt(((t.x * t.x) + (t.y * t.y)));
-var ang: f32 = atan2(t.y, t.x);
+var ang: f32 = atan2j(t.y, t.x);
 var rdc: f32 = (cr + ((rnd(rs) * 0.5) * ca));
 var esc: i32 = select(0, 1, (rad > cr));
 var cr0: i32 = select(0, 1, (i32(roundc(f32(i32(${p[4]})))) == 1));
@@ -1940,7 +2220,7 @@ if (((cr0 != 0) && (esc != 0))) {
 r2 = ((t.x * t.x) + (t.y * t.y));
 r = sqrt(r2);
 rinv_ = (1.0 / r);
-th = atan2(t.x, t.y);
+th = atan2j(t.x, t.y);
 ph = ((0.5 * PI) - th);
 if ((ph > PI)) {
   ph -= (2.0 * PI);
@@ -1950,8 +2230,10 @@ if ((ph > PI)) {
   "post_circlecrop": {
     params: [{ name: "radius", def: 1 }, { name: "x", def: 0 }, { name: "y", def: 0 }, { name: "scatter_area", def: 0 }, { name: "zero", def: 1 }],
     verified: true, priority: 1, flags: ["hide"], types: ["CROP","POST"],
-    funcNames: ["roundc"],
-    funcs: `fn roundc(x: f32) -> f32 { return sign(x) * floor(abs(x) + 0.5); }`,
+    funcNames: ["atan2j","roundc"],
+    funcs: `fn atan2j(y: f32, x: f32) -> f32 { if (x == 0.0 && y == 0.0) { return select(0.0, PI, (bitcast<u32>(x) >> 31u) == 1u) * select(1.0, -1.0, (bitcast<u32>(y) >> 31u) == 1u); } return atan2(y, x); }
+
+fn roundc(x: f32) -> f32 { return sign(x) * floor(abs(x) + 0.5); }`,
     code: (w, p) => `{
 var x0: f32 = ${p[1]};
 var y0: f32 = ${p[2]};
@@ -1961,7 +2243,7 @@ var vv: f32 = ${w};
 v.x -= x0;
 v.y -= y0;
 var rad: f32 = sqrt(((v.x * v.x) + (v.y * v.y)));
-var ang: f32 = atan2(v.y, v.x);
+var ang: f32 = atan2j(v.y, v.x);
 var rdc: f32 = (cr + ((rnd(rs) * 0.5) * ca));
 var esc: bool = (rad > cr);
 var cr0: bool = (i32(roundc(f32(i32(${p[4]})))) == 1);
@@ -1987,7 +2269,7 @@ if ((cr0 && esc)) {
   "hexes": {
     params: [{ name: "cellsize", def: 1 }, { name: "power", def: 1 }, { name: "rotate", def: 0.166 }, { name: "scale", def: 1 }],
     verified: true, priority: 0, flags: [], types: ["2D","SIMULATION"],
-    funcNames: ["powc","hexes_cell_centre","hexes_closest","hexes_cell_choice","hexes_vratio","hexes_voronoi"],
+    funcNames: ["powc","atan2j","hexes_cell_centre","hexes_closest","hexes_cell_choice","hexes_vratio","hexes_voronoi"],
     funcs: `fn powc(x: f32, y: f32) -> f32 {
   if (x >= 0.0) { return pow(x, y); }
   let yi = round(y);
@@ -1995,6 +2277,8 @@ if ((cr0 && esc)) {
   let m = pow(-x, y);
   return select(m, -m, (i32(yi) & 1) != 0);
 }
+
+fn atan2j(y: f32, x: f32) -> f32 { if (x == 0.0 && y == 0.0) { return select(0.0, PI, (bitcast<u32>(x) >> 31u) == 1u) * select(1.0, -1.0, (bitcast<u32>(y) >> 31u) == 1u); } return atan2(y, x); }
 
 fn hexes_cell_centre(x: i32, y: i32, s: f32, V: ptr<function, array<f32, 2>>) {
   (*V)[0] = (((1.5 * f32(x)) + (-1.5 * f32(y))) * s);
@@ -2114,7 +2398,7 @@ if ((0.0 != s)) {
   "crackle": {
     params: [{ name: "cellsize", def: 1 }, { name: "power", def: 0.2 }, { name: "distort", def: 0 }, { name: "scale", def: 1 }, { name: "z", def: 0 }],
     verified: true, priority: 0, flags: ["stateful"], types: ["2D","SIMULATION","BASE_SHAPE"],
-    funcNames: ["powc","F3","fastFloor","G3","G33","X_PRIME","Y_PRIME","Z_PRIME","GRAD_3D_x","GRAD_3D_y","GRAD_3D_z","gradCoord3D","singleSimplex","jw_state0_crackle_position","jw_state0_crackle_closest","jw_state0_crackle_vratio","jw_state0_crackle_voronoi"],
+    funcNames: ["powc","atan2j","F3","fastFloor","G3","G33","X_PRIME","Y_PRIME","Z_PRIME","GRAD_3D_x","GRAD_3D_y","GRAD_3D_z","gradCoord3D","singleSimplex","jw_state0_crackle_position","jw_state0_crackle_closest","jw_state0_crackle_vratio","jw_state0_crackle_voronoi"],
     funcs: `fn powc(x: f32, y: f32) -> f32 {
   if (x >= 0.0) { return pow(x, y); }
   let yi = round(y);
@@ -2122,6 +2406,8 @@ if ((0.0 != s)) {
   let m = pow(-x, y);
   return select(m, -m, (i32(yi) & 1) != 0);
 }
+
+fn atan2j(y: f32, x: f32) -> f32 { if (x == 0.0 && y == 0.0) { return select(0.0, PI, (bitcast<u32>(x) >> 31u) == 1u) * select(1.0, -1.0, (bitcast<u32>(y) >> 31u) == 1u); } return atan2(y, x); }
 
 const F3: f32 = (1.0 / 3.0);
 
@@ -2374,8 +2660,10 @@ if ((abs(${p[0]}) > 0.000001)) {
   "mandelbrot": {
     params: [{ name: "iter", def: 100 }, { name: "xmin", def: -1.6 }, { name: "xmax", def: 1.6 }, { name: "ymin", def: -1.2 }, { name: "ymax", def: 1.2 }, { name: "invert", def: 0 }, { name: "skin", def: 0.012 }, { name: "cx", def: 0 }, { name: "cy", def: 0 }, { name: "max_points", def: -1 }, { name: "seed", def: 1234 }, { name: "rnd_z_range", def: 0 }],
     verified: true, priority: 0, flags: ["3d","state","z"], types: ["3D","SIMULATION","BASE_SHAPE","ESCAPE_TIME_FRACTAL"],
-    funcNames: ["jwx_mandelbrot_x0","jwx_mandelbrot_y0","jwx_mandelbrot_z0"],
-    funcs: `var<private> jwx_mandelbrot_x0: f32 = 0.0;
+    funcNames: ["jwx_mandelbrot_x0","jwx_mandelbrot_y0","jwx_mandelbrot_z0","atan2j"],
+    funcs: `fn atan2j(y: f32, x: f32) -> f32 { if (x == 0.0 && y == 0.0) { return select(0.0, PI, (bitcast<u32>(x) >> 31u) == 1u) * select(1.0, -1.0, (bitcast<u32>(y) >> 31u) == 1u); } return atan2(y, x); }
+
+var<private> jwx_mandelbrot_x0: f32 = 0.0;
 
 var<private> jwx_mandelbrot_y0: f32 = 0.0;
 
@@ -2441,6 +2729,8 @@ pz_ += _z0;
   "bubble_wf": {
     params: [],
     verified: true, priority: 0, flags: ["3d","z"], types: ["3D"],
+    funcNames: ["atan2j"],
+    funcs: `fn atan2j(y: f32, x: f32) -> f32 { if (x == 0.0 && y == 0.0) { return select(0.0, PI, (bitcast<u32>(x) >> 31u) == 1u) * select(1.0, -1.0, (bitcast<u32>(y) >> 31u) == 1u); } return atan2(y, x); }`,
     code: (w, _p) => `{
 var r_: f32 = ((((t.x * t.x) + (t.y * t.y)) / 4.0) + 1.0);
 var t_: f32 = (${w} / r_);
@@ -2456,6 +2746,8 @@ if ((rnd(rs) < 0.5)) {
   "spirograph": {
     params: [{ name: "a", def: 3 }, { name: "b", def: 2 }, { name: "d", def: 0 }, { name: "tmin", def: -1 }, { name: "tmax", def: 1 }, { name: "ymin", def: -1 }, { name: "ymax", def: 1 }, { name: "c1", def: 0 }, { name: "c2", def: 0 }],
     verified: true, priority: 0, flags: [], types: ["2D"],
+    funcNames: ["atan2j"],
+    funcs: `fn atan2j(y: f32, x: f32) -> f32 { if (x == 0.0 && y == 0.0) { return select(0.0, PI, (bitcast<u32>(x) >> 31u) == 1u) * select(1.0, -1.0, (bitcast<u32>(y) >> 31u) == 1u); } return atan2(y, x); }`,
     code: (w, p) => `{
 var d1: f32 = (((${p[4]} - ${p[3]}) * rnd(rs)) + ${p[3]});
 var d2: f32 = (((${p[6]} - ${p[5]}) * rnd(rs)) + ${p[5]});
@@ -2470,7 +2762,7 @@ v.y += (${w} * ((d4 + (${p[2]} * sin(d1))) + d2));
   "truchet": {
     params: [{ name: "extended", def: 0 }, { name: "exponent", def: 2 }, { name: "arc_width", def: 0.5 }, { name: "rotation", def: 0 }, { name: "size", def: 1 }, { name: "seed", def: 50 }, { name: "direct_color", def: 0 }],
     verified: true, priority: 0, flags: ["dc"], types: ["DC","SIMULATION"],
-    funcNames: ["roundc","powc"],
+    funcNames: ["roundc","powc","atan2j"],
     funcs: `fn roundc(x: f32) -> f32 { return sign(x) * floor(abs(x) + 0.5); }
 
 fn powc(x: f32, y: f32) -> f32 {
@@ -2479,7 +2771,9 @@ fn powc(x: f32, y: f32) -> f32 {
   if (abs(y - yi) > 1e-6) { return pow(x, y); }
   let m = pow(-x, y);
   return select(m, -m, (i32(yi) & 1) != 0);
-}`,
+}
+
+fn atan2j(y: f32, x: f32) -> f32 { if (x == 0.0 && y == 0.0) { return select(0.0, PI, (bitcast<u32>(x) >> 31u) == 1u) * select(1.0, -1.0, (bitcast<u32>(y) >> 31u) == 1u); } return atan2(y, x); }`,
     code: (w, p) => `{
 var extended: i32 = i32(roundc(min(max(${p[0]}, 0.0), 1.0)));
 var exponent: f32 = ${p[1]};
@@ -2621,6 +2915,8 @@ if ((r_ < 1.0)) {
   "post_colorscale_wf": {
     params: [{ name: "scale_x", def: 0 }, { name: "scale_y", def: 0 }, { name: "scale_z", def: 0.5 }, { name: "offset_z", def: 0 }, { name: "reset_z", def: 0 }, { name: "sides", def: 0 }],
     verified: true, priority: 1, flags: ["3d","dc","z"], types: ["3D","POST"],
+    funcNames: ["atan2j"],
+    funcs: `fn atan2j(y: f32, x: f32) -> f32 { if (x == 0.0 && y == 0.0) { return select(0.0, PI, (bitcast<u32>(x) >> 31u) == 1u) * select(1.0, -1.0, (bitcast<u32>(y) >> 31u) == 1u); } return atan2(y, x); }`,
     code: (w, p) => `{
 v.x += ((${w} * ${p[0]}) * v.x);
 v.y += ((${w} * ${p[1]}) * v.y);
@@ -2639,6 +2935,8 @@ if ((${p[4]} > 0)) {
   "cloverleaf_wf": {
     params: [{ name: "filled", def: 0.85 }],
     verified: true, priority: 0, flags: [], types: ["BASE_SHAPE"],
+    funcNames: ["atan2j"],
+    funcs: `fn atan2j(y: f32, x: f32) -> f32 { if (x == 0.0 && y == 0.0) { return select(0.0, PI, (bitcast<u32>(x) >> 31u) == 1u) * select(1.0, -1.0, (bitcast<u32>(y) >> 31u) == 1u); } return atan2(y, x); }`,
     code: (w, p) => `{
 var a: f32 = th;
 var r_: f32 = (sin((2.0 * a)) + (0.25 * sin((6.0 * a))));
@@ -2654,6 +2952,8 @@ v.y += (${w} * ny);
   "cannabiscurve_wf": {
     params: [{ name: "filled", def: 0.85 }],
     verified: true, priority: 0, flags: [], types: ["BASE_SHAPE"],
+    funcNames: ["atan2j"],
+    funcs: `fn atan2j(y: f32, x: f32) -> f32 { if (x == 0.0 && y == 0.0) { return select(0.0, PI, (bitcast<u32>(x) >> 31u) == 1u) * select(1.0, -1.0, (bitcast<u32>(y) >> 31u) == 1u); } return atan2(y, x); }`,
     code: (w, p) => `{
 var a: f32 = th;
 var r_: f32 = ((((1.0 + ((9.0 / 10.0) * cos((8.0 * a)))) * (1.0 + ((1.0 / 10.0) * cos((24.0 * a))))) * ((9.0 / 10.0) + ((1.0 / 10.0) * cos((200.0 * a))))) * (1.0 + sin(a)));
@@ -2670,6 +2970,8 @@ v.y += (${w} * ny);
   "kaleidoscope": {
     params: [{ name: "pull", def: 0 }, { name: "rotate", def: 1 }, { name: "line_up", def: 1 }, { name: "x", def: 0 }, { name: "y", def: 0 }],
     verified: true, priority: 0, flags: [], types: ["2D"],
+    funcNames: ["atan2j"],
+    funcs: `fn atan2j(y: f32, x: f32) -> f32 { if (x == 0.0 && y == 0.0) { return select(0.0, PI, (bitcast<u32>(x) >> 31u) == 1u) * select(1.0, -1.0, (bitcast<u32>(y) >> 31u) == 1u); } return atan2(y, x); }`,
     code: (_w, p) => `{
 var q: f32 = ${p[0]};
 var w_: f32 = ${p[1]};
@@ -2687,6 +2989,8 @@ if ((t.y > 0)) {
   "waves3_wf": {
     params: [{ name: "scalex", def: 0.25 }, { name: "scaley", def: 0.5 }, { name: "freqx", def: 1.5707963267948966 }, { name: "freqy", def: 0.7853981633974483 }, { name: "use_cos_x", def: 1 }, { name: "use_cos_y", def: 0 }, { name: "dampx", def: 0 }, { name: "dampy", def: 0 }],
     verified: true, priority: 0, flags: [], types: ["2D"],
+    funcNames: ["atan2j"],
+    funcs: `fn atan2j(y: f32, x: f32) -> f32 { if (x == 0.0 && y == 0.0) { return select(0.0, PI, (bitcast<u32>(x) >> 31u) == 1u) * select(1.0, -1.0, (bitcast<u32>(y) >> 31u) == 1u); } return atan2(y, x); }`,
     code: (w, p) => `{
 var use_cos_x: bool = (i32(${p[4]}) != 0);
 var use_cos_y: bool = (i32(${p[5]}) != 0);
@@ -2707,6 +3011,8 @@ if (use_cos_y) {
   "waves4_wf": {
     params: [{ name: "scalex", def: 0.25 }, { name: "scaley", def: 0.5 }, { name: "freqx", def: 1.5707963267948966 }, { name: "freqy", def: 0.7853981633974483 }, { name: "use_cos_x", def: 1 }, { name: "use_cos_y", def: 0 }, { name: "dampx", def: 0 }, { name: "dampy", def: 0 }],
     verified: true, priority: 0, flags: [], types: ["2D"],
+    funcNames: ["atan2j"],
+    funcs: `fn atan2j(y: f32, x: f32) -> f32 { if (x == 0.0 && y == 0.0) { return select(0.0, PI, (bitcast<u32>(x) >> 31u) == 1u) * select(1.0, -1.0, (bitcast<u32>(y) >> 31u) == 1u); } return atan2(y, x); }`,
     code: (w, p) => `{
 var use_cos_x: bool = (i32(${p[4]}) != 0);
 var use_cos_y: bool = (i32(${p[5]}) != 0);
@@ -2727,7 +3033,7 @@ if (use_cos_y) {
   "glynnSim1": {
     params: [{ name: "radius", def: 1 }, { name: "radius1", def: 0.1 }, { name: "phi1", def: 110 }, { name: "thickness", def: 0.1 }, { name: "pow", def: 1.5 }, { name: "contrast", def: 0.5 }],
     verified: true, priority: 0, flags: [], types: ["2D","SIMULATION"],
-    funcNames: ["powc","glynnSim1_circle","sqrf"],
+    funcNames: ["powc","atan2j","glynnSim1_circle","sqrf"],
     funcs: `fn powc(x: f32, y: f32) -> f32 {
   if (x >= 0.0) { return pow(x, y); }
   let yi = round(y);
@@ -2735,6 +3041,8 @@ if (use_cos_y) {
   let m = pow(-x, y);
   return select(m, -m, (i32(yi) & 1) != 0);
 }
+
+fn atan2j(y: f32, x: f32) -> f32 { if (x == 0.0 && y == 0.0) { return select(0.0, PI, (bitcast<u32>(x) >> 31u) == 1u) * select(1.0, -1.0, (bitcast<u32>(y) >> 31u) == 1u); } return atan2(y, x); }
 
 fn glynnSim1_circle(x: ptr<function, f32>, y: ptr<function, f32>, rnd1: f32, rnd2: f32, radius1: f32, thickness: f32, _x1: f32, _y1: f32) {
   var r_: f32 = (radius1 * (thickness + ((1.0 - thickness) * rnd1)));
@@ -2786,7 +3094,7 @@ if ((r_ < ${p[0]})) {
   "glynnSim2": {
     params: [{ name: "radius", def: 1 }, { name: "thickness", def: 0.1 }, { name: "contrast", def: 0.5 }, { name: "pow", def: 1.5 }, { name: "phi1", def: 110 }, { name: "phi2", def: 150 }],
     verified: true, priority: 0, flags: [], types: ["2D","SIMULATION"],
-    funcNames: ["powc","glynnSim2_circle"],
+    funcNames: ["powc","atan2j","glynnSim2_circle"],
     funcs: `fn powc(x: f32, y: f32) -> f32 {
   if (x >= 0.0) { return pow(x, y); }
   let yi = round(y);
@@ -2794,6 +3102,8 @@ if ((r_ < ${p[0]})) {
   let m = pow(-x, y);
   return select(m, -m, (i32(yi) & 1) != 0);
 }
+
+fn atan2j(y: f32, x: f32) -> f32 { if (x == 0.0 && y == 0.0) { return select(0.0, PI, (bitcast<u32>(x) >> 31u) == 1u) * select(1.0, -1.0, (bitcast<u32>(y) >> 31u) == 1u); } return atan2(y, x); }
 
 fn glynnSim2_circle(x: ptr<function, f32>, y: ptr<function, f32>, rnd1: f32, rnd2: f32, radius: f32, thickness: f32, gamma: f32, phi10: f32, delta: f32) {
   var r_: f32 = ((radius + thickness) - (gamma * rnd1));
@@ -2836,7 +3146,7 @@ if ((r_ < ${p[0]})) {
   "glynnSim3": {
     params: [{ name: "radius", def: 1 }, { name: "thickness", def: 0.1 }, { name: "contrast", def: 0.5 }, { name: "pow", def: 1.5 }],
     verified: true, priority: 0, flags: [], types: ["2D","SIMULATION"],
-    funcNames: ["powc","sqrf","glynnSim3_circle2"],
+    funcNames: ["powc","atan2j","sqrf","glynnSim3_circle2"],
     funcs: `fn powc(x: f32, y: f32) -> f32 {
   if (x >= 0.0) { return pow(x, y); }
   let yi = round(y);
@@ -2844,6 +3154,8 @@ if ((r_ < ${p[0]})) {
   let m = pow(-x, y);
   return select(m, -m, (i32(yi) & 1) != 0);
 }
+
+fn atan2j(y: f32, x: f32) -> f32 { if (x == 0.0 && y == 0.0) { return select(0.0, PI, (bitcast<u32>(x) >> 31u) == 1u) * select(1.0, -1.0, (bitcast<u32>(y) >> 31u) == 1u); } return atan2(y, x); }
 
 fn sqrf(x: f32) -> f32 {
   return (x * x);
@@ -2893,6 +3205,8 @@ if ((r_ < _radius1)) {
   "eclipse": {
     params: [{ name: "shift", def: 0.1 }],
     verified: true, priority: 0, flags: [], types: ["2D"],
+    funcNames: ["atan2j"],
+    funcs: `fn atan2j(y: f32, x: f32) -> f32 { if (x == 0.0 && y == 0.0) { return select(0.0, PI, (bitcast<u32>(x) >> 31u) == 1u) * select(1.0, -1.0, (bitcast<u32>(y) >> 31u) == 1u); } return atan2(y, x); }`,
     code: (w, p) => `{
 var c_2: f32;
 var x: f32;
@@ -2918,14 +3232,16 @@ if ((abs(t.y) <= ${w})) {
   "spherical3D_wf": {
     params: [{ name: "invert", def: 0 }, { name: "exponent", def: 2 }],
     verified: true, priority: 0, flags: ["3d","z"], types: ["3D"],
-    funcNames: ["powc"],
+    funcNames: ["powc","atan2j"],
     funcs: `fn powc(x: f32, y: f32) -> f32 {
   if (x >= 0.0) { return pow(x, y); }
   let yi = round(y);
   if (abs(y - yi) > 1e-6) { return pow(x, y); }
   let m = pow(-x, y);
   return select(m, -m, (i32(yi) & 1) != 0);
-}`,
+}
+
+fn atan2j(y: f32, x: f32) -> f32 { if (x == 0.0 && y == 0.0) { return select(0.0, PI, (bitcast<u32>(x) >> 31u) == 1u) * select(1.0, -1.0, (bitcast<u32>(y) >> 31u) == 1u); } return atan2(y, x); }`,
     code: (w, p) => `{
 var _regularForm: f32 = select(0.0, 1.0, (abs((${p[1]} - 2.0)) < 1.0e-10));
 var _dontInvert: bool = (abs(f32(i32(${p[0]}))) < 1.0e-8);
@@ -2949,6 +3265,8 @@ if (_dontInvert) {
   "post_ztranslate_wf": {
     params: [],
     verified: true, priority: 1, flags: ["z"], types: ["ZTRANSFORM","POST"],
+    funcNames: ["atan2j"],
+    funcs: `fn atan2j(y: f32, x: f32) -> f32 { if (x == 0.0 && y == 0.0) { return select(0.0, PI, (bitcast<u32>(x) >> 31u) == 1u) * select(1.0, -1.0, (bitcast<u32>(y) >> 31u) == 1u); } return atan2(y, x); }`,
     code: (w, _p) => `{
 pz_ += ${w};
 }`,
@@ -2956,6 +3274,8 @@ pz_ += ${w};
   "post_zscale_wf": {
     params: [{ name: "ztranslate", def: 0 }],
     verified: true, priority: 0, flags: ["z"], types: ["ZTRANSFORM","POST"],
+    funcNames: ["atan2j"],
+    funcs: `fn atan2j(y: f32, x: f32) -> f32 { if (x == 0.0 && y == 0.0) { return select(0.0, PI, (bitcast<u32>(x) >> 31u) == 1u) * select(1.0, -1.0, (bitcast<u32>(y) >> 31u) == 1u); } return atan2(y, x); }`,
     code: (w, p) => `{
 pz_ = ((${w} * pz_) + ${p[0]});
 }`,
@@ -2963,14 +3283,16 @@ pz_ = ((${w} * pz_) + ${p[0]});
   "linearT": {
     params: [{ name: "powX", def: 1.2 }, { name: "powY", def: 0.9 }],
     verified: true, priority: 0, flags: [], types: ["2D"],
-    funcNames: ["powc"],
+    funcNames: ["powc","atan2j"],
     funcs: `fn powc(x: f32, y: f32) -> f32 {
   if (x >= 0.0) { return pow(x, y); }
   let yi = round(y);
   if (abs(y - yi) > 1e-6) { return pow(x, y); }
   let m = pow(-x, y);
   return select(m, -m, (i32(yi) & 1) != 0);
-}`,
+}
+
+fn atan2j(y: f32, x: f32) -> f32 { if (x == 0.0 && y == 0.0) { return select(0.0, PI, (bitcast<u32>(x) >> 31u) == 1u) * select(1.0, -1.0, (bitcast<u32>(y) >> 31u) == 1u); } return atan2(y, x); }`,
     code: (w, p) => `{
 v.x += ((select(1.0, -1.0, (t.x < 0.0)) * powc(abs(t.x), ${p[0]})) * ${w});
 v.y += ((select(1.0, -1.0, (t.y < 0.0)) * powc(abs(t.y), ${p[1]})) * ${w});
@@ -2979,14 +3301,16 @@ v.y += ((select(1.0, -1.0, (t.y < 0.0)) * powc(abs(t.y), ${p[1]})) * ${w});
   "linearT3D": {
     params: [{ name: "powX", def: 1.35 }, { name: "powY", def: 0.85 }, { name: "powZ", def: 1.15 }],
     verified: true, priority: 0, flags: ["3d","z"], types: ["3D"],
-    funcNames: ["powc"],
+    funcNames: ["powc","atan2j"],
     funcs: `fn powc(x: f32, y: f32) -> f32 {
   if (x >= 0.0) { return pow(x, y); }
   let yi = round(y);
   if (abs(y - yi) > 1e-6) { return pow(x, y); }
   let m = pow(-x, y);
   return select(m, -m, (i32(yi) & 1) != 0);
-}`,
+}
+
+fn atan2j(y: f32, x: f32) -> f32 { if (x == 0.0 && y == 0.0) { return select(0.0, PI, (bitcast<u32>(x) >> 31u) == 1u) * select(1.0, -1.0, (bitcast<u32>(y) >> 31u) == 1u); } return atan2(y, x); }`,
     code: (w, p) => `{
 v.x += ((select(1.0, -1.0, (t.x < 0.0)) * powc(abs(t.x), ${p[0]})) * ${w});
 v.y += ((select(1.0, -1.0, (t.y < 0.0)) * powc(abs(t.y), ${p[1]})) * ${w});
@@ -2996,8 +3320,10 @@ pz_ += ((select(1.0, -1.0, (z_ < 0.0)) * powc(abs(z_), ${p[2]})) * ${w});
   "npolar": {
     params: [{ name: "parity", def: 0 }, { name: "n", def: 1 }],
     verified: true, priority: 0, flags: [], types: ["2D"],
-    funcNames: ["roundc","powc"],
+    funcNames: ["roundc","atan2j","powc"],
     funcs: `fn roundc(x: f32) -> f32 { return sign(x) * floor(abs(x) + 0.5); }
+
+fn atan2j(y: f32, x: f32) -> f32 { if (x == 0.0 && y == 0.0) { return select(0.0, PI, (bitcast<u32>(x) >> 31u) == 1u) * select(1.0, -1.0, (bitcast<u32>(y) >> 31u) == 1u); } return atan2(y, x); }
 
 fn powc(x: f32, y: f32) -> f32 {
   if (x >= 0.0) { return pow(x, y); }
@@ -3015,16 +3341,16 @@ var _vvar_2: f32 = (_vvar * 0.5);
 var _absn: f32 = abs(f32(_nnz));
 var _cn: f32 = ((1.0 / f32(_nnz)) / 2.0);
 var _isodd: f32 = f32((select(parity, -parity, (parity < 0)) % 2));
-var x: f32 = select((_vvar * atan2(t.x, t.y)), t.x, (_isodd != 0));
+var x: f32 = select((_vvar * atan2j(t.x, t.y)), t.x, (_isodd != 0));
 var y: f32 = select((_vvar_2 * log(((t.x * t.x) + (t.y * t.y)))), t.y, (_isodd != 0));
-var angle: f32 = ((atan2(y, x) + ((2.0 * PI) * f32((i32(roundc((rnd(rs) * 65535))) % i32(_absn))))) / f32(_nnz));
+var angle: f32 = ((atan2j(y, x) + ((2.0 * PI) * f32((i32(roundc((rnd(rs) * 65535))) % i32(_absn))))) / f32(_nnz));
 var r_: f32 = ((${w} * powc(((x * x) + (y * y)), _cn)) * select(f32(parity), 1.0, (_isodd == 0)));
 var sina: f32 = sin(angle);
 var cosa: f32 = cos(angle);
 cosa *= r_;
 sina *= r_;
 x = select((_vvar_2 * log(((cosa * cosa) + (sina * sina)))), cosa, (_isodd != 0));
-y = select((_vvar * atan2(cosa, sina)), sina, (_isodd != 0));
+y = select((_vvar * atan2j(cosa, sina)), sina, (_isodd != 0));
 v.x += x;
 v.y += y;
 }`,
@@ -3032,6 +3358,8 @@ v.y += y;
   "lissajous": {
     params: [{ name: "tmin", def: -3.141592653589793 }, { name: "tmax", def: 3.141592653589793 }, { name: "a", def: 3 }, { name: "b", def: 2 }, { name: "c", def: 0 }, { name: "d", def: 0 }, { name: "e", def: 0 }],
     verified: true, priority: 0, flags: [], types: ["2D"],
+    funcNames: ["atan2j"],
+    funcs: `fn atan2j(y: f32, x: f32) -> f32 { if (x == 0.0 && y == 0.0) { return select(0.0, PI, (bitcast<u32>(x) >> 31u) == 1u) * select(1.0, -1.0, (bitcast<u32>(y) >> 31u) == 1u); } return atan2(y, x); }`,
     code: (w, p) => `{
 var t_: f32 = (((${p[1]} - ${p[0]}) * rnd(rs)) + ${p[0]});
 var y0: f32 = (rnd(rs) - 0.5);
@@ -3044,6 +3372,8 @@ v.y += (${w} * ((y1 + (${p[4]} * t_)) + (${p[6]} * y0)));
   "waffle": {
     params: [{ name: "slices", def: 6 }, { name: "xthickness", def: 0.5 }, { name: "ythickness", def: 0.5 }, { name: "rotation", def: 0 }],
     verified: true, priority: 0, flags: [], types: [],
+    funcNames: ["atan2j"],
+    funcs: `fn atan2j(y: f32, x: f32) -> f32 { if (x == 0.0 && y == 0.0) { return select(0.0, PI, (bitcast<u32>(x) >> 31u) == 1u) * select(1.0, -1.0, (bitcast<u32>(y) >> 31u) == 1u); } return atan2(y, x); }`,
     code: (w, p) => `{
 var vcosr: f32 = (${w} * cos(${p[3]}));
 var vsinr: f32 = (${w} * sin(${p[3]}));
@@ -3080,6 +3410,8 @@ v.y += ((-vsinr * a) + (vcosr * r_));
   "unpolar": {
     params: [],
     verified: true, priority: 0, flags: [], types: ["2D"],
+    funcNames: ["atan2j"],
+    funcs: `fn atan2j(y: f32, x: f32) -> f32 { if (x == 0.0 && y == 0.0) { return select(0.0, PI, (bitcast<u32>(x) >> 31u) == 1u) * select(1.0, -1.0, (bitcast<u32>(y) >> 31u) == 1u); } return atan2(y, x); }`,
     code: (w, _p) => `{
 var vvar: f32 = (${w} / PI);
 var vvar_2: f32 = (vvar * 0.5);
@@ -3093,6 +3425,8 @@ v.x += ((vvar_2 * r_) * s);
   "checks": {
     params: [{ name: "x", def: 3 }, { name: "y", def: 3 }, { name: "size", def: 1 }, { name: "rnd", def: 0.5 }],
     verified: true, priority: 0, flags: [], types: ["2D"],
+    funcNames: ["atan2j"],
+    funcs: `fn atan2j(y: f32, x: f32) -> f32 { if (x == 0.0 && y == 0.0) { return select(0.0, PI, (bitcast<u32>(x) >> 31u) == 1u) * select(1.0, -1.0, (bitcast<u32>(y) >> 31u) == 1u); } return atan2(y, x); }`,
     code: (w, p) => `{
 var _cs: f32;
 var _ncx: f32;
@@ -3119,6 +3453,8 @@ v.y += (${w} * (t.y + dy));
   "bi_linear": {
     params: [],
     verified: true, priority: 0, flags: [], types: ["2D"],
+    funcNames: ["atan2j"],
+    funcs: `fn atan2j(y: f32, x: f32) -> f32 { if (x == 0.0 && y == 0.0) { return select(0.0, PI, (bitcast<u32>(x) >> 31u) == 1u) * select(1.0, -1.0, (bitcast<u32>(y) >> 31u) == 1u); } return atan2(y, x); }`,
     code: (w, _p) => `{
 v.x += (${w} * t.y);
 v.y += (${w} * t.x);
@@ -3127,6 +3463,8 @@ v.y += (${w} * t.x);
   "farblur": {
     params: [{ name: "x", def: 1 }, { name: "y", def: 1 }, { name: "z", def: 1 }, { name: "x_origin", def: 0 }, { name: "y_origin", def: 0 }, { name: "z_origin", def: 0 }],
     verified: true, priority: 1, flags: ["z"], types: ["BLUR"],
+    funcNames: ["atan2j"],
+    funcs: `fn atan2j(y: f32, x: f32) -> f32 { if (x == 0.0 && y == 0.0) { return select(0.0, PI, (bitcast<u32>(x) >> 31u) == 1u) * select(1.0, -1.0, (bitcast<u32>(y) >> 31u) == 1u); } return atan2(y, x); }`,
     code: (w, p) => `{
 var su: f32;
 var cu: f32;
@@ -3149,8 +3487,10 @@ pz_ += ((${p[2]} * r_) * cv);
   "falloff2": {
     params: [{ name: "scatter", def: 1 }, { name: "mindist", def: 0.5 }, { name: "mul_x", def: 1 }, { name: "mul_y", def: 1 }, { name: "mul_z", def: 0 }, { name: "mul_c", def: 0 }, { name: "x0", def: 0 }, { name: "y0", def: 0 }, { name: "z0", def: 0 }, { name: "invert", def: 0 }, { name: "type", def: 0 }],
     verified: true, priority: 0, flags: ["3d","dc","z"], types: ["3D","BLUR"],
-    funcNames: ["roundc","sqrf","fracf"],
+    funcNames: ["roundc","atan2j","sqrf","fracf"],
     funcs: `fn roundc(x: f32) -> f32 { return sign(x) * floor(abs(x) + 0.5); }
+
+fn atan2j(y: f32, x: f32) -> f32 { if (x == 0.0 && y == 0.0) { return select(0.0, PI, (bitcast<u32>(x) >> 31u) == 1u) * select(1.0, -1.0, (bitcast<u32>(y) >> 31u) == 1u); } return atan2(y, x); }
 
 fn sqrf(x: f32) -> f32 {
   return (x * x);
@@ -3180,7 +3520,7 @@ switch i32(roundc(min(max(${p[10]}, 0.0), 2.0))) {
         d = 0;
       }
       var sigma: f32 = (asin((pIn_z / r_in)) + ((min(max(${p[4]}, 0.0), 1.0) * rnd(rs)) * d));
-      var phi: f32 = (atan2(pIn_y, pIn_x) + ((min(max(${p[3]}, 0.0), 1.0) * rnd(rs)) * d));
+      var phi: f32 = (atan2j(pIn_y, pIn_x) + ((min(max(${p[3]}, 0.0), 1.0) * rnd(rs)) * d));
       var r_: f32 = (r_in + ((min(max(${p[2]}, 0.0), 1.0) * rnd(rs)) * d));
       var sins: f32 = sin(sigma);
       var coss: f32 = cos(sigma);
@@ -3243,8 +3583,10 @@ switch i32(roundc(min(max(${p[10]}, 0.0), 2.0))) {
   "post_falloff2": {
     params: [{ name: "scatter", def: 1 }, { name: "mindist", def: 0.5 }, { name: "mul_x", def: 1 }, { name: "mul_y", def: 1 }, { name: "mul_z", def: 0 }, { name: "mul_c", def: 0 }, { name: "x0", def: 0 }, { name: "y0", def: 0 }, { name: "z0", def: 0 }, { name: "invert", def: 0 }, { name: "type", def: 0 }],
     verified: true, priority: 1, flags: ["3d","dc","z"], types: ["3D","POST","BLUR"],
-    funcNames: ["roundc","sqrf","fracf"],
+    funcNames: ["roundc","atan2j","sqrf","fracf"],
     funcs: `fn roundc(x: f32) -> f32 { return sign(x) * floor(abs(x) + 0.5); }
+
+fn atan2j(y: f32, x: f32) -> f32 { if (x == 0.0 && y == 0.0) { return select(0.0, PI, (bitcast<u32>(x) >> 31u) == 1u) * select(1.0, -1.0, (bitcast<u32>(y) >> 31u) == 1u); } return atan2(y, x); }
 
 fn sqrf(x: f32) -> f32 {
   return (x * x);
@@ -3274,7 +3616,7 @@ switch i32(roundc(${p[10]})) {
         d = 0;
       }
       var sigma: f32 = (asin((pIn_z / r_in)) + ((${p[4]} * rnd(rs)) * d));
-      var phi: f32 = (atan2(pIn_y, pIn_x) + ((${p[3]} * rnd(rs)) * d));
+      var phi: f32 = (atan2j(pIn_y, pIn_x) + ((${p[3]} * rnd(rs)) * d));
       var r_: f32 = (r_in + ((${p[2]} * rnd(rs)) * d));
       var sins: f32 = sin(sigma);
       var coss: f32 = cos(sigma);
@@ -3337,6 +3679,8 @@ switch i32(roundc(${p[10]})) {
   "flipy": {
     params: [],
     verified: true, priority: 0, flags: [], types: ["2D"],
+    funcNames: ["atan2j"],
+    funcs: `fn atan2j(y: f32, x: f32) -> f32 { if (x == 0.0 && y == 0.0) { return select(0.0, PI, (bitcast<u32>(x) >> 31u) == 1u) * select(1.0, -1.0, (bitcast<u32>(y) >> 31u) == 1u); } return atan2(y, x); }`,
     code: (w, _p) => `{
 if ((t.x > 0.0)) {
   v.y -= (${w} * t.y);
@@ -3349,6 +3693,8 @@ v.x += (${w} * t.x);
   "flipcircle": {
     params: [],
     verified: true, priority: 0, flags: [], types: ["2D"],
+    funcNames: ["atan2j"],
+    funcs: `fn atan2j(y: f32, x: f32) -> f32 { if (x == 0.0 && y == 0.0) { return select(0.0, PI, (bitcast<u32>(x) >> 31u) == 1u) * select(1.0, -1.0, (bitcast<u32>(y) >> 31u) == 1u); } return atan2(y, x); }`,
     code: (w, _p) => `{
 if ((r2 > (${w} * ${w}))) {
   v.y += (${w} * t.y);
@@ -3361,8 +3707,10 @@ v.x += (${w} * t.x);
   "epispiral": {
     params: [{ name: "n", def: 6 }, { name: "thickness", def: 0 }, { name: "holes", def: 1 }],
     verified: true, priority: 0, flags: [], types: ["2D"],
+    funcNames: ["atan2j"],
+    funcs: `fn atan2j(y: f32, x: f32) -> f32 { if (x == 0.0 && y == 0.0) { return select(0.0, PI, (bitcast<u32>(x) >> 31u) == 1u) * select(1.0, -1.0, (bitcast<u32>(y) >> 31u) == 1u); } return atan2(y, x); }`,
     code: (w, p) => `{
-var theta: f32 = atan2(t.y, t.x);
+var theta: f32 = atan2j(t.y, t.x);
 var t_: f32 = -(${p[2]});
 if ((abs(${p[1]}) > 0.000001)) {
   var d: f32 = cos((${p[0]} * theta));
@@ -3375,9 +3723,65 @@ v.x += ((${w} * t_) * cos(theta));
 v.y += ((${w} * t_) * sin(theta));
 }`,
   },
+  "dc_cube": {
+    params: [{ name: "c1", def: 0.1 }, { name: "c2", def: 0.2 }, { name: "c3", def: 0.3 }, { name: "c4", def: 0.4 }, { name: "c5", def: 0.5 }, { name: "c6", def: 0.6 }, { name: "x", def: 1 }, { name: "y", def: 1 }, { name: "z", def: 1 }],
+    verified: true, priority: 0, flags: ["3d","dc","z"], types: ["3D","DC","BASE_SHAPE"],
+    funcNames: ["rndi","atan2j"],
+    funcs: `fn rndi(state: ptr<function, u32>) -> u32 { var x = *state; x ^= x << 13u; x ^= x >> 17u; x ^= x << 5u; *state = x; return x; }
+
+fn atan2j(y: f32, x: f32) -> f32 { if (x == 0.0 && y == 0.0) { return select(0.0, PI, (bitcast<u32>(x) >> 31u) == 1u) * select(1.0, -1.0, (bitcast<u32>(y) >> 31u) == 1u); } return atan2(y, x); }`,
+    code: (w, p) => `{
+var p_: f32 = ((2 * rnd(rs)) - 1.0);
+var q: f32 = ((2 * rnd(rs)) - 1);
+var i: i32 = (i32((rndi(rs) >> 1)) % 3);
+var j: bool = ((i32((rndi(rs) >> 1)) & 1) == 1);
+var x: f32 = 0.0;
+var y: f32 = 0.0;
+var z: f32 = 0.0;
+switch i {
+  case 0: {
+    x = (${w} * f32(select(1, -1, j)));
+    y = (${w} * p_);
+    z = (${w} * q);
+    if (j) {
+      (*cp) = min(max(${p[0]}, 0.0), 1.0);
+    } else {
+      (*cp) = min(max(${p[1]}, 0.0), 1.0);
+    }
+  }
+  case 1: {
+    x = (${w} * p_);
+    y = (${w} * f32(select(1, -1, j)));
+    z = (${w} * q);
+    if (j) {
+      (*cp) = min(max(${p[2]}, 0.0), 1.0);
+    } else {
+      (*cp) = min(max(${p[3]}, 0.0), 1.0);
+    }
+  }
+  case 2: {
+    x = (${w} * p_);
+    y = (${w} * q);
+    z = (${w} * f32(select(1, -1, j)));
+    if (j) {
+      (*cp) = min(max(${p[4]}, 0.0), 1.0);
+    } else {
+      (*cp) = min(max(${p[5]}, 0.0), 1.0);
+    }
+  }
+  case default: {
+  }
+}
+v.x += (x * ${p[6]});
+v.y += (y * ${p[7]});
+pz_ += (z * ${p[8]});
+}`,
+  },
   "layered_spiral": {
     params: [{ name: "radius", def: 1 }],
     verified: true, priority: 0, flags: [], types: ["2D"],
+    funcNames: ["atan2j"],
+    funcs: `fn atan2j(y: f32, x: f32) -> f32 { if (x == 0.0 && y == 0.0) { return select(0.0, PI, (bitcast<u32>(x) >> 31u) == 1u) * select(1.0, -1.0, (bitcast<u32>(y) >> 31u) == 1u); } return atan2(y, x); }`,
     code: (w, p) => `{
 var a: f32 = (t.x * ${p[0]});
 var t_: f32 = (((t.x * t.x) + (t.y * t.y)) + 1.0e-20);
@@ -3392,12 +3796,14 @@ v.y += ((${w} * a) * s);
   "collideoscope": {
     params: [{ name: "a", def: 0.2 }, { name: "num", def: 1 }],
     verified: true, priority: 0, flags: [], types: ["2D"],
+    funcNames: ["atan2j"],
+    funcs: `fn atan2j(y: f32, x: f32) -> f32 { if (x == 0.0 && y == 0.0) { return select(0.0, PI, (bitcast<u32>(x) >> 31u) == 1u) * select(1.0, -1.0, (bitcast<u32>(y) >> 31u) == 1u); } return atan2(y, x); }`,
     code: (w, p) => `{
 var _kn_pi: f32 = (${p[1]} * (1.0 / PI));
 var _pi_kn: f32 = (PI / ${p[1]});
 var _ka: f32 = (PI * min(max(${p[0]}, 0.0), 1.0));
 var _ka_kn: f32 = (_ka / ${p[1]});
-var a: f32 = atan2(t.y, t.x);
+var a: f32 = atan2j(t.y, t.x);
 var r_: f32 = (${w} * r);
 var alt: i32;
 if ((a >= 0.0)) {
@@ -3426,6 +3832,8 @@ v.y += (r_ * s);
   "hypertile": {
     params: [{ name: "p", def: 3 }, { name: "q", def: 7 }, { name: "n", def: 1 }],
     verified: true, priority: 0, flags: [], types: ["2D"],
+    funcNames: ["atan2j"],
+    funcs: `fn atan2j(y: f32, x: f32) -> f32 { if (x == 0.0 && y == 0.0) { return select(0.0, PI, (bitcast<u32>(x) >> 31u) == 1u) * select(1.0, -1.0, (bitcast<u32>(y) >> 31u) == 1u); } return atan2(y, x); }`,
     code: (w, p) => `{
 var pa: f32 = ((2.0 * PI) / ${p[0]});
 var qa: f32 = ((2.0 * PI) / ${p[1]});
@@ -3453,8 +3861,10 @@ v.y += (vr * ((b * c) - (a * d)));
   "hypertile1": {
     params: [{ name: "p", def: 3 }, { name: "q", def: 7 }],
     verified: true, priority: 0, flags: [], types: ["2D"],
-    funcNames: ["roundc"],
-    funcs: `fn roundc(x: f32) -> f32 { return sign(x) * floor(abs(x) + 0.5); }`,
+    funcNames: ["roundc","atan2j"],
+    funcs: `fn roundc(x: f32) -> f32 { return sign(x) * floor(abs(x) + 0.5); }
+
+fn atan2j(y: f32, x: f32) -> f32 { if (x == 0.0 && y == 0.0) { return select(0.0, PI, (bitcast<u32>(x) >> 31u) == 1u) * select(1.0, -1.0, (bitcast<u32>(y) >> 31u) == 1u); } return atan2(y, x); }`,
     code: (w, p) => `{
 var pa: f32;
 var r_: f32;
@@ -3484,8 +3894,10 @@ v.y += (vr * ((b * c) - (a * d)));
   "hypertile2": {
     params: [{ name: "p", def: 3 }, { name: "q", def: 7 }],
     verified: true, priority: 0, flags: [], types: ["2D"],
-    funcNames: ["roundc"],
-    funcs: `fn roundc(x: f32) -> f32 { return sign(x) * floor(abs(x) + 0.5); }`,
+    funcNames: ["roundc","atan2j"],
+    funcs: `fn roundc(x: f32) -> f32 { return sign(x) * floor(abs(x) + 0.5); }
+
+fn atan2j(y: f32, x: f32) -> f32 { if (x == 0.0 && y == 0.0) { return select(0.0, PI, (bitcast<u32>(x) >> 31u) == 1u) * select(1.0, -1.0, (bitcast<u32>(y) >> 31u) == 1u); } return atan2(y, x); }`,
     code: (w, p) => `{
 var p_: i32 = i32(roundc(${p[0]}));
 var q: i32 = i32(roundc(${p[1]}));
@@ -3514,18 +3926,20 @@ v.y += (vr * ((y * cosa) - (x * sina)));
   "sphericalN": {
     params: [{ name: "power", def: 3 }, { name: "dist", def: 1 }],
     verified: true, priority: 0, flags: [], types: ["2D"],
-    funcNames: ["powc"],
+    funcNames: ["powc","atan2j"],
     funcs: `fn powc(x: f32, y: f32) -> f32 {
   if (x >= 0.0) { return pow(x, y); }
   let yi = round(y);
   if (abs(y - yi) > 1e-6) { return pow(x, y); }
   let m = pow(-x, y);
   return select(m, -m, (i32(yi) & 1) != 0);
-}`,
+}
+
+fn atan2j(y: f32, x: f32) -> f32 { if (x == 0.0 && y == 0.0) { return select(0.0, PI, (bitcast<u32>(x) >> 31u) == 1u) * select(1.0, -1.0, (bitcast<u32>(y) >> 31u) == 1u); } return atan2(y, x); }`,
     code: (w, p) => `{
 var R: f32 = powc(sqrt(((t.x * t.x) + (t.y * t.y))), ${p[1]});
 var N: i32 = i32(floor((${p[0]} * rnd(rs))));
-var alpha: f32 = (atan2(t.y, t.x) + (((f32(N) * 2.0) * PI) / floor(${p[0]})));
+var alpha: f32 = (atan2j(t.y, t.x) + (((f32(N) * 2.0) * PI) / floor(${p[0]})));
 var sina: f32 = sin(alpha);
 var cosa: f32 = cos(alpha);
 if ((R > 0.000001)) {
@@ -3537,6 +3951,8 @@ if ((R > 0.000001)) {
   "waves2_3D": {
     params: [{ name: "freq", def: 2 }, { name: "scale", def: 1 }],
     verified: true, priority: 0, flags: ["3d","z"], types: ["3D"],
+    funcNames: ["atan2j"],
+    funcs: `fn atan2j(y: f32, x: f32) -> f32 { if (x == 0.0 && y == 0.0) { return select(0.0, PI, (bitcast<u32>(x) >> 31u) == 1u) * select(1.0, -1.0, (bitcast<u32>(y) >> 31u) == 1u); } return atan2(y, x); }`,
     code: (w, p) => `{
 var avgxy: f32 = ((t.x + t.y) / 2.0);
 v.x += (${w} * (t.x + (${p[1]} * sin((t.y * ${p[0]})))));
@@ -3547,13 +3963,15 @@ pz_ += (${w} * (z_ + (${p[1]} * sin((avgxy * ${p[0]})))));
   "scry_3D": {
     params: [],
     verified: true, priority: 0, flags: ["z"], types: ["2D"],
+    funcNames: ["atan2j"],
+    funcs: `fn atan2j(y: f32, x: f32) -> f32 { if (x == 0.0 && y == 0.0) { return select(0.0, PI, (bitcast<u32>(x) >> 31u) == 1u) * select(1.0, -1.0, (bitcast<u32>(y) >> 31u) == 1u); } return atan2(y, x); }`,
     code: (w, _p) => `{
 var inv: f32 = (1.0 / (${w} + 0.000001));
 var t_: f32 = (((t.x * t.x) + (t.y * t.y)) + (z_ * z_));
 var r_: f32 = (1.0 / (sqrt(t_) * (t_ + inv)));
 var Footzee: f32;
 var kikr: f32;
-kikr = atan2(t.y, t.x);
+kikr = atan2j(t.y, t.x);
 Footzee = z_;
 v.x += (t.x * r_);
 v.y += (t.y * r_);
@@ -3568,13 +3986,15 @@ if ((Footzee != 0.0)) {
   "foci_3D": {
     params: [],
     verified: true, priority: 0, flags: ["3d","z"], types: ["3D"],
+    funcNames: ["atan2j"],
+    funcs: `fn atan2j(y: f32, x: f32) -> f32 { if (x == 0.0 && y == 0.0) { return select(0.0, PI, (bitcast<u32>(x) >> 31u) == 1u) * select(1.0, -1.0, (bitcast<u32>(y) >> 31u) == 1u); } return atan2(y, x); }`,
     code: (w, _p) => `{
 var expx: f32 = (exp(t.x) * 0.5);
 var expnx: f32 = (0.25 / expx);
 var kikr: f32;
 var boot: f32;
 boot = z_;
-kikr = atan2(t.y, t.x);
+kikr = atan2j(t.y, t.x);
 if ((boot == 0.0)) {
   boot = kikr;
 }
@@ -3591,8 +4011,10 @@ pz_ += (sinz * tmp);
   "inflateZ_1": {
     params: [],
     verified: true, priority: 0, flags: ["z"], types: ["ZTRANSFORM"],
+    funcNames: ["atan2j"],
+    funcs: `fn atan2j(y: f32, x: f32) -> f32 { if (x == 0.0 && y == 0.0) { return select(0.0, PI, (bitcast<u32>(x) >> 31u) == 1u) * select(1.0, -1.0, (bitcast<u32>(y) >> 31u) == 1u); } return atan2(y, x); }`,
     code: (w, _p) => `{
-var ang: f32 = atan2(t.y, t.x);
+var ang: f32 = atan2j(t.y, t.x);
 var val1: f32 = (t.y * 2.0);
 pz_ += (${w} * (sin(ang) - val1));
 }`,
@@ -3600,6 +4022,8 @@ pz_ += (${w} * (sin(ang) - val1));
   "inflateZ_2": {
     params: [],
     verified: true, priority: 0, flags: ["z"], types: ["ZTRANSFORM"],
+    funcNames: ["atan2j"],
+    funcs: `fn atan2j(y: f32, x: f32) -> f32 { if (x == 0.0 && y == 0.0) { return select(0.0, PI, (bitcast<u32>(x) >> 31u) == 1u) * select(1.0, -1.0, (bitcast<u32>(y) >> 31u) == 1u); } return atan2(y, x); }`,
     code: (w, _p) => `{
 var val1: f32 = (t.y * 2.0);
 var val2: f32 = (t.x * 2.0);
@@ -3610,8 +4034,10 @@ pz_ += (${w} * (0.25 - aval));
   "inflateZ_3": {
     params: [],
     verified: true, priority: 0, flags: ["z"], types: ["ZTRANSFORM"],
+    funcNames: ["atan2j"],
+    funcs: `fn atan2j(y: f32, x: f32) -> f32 { if (x == 0.0 && y == 0.0) { return select(0.0, PI, (bitcast<u32>(x) >> 31u) == 1u) * select(1.0, -1.0, (bitcast<u32>(y) >> 31u) == 1u); } return atan2(y, x); }`,
     code: (w, _p) => `{
-var ang: f32 = atan2(t.y, t.x);
+var ang: f32 = atan2j(t.y, t.x);
 var val1: f32 = ((0.2 * (PI - ang)) * cos(((3.0 * ang) + (t.y - t.x))));
 pz_ += (${w} * val1);
 }`,
@@ -3619,8 +4045,10 @@ pz_ += (${w} * val1);
   "inflateZ_4": {
     params: [],
     verified: true, priority: 0, flags: ["z"], types: ["ZTRANSFORM"],
+    funcNames: ["atan2j"],
+    funcs: `fn atan2j(y: f32, x: f32) -> f32 { if (x == 0.0 && y == 0.0) { return select(0.0, PI, (bitcast<u32>(x) >> 31u) == 1u) * select(1.0, -1.0, (bitcast<u32>(y) >> 31u) == 1u); } return atan2(y, x); }`,
     code: (w, _p) => `{
-var ang1: f32 = atan2(t.y, t.x);
+var ang1: f32 = atan2j(t.y, t.x);
 var rndm: f32 = rnd(rs);
 var val1: f32 = ((PI * 0.5) - ang1);
 if ((rndm < 0.5)) {
@@ -3632,8 +4060,10 @@ pz_ += ((${w} * val1) * 0.25);
   "inflateZ_5": {
     params: [],
     verified: true, priority: 0, flags: ["z"], types: ["ZTRANSFORM"],
+    funcNames: ["atan2j"],
+    funcs: `fn atan2j(y: f32, x: f32) -> f32 { if (x == 0.0 && y == 0.0) { return select(0.0, PI, (bitcast<u32>(x) >> 31u) == 1u) * select(1.0, -1.0, (bitcast<u32>(y) >> 31u) == 1u); } return atan2(y, x); }`,
     code: (w, _p) => `{
-var ang1: f32 = atan2(t.y, t.x);
+var ang1: f32 = atan2j(t.y, t.x);
 var val1: f32 = (cos(((PI * 0.5) - ang1)) / 2.0);
 pz_ += (${w} * val1);
 }`,
@@ -3641,8 +4071,10 @@ pz_ += (${w} * val1);
   "inflateZ_6": {
     params: [],
     verified: true, priority: 0, flags: ["z"], types: ["ZTRANSFORM"],
+    funcNames: ["atan2j"],
+    funcs: `fn atan2j(y: f32, x: f32) -> f32 { if (x == 0.0 && y == 0.0) { return select(0.0, PI, (bitcast<u32>(x) >> 31u) == 1u) * select(1.0, -1.0, (bitcast<u32>(y) >> 31u) == 1u); } return atan2(y, x); }`,
     code: (w, _p) => `{
-var ang: f32 = atan2(t.y, t.x);
+var ang: f32 = atan2j(t.y, t.x);
 var adf: f32 = (t.y - t.x);
 var kik: f32 = (ang * sin(adf));
 pz_ += (${w} * (1.5 - acos(((sin(ang) * kik) * 0.5))));
@@ -3651,11 +4083,13 @@ pz_ += (${w} * (1.5 - acos(((sin(ang) * kik) * 0.5))));
   "loonie_3D": {
     params: [],
     verified: true, priority: 0, flags: ["3d","hide","z"], types: ["3D"],
+    funcNames: ["atan2j"],
+    funcs: `fn atan2j(y: f32, x: f32) -> f32 { if (x == 0.0 && y == 0.0) { return select(0.0, PI, (bitcast<u32>(x) >> 31u) == 1u) * select(1.0, -1.0, (bitcast<u32>(y) >> 31u) == 1u); } return atan2(y, x); }`,
     code: (w, _p) => `{
 var sqrvvar: f32 = (${w} * ${w});
 var efTez: f32 = z_;
 var kikr: f32;
-kikr = atan2(t.y, t.x);
+kikr = atan2j(t.y, t.x);
 if ((efTez == 0.0)) {
   efTez = kikr;
 }
@@ -3677,9 +4111,28 @@ if ((r2_ < 0.000001)) {
 }
 }`,
   },
+  "pre_spin_z": {
+    params: [],
+    verified: true, priority: -1, flags: [], types: ["2D","PRE"],
+    funcNames: ["atan2j"],
+    funcs: `fn atan2j(y: f32, x: f32) -> f32 { if (x == 0.0 && y == 0.0) { return select(0.0, PI, (bitcast<u32>(x) >> 31u) == 1u) * select(1.0, -1.0, (bitcast<u32>(y) >> 31u) == 1u); } return atan2(y, x); }`,
+    code: (w, _p) => `{
+var _rz_sin: f32 = 0;
+var _rz_cos: f32 = 0;
+{
+  _rz_sin = sin((${w} * (PI * 0.5)));
+  _rz_cos = cos((${w} * (PI * 0.5)));
+}
+var y: f32 = ((_rz_cos * t.y) - (_rz_sin * t.x));
+t.x = ((_rz_sin * t.y) + (_rz_cos * t.x));
+t.y = y;
+}`,
+  },
   "post_spin_z": {
     params: [],
     verified: true, priority: 1, flags: [], types: ["2D","POST"],
+    funcNames: ["atan2j"],
+    funcs: `fn atan2j(y: f32, x: f32) -> f32 { if (x == 0.0 && y == 0.0) { return select(0.0, PI, (bitcast<u32>(x) >> 31u) == 1u) * select(1.0, -1.0, (bitcast<u32>(y) >> 31u) == 1u); } return atan2(y, x); }`,
     code: (w, _p) => `{
 var _pz_sin: f32 = sin((${w} * (PI * 0.5)));
 var _pz_cos: f32 = cos((${w} * (PI * 0.5)));
@@ -3691,8 +4144,10 @@ v.y = y;
   "roundspher3D": {
     params: [],
     verified: true, priority: 0, flags: ["3d","z"], types: ["3D"],
-    funcNames: ["sqrf"],
-    funcs: `fn sqrf(x: f32) -> f32 {
+    funcNames: ["atan2j","sqrf"],
+    funcs: `fn atan2j(y: f32, x: f32) -> f32 { if (x == 0.0 && y == 0.0) { return select(0.0, PI, (bitcast<u32>(x) >> 31u) == 1u) * select(1.0, -1.0, (bitcast<u32>(y) >> 31u) == 1u); } return atan2(y, x); }
+
+fn sqrf(x: f32) -> f32 {
   return (x * x);
 }`,
     code: (w, _p) => `{
@@ -3721,12 +4176,14 @@ pz_ = (tempPZ + (${w} * (((${w} / d) * tempTZ) / e)));
   "disc3d": {
     params: [{ name: "pi", def: 3.141592653589793 }],
     verified: true, priority: 0, flags: ["3d","z"], types: ["3D"],
+    funcNames: ["atan2j"],
+    funcs: `fn atan2j(y: f32, x: f32) -> f32 { if (x == 0.0 && y == 0.0) { return select(0.0, PI, (bitcast<u32>(x) >> 31u) == 1u) * select(1.0, -1.0, (bitcast<u32>(y) >> 31u) == 1u); } return atan2(y, x); }`,
     code: (w, p) => `{
 var r_: f32 = sqrt((((t.y * t.y) + (t.x * t.x)) + 0.000001));
 var a: f32 = (${p[0]} * r_);
 var sr: f32 = sin(a);
 var cr: f32 = cos(a);
-var vv: f32 = ((${w} * atan2(t.x, t.y)) / (${p[0]} + 0.000001));
+var vv: f32 = ((${w} * atan2j(t.x, t.y)) / (${p[0]} + 0.000001));
 v.x += (vv * sr);
 v.y += (vv * cr);
 pz_ += (vv * (r_ * cos(z_)));
@@ -3735,6 +4192,8 @@ pz_ += (vv * (r_ * cos(z_)));
   "popcorn2_3D": {
     params: [{ name: "x", def: 0.1 }, { name: "y", def: 0.1 }, { name: "z", def: 0.1 }, { name: "c", def: 3 }],
     verified: true, priority: 0, flags: ["3d","z"], types: ["3D"],
+    funcNames: ["atan2j"],
+    funcs: `fn atan2j(y: f32, x: f32) -> f32 { if (x == 0.0 && y == 0.0) { return select(0.0, PI, (bitcast<u32>(x) >> 31u) == 1u) * select(1.0, -1.0, (bitcast<u32>(y) >> 31u) == 1u); } return atan2(y, x); }`,
     code: (w, p) => `{
 var inZ: f32;
 var otherZ: f32;
@@ -3749,12 +4208,12 @@ if ((abs(${w}) <= 1.0)) {
   tmpVV = ${w};
 }
 if ((otherZ == 0.0)) {
-  tempPZ = ((tmpVV * sin(tan(${p[3]}))) * atan2(t.y, t.x));
+  tempPZ = ((tmpVV * sin(tan(${p[3]}))) * atan2j(t.y, t.x));
 } else {
   tempPZ = pz_;
 }
 if ((inZ == 0.0)) {
-  tempTZ = ((tmpVV * sin(tan(${p[3]}))) * atan2(t.y, t.x));
+  tempTZ = ((tmpVV * sin(tan(${p[3]}))) * atan2j(t.y, t.x));
 } else {
   tempTZ = z_;
 }
@@ -3766,8 +4225,10 @@ pz_ = (tempPZ + (tmpVV * ((${p[2]} * sin(tan(${p[3]}))) * tempTZ)));
   "phoenix_julia": {
     params: [{ name: "power", def: 3 }, { name: "dist", def: 1 }, { name: "x_distort", def: -0.5 }, { name: "y_distort", def: 0 }],
     verified: true, priority: 0, flags: [], types: ["2D"],
-    funcNames: ["roundc","powc"],
-    funcs: `fn roundc(x: f32) -> f32 { return sign(x) * floor(abs(x) + 0.5); }
+    funcNames: ["atan2j","roundc","powc"],
+    funcs: `fn atan2j(y: f32, x: f32) -> f32 { if (x == 0.0 && y == 0.0) { return select(0.0, PI, (bitcast<u32>(x) >> 31u) == 1u) * select(1.0, -1.0, (bitcast<u32>(y) >> 31u) == 1u); } return atan2(y, x); }
+
+fn roundc(x: f32) -> f32 { return sign(x) * floor(abs(x) + 0.5); }
 
 fn powc(x: f32, y: f32) -> f32 {
   if (x >= 0.0) { return pow(x, y); }
@@ -3782,7 +4243,7 @@ var _inv2PI_N: f32 = ((2.0 * PI) / ${p[0]});
 var _cN: f32 = ((${p[1]} / ${p[0]}) / 2.0);
 var preX: f32 = (t.x * (${p[2]} + 1.0));
 var preY: f32 = (t.y * (${p[3]} + 1.0));
-var a: f32 = ((atan2(preY, preX) * _invN) + (f32(i32(roundc((32767 * rnd(rs))))) * _inv2PI_N));
+var a: f32 = ((atan2j(preY, preX) * _invN) + (f32(i32(roundc((32767 * rnd(rs))))) * _inv2PI_N));
 var sina: f32 = sin(a);
 var cosa: f32 = cos(a);
 var r_: f32 = (${w} * powc(((t.x * t.x) + (t.y * t.y)), _cN));
@@ -3793,6 +4254,8 @@ v.y += (r_ * sina);
   "boarders2": {
     params: [{ name: "c", def: 0.4 }, { name: "left", def: 0.65 }, { name: "right", def: 0.35 }],
     verified: true, priority: 0, flags: [], types: ["2D"],
+    funcNames: ["atan2j"],
+    funcs: `fn atan2j(y: f32, x: f32) -> f32 { if (x == 0.0 && y == 0.0) { return select(0.0, PI, (bitcast<u32>(x) >> 31u) == 1u) * select(1.0, -1.0, (bitcast<u32>(y) >> 31u) == 1u); } return atan2(y, x); }`,
     code: (w, p) => `{
 var _c: f32;
 var _cl: f32;
@@ -3833,11 +4296,60 @@ if ((rnd(rs) >= _cr)) {
 }
 }`,
   },
+  "pre_boarders2": {
+    params: [{ name: "c", def: 0.4 }, { name: "left", def: 0.65 }, { name: "right", def: 0.35 }],
+    verified: true, priority: -1, flags: [], types: ["2D","PRE"],
+    funcNames: ["atan2j"],
+    funcs: `fn atan2j(y: f32, x: f32) -> f32 { if (x == 0.0 && y == 0.0) { return select(0.0, PI, (bitcast<u32>(x) >> 31u) == 1u) * select(1.0, -1.0, (bitcast<u32>(y) >> 31u) == 1u); } return atan2(y, x); }`,
+    code: (w, p) => `{
+var _c: f32 = 0;
+var _cl: f32 = 0;
+var _cr: f32 = 0;
+{
+  _c = abs(${p[0]});
+  _cl = abs(${p[1]});
+  _cr = abs(${p[2]});
+  _c = select(_c, 1.0e-9, (_c == 0));
+  _cl = select(_cl, 1.0e-9, (_cl == 0));
+  _cr = select(_cr, 1.0e-9, (_cr == 0));
+  _cl = (_c * _cl);
+  _cr = (_c + (_c * _cr));
+}
+var roundX: f32 = round(t.x);
+var roundY: f32 = round(t.y);
+var offsetX: f32 = (t.x - roundX);
+var offsetY: f32 = (t.y - roundY);
+if ((rnd(rs) >= _cr)) {
+  t.x = (${w} * ((offsetX * _c) + roundX));
+  t.y = (${w} * ((offsetY * _c) + roundY));
+} else {
+  if ((abs(offsetX) >= abs(offsetY))) {
+    if ((offsetX >= 0.0)) {
+      t.x = (${w} * (((offsetX * _c) + roundX) + _cl));
+      t.y = (${w} * (((offsetY * _c) + roundY) + ((_cl * offsetY) / offsetX)));
+    } else {
+      t.x = (${w} * (((offsetX * _c) + roundX) - _cl));
+      t.y = (${w} * (((offsetY * _c) + roundY) - ((_cl * offsetY) / offsetX)));
+    }
+  } else {
+    if ((offsetY >= 0.0)) {
+      t.y = (${w} * (((offsetY * _c) + roundY) + _cl));
+      t.x = (${w} * (((offsetX * _c) + roundX) + ((offsetX / offsetY) * _cl)));
+    } else {
+      t.y = (${w} * (((offsetY * _c) + roundY) - _cl));
+      t.x = (${w} * (((offsetX * _c) + roundX) - ((offsetX / offsetY) * _cl)));
+    }
+  }
+}
+}`,
+  },
   "bCollide": {
     params: [{ name: "num", def: 1 }, { name: "a", def: 0 }],
     verified: true, priority: 0, flags: [], types: ["2D"],
-    funcNames: ["roundc","sqrf"],
+    funcNames: ["roundc","atan2j","sqrf"],
     funcs: `fn roundc(x: f32) -> f32 { return sign(x) * floor(abs(x) + 0.5); }
+
+fn atan2j(y: f32, x: f32) -> f32 { if (x == 0.0 && y == 0.0) { return select(0.0, PI, (bitcast<u32>(x) >> 31u) == 1u) * select(1.0, -1.0, (bitcast<u32>(y) >> 31u) == 1u); } return atan2(y, x); }
 
 fn sqrf(x: f32) -> f32 {
   return (x * x);
@@ -3861,7 +4373,7 @@ var sins: f32;
 var coss: f32;
 var alt: i32;
 tau = (0.5 * (log((sqrf((t.x + 1.0)) + (t.y * t.y))) - log((sqrf((t.x - 1.0)) + (t.y * t.y)))));
-sigma = ((PI - atan2(t.y, (t.x + 1.0))) - atan2(t.y, (1.0 - t.x)));
+sigma = ((PI - atan2j(t.y, (t.x + 1.0))) - atan2j(t.y, (1.0 - t.x)));
 alt = i32((sigma * _bCn_pi));
 if (((alt % 2) == 0)) {
   sigma = ((f32(alt) * _pi_bCn) + ((sigma + _bCa_bCn) % _pi_bCn));
@@ -3880,8 +4392,10 @@ v.y += ((${w} * sins) / temp);
   "bMod": {
     params: [{ name: "radius", def: 1 }, { name: "distance", def: 0 }],
     verified: true, priority: 0, flags: [], types: ["2D"],
-    funcNames: ["sqrf"],
-    funcs: `fn sqrf(x: f32) -> f32 {
+    funcNames: ["atan2j","sqrf"],
+    funcs: `fn atan2j(y: f32, x: f32) -> f32 { if (x == 0.0 && y == 0.0) { return select(0.0, PI, (bitcast<u32>(x) >> 31u) == 1u) * select(1.0, -1.0, (bitcast<u32>(y) >> 31u) == 1u); } return atan2(y, x); }
+
+fn sqrf(x: f32) -> f32 {
   return (x * x);
 }`,
     code: (w, p) => `{
@@ -3893,7 +4407,7 @@ var sinht: f32;
 var sins: f32;
 var coss: f32;
 tau = (0.5 * (log((sqrf((t.x + 1.0)) + (t.y * t.y))) - log((sqrf((t.x - 1.0)) + (t.y * t.y)))));
-sigma = ((PI - atan2(t.y, (t.x + 1.0))) - atan2(t.y, (1.0 - t.x)));
+sigma = ((PI - atan2j(t.y, (t.x + 1.0))) - atan2j(t.y, (1.0 - t.x)));
 if (((tau < ${p[0]}) && (-tau < ${p[0]}))) {
   tau = ((((tau + ${p[0]}) + (min(max(${p[1]}, 0.0), 2.0) * ${p[0]})) % (2.0 * ${p[0]})) - ${p[0]});
 }
@@ -3911,8 +4425,10 @@ if ((temp != 0)) {
   "bSwirl": {
     params: [{ name: "in", def: 0 }, { name: "out", def: 0 }],
     verified: true, priority: 0, flags: [], types: ["2D"],
-    funcNames: ["sqrf"],
-    funcs: `fn sqrf(x: f32) -> f32 {
+    funcNames: ["atan2j","sqrf"],
+    funcs: `fn atan2j(y: f32, x: f32) -> f32 { if (x == 0.0 && y == 0.0) { return select(0.0, PI, (bitcast<u32>(x) >> 31u) == 1u) * select(1.0, -1.0, (bitcast<u32>(y) >> 31u) == 1u); } return atan2(y, x); }
+
+fn sqrf(x: f32) -> f32 {
   return (x * x);
 }`,
     code: (w, p) => `{
@@ -3924,7 +4440,7 @@ var sinht: f32;
 var sins: f32;
 var coss: f32;
 tau = (0.5 * (log((sqrf((t.x + 1.0)) + (t.y * t.y))) - log((sqrf((t.x - 1.0)) + (t.y * t.y)))));
-sigma = ((PI - atan2(t.y, (t.x + 1.0))) - atan2(t.y, (1.0 - t.x)));
+sigma = ((PI - atan2j(t.y, (t.x + 1.0))) - atan2j(t.y, (1.0 - t.x)));
 sigma = ((sigma + (tau * ${p[1]})) + (${p[0]} / tau));
 sinht = sinh(tau);
 cosht = cosh(tau);
@@ -3940,8 +4456,10 @@ if ((temp != 0)) {
   "bTransform": {
     params: [{ name: "rotate", def: 0 }, { name: "power", def: 1 }, { name: "move", def: 0 }, { name: "split", def: 0 }],
     verified: true, priority: 0, flags: [], types: ["2D"],
-    funcNames: ["sqrf"],
-    funcs: `fn sqrf(x: f32) -> f32 {
+    funcNames: ["atan2j","sqrf"],
+    funcs: `fn atan2j(y: f32, x: f32) -> f32 { if (x == 0.0 && y == 0.0) { return select(0.0, PI, (bitcast<u32>(x) >> 31u) == 1u) * select(1.0, -1.0, (bitcast<u32>(y) >> 31u) == 1u); } return atan2(y, x); }
+
+fn sqrf(x: f32) -> f32 {
   return (x * x);
 }`,
     code: (w, p) => `{
@@ -3953,7 +4471,7 @@ var sinht: f32;
 var sins: f32;
 var coss: f32;
 tau = (((0.5 * (log((sqrf((t.x + 1.0)) + (t.y * t.y))) - log((sqrf((t.x - 1.0)) + (t.y * t.y))))) / ${p[1]}) + ${p[2]});
-sigma = (((PI - atan2(t.y, (t.x + 1.0))) - atan2(t.y, (1.0 - t.x))) + ${p[0]});
+sigma = (((PI - atan2j(t.y, (t.x + 1.0))) - atan2j(t.y, (1.0 - t.x))) + ${p[0]});
 sigma = ((sigma / ${p[1]}) + (((2.0 * PI) / ${p[1]}) * floor((rnd(rs) * ${p[1]}))));
 if ((t.x >= 0.0)) {
   tau += ${p[3]};
@@ -3972,6 +4490,8 @@ v.y += ((${w} * sins) / temp);
   "glynnia": {
     params: [],
     verified: true, priority: 0, flags: [], types: ["2D"],
+    funcNames: ["atan2j"],
+    funcs: `fn atan2j(y: f32, x: f32) -> f32 { if (x == 0.0 && y == 0.0) { return select(0.0, PI, (bitcast<u32>(x) >> 31u) == 1u) * select(1.0, -1.0, (bitcast<u32>(y) >> 31u) == 1u); } return atan2(y, x); }`,
     code: (w, _p) => `{
 var vvar2: f32 = (${w} * inverseSqrt(2.0));
 var r_: f32 = r;
@@ -4003,6 +4523,8 @@ if ((r_ > 1.0)) {
   "cylinder_apo": {
     params: [],
     verified: true, priority: 0, flags: ["3d","z"], types: ["3D"],
+    funcNames: ["atan2j"],
+    funcs: `fn atan2j(y: f32, x: f32) -> f32 { if (x == 0.0 && y == 0.0) { return select(0.0, PI, (bitcast<u32>(x) >> 31u) == 1u) * select(1.0, -1.0, (bitcast<u32>(y) >> 31u) == 1u); } return atan2(y, x); }`,
     code: (w, _p) => `{
 v.x += (${w} * sin(t.x));
 v.y += (${w} * t.y);
@@ -4012,8 +4534,10 @@ pz_ += (${w} * cos(t.x));
   "eCollide": {
     params: [{ name: "num", def: 1 }, { name: "a", def: 0 }],
     verified: true, priority: 0, flags: [], types: ["2D"],
-    funcNames: ["roundc","sqrtf_safe"],
+    funcNames: ["roundc","atan2j","sqrtf_safe"],
     funcs: `fn roundc(x: f32) -> f32 { return sign(x) * floor(abs(x) + 0.5); }
+
+fn atan2j(y: f32, x: f32) -> f32 { if (x == 0.0 && y == 0.0) { return select(0.0, PI, (bitcast<u32>(x) >> 31u) == 1u) * select(1.0, -1.0, (bitcast<u32>(y) >> 31u) == 1u); } return atan2(y, x); }
 
 fn sqrtf_safe(x: f32) -> f32 {
   if ((x <= 0.0)) {
@@ -4066,8 +4590,10 @@ v.y += (((${w} * sqrt((xmax - 1.0))) * sqrt((xmax + 1.0))) * sinnu);
   "eJulia": {
     params: [{ name: "power", def: 2 }],
     verified: true, priority: 0, flags: [], types: ["2D"],
-    funcNames: ["sqrtf_safe"],
-    funcs: `fn sqrtf_safe(x: f32) -> f32 {
+    funcNames: ["atan2j","sqrtf_safe"],
+    funcs: `fn atan2j(y: f32, x: f32) -> f32 { if (x == 0.0 && y == 0.0) { return select(0.0, PI, (bitcast<u32>(x) >> 31u) == 1u) * select(1.0, -1.0, (bitcast<u32>(y) >> 31u) == 1u); } return atan2(y, x); }
+
+fn sqrtf_safe(x: f32) -> f32 {
   if ((x <= 0.0)) {
     return 0.0;
   } else {
@@ -4122,8 +4648,10 @@ v.y += ((${w} * sinhmu) * sinnu);
   "eMod": {
     params: [{ name: "radius", def: 1 }, { name: "distance", def: 0 }],
     verified: true, priority: 0, flags: [], types: ["2D"],
-    funcNames: ["sqrtf_safe"],
-    funcs: `fn sqrtf_safe(x: f32) -> f32 {
+    funcNames: ["atan2j","sqrtf_safe"],
+    funcs: `fn atan2j(y: f32, x: f32) -> f32 { if (x == 0.0 && y == 0.0) { return select(0.0, PI, (bitcast<u32>(x) >> 31u) == 1u) * select(1.0, -1.0, (bitcast<u32>(y) >> 31u) == 1u); } return atan2(y, x); }
+
+fn sqrtf_safe(x: f32) -> f32 {
   if ((x <= 0.0)) {
     return 0.0;
   } else {
@@ -4166,8 +4694,10 @@ v.y += ((${w} * sinhmu) * sin(nu));
   "eMotion": {
     params: [{ name: "move", def: 0 }, { name: "rotate", def: 0 }],
     verified: true, priority: 0, flags: [], types: ["2D"],
-    funcNames: ["sqrtf_safe"],
-    funcs: `fn sqrtf_safe(x: f32) -> f32 {
+    funcNames: ["atan2j","sqrtf_safe"],
+    funcs: `fn atan2j(y: f32, x: f32) -> f32 { if (x == 0.0 && y == 0.0) { return select(0.0, PI, (bitcast<u32>(x) >> 31u) == 1u) * select(1.0, -1.0, (bitcast<u32>(y) >> 31u) == 1u); } return atan2(y, x); }
+
+fn sqrtf_safe(x: f32) -> f32 {
   if ((x <= 0.0)) {
     return 0.0;
   } else {
@@ -4210,11 +4740,196 @@ v.x += ((${w} * coshmu) * cos(nu));
 v.y += ((${w} * sinhmu) * sin(nu));
 }`,
   },
+  "ePush": {
+    params: [{ name: "push", def: 0 }, { name: "dist", def: 1 }, { name: "rotate", def: 0 }],
+    verified: true, priority: 0, flags: ["z"], types: ["2D"],
+    funcNames: ["atan2j","ePush_sqrt_safe"],
+    funcs: `fn atan2j(y: f32, x: f32) -> f32 { if (x == 0.0 && y == 0.0) { return select(0.0, PI, (bitcast<u32>(x) >> 31u) == 1u) * select(1.0, -1.0, (bitcast<u32>(y) >> 31u) == 1u); } return atan2(y, x); }
+
+fn ePush_sqrt_safe(x: f32) -> f32 {
+  if ((x <= 0.0)) {
+    return 0.0;
+  }
+  return sqrt(x);
+}`,
+    code: (w, p) => `{
+var tmp: f32 = (((t.y * t.y) + (t.x * t.x)) + 1.0);
+var tmp2: f32 = (2.0 * t.x);
+var xmax: f32 = ((ePush_sqrt_safe((tmp + tmp2)) + ePush_sqrt_safe((tmp - tmp2))) * 0.5);
+if ((xmax < 1.0)) {
+  xmax = 1.0;
+}
+var sinhmu: f32;
+var coshmu: f32;
+var mu: f32 = acosh(xmax);
+var t_: f32 = (t.x / xmax);
+if ((t_ > 1.0)) {
+  t_ = 1.0;
+} else if ((t_ < -1.0)) {
+  t_ = -1.0;
+}
+var nu: f32 = acos(t_);
+if ((t.y < 0)) {
+  nu *= -1.0;
+}
+nu += ${p[2]};
+mu *= ${p[1]};
+mu += ${p[0]};
+sinhmu = sinh(mu);
+coshmu = cosh(mu);
+v.x += ((${w} * coshmu) * cos(nu));
+v.y += ((${w} * sinhmu) * sin(nu));
+if (false) {
+  pz_ += (${w} * z_);
+}
+}`,
+  },
+  "eRotate": {
+    params: [{ name: "rotate", def: 0 }],
+    verified: true, priority: 0, flags: ["z"], types: ["2D"],
+    funcNames: ["atan2j","eRotate_sqrt_safe"],
+    funcs: `fn atan2j(y: f32, x: f32) -> f32 { if (x == 0.0 && y == 0.0) { return select(0.0, PI, (bitcast<u32>(x) >> 31u) == 1u) * select(1.0, -1.0, (bitcast<u32>(y) >> 31u) == 1u); } return atan2(y, x); }
+
+fn eRotate_sqrt_safe(x: f32) -> f32 {
+  if ((x <= 0.0)) {
+    return 0.0;
+  }
+  return sqrt(x);
+}`,
+    code: (w, p) => `{
+var tmp: f32 = (((t.y * t.y) + (t.x * t.x)) + 1.0);
+var tmp2: f32 = (2.0 * t.x);
+var xmax: f32 = ((eRotate_sqrt_safe((tmp + tmp2)) + eRotate_sqrt_safe((tmp - tmp2))) * 0.5);
+var sinnu: f32;
+var cosnu: f32;
+if ((xmax < 1.0)) {
+  xmax = 1.0;
+}
+var t_: f32 = (t.x / xmax);
+if ((t_ > 1.0)) {
+  t_ = 1.0;
+} else if ((t_ < -1.0)) {
+  t_ = -1.0;
+}
+var nu: f32 = acos(t_);
+if ((t.y < 0)) {
+  nu *= -1.0;
+}
+nu = ((((nu + ${p[0]}) + PI) % (2.0 * PI)) - PI);
+sinnu = sin(nu);
+cosnu = cos(nu);
+v.x += ((${w} * xmax) * cosnu);
+v.y += (((${w} * sqrt((xmax - 1.0))) * sqrt((xmax + 1.0))) * sinnu);
+if (false) {
+  pz_ += (${w} * z_);
+}
+}`,
+  },
+  "eScale": {
+    params: [{ name: "scale", def: 1 }, { name: "angle", def: 0 }],
+    verified: true, priority: 0, flags: ["z"], types: ["2D"],
+    funcNames: ["atan2j","eScale_sqrt_safe"],
+    funcs: `fn atan2j(y: f32, x: f32) -> f32 { if (x == 0.0 && y == 0.0) { return select(0.0, PI, (bitcast<u32>(x) >> 31u) == 1u) * select(1.0, -1.0, (bitcast<u32>(y) >> 31u) == 1u); } return atan2(y, x); }
+
+fn eScale_sqrt_safe(x: f32) -> f32 {
+  if ((x <= 0.0)) {
+    return 0.0;
+  }
+  return sqrt(x);
+}`,
+    code: (w, p) => `{
+var tmp: f32 = (((t.y * t.y) + (t.x * t.x)) + 1.0);
+var tmp2: f32 = (2.0 * t.x);
+var xmax: f32 = ((eScale_sqrt_safe((tmp + tmp2)) + eScale_sqrt_safe((tmp - tmp2))) * 0.5);
+if ((xmax < 1.0)) {
+  xmax = 1.0;
+}
+var sinhmu: f32;
+var coshmu: f32;
+var mu: f32 = acosh(xmax);
+var t_: f32 = (t.x / xmax);
+if ((t_ > 1.0)) {
+  t_ = 1.0;
+} else if ((t_ < -1.0)) {
+  t_ = -1.0;
+}
+var nu: f32 = acos(t_);
+if ((t.y < 0.0)) {
+  nu *= -1.0;
+}
+mu *= ${p[0]};
+nu = (((((${p[0]} * ((nu + PI) + ${p[1]})) % ((2.0 * PI) * ${p[0]})) - ${p[1]}) - (${p[0]} * PI)) % (2.0 * PI));
+if ((nu > PI)) {
+  nu -= (2.0 * PI);
+}
+if ((nu < -PI)) {
+  nu += (2.0 * PI);
+}
+sinhmu = sinh(mu);
+coshmu = cosh(mu);
+v.x += ((${w} * coshmu) * cos(nu));
+v.y += ((${w} * sinhmu) * sin(nu));
+if (false) {
+  pz_ += (${w} * z_);
+}
+}`,
+  },
+  "eSwirl": {
+    params: [{ name: "in", def: 1.2 }, { name: "out", def: 0.2 }],
+    verified: true, priority: 0, flags: ["z"], types: ["2D"],
+    funcNames: ["atan2j","eSwirl_sqrt_safe"],
+    funcs: `fn atan2j(y: f32, x: f32) -> f32 { if (x == 0.0 && y == 0.0) { return select(0.0, PI, (bitcast<u32>(x) >> 31u) == 1u) * select(1.0, -1.0, (bitcast<u32>(y) >> 31u) == 1u); } return atan2(y, x); }
+
+fn eSwirl_sqrt_safe(x: f32) -> f32 {
+  if ((x <= 0.0)) {
+    return 0.0;
+  }
+  return sqrt(x);
+}`,
+    code: (w, p) => `{
+var tmp: f32 = (((t.y * t.y) + (t.x * t.x)) + 1.0);
+var tmp2: f32 = (2.0 * t.x);
+var ea: f32 = eSwirl_sqrt_safe((tmp + tmp2));
+var eb: f32 = eSwirl_sqrt_safe((tmp - tmp2));
+var xmax: f32 = ((ea + eb) * 0.5);
+var ed: f32 = (((((t.y * t.y) / (ea + abs((t.x + 1.0)))) + ((t.y * t.y) / (eb + abs((t.x - 1.0))))) * 0.5) + max((abs(t.x) - 1.0), 0.0));
+if ((xmax < 1.0)) {
+  xmax = 1.0;
+}
+var sinhmu: f32;
+var coshmu: f32;
+var sinnu: f32;
+var cosnu: f32;
+var mu: f32 = select(log(((1.0 + ed) + sqrt((ed * (2.0 + ed))))), (sqrt((2.0 * ed)) * (1.0 - (ed / 12.0))), (ed < 0.0001));
+var t_: f32 = (t.x / xmax);
+if ((t_ > 1.0)) {
+  t_ = 1.0;
+} else if ((t_ < -1.0)) {
+  t_ = -1.0;
+}
+var nu: f32 = acos(t_);
+if ((t.y < 0)) {
+  nu *= -1.0;
+}
+nu = ((nu + (mu * ${p[1]})) + (${p[0]} / mu));
+sinhmu = sinh(mu);
+coshmu = cosh(mu);
+sinnu = sin(nu);
+cosnu = cos(nu);
+v.x += ((${w} * coshmu) * cosnu);
+v.y += ((${w} * sinhmu) * sinnu);
+if (false) {
+  pz_ += (${w} * z_);
+}
+}`,
+  },
   "dc_ztransl": {
     params: [{ name: "x0", def: 0 }, { name: "x1", def: 1 }, { name: "factor", def: 1 }, { name: "overwrite", def: 1 }, { name: "clamp", def: 0 }],
     verified: true, priority: 0, flags: ["3d","dc","z"], types: ["ZTRANSFORM","3D"],
-    funcNames: ["roundc"],
-    funcs: `fn roundc(x: f32) -> f32 { return sign(x) * floor(abs(x) + 0.5); }`,
+    funcNames: ["roundc","atan2j"],
+    funcs: `fn roundc(x: f32) -> f32 { return sign(x) * floor(abs(x) + 0.5); }
+
+fn atan2j(y: f32, x: f32) -> f32 { if (x == 0.0 && y == 0.0) { return select(0.0, PI, (bitcast<u32>(x) >> 31u) == 1u) * select(1.0, -1.0, (bitcast<u32>(y) >> 31u) == 1u); } return atan2(y, x); }`,
     code: (w, p) => `{
 var _x0: f32 = select(min(max(${p[1]}, 0.0), 1.0), min(max(${p[0]}, 0.0), 1.0), (min(max(${p[0]}, 0.0), 1.0) < min(max(${p[1]}, 0.0), 1.0)));
 var _x1: f32 = select(min(max(${p[1]}, 0.0), 1.0), min(max(${p[0]}, 0.0), 1.0), (min(max(${p[0]}, 0.0), 1.0) > min(max(${p[1]}, 0.0), 1.0)));
@@ -4235,8 +4950,10 @@ if ((i32(roundc(min(max(${p[3]}, 0.0), 1.0))) == 0)) {
   "pre_dcztransl": {
     params: [{ name: "x0", def: 0 }, { name: "x1", def: 1 }, { name: "factor", def: 1 }, { name: "overwrite", def: 1 }, { name: "clamp", def: 0 }],
     verified: true, priority: -1, flags: ["3d","dc","z"], types: ["3D","PRE"],
-    funcNames: ["roundc"],
-    funcs: `fn roundc(x: f32) -> f32 { return sign(x) * floor(abs(x) + 0.5); }`,
+    funcNames: ["roundc","atan2j"],
+    funcs: `fn roundc(x: f32) -> f32 { return sign(x) * floor(abs(x) + 0.5); }
+
+fn atan2j(y: f32, x: f32) -> f32 { if (x == 0.0 && y == 0.0) { return select(0.0, PI, (bitcast<u32>(x) >> 31u) == 1u) * select(1.0, -1.0, (bitcast<u32>(y) >> 31u) == 1u); } return atan2(y, x); }`,
     code: (w, p) => `{
 var rinv_: f32 = 1.0 / r;
 var _x0: f32 = select(min(max(${p[1]}, 0.0), 1.0), min(max(${p[0]}, 0.0), 1.0), (min(max(${p[0]}, 0.0), 1.0) < min(max(${p[1]}, 0.0), 1.0)));
@@ -4256,7 +4973,7 @@ if ((i32(roundc(min(max(${p[3]}, 0.0), 1.0))) == 0)) {
 r2 = ((t.x * t.x) + (t.y * t.y));
 r = sqrt(r2);
 rinv_ = (1.0 / r);
-th = atan2(t.x, t.y);
+th = atan2j(t.x, t.y);
 ph = ((0.5 * PI) - th);
 if ((ph > PI)) {
   ph -= (2.0 * PI);
@@ -4266,17 +4983,21 @@ if ((ph > PI)) {
   "log_apo": {
     params: [{ name: "base", def: 2.71828182845905 }],
     verified: true, priority: 0, flags: [], types: ["2D"],
+    funcNames: ["atan2j"],
+    funcs: `fn atan2j(y: f32, x: f32) -> f32 { if (x == 0.0 && y == 0.0) { return select(0.0, PI, (bitcast<u32>(x) >> 31u) == 1u) * select(1.0, -1.0, (bitcast<u32>(y) >> 31u) == 1u); } return atan2(y, x); }`,
     code: (w, p) => `{
 var _denom: f32 = (0.5 / log(${p[0]}));
 v.x += ((${w} * log(((t.x * t.x) + (t.y * t.y)))) * _denom);
-v.y += (${w} * atan2(t.y, t.x));
+v.y += (${w} * atan2j(t.y, t.x));
 }`,
   },
   "ripple": {
     params: [{ name: "frequency", def: 2 }, { name: "velocity", def: 1 }, { name: "amplitude", def: 0.5 }, { name: "centerx", def: 0 }, { name: "centery", def: 0 }, { name: "phase", def: 0 }, { name: "scale", def: 1 }, { name: "fixed_dist_calc", def: 0 }],
     verified: true, priority: 0, flags: [], types: ["2D"],
-    funcNames: ["roundc","lerpf"],
+    funcNames: ["roundc","atan2j","lerpf"],
     funcs: `fn roundc(x: f32) -> f32 { return sign(x) * floor(abs(x) + 0.5); }
+
+fn atan2j(y: f32, x: f32) -> f32 { if (x == 0.0 && y == 0.0) { return select(0.0, PI, (bitcast<u32>(x) >> 31u) == 1u) * select(1.0, -1.0, (bitcast<u32>(y) >> 31u) == 1u); } return atan2(y, x); }
 
 fn lerpf(a: f32, b: f32, p_: f32) -> f32 {
   return (a + ((b - a) * p_));
@@ -4321,8 +5042,10 @@ v.y = ((${w} * lerpf(v1, v2, _p)) * _is);
   "julian2": {
     params: [{ name: "power", def: 3 }, { name: "dist", def: 1 }, { name: "a", def: 1 }, { name: "b", def: 0 }, { name: "c", def: 0 }, { name: "d", def: 1 }, { name: "e", def: 0 }, { name: "f", def: 0 }],
     verified: true, priority: 0, flags: [], types: ["2D"],
-    funcNames: ["roundc","powc"],
+    funcNames: ["roundc","atan2j","powc"],
     funcs: `fn roundc(x: f32) -> f32 { return sign(x) * floor(abs(x) + 0.5); }
+
+fn atan2j(y: f32, x: f32) -> f32 { if (x == 0.0 && y == 0.0) { return select(0.0, PI, (bitcast<u32>(x) >> 31u) == 1u) * select(1.0, -1.0, (bitcast<u32>(y) >> 31u) == 1u); } return atan2(y, x); }
 
 fn powc(x: f32, y: f32) -> f32 {
   if (x >= 0.0) { return pow(x, y); }
@@ -4340,7 +5063,7 @@ if ((power != 0)) {
   var y: f32 = (((${p[4]} * t.x) + (${p[5]} * t.y)) + ${p[7]});
   var sina: f32 = 0.0;
   var cosa: f32 = 0.0;
-  var angle: f32 = ((atan2(y, x) + ((2.0 * PI) * f32((i32(roundc((rnd(rs) * 65535))) % _absN)))) / f32(power));
+  var angle: f32 = ((atan2j(y, x) + ((2.0 * PI) * f32((i32(roundc((rnd(rs) * 65535))) % _absN)))) / f32(power));
   var r_: f32 = (${w} * powc(((x * x) + (y * y)), _cN));
   sina = sin(angle);
   cosa = cos(angle);
@@ -4352,6 +5075,8 @@ if ((power != 0)) {
   "post_bwraps2": {
     params: [{ name: "cellsize", def: 1 }, { name: "space", def: 0 }, { name: "gain", def: 2 }, { name: "inner_twist", def: 0 }, { name: "outer_twist", def: 0 }],
     verified: true, priority: 1, flags: [], types: ["2D","POST"],
+    funcNames: ["atan2j"],
+    funcs: `fn atan2j(y: f32, x: f32) -> f32 { if (x == 0.0 && y == 0.0) { return select(0.0, PI, (bitcast<u32>(x) >> 31u) == 1u) * select(1.0, -1.0, (bitcast<u32>(y) >> 31u) == 1u); } return atan2(y, x); }`,
     code: (w, p) => `{
 var Vx: f32;
 var Vy: f32;
@@ -4406,9 +5131,76 @@ if ((abs(${p[0]}) < 0.000001)) {
 }
 }`,
   },
+  "pre_bwraps2": {
+    params: [{ name: "cellsize", def: 1 }, { name: "space", def: 0 }, { name: "gain", def: 2 }, { name: "inner_twist", def: 0 }, { name: "outer_twist", def: 0 }],
+    verified: true, priority: -1, flags: [], types: ["2D","PRE"],
+    funcNames: ["atan2j"],
+    funcs: `fn atan2j(y: f32, x: f32) -> f32 { if (x == 0.0 && y == 0.0) { return select(0.0, PI, (bitcast<u32>(x) >> 31u) == 1u) * select(1.0, -1.0, (bitcast<u32>(y) >> 31u) == 1u); } return atan2(y, x); }`,
+    code: (w, p) => `{
+loop {
+var _g2: f32 = 0;
+var _r2: f32 = 0;
+var _rfactor: f32 = 0;
+{
+  var radius: f32 = (0.5 * (${p[0]} / (1.0 + (${p[1]} * ${p[1]}))));
+  _g2 = (((${p[2]} * ${p[2]}) / ${p[0]}) + 0.000001);
+  var max_bubble: f32 = (_g2 * radius);
+  if ((max_bubble > 2.0)) {
+    max_bubble = 1.0;
+  } else {
+    max_bubble *= (1.0 / (((max_bubble * max_bubble) / 4.0) + 1.0));
+  }
+  _r2 = (radius * radius);
+  _rfactor = (radius / max_bubble);
+}
+var Vx: f32;
+var Vy: f32;
+var Cx: f32;
+var Cy: f32;
+var Lx: f32;
+var Ly: f32;
+var r_: f32;
+var theta: f32;
+var s: f32;
+var c: f32;
+Vx = t.x;
+Vy = t.y;
+if ((abs(${p[0]}) < 1.0e-30)) {
+  t.x = (${w} * Vx);
+  t.y = (${w} * Vy);
+  break;
+}
+Cx = ((floor((Vx / ${p[0]})) + 0.5) * ${p[0]});
+Cy = ((floor((Vy / ${p[0]})) + 0.5) * ${p[0]});
+Lx = (Vx - Cx);
+Ly = (Vy - Cy);
+if ((((Lx * Lx) + (Ly * Ly)) > _r2)) {
+  t.x = (${w} * Vx);
+  t.y = (${w} * Vy);
+  break;
+}
+Lx *= _g2;
+Ly *= _g2;
+r_ = (_rfactor / ((((Lx * Lx) + (Ly * Ly)) / 4.0) + 1.0));
+Lx *= r_;
+Ly *= r_;
+r_ = (((Lx * Lx) + (Ly * Ly)) / _r2);
+theta = ((${p[3]} * (1.0 - r_)) + (${p[4]} * r_));
+s = sin(theta);
+c = cos(theta);
+Vx = ((Cx + (c * Lx)) + (s * Ly));
+Vy = ((Cy - (s * Lx)) + (c * Ly));
+t.x = (${w} * Vx);
+t.y = (${w} * Vy);
+break;
+}
+}`,
+  },
   "post_curl": {
     params: [{ name: "c1", def: 0 }, { name: "c2", def: 0 }],
     verified: true, priority: 1, flags: [], types: ["2D","POST"],
+    funcNames: ["atan2j"],
+    funcs: `fn atan2j(y: f32, x: f32) -> f32 { if (x == 0.0 && y == 0.0) { return select(0.0, PI, (bitcast<u32>(x) >> 31u) == 1u) * select(1.0, -1.0, (bitcast<u32>(y) >> 31u) == 1u); } return atan2(y, x); }`,
     code: (w, p) => `{
 var _c1: f32 = (${p[0]} * ${w});
 var _c2: f32 = (${p[1]} * ${w});
@@ -4425,6 +5217,8 @@ v.y = (((y * re) - (x * im)) / r_);
   "post_curl3D": {
     params: [{ name: "cx", def: 0 }, { name: "cy", def: 0 }, { name: "cz", def: 0 }],
     verified: true, priority: 1, flags: ["3d","z"], types: ["3D","POST"],
+    funcNames: ["atan2j"],
+    funcs: `fn atan2j(y: f32, x: f32) -> f32 { if (x == 0.0 && y == 0.0) { return select(0.0, PI, (bitcast<u32>(x) >> 31u) == 1u) * select(1.0, -1.0, (bitcast<u32>(y) >> 31u) == 1u); } return atan2(y, x); }`,
     code: (w, p) => `{
 var _cx: f32;
 var _cy: f32;
@@ -4456,8 +5250,10 @@ pz_ = (r_ * (pz_ + (_cz * r2_)));
   "fract_dragon_wf": {
     params: [{ name: "max_iter", def: 100 }, { name: "xmin", def: -0.25 }, { name: "xmax", def: 1.2 }, { name: "ymin", def: -0.75 }, { name: "ymax", def: 0.75 }, { name: "buddhabrot_mode", def: 0 }, { name: "xseed", def: 1.4 }, { name: "yseed", def: 0.85 }, { name: "direct_color", def: 1 }, { name: "scalez", def: 1 }, { name: "clip_iter_min", def: 4 }, { name: "clip_iter_max", def: -5 }, { name: "max_clip_iter", def: 3 }, { name: "buddhabrot_min_iter", def: 7 }, { name: "scale", def: 5 }, { name: "offsetx", def: -0.5 }, { name: "offsety", def: 0 }, { name: "offsetz", def: 0 }, { name: "z_fill", def: 0 }, { name: "z_logscale", def: 0 }, { name: "color_only", def: 0 }],
     verified: true, priority: 0, flags: ["dc","hide","state","z"], types: ["SIMULATION","DC","BASE_SHAPE","ESCAPE_TIME_FRACTAL"],
-    funcNames: ["jwx_fract_dragon_wf_chooseNewPoint","jwx_fract_dragon_wf_xs","jwx_fract_dragon_wf_ys","jwx_fract_dragon_wf_currIter","jwx_fract_dragon_wf_maxIter","jwx_fract_dragon_wf_startX","jwx_fract_dragon_wf_startY","jwx_fract_dragon_wf_currX","jwx_fract_dragon_wf_currY","jwx_fract_dragon_wf_xseed_c","jwx_fract_dragon_wf_yseed_c","jwx_fract_dragon_wf_buddhabrot_min_iter_c","roundc","fract_dragon_wf_init","fract_dragon_wf_setCurrPoint","fract_dragon_wf_nextIteration","fract_dragon_wf_preBuddhaIterate","fract_dragon_wf_iterate"],
+    funcNames: ["jwx_fract_dragon_wf_chooseNewPoint","jwx_fract_dragon_wf_xs","jwx_fract_dragon_wf_ys","jwx_fract_dragon_wf_currIter","jwx_fract_dragon_wf_maxIter","jwx_fract_dragon_wf_startX","jwx_fract_dragon_wf_startY","jwx_fract_dragon_wf_currX","jwx_fract_dragon_wf_currY","jwx_fract_dragon_wf_xseed_c","jwx_fract_dragon_wf_yseed_c","jwx_fract_dragon_wf_buddhabrot_min_iter_c","roundc","atan2j","fract_dragon_wf_init","fract_dragon_wf_setCurrPoint","fract_dragon_wf_nextIteration","fract_dragon_wf_preBuddhaIterate","fract_dragon_wf_iterate"],
     funcs: `fn roundc(x: f32) -> f32 { return sign(x) * floor(abs(x) + 0.5); }
+
+fn atan2j(y: f32, x: f32) -> f32 { if (x == 0.0 && y == 0.0) { return select(0.0, PI, (bitcast<u32>(x) >> 31u) == 1u) * select(1.0, -1.0, (bitcast<u32>(y) >> 31u) == 1u); } return atan2(y, x); }
 
 fn fract_dragon_wf_init(pX0: f32, pY0: f32) {
   jwx_fract_dragon_wf_ys = 0;
@@ -4638,8 +5434,10 @@ if ((${p[5]} > 0)) {
   "fract_mandelbrot_wf": {
     params: [{ name: "max_iter", def: 100 }, { name: "xmin", def: -2.35 }, { name: "xmax", def: 0.75 }, { name: "ymin", def: -1.2 }, { name: "ymax", def: 1.2 }, { name: "buddhabrot_mode", def: 0 }, { name: "power", def: 2 }, { name: "direct_color", def: 1 }, { name: "scalez", def: 1 }, { name: "clip_iter_min", def: 3 }, { name: "clip_iter_max", def: -5 }, { name: "max_clip_iter", def: 3 }, { name: "buddhabrot_min_iter", def: 7 }, { name: "scale", def: 4 }, { name: "offsetx", def: 0.55 }, { name: "offsety", def: 0 }, { name: "offsetz", def: 0 }, { name: "z_fill", def: 0 }, { name: "z_logscale", def: 0 }, { name: "color_only", def: 0 }],
     verified: true, priority: 0, flags: ["dc","hide","state","z"], types: ["SIMULATION","DC","BASE_SHAPE","ESCAPE_TIME_FRACTAL"],
-    funcNames: ["jwx_fract_mandelbrot_wf_chooseNewPoint","jwx_fract_mandelbrot_wf_xs","jwx_fract_mandelbrot_wf_ys","jwx_fract_mandelbrot_wf_currIter","jwx_fract_mandelbrot_wf_maxIter","jwx_fract_mandelbrot_wf_startX","jwx_fract_mandelbrot_wf_startY","jwx_fract_mandelbrot_wf_currX","jwx_fract_mandelbrot_wf_currY","jwx_fract_mandelbrot_wf_power_c","jwx_fract_mandelbrot_wf_buddhabrot_min_iter_c","roundc","fract_mandelbrot_wf_init","fract_mandelbrot_wf_setCurrPoint","fract_mandelbrot_wf_nextIteration","fract_mandelbrot_wf_preBuddhaIterate","fract_mandelbrot_wf_iterate"],
+    funcNames: ["jwx_fract_mandelbrot_wf_chooseNewPoint","jwx_fract_mandelbrot_wf_xs","jwx_fract_mandelbrot_wf_ys","jwx_fract_mandelbrot_wf_currIter","jwx_fract_mandelbrot_wf_maxIter","jwx_fract_mandelbrot_wf_startX","jwx_fract_mandelbrot_wf_startY","jwx_fract_mandelbrot_wf_currX","jwx_fract_mandelbrot_wf_currY","jwx_fract_mandelbrot_wf_power_c","jwx_fract_mandelbrot_wf_buddhabrot_min_iter_c","roundc","atan2j","fract_mandelbrot_wf_init","fract_mandelbrot_wf_setCurrPoint","fract_mandelbrot_wf_nextIteration","fract_mandelbrot_wf_preBuddhaIterate","fract_mandelbrot_wf_iterate"],
     funcs: `fn roundc(x: f32) -> f32 { return sign(x) * floor(abs(x) + 0.5); }
+
+fn atan2j(y: f32, x: f32) -> f32 { if (x == 0.0 && y == 0.0) { return select(0.0, PI, (bitcast<u32>(x) >> 31u) == 1u) * select(1.0, -1.0, (bitcast<u32>(y) >> 31u) == 1u); } return atan2(y, x); }
 
 fn fract_mandelbrot_wf_init(pX0: f32, pY0: f32) {
   jwx_fract_mandelbrot_wf_ys = 0;
@@ -4865,8 +5663,10 @@ if ((${p[5]} > 0)) {
   "fract_meteors_wf": {
     params: [{ name: "max_iter", def: 100 }, { name: "xmin", def: -1.7 }, { name: "xmax", def: 1.7 }, { name: "ymin", def: -1.1 }, { name: "ymax", def: 1.1 }, { name: "buddhabrot_mode", def: 0 }, { name: "direct_color", def: 1 }, { name: "scalez", def: 1 }, { name: "clip_iter_min", def: 3 }, { name: "clip_iter_max", def: -5 }, { name: "max_clip_iter", def: 3 }, { name: "buddhabrot_min_iter", def: 7 }, { name: "scale", def: 5.7 }, { name: "offsetx", def: 0 }, { name: "offsety", def: 0 }, { name: "offsetz", def: 0 }, { name: "z_fill", def: 0 }, { name: "z_logscale", def: 0 }, { name: "color_only", def: 0 }],
     verified: true, priority: 0, flags: ["dc","hide","state","z"], types: ["SIMULATION","DC","BASE_SHAPE","ESCAPE_TIME_FRACTAL"],
-    funcNames: ["jwx_fract_meteors_wf_chooseNewPoint","jwx_fract_meteors_wf_xs","jwx_fract_meteors_wf_ys","jwx_fract_meteors_wf_currIter","jwx_fract_meteors_wf_maxIter","jwx_fract_meteors_wf_startX","jwx_fract_meteors_wf_startY","jwx_fract_meteors_wf_currX","jwx_fract_meteors_wf_currY","jwx_fract_meteors_wf_buddhabrot_min_iter_c","roundc","fract_meteors_wf_init","fract_meteors_wf_setCurrPoint","fract_meteors_wf_nextIteration","fract_meteors_wf_preBuddhaIterate","fract_meteors_wf_iterate"],
+    funcNames: ["jwx_fract_meteors_wf_chooseNewPoint","jwx_fract_meteors_wf_xs","jwx_fract_meteors_wf_ys","jwx_fract_meteors_wf_currIter","jwx_fract_meteors_wf_maxIter","jwx_fract_meteors_wf_startX","jwx_fract_meteors_wf_startY","jwx_fract_meteors_wf_currX","jwx_fract_meteors_wf_currY","jwx_fract_meteors_wf_buddhabrot_min_iter_c","roundc","atan2j","fract_meteors_wf_init","fract_meteors_wf_setCurrPoint","fract_meteors_wf_nextIteration","fract_meteors_wf_preBuddhaIterate","fract_meteors_wf_iterate"],
     funcs: `fn roundc(x: f32) -> f32 { return sign(x) * floor(abs(x) + 0.5); }
+
+fn atan2j(y: f32, x: f32) -> f32 { if (x == 0.0 && y == 0.0) { return select(0.0, PI, (bitcast<u32>(x) >> 31u) == 1u) * select(1.0, -1.0, (bitcast<u32>(y) >> 31u) == 1u); } return atan2(y, x); }
 
 fn fract_meteors_wf_init(pX0: f32, pY0: f32) {
   jwx_fract_meteors_wf_ys = 0;
@@ -5041,8 +5841,10 @@ if ((${p[5]} > 0)) {
   "fract_julia_wf": {
     params: [{ name: "max_iter", def: 100 }, { name: "xmin", def: -1 }, { name: "xmax", def: 1 }, { name: "ymin", def: -1.2 }, { name: "ymax", def: 1.2 }, { name: "buddhabrot_mode", def: 0 }, { name: "power", def: 2 }, { name: "xseed", def: 0.35 }, { name: "yseed", def: 0.09 }, { name: "direct_color", def: 1 }, { name: "scalez", def: 1 }, { name: "clip_iter_min", def: 4 }, { name: "clip_iter_max", def: -5 }, { name: "max_clip_iter", def: 3 }, { name: "buddhabrot_min_iter", def: 7 }, { name: "scale", def: 3.8 }, { name: "offsetx", def: 0 }, { name: "offsety", def: 0 }, { name: "offsetz", def: 0 }, { name: "z_fill", def: 0 }, { name: "z_logscale", def: 0 }, { name: "color_only", def: 0 }],
     verified: true, priority: 0, flags: ["dc","hide","state","z"], types: ["SIMULATION","DC","BASE_SHAPE","ESCAPE_TIME_FRACTAL"],
-    funcNames: ["jwx_fract_julia_wf_chooseNewPoint","jwx_fract_julia_wf_xs","jwx_fract_julia_wf_ys","jwx_fract_julia_wf_currIter","jwx_fract_julia_wf_maxIter","jwx_fract_julia_wf_startX","jwx_fract_julia_wf_startY","jwx_fract_julia_wf_currX","jwx_fract_julia_wf_currY","jwx_fract_julia_wf_power_c","jwx_fract_julia_wf_yseed_c","jwx_fract_julia_wf_xseed_c","jwx_fract_julia_wf_buddhabrot_min_iter_c","roundc","fract_julia_wf_init","fract_julia_wf_setCurrPoint","fract_julia_wf_nextIteration","fract_julia_wf_preBuddhaIterate","fract_julia_wf_iterate"],
+    funcNames: ["jwx_fract_julia_wf_chooseNewPoint","jwx_fract_julia_wf_xs","jwx_fract_julia_wf_ys","jwx_fract_julia_wf_currIter","jwx_fract_julia_wf_maxIter","jwx_fract_julia_wf_startX","jwx_fract_julia_wf_startY","jwx_fract_julia_wf_currX","jwx_fract_julia_wf_currY","jwx_fract_julia_wf_power_c","jwx_fract_julia_wf_yseed_c","jwx_fract_julia_wf_xseed_c","jwx_fract_julia_wf_buddhabrot_min_iter_c","roundc","atan2j","fract_julia_wf_init","fract_julia_wf_setCurrPoint","fract_julia_wf_nextIteration","fract_julia_wf_preBuddhaIterate","fract_julia_wf_iterate"],
     funcs: `fn roundc(x: f32) -> f32 { return sign(x) * floor(abs(x) + 0.5); }
+
+fn atan2j(y: f32, x: f32) -> f32 { if (x == 0.0 && y == 0.0) { return select(0.0, PI, (bitcast<u32>(x) >> 31u) == 1u) * select(1.0, -1.0, (bitcast<u32>(y) >> 31u) == 1u); } return atan2(y, x); }
 
 fn fract_julia_wf_init(pX0: f32, pY0: f32) {
   jwx_fract_julia_wf_ys = 0;
@@ -5274,8 +6076,10 @@ if ((${p[5]} > 0)) {
   "fract_pearls_wf": {
     params: [{ name: "max_iter", def: 100 }, { name: "xmin", def: -2 }, { name: "xmax", def: 2 }, { name: "ymin", def: -2 }, { name: "ymax", def: 2 }, { name: "buddhabrot_mode", def: 0 }, { name: "xseed", def: 0 }, { name: "yseed", def: -0.31 }, { name: "direct_color", def: 1 }, { name: "scalez", def: 1 }, { name: "clip_iter_min", def: 1 }, { name: "clip_iter_max", def: -5 }, { name: "max_clip_iter", def: 3 }, { name: "buddhabrot_min_iter", def: 7 }, { name: "scale", def: 2.45 }, { name: "offsetx", def: 0 }, { name: "offsety", def: 0 }, { name: "offsetz", def: 0 }, { name: "z_fill", def: 0 }, { name: "z_logscale", def: 0 }, { name: "color_only", def: 0 }],
     verified: true, priority: 0, flags: ["dc","hide","state","z"], types: ["SIMULATION","DC","BASE_SHAPE","ESCAPE_TIME_FRACTAL"],
-    funcNames: ["jwx_fract_pearls_wf_chooseNewPoint","jwx_fract_pearls_wf_xs","jwx_fract_pearls_wf_ys","jwx_fract_pearls_wf_currIter","jwx_fract_pearls_wf_maxIter","jwx_fract_pearls_wf_startX","jwx_fract_pearls_wf_startY","jwx_fract_pearls_wf_currX","jwx_fract_pearls_wf_currY","jwx_fract_pearls_wf_xseed_c","jwx_fract_pearls_wf_yseed_c","jwx_fract_pearls_wf_buddhabrot_min_iter_c","roundc","fract_pearls_wf_init","fract_pearls_wf_setCurrPoint","fract_pearls_wf_nextIteration","fract_pearls_wf_preBuddhaIterate","fract_pearls_wf_iterate"],
+    funcNames: ["jwx_fract_pearls_wf_chooseNewPoint","jwx_fract_pearls_wf_xs","jwx_fract_pearls_wf_ys","jwx_fract_pearls_wf_currIter","jwx_fract_pearls_wf_maxIter","jwx_fract_pearls_wf_startX","jwx_fract_pearls_wf_startY","jwx_fract_pearls_wf_currX","jwx_fract_pearls_wf_currY","jwx_fract_pearls_wf_xseed_c","jwx_fract_pearls_wf_yseed_c","jwx_fract_pearls_wf_buddhabrot_min_iter_c","roundc","atan2j","fract_pearls_wf_init","fract_pearls_wf_setCurrPoint","fract_pearls_wf_nextIteration","fract_pearls_wf_preBuddhaIterate","fract_pearls_wf_iterate"],
     funcs: `fn roundc(x: f32) -> f32 { return sign(x) * floor(abs(x) + 0.5); }
+
+fn atan2j(y: f32, x: f32) -> f32 { if (x == 0.0 && y == 0.0) { return select(0.0, PI, (bitcast<u32>(x) >> 31u) == 1u) * select(1.0, -1.0, (bitcast<u32>(y) >> 31u) == 1u); } return atan2(y, x); }
 
 fn fract_pearls_wf_init(pX0: f32, pY0: f32) {
   jwx_fract_pearls_wf_ys = 0;
@@ -5456,8 +6260,10 @@ if ((${p[5]} > 0)) {
   "fract_salamander_wf": {
     params: [{ name: "max_iter", def: 100 }, { name: "xmin", def: -2 }, { name: "xmax", def: 2 }, { name: "ymin", def: -2 }, { name: "ymax", def: 2 }, { name: "buddhabrot_mode", def: 0 }, { name: "xseed", def: 0.8 }, { name: "yseed", def: -0.15 }, { name: "direct_color", def: 1 }, { name: "scalez", def: 1 }, { name: "clip_iter_min", def: 1 }, { name: "clip_iter_max", def: -5 }, { name: "max_clip_iter", def: 3 }, { name: "buddhabrot_min_iter", def: 7 }, { name: "scale", def: 2.45 }, { name: "offsetx", def: 0 }, { name: "offsety", def: 0 }, { name: "offsetz", def: 0 }, { name: "z_fill", def: 0 }, { name: "z_logscale", def: 0 }, { name: "color_only", def: 0 }],
     verified: true, priority: 0, flags: ["3d","dc","hide","state","z"], types: ["3D","SIMULATION","DC","BASE_SHAPE","ESCAPE_TIME_FRACTAL"],
-    funcNames: ["jwx_fract_salamander_wf_chooseNewPoint","jwx_fract_salamander_wf_xs","jwx_fract_salamander_wf_ys","jwx_fract_salamander_wf_currIter","jwx_fract_salamander_wf_maxIter","jwx_fract_salamander_wf_startX","jwx_fract_salamander_wf_startY","jwx_fract_salamander_wf_currX","jwx_fract_salamander_wf_currY","jwx_fract_salamander_wf_xseed_c","jwx_fract_salamander_wf_yseed_c","jwx_fract_salamander_wf_buddhabrot_min_iter_c","roundc","fract_salamander_wf_init","fract_salamander_wf_setCurrPoint","fract_salamander_wf_nextIteration","fract_salamander_wf_preBuddhaIterate","fract_salamander_wf_iterate"],
+    funcNames: ["jwx_fract_salamander_wf_chooseNewPoint","jwx_fract_salamander_wf_xs","jwx_fract_salamander_wf_ys","jwx_fract_salamander_wf_currIter","jwx_fract_salamander_wf_maxIter","jwx_fract_salamander_wf_startX","jwx_fract_salamander_wf_startY","jwx_fract_salamander_wf_currX","jwx_fract_salamander_wf_currY","jwx_fract_salamander_wf_xseed_c","jwx_fract_salamander_wf_yseed_c","jwx_fract_salamander_wf_buddhabrot_min_iter_c","roundc","atan2j","fract_salamander_wf_init","fract_salamander_wf_setCurrPoint","fract_salamander_wf_nextIteration","fract_salamander_wf_preBuddhaIterate","fract_salamander_wf_iterate"],
     funcs: `fn roundc(x: f32) -> f32 { return sign(x) * floor(abs(x) + 0.5); }
+
+fn atan2j(y: f32, x: f32) -> f32 { if (x == 0.0 && y == 0.0) { return select(0.0, PI, (bitcast<u32>(x) >> 31u) == 1u) * select(1.0, -1.0, (bitcast<u32>(y) >> 31u) == 1u); } return atan2(y, x); }
 
 fn fract_salamander_wf_init(pX0: f32, pY0: f32) {
   jwx_fract_salamander_wf_ys = 0;
@@ -5638,8 +6444,10 @@ if ((${p[5]} > 0)) {
   "xtrb": {
     params: [{ name: "power", def: 2 }, { name: "radius", def: 1 }, { name: "width", def: 0.5 }, { name: "dist", def: 1 }, { name: "a", def: 1 }, { name: "b", def: 1 }],
     verified: true, priority: 0, flags: [], types: ["2D"],
-    funcNames: ["roundc","powc"],
+    funcNames: ["roundc","atan2j","powc"],
     funcs: `fn roundc(x: f32) -> f32 { return sign(x) * floor(abs(x) + 0.5); }
+
+fn atan2j(y: f32, x: f32) -> f32 { if (x == 0.0 && y == 0.0) { return select(0.0, PI, (bitcast<u32>(x) >> 31u) == 1u) * select(1.0, -1.0, (bitcast<u32>(y) >> 31u) == 1u); } return atan2(y, x); }
 
 fn powc(x: f32, y: f32) -> f32 {
   if (x >= 0.0) { return pow(x, y); }
@@ -5894,7 +6702,7 @@ Beta = (Beta + (f32(N) * S2b));
 {
   var inx: f32 = (((Beta - ${p[1]}) + ((Alpha - ${p[1]}) * cosC)) / sinC);
   var iny: f32 = (Alpha - ${p[1]});
-  var angle: f32 = ((atan2(iny, inx) + ((2.0 * PI) * f32((i32(roundc((rnd(rs) * 8191))) % absN)))) / f32(power));
+  var angle: f32 = ((atan2j(iny, inx) + ((2.0 * PI) * f32((i32(roundc((rnd(rs) * 8191))) % absN)))) / f32(power));
   var r_: f32 = (${w} * powc(((inx * inx) + (iny * iny)), cN));
   var sina: f32 = sin(angle);
   var cosa: f32 = cos(angle);
@@ -5908,7 +6716,7 @@ v.y += (${w} * Y);
   "superShape3d": {
     params: [{ name: "rho", def: 9.9 }, { name: "phi", def: 2.5 }, { name: "m1", def: 6 }, { name: "m2", def: 3 }, { name: "a1", def: 1 }, { name: "a2", def: 1 }, { name: "b1", def: 1 }, { name: "b2", def: 1 }, { name: "n1_1", def: 1 }, { name: "n1_2", def: 1 }, { name: "n2_1", def: 1 }, { name: "n2_2", def: 1 }, { name: "n3_1", def: 1 }, { name: "n3_2", def: 1 }, { name: "spiral", def: 0 }, { name: "toroidmap", def: 0 }],
     verified: true, priority: 0, flags: ["3d","z"], types: ["3D","BASE_SHAPE"],
-    funcNames: ["powc","roundc"],
+    funcNames: ["powc","roundc","atan2j"],
     funcs: `fn powc(x: f32, y: f32) -> f32 {
   if (x >= 0.0) { return pow(x, y); }
   let yi = round(y);
@@ -5917,7 +6725,9 @@ v.y += (${w} * Y);
   return select(m, -m, (i32(yi) & 1) != 0);
 }
 
-fn roundc(x: f32) -> f32 { return sign(x) * floor(abs(x) + 0.5); }`,
+fn roundc(x: f32) -> f32 { return sign(x) * floor(abs(x) + 0.5); }
+
+fn atan2j(y: f32, x: f32) -> f32 { if (x == 0.0 && y == 0.0) { return select(0.0, PI, (bitcast<u32>(x) >> 31u) == 1u) * select(1.0, -1.0, (bitcast<u32>(y) >> 31u) == 1u); } return atan2(y, x); }`,
     code: (w, p) => `{
 var n1n_1: f32;
 var n1n_2: f32;
@@ -5980,6 +6790,8 @@ if ((i32(roundc(${p[15]})) == 1)) {
   "fibonacci2": {
     params: [{ name: "sc", def: 1 }, { name: "sc2", def: 1 }],
     verified: true, priority: 0, flags: [], types: ["2D"],
+    funcNames: ["atan2j"],
+    funcs: `fn atan2j(y: f32, x: f32) -> f32 { if (x == 0.0 && y == 0.0) { return select(0.0, PI, (bitcast<u32>(x) >> 31u) == 1u) * select(1.0, -1.0, (bitcast<u32>(y) >> 31u) == 1u); } return atan2(y, x); }`,
     code: (w, p) => `{
 var ffive: f32 = 0.447213595;
 var fnatlog: f32 = log(1.61803398);
@@ -5998,6 +6810,8 @@ v.y += ((${w} * ((eradius1 * snum1) - (eradius2 * snum2))) * ffive);
   "ovoid3d": {
     params: [{ name: "x", def: 0.92 }, { name: "y", def: 0.92 }, { name: "z", def: 0.92 }],
     verified: true, priority: 0, flags: ["3d","z"], types: ["3D"],
+    funcNames: ["atan2j"],
+    funcs: `fn atan2j(y: f32, x: f32) -> f32 { if (x == 0.0 && y == 0.0) { return select(0.0, PI, (bitcast<u32>(x) >> 31u) == 1u) * select(1.0, -1.0, (bitcast<u32>(y) >> 31u) == 1u); } return atan2(y, x); }`,
     code: (w, p) => `{
 var T: f32 = ((((t.x * t.x) + (t.y * t.y)) + (z_ * z_)) + 1.0e-8);
 var r_: f32 = (${w} / T);
@@ -6009,8 +6823,10 @@ pz_ += ((z_ * r_) * ${p[2]});
   "ho": {
     params: [{ name: "xpow", def: 3 }, { name: "ypow", def: 3 }, { name: "zpow", def: 3 }],
     verified: true, priority: 0, flags: ["3d","z"], types: ["3D"],
-    funcNames: ["powc"],
-    funcs: `fn powc(x: f32, y: f32) -> f32 {
+    funcNames: ["atan2j","powc"],
+    funcs: `fn atan2j(y: f32, x: f32) -> f32 { if (x == 0.0 && y == 0.0) { return select(0.0, PI, (bitcast<u32>(x) >> 31u) == 1u) * select(1.0, -1.0, (bitcast<u32>(y) >> 31u) == 1u); } return atan2(y, x); }
+
+fn powc(x: f32, y: f32) -> f32 {
   if (x >= 0.0) { return pow(x, y); }
   let yi = round(y);
   if (abs(y - yi) > 1e-6) { return pow(x, y); }
@@ -6021,8 +6837,8 @@ pz_ += ((z_ * r_) * ${p[2]});
 var u: f32 = t.x;
 var v_: f32 = t.y;
 var w_: f32 = z_;
-var at_omega_x: f32 = atan2((v_ * v_), (w_ * w_));
-var at_omega_y: f32 = atan2((u * u), (w_ * w_));
+var at_omega_x: f32 = atan2j((v_ * v_), (w_ * w_));
+var at_omega_y: f32 = atan2j((u * u), (w_ * w_));
 var sv: f32 = sin(v_);
 var cv: f32 = cos(v_);
 var su: f32 = sin(u);
@@ -6038,8 +6854,10 @@ pz_ += (${w} * z);
   "pRose3D": {
     params: [{ name: "l", def: 1 }, { name: "k", def: 16 }, { name: "c", def: 0 }, { name: "z1", def: 1 }, { name: "z2", def: 1 }, { name: "refSc", def: 1 }, { name: "opt", def: 1 }, { name: "optSc", def: 1 }, { name: "opt3", def: 0 }, { name: "transp", def: 0.5 }, { name: "dist", def: 1 }, { name: "wagsc", def: 0 }, { name: "srvsc", def: 0 }, { name: "f", def: 3 }, { name: "wigsc", def: 0 }, { name: "offset", def: 0 }],
     verified: true, priority: 0, flags: ["3d","z"], types: ["3D","BASE_SHAPE","SIMULATION"],
-    funcNames: ["sqrf"],
-    funcs: `fn sqrf(x: f32) -> f32 {
+    funcNames: ["atan2j","sqrf"],
+    funcs: `fn atan2j(y: f32, x: f32) -> f32 { if (x == 0.0 && y == 0.0) { return select(0.0, PI, (bitcast<u32>(x) >> 31u) == 1u) * select(1.0, -1.0, (bitcast<u32>(y) >> 31u) == 1u); } return atan2(y, x); }
+
+fn sqrf(x: f32) -> f32 {
   return (x * x);
 }`,
     code: (w, p) => `{
@@ -6088,7 +6906,7 @@ if ((smooth12 > 2.0)) {
 }
 var antiOpt1: f32 = (2.0 - smooth12);
 ghostPrep = rnd(rs);
-th_ = atan2(t.y, t.x);
+th_ = atan2j(t.y, t.x);
 sth = sin(th_);
 cth = cos(th_);
 _optDir = sign(${p[6]});
@@ -6157,6 +6975,8 @@ if ((ghostPrep < ghost)) {
   "circus": {
     params: [{ name: "scale", def: 0.92 }],
     verified: true, priority: 0, flags: [], types: ["2D"],
+    funcNames: ["atan2j"],
+    funcs: `fn atan2j(y: f32, x: f32) -> f32 { if (x == 0.0 && y == 0.0) { return select(0.0, PI, (bitcast<u32>(x) >> 31u) == 1u) * select(1.0, -1.0, (bitcast<u32>(y) >> 31u) == 1u); } return atan2(y, x); }`,
     code: (w, p) => `{
 var scale_1: f32 = (1.0 / ${p[0]});
 var r_: f32 = r;
@@ -6175,6 +6995,8 @@ v.y += ((${w} * r_) * s);
   "lazyTravis": {
     params: [{ name: "spin_in", def: 1 }, { name: "spin_out", def: 0.5 }, { name: "space", def: 1.5707963267948966 }],
     verified: true, priority: 0, flags: [], types: ["2D"],
+    funcNames: ["atan2j"],
+    funcs: `fn atan2j(y: f32, x: f32) -> f32 { if (x == 0.0 && y == 0.0) { return select(0.0, PI, (bitcast<u32>(x) >> 31u) == 1u) * select(1.0, -1.0, (bitcast<u32>(y) >> 31u) == 1u); } return atan2(y, x); }`,
     code: (w, p) => `{
 var spin_in: f32 = (4.0 * ${p[0]});
 var spin_out: f32 = (4.0 * ${p[1]});
@@ -6256,8 +7078,10 @@ if (((x > ${w}) || (y > ${w}))) {
   "hypertile3D": {
     params: [{ name: "p", def: 3 }, { name: "q", def: 7 }, { name: "n", def: 0 }],
     verified: true, priority: 0, flags: ["3d","z"], types: ["3D"],
-    funcNames: ["roundc"],
-    funcs: `fn roundc(x: f32) -> f32 { return sign(x) * floor(abs(x) + 0.5); }`,
+    funcNames: ["roundc","atan2j"],
+    funcs: `fn roundc(x: f32) -> f32 { return sign(x) * floor(abs(x) + 0.5); }
+
+fn atan2j(y: f32, x: f32) -> f32 { if (x == 0.0 && y == 0.0) { return select(0.0, PI, (bitcast<u32>(x) >> 31u) == 1u) * select(1.0, -1.0, (bitcast<u32>(y) >> 31u) == 1u); } return atan2(y, x); }`,
     code: (w, p) => `{
 var c2x: f32;
 var c2y: f32;
@@ -6296,8 +7120,10 @@ pz_ += (d * (z_ * s2z));
   "hypertile3D1": {
     params: [{ name: "p", def: 3 }, { name: "q", def: 7 }],
     verified: true, priority: 0, flags: ["3d","z"], types: ["3D"],
-    funcNames: ["roundc"],
-    funcs: `fn roundc(x: f32) -> f32 { return sign(x) * floor(abs(x) + 0.5); }`,
+    funcNames: ["roundc","atan2j"],
+    funcs: `fn roundc(x: f32) -> f32 { return sign(x) * floor(abs(x) + 0.5); }
+
+fn atan2j(y: f32, x: f32) -> f32 { if (x == 0.0 && y == 0.0) { return select(0.0, PI, (bitcast<u32>(x) >> 31u) == 1u) * select(1.0, -1.0, (bitcast<u32>(y) >> 31u) == 1u); } return atan2(y, x); }`,
     code: (w, p) => `{
 var p_: i32 = i32(roundc(${p[0]}));
 var q: i32 = i32(roundc(${p[1]}));
@@ -6335,8 +7161,10 @@ pz_ += (d * (z_ * s2z));
   "hypertile3D2": {
     params: [{ name: "p", def: 3 }, { name: "q", def: 7 }],
     verified: true, priority: 0, flags: ["3d","z"], types: ["3D"],
-    funcNames: ["roundc"],
-    funcs: `fn roundc(x: f32) -> f32 { return sign(x) * floor(abs(x) + 0.5); }`,
+    funcNames: ["roundc","atan2j"],
+    funcs: `fn roundc(x: f32) -> f32 { return sign(x) * floor(abs(x) + 0.5); }
+
+fn atan2j(y: f32, x: f32) -> f32 { if (x == 0.0 && y == 0.0) { return select(0.0, PI, (bitcast<u32>(x) >> 31u) == 1u) * select(1.0, -1.0, (bitcast<u32>(y) >> 31u) == 1u); } return atan2(y, x); }`,
     code: (w, p) => `{
 var pa: f32;
 var qa: f32;
@@ -6376,6 +7204,8 @@ pz_ += (vr * (z_ * s2z));
   "poincare3D": {
     params: [{ name: "r", def: 0 }, { name: "a", def: 0 }, { name: "b", def: 0 }],
     verified: true, priority: 0, flags: ["3d","z"], types: ["3D"],
+    funcNames: ["atan2j"],
+    funcs: `fn atan2j(y: f32, x: f32) -> f32 { if (x == 0.0 && y == 0.0) { return select(0.0, PI, (bitcast<u32>(x) >> 31u) == 1u) * select(1.0, -1.0, (bitcast<u32>(y) >> 31u) == 1u); } return atan2(y, x); }`,
     code: (w, p) => `{
 var cx: f32;
 var cy: f32;
@@ -6410,8 +7240,10 @@ pz_ += (d * ((z_ * s2z) + (cz * (((y2cy + x2cx) - r2_) - 1))));
   "gdoffs": {
     params: [{ name: "delta_x", def: 0 }, { name: "delta_y", def: 0 }, { name: "area_x", def: 2 }, { name: "area_y", def: 2 }, { name: "center_x", def: 0 }, { name: "center_y", def: 0 }, { name: "gamma", def: 1 }, { name: "square", def: 0 }],
     verified: true, priority: 0, flags: [], types: ["2D"],
-    funcNames: ["gdoffs_fclp","gdoffs_fscl","gdoffs_fosc","gdoffs_flip"],
-    funcs: `fn gdoffs_fclp(a: f32) -> f32 {
+    funcNames: ["atan2j","gdoffs_fclp","gdoffs_fscl","gdoffs_fosc","gdoffs_flip"],
+    funcs: `fn atan2j(y: f32, x: f32) -> f32 { if (x == 0.0 && y == 0.0) { return select(0.0, PI, (bitcast<u32>(x) >> 31u) == 1u) * select(1.0, -1.0, (bitcast<u32>(y) >> 31u) == 1u); } return atan2(y, x); }
+
+fn gdoffs_fclp(a: f32) -> f32 {
   return select((abs(a) % 1.0), -(abs(a) % 1.0), (a < 0.0));
 }
 
@@ -6455,15 +7287,35 @@ v.y += (${w} * out_y);
   "sinusoidal3d": {
     params: [],
     verified: true, priority: 0, flags: ["3d","z"], types: ["3D"],
+    funcNames: ["atan2j"],
+    funcs: `fn atan2j(y: f32, x: f32) -> f32 { if (x == 0.0 && y == 0.0) { return select(0.0, PI, (bitcast<u32>(x) >> 31u) == 1u) * select(1.0, -1.0, (bitcast<u32>(y) >> 31u) == 1u); } return atan2(y, x); }`,
     code: (w, _p) => `{
 v.x += (${w} * sin(t.x));
 v.y += (${w} * sin(t.y));
-pz_ += (${w} * (atan2((t.x * t.x), (t.y * t.y)) * cos(z_)));
+pz_ += (${w} * (atan2j((t.x * t.x), (t.y * t.y)) * cos(z_)));
+}`,
+  },
+  "svf": {
+    params: [{ name: "n", def: 2 }],
+    verified: true, priority: 0, flags: ["3d","z"], types: ["3D"],
+    funcNames: ["atan2j"],
+    funcs: `fn atan2j(y: f32, x: f32) -> f32 { if (x == 0.0 && y == 0.0) { return select(0.0, PI, (bitcast<u32>(x) >> 31u) == 1u) * select(1.0, -1.0, (bitcast<u32>(y) >> 31u) == 1u); } return atan2(y, x); }`,
+    code: (w, p) => `{
+var cn: f32 = cos((${p[0]} * t.y));
+var sx: f32 = sin(t.x);
+var cx: f32 = cos(t.x);
+var sy: f32 = sin(t.y);
+var cy: f32 = cos(t.y);
+v.x += (${w} * (cy * (cn * cx)));
+v.y += (${w} * (cy * (cn * sx)));
+pz_ += (${w} * (sy * cn));
 }`,
   },
   "taurus": {
     params: [{ name: "r", def: 3 }, { name: "n", def: 5 }, { name: "inv", def: 1.5 }, { name: "sor", def: 1 }],
     verified: true, priority: 0, flags: ["3d","z"], types: ["3D"],
+    funcNames: ["atan2j"],
+    funcs: `fn atan2j(y: f32, x: f32) -> f32 { if (x == 0.0 && y == 0.0) { return select(0.0, PI, (bitcast<u32>(x) >> 31u) == 1u) * select(1.0, -1.0, (bitcast<u32>(y) >> 31u) == 1u); } return atan2(y, x); }`,
     code: (w, p) => `{
 var sx: f32 = sin(t.x);
 var cx: f32 = cos(t.x);
@@ -6478,15 +7330,17 @@ pz_ += ((${w} * (${p[3]} * cy)) + ((1.0 - ${p[3]}) * t.y));
   "pre_sinusoidal3d": {
     params: [],
     verified: true, priority: -1, flags: ["3d","z"], types: ["3D","PRE"],
+    funcNames: ["atan2j"],
+    funcs: `fn atan2j(y: f32, x: f32) -> f32 { if (x == 0.0 && y == 0.0) { return select(0.0, PI, (bitcast<u32>(x) >> 31u) == 1u) * select(1.0, -1.0, (bitcast<u32>(y) >> 31u) == 1u); } return atan2(y, x); }`,
     code: (w, _p) => `{
 var rinv_: f32 = 1.0 / r;
 t.x = (${w} * sin(t.x));
 t.y = (${w} * sin(t.y));
-z_ = ((${w} * atan2((t.x * t.x), (t.y * t.y))) * cos(z_));
+z_ = ((${w} * atan2j((t.x * t.x), (t.y * t.y))) * cos(z_));
 r2 = ((t.x * t.x) + (t.y * t.y));
 r = sqrt(r2);
 rinv_ = (1.0 / r);
-th = atan2(t.x, t.y);
+th = atan2j(t.x, t.y);
 ph = ((0.5 * PI) - th);
 if ((ph > PI)) {
   ph -= (2.0 * PI);
@@ -6496,20 +7350,22 @@ if ((ph > PI)) {
   "pre_disc3d": {
     params: [{ name: "pi", def: 3.141592653589793 }],
     verified: true, priority: -1, flags: ["3d","z"], types: ["3D","PRE"],
+    funcNames: ["atan2j"],
+    funcs: `fn atan2j(y: f32, x: f32) -> f32 { if (x == 0.0 && y == 0.0) { return select(0.0, PI, (bitcast<u32>(x) >> 31u) == 1u) * select(1.0, -1.0, (bitcast<u32>(y) >> 31u) == 1u); } return atan2(y, x); }`,
     code: (w, p) => `{
 var rinv_: f32 = 1.0 / r;
 var r_: f32 = sqrt((((t.y * t.y) + (t.x * t.x)) + 0.000001));
 var a: f32 = (${p[0]} * r_);
 var sr: f32 = sin(a);
 var cr: f32 = cos(a);
-var vv: f32 = ((${w} * atan2(t.x, t.y)) / (${p[0]} + 0.000001));
+var vv: f32 = ((${w} * atan2j(t.x, t.y)) / (${p[0]} + 0.000001));
 t.x = (vv * sr);
 t.y = (vv * cr);
 z_ = (vv * (r_ * cos(z_)));
 r2 = ((t.x * t.x) + (t.y * t.y));
 r = sqrt(r2);
 rinv_ = (1.0 / r);
-th = atan2(t.x, t.y);
+th = atan2j(t.x, t.y);
 ph = ((0.5 * PI) - th);
 if ((ph > PI)) {
   ph -= (2.0 * PI);
@@ -6519,6 +7375,8 @@ if ((ph > PI)) {
   "sintrange": {
     params: [{ name: "w", def: 1 }],
     verified: true, priority: 0, flags: [], types: ["2D"],
+    funcNames: ["atan2j"],
+    funcs: `fn atan2j(y: f32, x: f32) -> f32 { if (x == 0.0 && y == 0.0) { return select(0.0, PI, (bitcast<u32>(x) >> 31u) == 1u) * select(1.0, -1.0, (bitcast<u32>(y) >> 31u) == 1u); } return atan2(y, x); }`,
     code: (w, p) => `{
 var v_: f32 = (((t.x * t.x) + (t.y * t.y)) * ${p[0]});
 v.x = ((${w} * sin(t.x)) * (((t.x * t.x) + ${p[0]}) - v_));
@@ -6528,9 +7386,11 @@ v.y = ((${w} * sin(t.y)) * (((t.y * t.y) + ${p[0]}) - v_));
   "target": {
     params: [{ name: "even", def: 3.77146251654138 }, { name: "odd", def: 3.3606263050449705 }, { name: "size", def: 0.5154975384118059 }],
     verified: true, priority: 0, flags: [], types: ["2D"],
+    funcNames: ["atan2j"],
+    funcs: `fn atan2j(y: f32, x: f32) -> f32 { if (x == 0.0 && y == 0.0) { return select(0.0, PI, (bitcast<u32>(x) >> 31u) == 1u) * select(1.0, -1.0, (bitcast<u32>(y) >> 31u) == 1u); } return atan2(y, x); }`,
     code: (_w, p) => `{
 var t_size_2: f32 = (0.5 * ${p[2]});
-var a: f32 = atan2(t.y, t.x);
+var a: f32 = atan2j(t.y, t.x);
 var r_: f32 = sqrt(((t.x * t.x) + (t.y * t.y)));
 var t_: f32 = log(r_);
 if ((t_ < 0.0)) {
@@ -6551,6 +7411,8 @@ v.y += (r_ * s);
   "bubble2": {
     params: [{ name: "x", def: 1 }, { name: "y", def: 1 }, { name: "z", def: 0 }],
     verified: true, priority: 0, flags: ["3d","z"], types: ["3D"],
+    funcNames: ["atan2j"],
+    funcs: `fn atan2j(y: f32, x: f32) -> f32 { if (x == 0.0 && y == 0.0) { return select(0.0, PI, (bitcast<u32>(x) >> 31u) == 1u) * select(1.0, -1.0, (bitcast<u32>(y) >> 31u) == 1u); } return atan2(y, x); }`,
     code: (w, p) => `{
 var T: f32;
 var r_: f32;
@@ -6569,8 +7431,10 @@ pz_ += ((z_ * r_) * ${p[2]});
   "blocky": {
     params: [{ name: "x", def: 1 }, { name: "y", def: 1 }, { name: "mp", def: 4 }],
     verified: true, priority: 0, flags: [], types: ["2D"],
-    funcNames: ["sqrtf_safe"],
-    funcs: `fn sqrtf_safe(x: f32) -> f32 {
+    funcNames: ["atan2j","sqrtf_safe"],
+    funcs: `fn atan2j(y: f32, x: f32) -> f32 { if (x == 0.0 && y == 0.0) { return select(0.0, PI, (bitcast<u32>(x) >> 31u) == 1u) * select(1.0, -1.0, (bitcast<u32>(y) >> 31u) == 1u); } return atan2(y, x); }
+
+fn sqrtf_safe(x: f32) -> f32 {
   if ((x <= 0.0)) {
     return 0.0;
   } else {
@@ -6590,15 +7454,17 @@ var xmax: f32 = (0.5 * (sqrt((tmp + x2)) + sqrt((tmp - x2))));
 var ymax: f32 = (0.5 * (sqrt((tmp + y2)) + sqrt((tmp - y2))));
 var a: f32 = (t.x / xmax);
 var b: f32 = sqrtf_safe((1.0 - (a * a)));
-v.x += (((v_ * atan2(a, b)) * r_) * ${p[0]});
+v.x += (((v_ * atan2j(a, b)) * r_) * ${p[0]});
 a = (t.y / ymax);
 b = sqrtf_safe((1.0 - (a * a)));
-v.y += (((v_ * atan2(a, b)) * r_) * ${p[1]});
+v.y += (((v_ * atan2j(a, b)) * r_) * ${p[1]});
 }`,
   },
   "splitbrdr": {
     params: [{ name: "x", def: 0.25 }, { name: "y", def: 0.25 }, { name: "px", def: 0 }, { name: "py", def: 0 }],
     verified: true, priority: 0, flags: [], types: ["2D"],
+    funcNames: ["atan2j"],
+    funcs: `fn atan2j(y: f32, x: f32) -> f32 { if (x == 0.0 && y == 0.0) { return select(0.0, PI, (bitcast<u32>(x) >> 31u) == 1u) * select(1.0, -1.0, (bitcast<u32>(y) >> 31u) == 1u); } return atan2(y, x); }`,
     code: (w, p) => `{
 var B: f32;
 var b: f32;
@@ -6643,6 +7509,8 @@ v.y += (t.y * ${p[3]});
   "mcarpet": {
     params: [{ name: "x", def: 1 }, { name: "y", def: 0.75 }, { name: "twist", def: 0.5 }, { name: "tilt", def: -0.25 }],
     verified: true, priority: 0, flags: [], types: ["2D"],
+    funcNames: ["atan2j"],
+    funcs: `fn atan2j(y: f32, x: f32) -> f32 { if (x == 0.0 && y == 0.0) { return select(0.0, PI, (bitcast<u32>(x) >> 31u) == 1u) * select(1.0, -1.0, (bitcast<u32>(y) >> 31u) == 1u); } return atan2(y, x); }`,
     code: (w, p) => `{
 var T: f32 = ((((t.x * t.x) + (t.y * t.y)) / 4.0) + 1.0);
 var r_: f32 = (${w} / T);
@@ -6655,8 +7523,10 @@ v.y += ((${p[3]} * t.x) * ${w});
   "octagon": {
     params: [{ name: "x", def: 0 }, { name: "y", def: 0 }, { name: "z", def: 0 }, { name: "mode", def: 1 }],
     verified: true, priority: 0, flags: ["3d","z"], types: ["3D"],
-    funcNames: ["roundc","sqrf"],
+    funcNames: ["roundc","atan2j","sqrf"],
     funcs: `fn roundc(x: f32) -> f32 { return sign(x) * floor(abs(x) + 0.5); }
+
+fn atan2j(y: f32, x: f32) -> f32 { if (x == 0.0 && y == 0.0) { return select(0.0, PI, (bitcast<u32>(x) >> 31u) == 1u) * select(1.0, -1.0, (bitcast<u32>(y) >> 31u) == 1u); } return atan2(y, x); }
 
 fn sqrf(x: f32) -> f32 {
   return (x * x);
@@ -6766,10 +7636,12 @@ if ((splits != 0)) {
   "fourth": {
     params: [{ name: "spin", def: 3.141592653589793 }, { name: "space", def: 0.1 }, { name: "twist", def: 0.2 }, { name: "x", def: 0.3 }, { name: "y", def: 0.12 }],
     verified: true, priority: 0, flags: [], types: ["2D"],
+    funcNames: ["atan2j"],
+    funcs: `fn atan2j(y: f32, x: f32) -> f32 { if (x == 0.0 && y == 0.0) { return select(0.0, PI, (bitcast<u32>(x) >> 31u) == 1u) * select(1.0, -1.0, (bitcast<u32>(y) >> 31u) == 1u); } return atan2(y, x); }`,
     code: (w, p) => `{
 var sqrvvar: f32 = (${w} * ${w});
 if (((t.x > 0.0) && (t.y > 0.0))) {
-  var a: f32 = atan2(t.y, t.x);
+  var a: f32 = atan2j(t.y, t.x);
   var r_: f32 = (1.0 / sqrt(((t.x * t.x) + (t.y * t.y))));
   var s: f32 = sin(a);
   var c: f32 = cos(a);
@@ -6793,7 +7665,7 @@ if (((t.x > 0.0) && (t.y > 0.0))) {
   var y: f32 = (t.y + ${p[4]});
   r_ = sqrt(((x * x) + (y * y)));
   if ((r_ < ${w})) {
-    var a: f32 = ((atan2(y, x) + ${p[0]}) + (${p[2]} * (${w} - r_)));
+    var a: f32 = ((atan2j(y, x) + ${p[0]}) + (${p[2]} * (${w} - r_)));
     sina = sin(a);
     cosa = cos(a);
     r_ = (${w} * r_);
@@ -6813,6 +7685,8 @@ if (((t.x > 0.0) && (t.y > 0.0))) {
   "twoface": {
     params: [],
     verified: true, priority: 0, flags: [], types: ["2D"],
+    funcNames: ["atan2j"],
+    funcs: `fn atan2j(y: f32, x: f32) -> f32 { if (x == 0.0 && y == 0.0) { return select(0.0, PI, (bitcast<u32>(x) >> 31u) == 1u) * select(1.0, -1.0, (bitcast<u32>(y) >> 31u) == 1u); } return atan2(y, x); }`,
     code: (w, _p) => `{
 var v_: f32 = ${w};
 if ((t.x > 0.0)) {
@@ -6825,12 +7699,14 @@ v.y += (v_ * t.y);
   "juliac": {
     params: [{ name: "re", def: 3 }, { name: "im", def: 0 }, { name: "dist", def: 1 }],
     verified: true, priority: 0, flags: [], types: ["2D"],
-    funcNames: ["roundc"],
-    funcs: `fn roundc(x: f32) -> f32 { return sign(x) * floor(abs(x) + 0.5); }`,
+    funcNames: ["atan2j","roundc"],
+    funcs: `fn atan2j(y: f32, x: f32) -> f32 { if (x == 0.0 && y == 0.0) { return select(0.0, PI, (bitcast<u32>(x) >> 31u) == 1u) * select(1.0, -1.0, (bitcast<u32>(y) >> 31u) == 1u); } return atan2(y, x); }
+
+fn roundc(x: f32) -> f32 { return sign(x) * floor(abs(x) + 0.5); }`,
     code: (w, p) => `{
 var re: f32 = (1.0 / (${p[0]} + 0.000001));
 var im: f32 = (${p[1]} / 100.0);
-var arg: f32 = (atan2(t.y, t.x) + (((f32(i32(roundc((rnd(rs) * 65535)))) % ${p[0]}) * 2.0) * PI));
+var arg: f32 = (atan2j(t.y, t.x) + (((f32(i32(roundc((rnd(rs) * 65535)))) % ${p[0]}) * 2.0) * PI));
 var lnmod: f32 = ((${p[2]} * 0.5) * log(((t.x * t.x) + (t.y * t.y))));
 var a: f32 = ((arg * re) + (lnmod * im));
 var s: f32 = sin(a);
@@ -6843,8 +7719,10 @@ v.y += ((${w} * mod2) * s);
   "juliaq": {
     params: [{ name: "power", def: 3 }, { name: "divisor", def: 2 }],
     verified: true, priority: 0, flags: [], types: ["2D"],
-    funcNames: ["roundc","powc"],
+    funcNames: ["roundc","atan2j","powc"],
     funcs: `fn roundc(x: f32) -> f32 { return sign(x) * floor(abs(x) + 0.5); }
+
+fn atan2j(y: f32, x: f32) -> f32 { if (x == 0.0 && y == 0.0) { return select(0.0, PI, (bitcast<u32>(x) >> 31u) == 1u) * select(1.0, -1.0, (bitcast<u32>(y) >> 31u) == 1u); } return atan2(y, x); }
 
 fn powc(x: f32, y: f32) -> f32 {
   if (x >= 0.0) { return pow(x, y); }
@@ -6859,7 +7737,7 @@ var divisor: i32 = i32(roundc(f32(i32(${p[1]}))));
 var half_inv_power: f32 = ((0.5 * f32(divisor)) / f32(power));
 var inv_power: f32 = (f32(divisor) / f32(power));
 var inv_power_2pi: f32 = ((2.0 * PI) / f32(power));
-var a: f32 = ((atan2(t.y, t.x) * inv_power) + (f32(i32((rnd(rs) * 10))) * inv_power_2pi));
+var a: f32 = ((atan2j(t.y, t.x) * inv_power) + (f32(i32((rnd(rs) * 10))) * inv_power_2pi));
 var sina: f32 = sin(a);
 var cosa: f32 = cos(a);
 var r_: f32 = (${w} * powc(((t.x * t.x) + (t.y * t.y)), half_inv_power));
@@ -6870,8 +7748,10 @@ v.y += (r_ * sina);
   "julia3Dq": {
     params: [{ name: "power", def: 3 }, { name: "divisor", def: 2 }],
     verified: true, priority: 0, flags: ["3d","z"], types: ["3D"],
-    funcNames: ["roundc","powc"],
+    funcNames: ["roundc","atan2j","powc"],
     funcs: `fn roundc(x: f32) -> f32 { return sign(x) * floor(abs(x) + 0.5); }
+
+fn atan2j(y: f32, x: f32) -> f32 { if (x == 0.0 && y == 0.0) { return select(0.0, PI, (bitcast<u32>(x) >> 31u) == 1u) * select(1.0, -1.0, (bitcast<u32>(y) >> 31u) == 1u); } return atan2(y, x); }
 
 fn powc(x: f32, y: f32) -> f32 {
   if (x >= 0.0) { return pow(x, y); }
@@ -6891,7 +7771,7 @@ inv_power = (f32(divisor) / f32(power));
 abs_inv_power = abs(inv_power);
 half_inv_power = ((0.5 * inv_power) - 0.5);
 inv_power_2pi = ((2.0 * PI) / f32(power));
-var a: f32 = ((atan2(t.y, t.x) * inv_power) + (f32(i32((rnd(rs) * 131071))) * inv_power_2pi));
+var a: f32 = ((atan2j(t.y, t.x) * inv_power) + (f32(i32((rnd(rs) * 131071))) * inv_power_2pi));
 var sina: f32 = sin(a);
 var cosa: f32 = cos(a);
 var z: f32 = (z_ * abs_inv_power);
@@ -6903,9 +7783,81 @@ v.x += (r_ * cosa);
 v.y += (r_ * sina);
 }`,
   },
+  "post_juliaq": {
+    params: [{ name: "power", def: 3 }, { name: "divisor", def: 2 }],
+    verified: true, priority: 1, flags: [], types: ["2D","POST"],
+    funcNames: ["atan2j","sqr","powc"],
+    funcs: `fn atan2j(y: f32, x: f32) -> f32 { if (x == 0.0 && y == 0.0) { return select(0.0, PI, (bitcast<u32>(x) >> 31u) == 1u) * select(1.0, -1.0, (bitcast<u32>(y) >> 31u) == 1u); } return atan2(y, x); }
+
+fn sqr(x: f32) -> f32 { return x * x; }
+
+fn powc(x: f32, y: f32) -> f32 {
+  if (x >= 0.0) { return pow(x, y); }
+  let yi = round(y);
+  if (abs(y - yi) > 1e-6) { return pow(x, y); }
+  let m = pow(-x, y);
+  return select(m, -m, (i32(yi) & 1) != 0);
+}`,
+    code: (w, p) => `{
+var half_inv_power: f32 = 0;
+var inv_power: f32 = 0;
+var inv_power_2pi: f32 = 0;
+{
+  half_inv_power = ((0.5 * f32(i32(${p[1]}))) / f32(i32(${p[0]})));
+  inv_power = (f32(i32(${p[1]})) / f32(i32(${p[0]})));
+  inv_power_2pi = ((2.0 * PI) / f32(i32(${p[0]})));
+}
+var a: f32 = ((atan2j(v.y, v.x) * inv_power) + (f32(i32((rnd(rs) * abs(f32(i32(${p[0]})))))) * inv_power_2pi));
+var sina: f32 = sin(a);
+var cosa: f32 = cos(a);
+var r_: f32 = (${w} * powc((sqr(v.x) + sqr(v.y)), half_inv_power));
+v.x = (r_ * cosa);
+v.y = (r_ * sina);
+}`,
+  },
+  "post_julia3Dq": {
+    params: [{ name: "power", def: 3 }, { name: "divisor", def: 2 }],
+    verified: true, priority: 1, flags: ["z"], types: ["2D","POST"],
+    funcNames: ["atan2j","sqr","powc"],
+    funcs: `fn atan2j(y: f32, x: f32) -> f32 { if (x == 0.0 && y == 0.0) { return select(0.0, PI, (bitcast<u32>(x) >> 31u) == 1u) * select(1.0, -1.0, (bitcast<u32>(y) >> 31u) == 1u); } return atan2(y, x); }
+
+fn sqr(x: f32) -> f32 { return x * x; }
+
+fn powc(x: f32, y: f32) -> f32 {
+  if (x >= 0.0) { return pow(x, y); }
+  let yi = round(y);
+  if (abs(y - yi) > 1e-6) { return pow(x, y); }
+  let m = pow(-x, y);
+  return select(m, -m, (i32(yi) & 1) != 0);
+}`,
+    code: (w, p) => `{
+var inv_power: f32 = 0;
+var abs_inv_power: f32 = 0;
+var half_inv_power: f32 = 0;
+var inv_power_2pi: f32 = 0;
+{
+  inv_power = (f32(i32(${p[1]})) / f32(i32(${p[0]})));
+  abs_inv_power = abs(inv_power);
+  half_inv_power = ((0.5 * inv_power) - 0.5);
+  inv_power_2pi = ((2.0 * PI) / f32(i32(${p[0]})));
+}
+var a: f32 = ((atan2j(v.y, v.x) * inv_power) + (f32(i32((rnd(rs) * abs(f32(i32(${p[0]})))))) * inv_power_2pi));
+var sina: f32 = sin(a);
+var cosa: f32 = cos(a);
+var z: f32 = (pz_ * abs_inv_power);
+var r2d: f32 = (sqr(v.x) + sqr(v.y));
+var r_: f32 = (${w} * powc((r2d + sqr(z)), half_inv_power));
+pz_ = (r_ * z);
+r_ *= sqrt(r2d);
+v.x = (r_ * cosa);
+v.y = (r_ * sina);
+}`,
+  },
   "circleblur": {
     params: [],
     verified: true, priority: 0, flags: [], types: ["BLUR"],
+    funcNames: ["atan2j"],
+    funcs: `fn atan2j(y: f32, x: f32) -> f32 { if (x == 0.0 && y == 0.0) { return select(0.0, PI, (bitcast<u32>(x) >> 31u) == 1u) * select(1.0, -1.0, (bitcast<u32>(y) >> 31u) == 1u); } return atan2(y, x); }`,
     code: (w, _p) => `{
 var rad: f32 = sqrt(rnd(rs));
 var c: f32;
@@ -6919,6 +7871,8 @@ v.y += ((${w} * rad) * s);
   "sineblur": {
     params: [{ name: "power", def: 1 }],
     verified: true, priority: 0, flags: [], types: ["BLUR"],
+    funcNames: ["atan2j"],
+    funcs: `fn atan2j(y: f32, x: f32) -> f32 { if (x == 0.0 && y == 0.0) { return select(0.0, PI, (bitcast<u32>(x) >> 31u) == 1u) * select(1.0, -1.0, (bitcast<u32>(y) >> 31u) == 1u); } return atan2(y, x); }`,
     code: (w, p) => `{
 var power: f32 = ${p[0]};
 if ((power < 0.0)) {
@@ -6935,8 +7889,10 @@ v.y += (r_ * s);
   "starblur": {
     params: [{ name: "power", def: 5 }, { name: "range", def: 0.40162283177245456 }],
     verified: true, priority: 0, flags: [], types: ["BASE_SHAPE"],
-    funcNames: ["roundc"],
-    funcs: `fn roundc(x: f32) -> f32 { return sign(x) * floor(abs(x) + 0.5); }`,
+    funcNames: ["roundc","atan2j"],
+    funcs: `fn roundc(x: f32) -> f32 { return sign(x) * floor(abs(x) + 0.5); }
+
+fn atan2j(y: f32, x: f32) -> f32 { if (x == 0.0 && y == 0.0) { return select(0.0, PI, (bitcast<u32>(x) >> 31u) == 1u) * select(1.0, -1.0, (bitcast<u32>(y) >> 31u) == 1u); } return atan2(y, x); }`,
     code: (w, p) => `{
 var power: f32 = f32(i32(roundc(f32(i32(${p[0]})))));
 var starblur_alpha: f32 = (PI / power);
@@ -6963,6 +7919,8 @@ v.y += ((${w} * z) * s);
   "post_depth": {
     params: [{ name: "power", def: 1 }],
     verified: true, priority: 1, flags: ["3d","z"], types: ["3D","POST"],
+    funcNames: ["atan2j"],
+    funcs: `fn atan2j(y: f32, x: f32) -> f32 { if (x == 0.0 && y == 0.0) { return select(0.0, PI, (bitcast<u32>(x) >> 31u) == 1u) * select(1.0, -1.0, (bitcast<u32>(y) >> 31u) == 1u); } return atan2(y, x); }`,
     code: (w, p) => `{
 var coeff: f32 = abs(z_);
 if (((coeff != 0.0) && (${p[0]} != 1.0))) {
@@ -6973,9 +7931,30 @@ v.y += (${w} * (t.y + (v.y * coeff)));
 pz_ += (${w} * (z_ + (pz_ * coeff)));
 }`,
   },
+  "post_rblur": {
+    params: [{ name: "strength", def: 1 }, { name: "offset", def: 1 }, { name: "center_x", def: 0 }, { name: "center_y", def: 1 }],
+    verified: true, priority: 1, flags: [], types: ["2D","BLUR","POST"],
+    funcNames: ["sqr","atan2j"],
+    funcs: `fn sqr(x: f32) -> f32 { return x * x; }
+
+fn atan2j(y: f32, x: f32) -> f32 { if (x == 0.0 && y == 0.0) { return select(0.0, PI, (bitcast<u32>(x) >> 31u) == 1u) * select(1.0, -1.0, (bitcast<u32>(y) >> 31u) == 1u); } return atan2(y, x); }`,
+    code: (w, p) => `{
+var s2: f32 = 0;
+{
+  s2 = (2.0 * ${p[0]});
+}
+var r_: f32 = (sqrt((sqr((v.x - ${p[2]})) + sqr((v.y - ${p[3]})))) - ${p[1]});
+r_ = select(r_, 0, (r_ < 0));
+r_ *= s2;
+v.x = (${w} * (v.x + ((rnd(rs) - 0.5) * r_)));
+v.y = (${w} * (v.y + ((rnd(rs) - 0.5) * r_)));
+}`,
+  },
   "shredlin": {
     params: [{ name: "xdistance", def: 1 }, { name: "xwidth", def: 0.5 }, { name: "ydistance", def: 1 }, { name: "ywidth", def: 0.5 }],
     verified: true, priority: 0, flags: [], types: ["2D"],
+    funcNames: ["atan2j"],
+    funcs: `fn atan2j(y: f32, x: f32) -> f32 { if (x == 0.0 && y == 0.0) { return select(0.0, PI, (bitcast<u32>(x) >> 31u) == 1u) * select(1.0, -1.0, (bitcast<u32>(y) >> 31u) == 1u); } return atan2(y, x); }`,
     code: (w, p) => `{
 var sxd: f32 = ${p[0]};
 var sxw: f32 = min(max(${p[1]}, -1.0), 1.0);
@@ -6993,8 +7972,10 @@ v.y += ((vv * syd) * ((((yrng - f32(i32(yrng))) * syw) + f32(i32(yrng))) + ((0.5
   "primitives_wf": {
     params: [{ name: "shape", def: 1 }, { name: "a", def: 1 }, { name: "b", def: 1 }, { name: "filled", def: 0 }],
     verified: true, priority: 0, flags: ["3d","z"], types: ["3D","BASE_SHAPE"],
-    funcNames: ["primitives_wf_insideUnitTriangle"],
-    funcs: `fn primitives_wf_insideUnitTriangle(pX: f32, pY: f32) -> i32 {
+    funcNames: ["atan2j","primitives_wf_insideUnitTriangle"],
+    funcs: `fn atan2j(y: f32, x: f32) -> f32 { if (x == 0.0 && y == 0.0) { return select(0.0, PI, (bitcast<u32>(x) >> 31u) == 1u) * select(1.0, -1.0, (bitcast<u32>(y) >> 31u) == 1u); } return atan2(y, x); }
+
+fn primitives_wf_insideUnitTriangle(pX: f32, pY: f32) -> i32 {
   var v0x: f32 = 0.0;
   var v0y: f32 = 1.0;
   var v1x: f32 = 1.0;
@@ -7203,6 +8184,8 @@ switch i32(${p[0]}) {
   "flatten": {
     params: [],
     verified: true, priority: 1, flags: ["z"], types: ["ZTRANSFORM","POST"],
+    funcNames: ["atan2j"],
+    funcs: `fn atan2j(y: f32, x: f32) -> f32 { if (x == 0.0 && y == 0.0) { return select(0.0, PI, (bitcast<u32>(x) >> 31u) == 1u) * select(1.0, -1.0, (bitcast<u32>(y) >> 31u) == 1u); } return atan2(y, x); }`,
     code: (_w, _p) => `{
 pz_ = 0;
 }`,
@@ -7210,15 +8193,103 @@ pz_ = 0;
   "blur_zoom": {
     params: [{ name: "length", def: 0.24 }, { name: "x", def: 0.2 }, { name: "y", def: -0.1 }],
     verified: true, priority: 0, flags: [], types: ["BLUR"],
+    funcNames: ["atan2j"],
+    funcs: `fn atan2j(y: f32, x: f32) -> f32 { if (x == 0.0 && y == 0.0) { return select(0.0, PI, (bitcast<u32>(x) >> 31u) == 1u) * select(1.0, -1.0, (bitcast<u32>(y) >> 31u) == 1u); } return atan2(y, x); }`,
     code: (w, p) => `{
 var _z: f32 = (1.0 + (${p[0]} * rnd(rs)));
 v.x += (${w} * (((t.x - ${p[1]}) * _z) + ${p[1]}));
 v.y += (${w} * (((t.y + ${p[2]}) * _z) - ${p[2]}));
 }`,
   },
+  "lazyjess": {
+    params: [{ name: "n", def: 4 }, { name: "spin", def: 3.141592653589793 }, { name: "space", def: 0 }, { name: "corner", def: 1 }],
+    verified: true, priority: 0, flags: ["z"], types: ["2D"],
+    funcNames: ["atan2j"],
+    funcs: `fn atan2j(y: f32, x: f32) -> f32 { if (x == 0.0 && y == 0.0) { return select(0.0, PI, (bitcast<u32>(x) >> 31u) == 1u) * select(1.0, -1.0, (bitcast<u32>(y) >> 31u) == 1u); } return atan2(y, x); }`,
+    code: (w, p) => `{
+var p0_: f32 = ${p[0]};
+var vertex: f32 = 0;
+var sin_vertex: f32 = 0;
+var pie_slice: f32 = 0;
+var half_slice: f32 = 0;
+var corner_rotation: f32 = 0;
+{
+  if ((i32(p0_) < 2)) {
+    p0_ = 2;
+  }
+  vertex = ((PI * f32((i32(p0_) - 2))) / f32((2 * i32(p0_))));
+  sin_vertex = sin(vertex);
+  pie_slice = ((2.0 * PI) / f32(i32(p0_)));
+  half_slice = (pie_slice / 2);
+  corner_rotation = (f32((i32(${p[3]}) - 1)) * pie_slice);
+}
+var theta: f32;
+var sina: f32;
+var cosa: f32;
+var x: f32 = t.x;
+var y: f32 = t.y;
+var modulus: f32 = sqrt(((x * x) + (y * y)));
+if ((i32(p0_) == 2)) {
+  if ((abs(x) < ${w})) {
+    theta = (atan2j(y, x) + ${p[1]});
+    sina = sin(theta);
+    cosa = cos(theta);
+    x = ((${w} * modulus) * cosa);
+    y = ((${w} * modulus) * sina);
+    if ((abs(x) < ${w})) {
+      v.x += x;
+      v.y += y;
+    } else {
+      theta = ((atan2j(y, x) - ${p[1]}) + corner_rotation);
+      sina = sin(theta);
+      cosa = cos(theta);
+      v.x += ((${w} * modulus) * cosa);
+      v.y -= ((${w} * modulus) * sina);
+    }
+  } else {
+    modulus = (1.0 + (${p[2]} / modulus));
+    v.x += ((${w} * modulus) * x);
+    v.y += ((${w} * modulus) * y);
+  }
+} else {
+  theta = (atan2j(y, x) + (2.0 * PI));
+  var theta_diff: f32 = ((theta + half_slice) % pie_slice);
+  var r_: f32 = (((${w} * 1.4142135623730951) * sin_vertex) / sin(((PI - theta_diff) - vertex)));
+  if ((modulus < r_)) {
+    theta = ((atan2j(y, x) + ${p[1]}) + (2.0 * PI));
+    sina = sin(theta);
+    cosa = cos(theta);
+    x = ((${w} * modulus) * cosa);
+    y = ((${w} * modulus) * sina);
+    theta_diff = ((theta + half_slice) % pie_slice);
+    r_ = (((${w} * 1.4142135623730951) * sin_vertex) / sin(((PI - theta_diff) - vertex)));
+    modulus = sqrt(((x * x) + (y * y)));
+    if ((modulus < r_)) {
+      v.x += x;
+      v.y += y;
+    } else {
+      theta = (((atan2j(y, x) - ${p[1]}) + corner_rotation) + (2.0 * PI));
+      sina = sin(theta);
+      cosa = cos(theta);
+      v.x += ((${w} * modulus) * cosa);
+      v.y -= ((${w} * modulus) * sina);
+    }
+  } else {
+    modulus = (1.0 + (${p[2]} / modulus));
+    v.x += ((${w} * modulus) * x);
+    v.y += ((${w} * modulus) * y);
+  }
+}
+if (false) {
+  pz_ += (${w} * z_);
+}
+}`,
+  },
   "voron": {
     params: [{ name: "k", def: 0.99 }, { name: "step", def: 0.25 }, { name: "num", def: 1 }, { name: "xseed", def: 3 }, { name: "yseed", def: 7 }],
     verified: true, priority: 0, flags: [], types: ["2D","SIMULATION"],
+    funcNames: ["atan2j"],
+    funcs: `fn atan2j(y: f32, x: f32) -> f32 { if (x == 0.0 && y == 0.0) { return select(0.0, PI, (bitcast<u32>(x) >> 31u) == 1u) * select(1.0, -1.0, (bitcast<u32>(y) >> 31u) == 1u); } return atan2(y, x); }`,
     code: (w, p) => `{
 var i: i32;
 var j: i32;
@@ -7278,8 +8349,10 @@ v.y += (${w} * ((${p[0]} * (t.y - Y0)) + Y0));
   "ortho": {
     params: [{ name: "in", def: 0 }, { name: "out", def: 0 }],
     verified: true, priority: 0, flags: [], types: ["2D"],
-    funcNames: ["sqrf"],
-    funcs: `fn sqrf(x: f32) -> f32 {
+    funcNames: ["atan2j","sqrf"],
+    funcs: `fn atan2j(y: f32, x: f32) -> f32 { if (x == 0.0 && y == 0.0) { return select(0.0, PI, (bitcast<u32>(x) >> 31u) == 1u) * select(1.0, -1.0, (bitcast<u32>(y) >> 31u) == 1u); } return atan2(y, x); }
+
+fn sqrf(x: f32) -> f32 {
   return (x * x);
 }`,
     code: (w, p) => `{
@@ -7300,8 +8373,8 @@ if ((r_ < 1.0)) {
   if ((t.x >= 0.0)) {
     xo = ((r_ + 1.0) / (2.0 * t.x));
     ro = sqrt((sqrf((t.x - xo)) + (t.y * t.y)));
-    theta = atan2(1.0, ro);
-    a = (((((${p[0]} * theta) + atan2(t.y, (xo - t.x))) + theta) % (2.0 * theta)) - theta);
+    theta = atan2j(1.0, ro);
+    a = (((((${p[0]} * theta) + atan2j(t.y, (xo - t.x))) + theta) % (2.0 * theta)) - theta);
     s = sin(a);
     c = cos(a);
     v.x += (${w} * (xo - (c * ro)));
@@ -7309,8 +8382,8 @@ if ((r_ < 1.0)) {
   } else {
     xo = (-(r_ + 1.0) / (2.0 * t.x));
     ro = sqrt((sqrf((-t.x - xo)) + (t.y * t.y)));
-    theta = atan2(1.0, ro);
-    a = (((((${p[0]} * theta) + atan2(t.y, (xo + t.x))) + theta) % (2.0 * theta)) - theta);
+    theta = atan2j(1.0, ro);
+    a = (((((${p[0]} * theta) + atan2j(t.y, (xo + t.x))) + theta) % (2.0 * theta)) - theta);
     s = sin(a);
     c = cos(a);
     v.x -= (${w} * (xo - (c * ro)));
@@ -7318,7 +8391,7 @@ if ((r_ < 1.0)) {
   }
 } else {
   r_ = (1.0 / sqrt(r_));
-  ta = atan2(t.y, t.x);
+  ta = atan2j(t.y, t.x);
   ts = sin(ta);
   tc = cos(ta);
   x = (r_ * tc);
@@ -7326,13 +8399,13 @@ if ((r_ < 1.0)) {
   if ((x >= 0.0)) {
     xo = ((((x * x) + (y * y)) + 1.0) / (2.0 * x));
     ro = sqrt((sqrf((x - xo)) + (y * y)));
-    theta = atan2(1.0, ro);
-    a = (((((${p[1]} * theta) + atan2(y, (xo - x))) + theta) % (2.0 * theta)) - theta);
+    theta = atan2j(1.0, ro);
+    a = (((((${p[1]} * theta) + atan2j(y, (xo - x))) + theta) % (2.0 * theta)) - theta);
     s = sin(a);
     c = cos(a);
     x = (xo - (c * ro));
     y = (s * ro);
-    ta = atan2(y, x);
+    ta = atan2j(y, x);
     ts = sin(ta);
     tc = cos(ta);
     r_ = (1.0 / sqrt(((x * x) + (y * y))));
@@ -7341,13 +8414,13 @@ if ((r_ < 1.0)) {
   } else {
     xo = (-(((x * x) + (y * y)) + 1.0) / (2.0 * x));
     ro = sqrt((sqrf((-x - xo)) + (y * y)));
-    theta = atan2(1.0, ro);
-    a = (((((${p[1]} * theta) + atan2(y, (xo + x))) + theta) % (2.0 * theta)) - theta);
+    theta = atan2j(1.0, ro);
+    a = (((((${p[1]} * theta) + atan2j(y, (xo + x))) + theta) % (2.0 * theta)) - theta);
     s = sin(a);
     c = cos(a);
     x = (xo - (c * ro));
     y = (s * ro);
-    ta = atan2(y, x);
+    ta = atan2j(y, x);
     ts = sin(ta);
     tc = cos(ta);
     r_ = (1.0 / sqrt(((x * x) + (y * y))));
@@ -7360,6 +8433,8 @@ if ((r_ < 1.0)) {
   "onion": {
     params: [{ name: "centre_x", def: 0 }, { name: "centre_y", def: 0 }],
     verified: true, priority: 0, flags: ["3d","z"], types: ["3D"],
+    funcNames: ["atan2j"],
+    funcs: `fn atan2j(y: f32, x: f32) -> f32 { if (x == 0.0 && y == 0.0) { return select(0.0, PI, (bitcast<u32>(x) >> 31u) == 1u) * select(1.0, -1.0, (bitcast<u32>(y) >> 31u) == 1u); } return atan2(y, x); }`,
     code: (w, p) => `{
 var r0: f32 = ${w};
 var x0: f32 = t.x;
@@ -7397,8 +8472,10 @@ pz_ += (z1 + z_);
   "bubbleT3D": {
     params: [{ name: "number_of_stripes", def: 0 }, { name: "ratio_of_stripes", def: 1 }, { name: "angle_of_hole", def: 0 }, { name: "exponent_z", def: 1 }, { name: "symmetry_z", def: 0 }, { name: "modus_blur", def: 0 }],
     verified: true, priority: 0, flags: ["3d","z"], types: ["3D"],
-    funcNames: ["powc","sqrf"],
-    funcs: `fn powc(x: f32, y: f32) -> f32 {
+    funcNames: ["atan2j","powc","sqrf"],
+    funcs: `fn atan2j(y: f32, x: f32) -> f32 { if (x == 0.0 && y == 0.0) { return select(0.0, PI, (bitcast<u32>(x) >> 31u) == 1u) * select(1.0, -1.0, (bitcast<u32>(y) >> 31u) == 1u); } return atan2(y, x); }
+
+fn powc(x: f32, y: f32) -> f32 {
   if (x >= 0.0) { return pow(x, y); }
   let yi = round(y);
   if (abs(y - yi) > 1e-6) { return pow(x, y); }
@@ -7468,7 +8545,7 @@ var fac: f32;
 var rad: f32 = ((((x * x) + (y * y)) / 4) + 1);
 var angXY: f32;
 var angZ: f32;
-angXY = atan2(x, y);
+angXY = atan2j(x, y);
 if ((angXY < 0)) {
   angXY += (2.0 * PI);
 }
@@ -7531,7 +8608,7 @@ if (((x != 0) || (y != 0))) {
   if ((${p[3]} <= 2)) {
     angZ = (PI - acos((z / (((x * x) + (y * y)) + (z * z)))));
   } else {
-    angZ = (PI - atan2(sqrf(((x * x) + (y * y))), z));
+    angZ = (PI - atan2j(sqrf(((x * x) + (y * y))), z));
   }
 } else {
   z = 0.0;
@@ -7597,8 +8674,10 @@ pz_ += (${w} * z);
   "extrude": {
     params: [{ name: "root_face", def: 0.5 }],
     verified: true, priority: 0, flags: ["z"], types: ["ZTRANSFORM"],
-    funcNames: ["rndi"],
-    funcs: `fn rndi(state: ptr<function, u32>) -> u32 { var x = *state; x ^= x << 13u; x ^= x >> 17u; x ^= x << 5u; *state = x; return x; }`,
+    funcNames: ["rndi","atan2j"],
+    funcs: `fn rndi(state: ptr<function, u32>) -> u32 { var x = *state; x ^= x << 13u; x ^= x >> 17u; x ^= x << 5u; *state = x; return x; }
+
+fn atan2j(y: f32, x: f32) -> f32 { if (x == 0.0 && y == 0.0) { return select(0.0, PI, (bitcast<u32>(x) >> 31u) == 1u) * select(1.0, -1.0, (bitcast<u32>(y) >> 31u) == 1u); } return atan2(y, x); }`,
     code: (w, p) => `{
 if (((f32(((rndi(rs) ^ (rndi(rs) << 15)) & 268435455)) / 268435455) < ${p[0]})) {
   pz_ = select(${w}, 0.0, (${w} < 0.0));
@@ -7610,6 +8689,8 @@ if (((f32(((rndi(rs) ^ (rndi(rs) << 15)) & 268435455)) / 268435455) < ${p[0]})) 
   "line": {
     params: [{ name: "delta", def: 0 }, { name: "phi", def: 0 }],
     verified: true, priority: 0, flags: ["z"], types: ["BASE_SHAPE"],
+    funcNames: ["atan2j"],
+    funcs: `fn atan2j(y: f32, x: f32) -> f32 { if (x == 0.0 && y == 0.0) { return select(0.0, PI, (bitcast<u32>(x) >> 31u) == 1u) * select(1.0, -1.0, (bitcast<u32>(y) >> 31u) == 1u); } return atan2(y, x); }`,
     code: (w, p) => `{
 var ux: f32 = (cos((${p[0]} * PI)) * cos((${p[1]} * PI)));
 var uy: f32 = (sin((${p[0]} * PI)) * cos((${p[1]} * PI)));
@@ -7627,8 +8708,10 @@ pz_ += (uz * rand);
   "onion2": {
     params: [{ name: "meeting_pt", def: 0.5 }, { name: "circle_a", def: 1 }, { name: "circle_b", def: 1 }, { name: "shift_x", def: 0 }, { name: "shift_y", def: 0 }, { name: "shift_z", def: 0 }, { name: "top_crop", def: 0 }, { name: "stretch", def: 1 }],
     verified: true, priority: 0, flags: ["3d","z"], types: ["3D"],
-    funcNames: ["onion2_getPrecalcSqrt"],
-    funcs: `fn onion2_getPrecalcSqrt(v_: vec3f) -> f32 {
+    funcNames: ["atan2j","onion2_getPrecalcSqrt"],
+    funcs: `fn atan2j(y: f32, x: f32) -> f32 { if (x == 0.0 && y == 0.0) { return select(0.0, PI, (bitcast<u32>(x) >> 31u) == 1u) * select(1.0, -1.0, (bitcast<u32>(y) >> 31u) == 1u); } return atan2(y, x); }
+
+fn onion2_getPrecalcSqrt(v_: vec3f) -> f32 {
   var val: f32 = (sqrt(((v_.x * v_.x) + (v_.y * v_.y))) + 0.000001);
   return val;
 }`,
@@ -7671,7 +8754,7 @@ pz_ += ${p[5]};
   "dc_crackle_wf": {
     params: [{ name: "cellsize", def: 1 }, { name: "power", def: 0.2 }, { name: "distort", def: 0 }, { name: "scale", def: 1 }, { name: "z", def: 0 }, { name: "color_scale", def: 0.5 }, { name: "color_offset", def: 0 }],
     verified: true, priority: 0, flags: ["dc","stateful"], types: ["2D","SIMULATION","DC"],
-    funcNames: ["powc","F3","fastFloor","G3","G33","X_PRIME","Y_PRIME","Z_PRIME","GRAD_3D_x","GRAD_3D_y","GRAD_3D_z","gradCoord3D","singleSimplex","jw_state0_dc_crackle_wf_position","jw_state0_dc_crackle_wf_closest","jw_state0_dc_crackle_wf_vratio","jw_state0_dc_crackle_wf_voronoi"],
+    funcNames: ["powc","atan2j","F3","fastFloor","G3","G33","X_PRIME","Y_PRIME","Z_PRIME","GRAD_3D_x","GRAD_3D_y","GRAD_3D_z","gradCoord3D","singleSimplex","jw_state0_dc_crackle_wf_position","jw_state0_dc_crackle_wf_closest","jw_state0_dc_crackle_wf_vratio","jw_state0_dc_crackle_wf_voronoi"],
     funcs: `fn powc(x: f32, y: f32) -> f32 {
   if (x >= 0.0) { return pow(x, y); }
   let yi = round(y);
@@ -7679,6 +8762,8 @@ pz_ += ${p[5]};
   let m = pow(-x, y);
   return select(m, -m, (i32(yi) & 1) != 0);
 }
+
+fn atan2j(y: f32, x: f32) -> f32 { if (x == 0.0 && y == 0.0) { return select(0.0, PI, (bitcast<u32>(x) >> 31u) == 1u) * select(1.0, -1.0, (bitcast<u32>(y) >> 31u) == 1u); } return atan2(y, x); }
 
 const F3: f32 = (1.0 / 3.0);
 
@@ -7937,7 +9022,7 @@ if ((abs(${p[0]}) > 0.000001)) {
   "dc_hexes_wf": {
     params: [{ name: "cellsize", def: 1 }, { name: "power", def: 1 }, { name: "rotate", def: 0.166 }, { name: "scale", def: 1 }, { name: "color_scale", def: 0.5 }, { name: "color_offset", def: 0 }],
     verified: true, priority: 0, flags: ["dc"], types: ["2D","SIMULATION","DC"],
-    funcNames: ["powc","dc_hexes_cell_centre","dc_hexes_closest","dc_hexes_cell_choice","dc_hexes_vratio","dc_hexes_voronoi"],
+    funcNames: ["powc","atan2j","dc_hexes_cell_centre","dc_hexes_closest","dc_hexes_cell_choice","dc_hexes_vratio","dc_hexes_voronoi"],
     funcs: `fn powc(x: f32, y: f32) -> f32 {
   if (x >= 0.0) { return pow(x, y); }
   let yi = round(y);
@@ -7945,6 +9030,8 @@ if ((abs(${p[0]}) > 0.000001)) {
   let m = pow(-x, y);
   return select(m, -m, (i32(yi) & 1) != 0);
 }
+
+fn atan2j(y: f32, x: f32) -> f32 { if (x == 0.0 && y == 0.0) { return select(0.0, PI, (bitcast<u32>(x) >> 31u) == 1u) * select(1.0, -1.0, (bitcast<u32>(y) >> 31u) == 1u); } return atan2(y, x); }
 
 fn dc_hexes_cell_centre(x: i32, y: i32, s: f32, V: ptr<function, array<f32, 2>>) {
   (*V)[0] = (((1.5 * f32(x)) + (-1.5 * f32(y))) * s);
@@ -8070,8 +9157,10 @@ if ((0.0 != s)) {
   "murl": {
     params: [{ name: "c", def: 0.1 }, { name: "power", def: 1 }],
     verified: true, priority: 0, flags: [], types: ["2D"],
-    funcNames: ["powc"],
-    funcs: `fn powc(x: f32, y: f32) -> f32 {
+    funcNames: ["atan2j","powc"],
+    funcs: `fn atan2j(y: f32, x: f32) -> f32 { if (x == 0.0 && y == 0.0) { return select(0.0, PI, (bitcast<u32>(x) >> 31u) == 1u) * select(1.0, -1.0, (bitcast<u32>(y) >> 31u) == 1u); } return atan2(y, x); }
+
+fn powc(x: f32, y: f32) -> f32 {
   if (x >= 0.0) { return pow(x, y); }
   let yi = round(y);
   if (abs(y - yi) > 1e-6) { return pow(x, y); }
@@ -8088,8 +9177,8 @@ var p2: f32 = (0.5 * murl_power);
 var vp: f32 = (${w} * (${p[0]} + 1.0));
 var cosa: f32;
 var sina: f32;
-sina = sin((atan2(t.y, t.x) * murl_power));
-cosa = cos((atan2(t.y, t.x) * murl_power));
+sina = sin((atan2j(t.y, t.x) * murl_power));
+cosa = cos((atan2j(t.y, t.x) * murl_power));
 var r_: f32 = (c * powc(r2, p2));
 var re: f32 = ((r_ * cosa) + 1.0);
 var im: f32 = (r_ * sina);
@@ -8101,14 +9190,16 @@ v.y += (r1 * ((t.y * re) - (t.x * im)));
   "murl2": {
     params: [{ name: "c", def: 0.1 }, { name: "power", def: 3 }],
     verified: true, priority: 0, flags: [], types: ["2D"],
-    funcNames: ["powc"],
+    funcNames: ["powc","atan2j"],
     funcs: `fn powc(x: f32, y: f32) -> f32 {
   if (x >= 0.0) { return pow(x, y); }
   let yi = round(y);
   if (abs(y - yi) > 1e-6) { return pow(x, y); }
   let m = pow(-x, y);
   return select(m, -m, (i32(yi) & 1) != 0);
-}`,
+}
+
+fn atan2j(y: f32, x: f32) -> f32 { if (x == 0.0 && y == 0.0) { return select(0.0, PI, (bitcast<u32>(x) >> 31u) == 1u) * select(1.0, -1.0, (bitcast<u32>(y) >> 31u) == 1u); } return atan2(y, x); }`,
     code: (w, p) => `{
 var _invp: f32;
 var _vp: f32;
@@ -8131,14 +9222,14 @@ if ((f32(i32(${p[1]})) != 0.0)) {
   _invp = 100000000000.0;
   _vp = (${w} * powc((${p[0]} + 1.0), 4.0));
 }
-_a = (atan2(t.y, t.x) * f32(i32(${p[1]})));
+_a = (atan2j(t.y, t.x) * f32(i32(${p[1]})));
 _sina = sin(_a);
 _cosa = cos(_a);
 _r = (${p[0]} * powc(((t.x * t.x) + (t.y * t.y)), _p2));
 _re = ((_r * _cosa) + 1.0);
 _im = (_r * _sina);
 _r = powc(((_re * _re) + (_im * _im)), _invp);
-_a = ((atan2(_im, _re) * 2.0) * _invp);
+_a = ((atan2j(_im, _re) * 2.0) * _invp);
 _re = (_r * cos(_a));
 _im = (_r * sin(_a));
 _rl = (_vp / (_r * _r));
@@ -8149,6 +9240,8 @@ v.y += (_rl * ((t.y * _re) - (t.x * _im)));
   "pre_curl": {
     params: [{ name: "c1", def: 0 }, { name: "c2", def: 0 }],
     verified: true, priority: -1, flags: [], types: ["2D","PRE"],
+    funcNames: ["atan2j"],
+    funcs: `fn atan2j(y: f32, x: f32) -> f32 { if (x == 0.0 && y == 0.0) { return select(0.0, PI, (bitcast<u32>(x) >> 31u) == 1u) * select(1.0, -1.0, (bitcast<u32>(y) >> 31u) == 1u); } return atan2(y, x); }`,
     code: (w, p) => `{
 var x: f32 = t.x;
 var y: f32 = t.y;
@@ -8163,14 +9256,16 @@ t.y = (((y * re) - (x * im)) * r_);
   "julian3Dx": {
     params: [{ name: "power", def: 3 }, { name: "dist", def: 1 }, { name: "a", def: 1 }, { name: "b", def: 0 }, { name: "c", def: 0 }, { name: "d", def: 1 }, { name: "e", def: 0 }, { name: "f", def: 0 }],
     verified: true, priority: 0, flags: ["z"], types: ["2D"],
-    funcNames: ["powc"],
+    funcNames: ["powc","atan2j"],
     funcs: `fn powc(x: f32, y: f32) -> f32 {
   if (x >= 0.0) { return pow(x, y); }
   let yi = round(y);
   if (abs(y - yi) > 1e-6) { return pow(x, y); }
   let m = pow(-x, y);
   return select(m, -m, (i32(yi) & 1) != 0);
-}`,
+}
+
+fn atan2j(y: f32, x: f32) -> f32 { if (x == 0.0 && y == 0.0) { return select(0.0, PI, (bitcast<u32>(x) >> 31u) == 1u) * select(1.0, -1.0, (bitcast<u32>(y) >> 31u) == 1u); } return atan2(y, x); }`,
     code: (w, p) => `{
 var absN: f32 = abs(f32(i32(${p[0]})));
 var cN: f32 = (((${p[1]} / f32(i32(${p[0]}))) - 1.0) / 2.0);
@@ -8187,7 +9282,7 @@ var c21: f32 = ${p[7]};
 var x: f32 = (((c00 * t.x) + (c01 * t.y)) + c20);
 var y: f32 = (((c10 * t.x) + (c11 * t.y)) + c21);
 var rand: f32 = f32(i32((rnd(rs) * absN)));
-var alpha: f32 = ((atan2(y, x) + ((2.0 * PI) * rand)) / f32(i32(${p[0]})));
+var alpha: f32 = ((atan2j(y, x) + ((2.0 * PI) * rand)) / f32(i32(${p[0]})));
 var gamma: f32 = (radius_out * sqrt(radius_square));
 var sina: f32 = sin(alpha);
 var cosa: f32 = cos(alpha);
@@ -8198,8 +9293,10 @@ v.y += (gamma * sina);
   "bwrands": {
     params: [{ name: "cellsize", def: 1 }, { name: "space", def: 0 }, { name: "gain", def: 1.25 }, { name: "inner_twist", def: 0 }, { name: "outer_twist", def: 0 }, { name: "seed", def: 3210 }, { name: "rrot", def: 1 }, { name: "rmin", def: 0.25 }, { name: "loonie_chance", def: 0.5 }, { name: "petals_chance", def: 0.5 }, { name: "minpetals", def: 3 }, { name: "maxpetals", def: 20 }],
     verified: true, priority: 0, flags: [], types: ["2D"],
-    funcNames: ["sqrf","bwrands_bytemix","bwrands_byteshf","bwrands_bytexim","bwrands_byteprimes"],
-    funcs: `fn sqrf(x: f32) -> f32 {
+    funcNames: ["atan2j","sqrf","bwrands_bytemix","bwrands_byteshf","bwrands_bytexim","bwrands_byteprimes"],
+    funcs: `fn atan2j(y: f32, x: f32) -> f32 { if (x == 0.0 && y == 0.0) { return select(0.0, PI, (bitcast<u32>(x) >> 31u) == 1u) * select(1.0, -1.0, (bitcast<u32>(y) >> 31u) == 1u); } return atan2(y, x); }
+
+fn sqrf(x: f32) -> f32 {
   return (x * x);
 }
 
@@ -8307,7 +9404,7 @@ if ((abs(${p[0]}) < 0.000001)) {
       Ly *= r_;
       Vv2 = 1.0;
     } else if ((PetalsChance > 0.0)) {
-      flwr = ((NPetals / (2.0 * PI)) * (PI + atan2(Ly, Lx)));
+      flwr = ((NPetals / (2.0 * PI)) * (PI + atan2j(Ly, Lx)));
       flwr = (flwr - f32(i32(flwr)));
       flwr = (abs((flwr - 0.5)) * 2.0);
       r_ = sqrt(((Lx * Lx) + (Ly * Ly)));
@@ -8344,8 +9441,10 @@ if ((abs(${p[0]}) < 0.000001)) {
   "loonie2": {
     params: [{ name: "sides", def: 4 }, { name: "star", def: 0.15 }, { name: "circle", def: 0.25 }],
     verified: true, priority: 0, flags: [], types: ["2D"],
-    funcNames: ["roundc"],
-    funcs: `fn roundc(x: f32) -> f32 { return sign(x) * floor(abs(x) + 0.5); }`,
+    funcNames: ["roundc","atan2j"],
+    funcs: `fn roundc(x: f32) -> f32 { return sign(x) * floor(abs(x) + 0.5); }
+
+fn atan2j(y: f32, x: f32) -> f32 { if (x == 0.0 && y == 0.0) { return select(0.0, PI, (bitcast<u32>(x) >> 31u) == 1u) * select(1.0, -1.0, (bitcast<u32>(y) >> 31u) == 1u); } return atan2(y, x); }`,
     code: (w, p) => `{
 var sides: i32 = i32(roundc(min(max(${p[0]}, 1.0), 50.0)));
 var _sqrvvar: f32 = (${w} * ${w});
@@ -8393,8 +9492,10 @@ if (((r2_ > 0) && (r2_ < _sqrvvar))) {
   "loonie3": {
     params: [],
     verified: true, priority: 0, flags: [], types: ["2D"],
-    funcNames: ["sqrf"],
-    funcs: `fn sqrf(x: f32) -> f32 {
+    funcNames: ["atan2j","sqrf"],
+    funcs: `fn atan2j(y: f32, x: f32) -> f32 { if (x == 0.0 && y == 0.0) { return select(0.0, PI, (bitcast<u32>(x) >> 31u) == 1u) * select(1.0, -1.0, (bitcast<u32>(y) >> 31u) == 1u); } return atan2(y, x); }
+
+fn sqrf(x: f32) -> f32 {
   return (x * x);
 }`,
     code: (w, _p) => `{
@@ -8416,12 +9517,14 @@ if ((r2_ < _sqrvvar)) {
   "jac_cn": {
     params: [{ name: "k", def: 0.5 }],
     verified: true, priority: 0, flags: [], types: ["2D"],
-    funcNames: ["Jacobi_elliptic_result","Jacobi_elliptic"],
+    funcNames: ["Jacobi_elliptic_result","atan2j","Jacobi_elliptic"],
     funcs: `struct Jacobi_elliptic_result {
   cn: f32,
   dn: f32,
   sn: f32,
 }
+
+fn atan2j(y: f32, x: f32) -> f32 { if (x == 0.0 && y == 0.0) { return select(0.0, PI, (bitcast<u32>(x) >> 31u) == 1u) * select(1.0, -1.0, (bitcast<u32>(y) >> 31u) == 1u); } return atan2(y, x); }
 
 fn Jacobi_elliptic(uu: f32, emmc: f32, res: ptr<function, Jacobi_elliptic_result>) {
   (*res).cn = 0.0;
@@ -8517,12 +9620,14 @@ v.y += (Denom * NumY);
   "jac_dn": {
     params: [{ name: "k", def: 0.5 }],
     verified: true, priority: 0, flags: [], types: ["2D"],
-    funcNames: ["Jacobi_elliptic_result","Jacobi_elliptic"],
+    funcNames: ["Jacobi_elliptic_result","atan2j","Jacobi_elliptic"],
     funcs: `struct Jacobi_elliptic_result {
   cn: f32,
   dn: f32,
   sn: f32,
 }
+
+fn atan2j(y: f32, x: f32) -> f32 { if (x == 0.0 && y == 0.0) { return select(0.0, PI, (bitcast<u32>(x) >> 31u) == 1u) * select(1.0, -1.0, (bitcast<u32>(y) >> 31u) == 1u); } return atan2(y, x); }
 
 fn Jacobi_elliptic(uu: f32, emmc: f32, res: ptr<function, Jacobi_elliptic_result>) {
   (*res).cn = 0.0;
@@ -8618,12 +9723,14 @@ v.y += (Denom * NumY);
   "jac_sn": {
     params: [{ name: "k", def: 0.5 }],
     verified: true, priority: 0, flags: [], types: ["2D"],
-    funcNames: ["Jacobi_elliptic_result","Jacobi_elliptic"],
+    funcNames: ["Jacobi_elliptic_result","atan2j","Jacobi_elliptic"],
     funcs: `struct Jacobi_elliptic_result {
   cn: f32,
   dn: f32,
   sn: f32,
 }
+
+fn atan2j(y: f32, x: f32) -> f32 { if (x == 0.0 && y == 0.0) { return select(0.0, PI, (bitcast<u32>(x) >> 31u) == 1u) * select(1.0, -1.0, (bitcast<u32>(y) >> 31u) == 1u); } return atan2(y, x); }
 
 fn Jacobi_elliptic(uu: f32, emmc: f32, res: ptr<function, Jacobi_elliptic_result>) {
   (*res).cn = 0.0;
@@ -8719,6 +9826,8 @@ v.y += (Denom * NumY);
   "tancos": {
     params: [],
     verified: true, priority: 0, flags: [], types: ["2D"],
+    funcNames: ["atan2j"],
+    funcs: `fn atan2j(y: f32, x: f32) -> f32 { if (x == 0.0 && y == 0.0) { return select(0.0, PI, (bitcast<u32>(x) >> 31u) == 1u) * select(1.0, -1.0, (bitcast<u32>(y) >> 31u) == 1u); } return atan2(y, x); }`,
     code: (w, _p) => `{
 var d1: f32 = ((0.000001 + (t.x * t.x)) + (t.y * t.y));
 var d2: f32 = (${w} / d1);
@@ -8729,6 +9838,8 @@ v.y += (d2 * (cos(d1) * (2.0 * t.y)));
   "rippled": {
     params: [],
     verified: true, priority: 0, flags: [], types: ["2D"],
+    funcNames: ["atan2j"],
+    funcs: `fn atan2j(y: f32, x: f32) -> f32 { if (x == 0.0 && y == 0.0) { return select(0.0, PI, (bitcast<u32>(x) >> 31u) == 1u) * select(1.0, -1.0, (bitcast<u32>(y) >> 31u) == 1u); } return atan2(y, x); }`,
     code: (w, _p) => `{
 v.x = ((0.5 * ${w}) * (tanh((r2 + 1.0e-20)) * (2.0 * t.x)));
 v.y = ((0.5 * ${w}) * (cos((r2 + 1.0e-20)) * (2.0 * t.y)));
@@ -8737,6 +9848,8 @@ v.y = ((0.5 * ${w}) * (cos((r2 + 1.0e-20)) * (2.0 * t.y)));
   "funnel": {
     params: [{ name: "effect", def: 8 }],
     verified: true, priority: 0, flags: [], types: ["2D"],
+    funcNames: ["atan2j"],
+    funcs: `fn atan2j(y: f32, x: f32) -> f32 { if (x == 0.0 && y == 0.0) { return select(0.0, PI, (bitcast<u32>(x) >> 31u) == 1u) * select(1.0, -1.0, (bitcast<u32>(y) >> 31u) == 1u); } return atan2(y, x); }`,
     code: (w, p) => `{
 v.x += ((${w} * tanh(t.x)) * ((1.0 / cos(t.x)) + (f32(i32(${p[0]})) * PI)));
 v.y += ((${w} * tanh(t.y)) * ((1.0 / cos(t.y)) + (f32(i32(${p[0]})) * PI)));
@@ -8745,6 +9858,8 @@ v.y += ((${w} * tanh(t.y)) * ((1.0 / cos(t.y)) + (f32(i32(${p[0]})) * PI)));
   "roundspher": {
     params: [],
     verified: true, priority: 0, flags: [], types: ["2D"],
+    funcNames: ["atan2j"],
+    funcs: `fn atan2j(y: f32, x: f32) -> f32 { if (x == 0.0 && y == 0.0) { return select(0.0, PI, (bitcast<u32>(x) >> 31u) == 1u) * select(1.0, -1.0, (bitcast<u32>(y) >> 31u) == 1u); } return atan2(y, x); }`,
     code: (w, _p) => `{
 var e: f32 = ((1.0 / r2) + (4.0 / (PI * PI)));
 v.x += (${w} * (((${w} / r2) * t.x) / e));
@@ -8754,6 +9869,8 @@ v.y += (${w} * (((${w} / r2) * t.y) / e));
   "spiralwing": {
     params: [],
     verified: true, priority: 0, flags: [], types: ["2D"],
+    funcNames: ["atan2j"],
+    funcs: `fn atan2j(y: f32, x: f32) -> f32 { if (x == 0.0 && y == 0.0) { return select(0.0, PI, (bitcast<u32>(x) >> 31u) == 1u) * select(1.0, -1.0, (bitcast<u32>(y) >> 31u) == 1u); } return atan2(y, x); }`,
     code: (w, _p) => `{
 var c1: f32 = (t.x * t.x);
 var c2: f32 = (t.y * t.y);
@@ -8764,8 +9881,10 @@ v.y += (${w} * ((((1.0 / r2) + 1.0e-20) * sin((c1 + 1.0e-20))) * sin((c2 + 1.0e-
   "rays1": {
     params: [],
     verified: true, priority: 0, flags: [], types: ["2D"],
-    funcNames: ["sqrf"],
-    funcs: `fn sqrf(x: f32) -> f32 {
+    funcNames: ["atan2j","sqrf"],
+    funcs: `fn atan2j(y: f32, x: f32) -> f32 { if (x == 0.0 && y == 0.0) { return select(0.0, PI, (bitcast<u32>(x) >> 31u) == 1u) * select(1.0, -1.0, (bitcast<u32>(y) >> 31u) == 1u); } return atan2(y, x); }
+
+fn sqrf(x: f32) -> f32 {
   return (x * x);
 }`,
     code: (w, _p) => `{
@@ -8778,6 +9897,8 @@ v.y = (((${w} * u) * t_) / t.y);
   "rays2": {
     params: [],
     verified: true, priority: 0, flags: [], types: ["2D"],
+    funcNames: ["atan2j"],
+    funcs: `fn atan2j(y: f32, x: f32) -> f32 { if (x == 0.0 && y == 0.0) { return select(0.0, PI, (bitcast<u32>(x) >> 31u) == 1u) * select(1.0, -1.0, (bitcast<u32>(y) >> 31u) == 1u); } return atan2(y, x); }`,
     code: (w, _p) => `{
 var t_: f32 = ((t.x * t.x) + (t.y * t.y));
 var u: f32 = (1.0 / cos(((t_ + 0.000001) * tan(((1.0 / t_) + 0.000001)))));
@@ -8788,6 +9909,8 @@ v.y = ((((${w} / 10.0) * u) * t_) / t.y);
   "rays3": {
     params: [],
     verified: true, priority: 0, flags: [], types: ["2D"],
+    funcNames: ["atan2j"],
+    funcs: `fn atan2j(y: f32, x: f32) -> f32 { if (x == 0.0 && y == 0.0) { return select(0.0, PI, (bitcast<u32>(x) >> 31u) == 1u) * select(1.0, -1.0, (bitcast<u32>(y) >> 31u) == 1u); } return atan2(y, x); }`,
     code: (w, _p) => `{
 var t_: f32 = ((t.x * t.x) + (t.y * t.y));
 var u: f32 = (1.0 / sqrt(cos((sin(((t_ * t_) + 0.000001)) * sin(((1.0 / (t_ * t_)) + 0.000001))))));
@@ -8798,6 +9921,8 @@ v.y = (((((${w} / 10.0) * u) * tan(t_)) * t_) / t.y);
   "petal": {
     params: [],
     verified: true, priority: 0, flags: [], types: ["2D"],
+    funcNames: ["atan2j"],
+    funcs: `fn atan2j(y: f32, x: f32) -> f32 { if (x == 0.0 && y == 0.0) { return select(0.0, PI, (bitcast<u32>(x) >> 31u) == 1u) * select(1.0, -1.0, (bitcast<u32>(y) >> 31u) == 1u); } return atan2(y, x); }`,
     code: (w, _p) => `{
 var a: f32 = cos(t.x);
 var bx: f32 = (((cos(t.x) * cos(t.y)) * (cos(t.x) * cos(t.y))) * (cos(t.x) * cos(t.y)));
@@ -8809,6 +9934,8 @@ v.y += ((${w} * a) * by);
   "ennepers": {
     params: [],
     verified: true, priority: 0, flags: [], types: ["2D"],
+    funcNames: ["atan2j"],
+    funcs: `fn atan2j(y: f32, x: f32) -> f32 { if (x == 0.0 && y == 0.0) { return select(0.0, PI, (bitcast<u32>(x) >> 31u) == 1u) * select(1.0, -1.0, (bitcast<u32>(y) >> 31u) == 1u); } return atan2(y, x); }`,
     code: (w, _p) => `{
 v.x = ((${w} * (t.x - (((t.x * t.x) * t.x) / 3.0))) + ((t.x * t.y) * t.y));
 v.y = ((${w} * (t.y - (((t.y * t.y) * t.y) / 3.0))) + ((t.y * t.x) * t.x));
@@ -8817,6 +9944,8 @@ v.y = ((${w} * (t.y - (((t.y * t.y) * t.y) / 3.0))) + ((t.y * t.x) * t.x));
   "squirrel": {
     params: [{ name: "a", def: 1 }, { name: "b", def: 1 }],
     verified: true, priority: 0, flags: [], types: ["2D"],
+    funcNames: ["atan2j"],
+    funcs: `fn atan2j(y: f32, x: f32) -> f32 { if (x == 0.0 && y == 0.0) { return select(0.0, PI, (bitcast<u32>(x) >> 31u) == 1u) * select(1.0, -1.0, (bitcast<u32>(y) >> 31u) == 1u); } return atan2(y, x); }`,
     code: (w, p) => `{
 var u: f32 = ((((${p[0]} + 1.0e-20) * t.x) * t.x) + (((${p[1]} + 1.0e-20) * t.y) * t.y));
 v.x = ((cos(sqrt(u)) * tan(t.x)) * ${w});
@@ -8826,6 +9955,8 @@ v.y = ((sin(sqrt(u)) * tan(t.y)) * ${w});
   "splits3D": {
     params: [{ name: "x", def: 0.1 }, { name: "y", def: 0.3 }, { name: "z", def: 0.2 }],
     verified: true, priority: 0, flags: ["3d","z"], types: ["3D"],
+    funcNames: ["atan2j"],
+    funcs: `fn atan2j(y: f32, x: f32) -> f32 { if (x == 0.0 && y == 0.0) { return select(0.0, PI, (bitcast<u32>(x) >> 31u) == 1u) * select(1.0, -1.0, (bitcast<u32>(y) >> 31u) == 1u); } return atan2(y, x); }`,
     code: (w, p) => `{
 if ((t.x >= 0.0)) {
   v.x += (${w} * (t.x + ${p[0]}));
@@ -8847,9 +9978,11 @@ if ((z_ >= 0.0)) {
   "squarize": {
     params: [],
     verified: true, priority: 0, flags: [], types: ["2D"],
+    funcNames: ["atan2j"],
+    funcs: `fn atan2j(y: f32, x: f32) -> f32 { if (x == 0.0 && y == 0.0) { return select(0.0, PI, (bitcast<u32>(x) >> 31u) == 1u) * select(1.0, -1.0, (bitcast<u32>(y) >> 31u) == 1u); } return atan2(y, x); }`,
     code: (w, _p) => `{
 var s: f32 = sqrt(((t.x * t.x) + (t.y * t.y)));
-var a: f32 = atan2(t.y, t.x);
+var a: f32 = atan2j(t.y, t.x);
 if ((a < 0.0)) {
   a += (2.0 * PI);
 }
@@ -8875,6 +10008,8 @@ if ((p_ <= (1.0 * s))) {
   "squish": {
     params: [{ name: "power", def: 2 }],
     verified: true, priority: 0, flags: [], types: ["2D"],
+    funcNames: ["atan2j"],
+    funcs: `fn atan2j(y: f32, x: f32) -> f32 { if (x == 0.0 && y == 0.0) { return select(0.0, PI, (bitcast<u32>(x) >> 31u) == 1u) * select(1.0, -1.0, (bitcast<u32>(y) >> 31u) == 1u); } return atan2(y, x); }`,
     code: (w, p) => `{
 var x: f32 = abs(t.x);
 var y: f32 = abs(t.y);
@@ -8920,6 +10055,8 @@ if ((p_ <= (1.0 * s))) {
   "circlize2": {
     params: [{ name: "hole", def: 0 }],
     verified: true, priority: 0, flags: [], types: ["2D"],
+    funcNames: ["atan2j"],
+    funcs: `fn atan2j(y: f32, x: f32) -> f32 { if (x == 0.0 && y == 0.0) { return select(0.0, PI, (bitcast<u32>(x) >> 31u) == 1u) * select(1.0, -1.0, (bitcast<u32>(y) >> 31u) == 1u); } return atan2(y, x); }`,
     code: (w, p) => `{
 var absx: f32 = abs(t.x);
 var absy: f32 = abs(t.y);
@@ -8954,6 +10091,8 @@ v.y += (r_ * sina);
   "sphere_nja": {
     params: [{ name: "circle_a", def: 1 }, { name: "circle_b", def: 1 }, { name: "shift_x", def: 0 }, { name: "shift_y", def: 0 }, { name: "shift_z", def: 0 }, { name: "stretch", def: 1 }],
     verified: true, priority: 0, flags: ["3d","z"], types: ["3D"],
+    funcNames: ["atan2j"],
+    funcs: `fn atan2j(y: f32, x: f32) -> f32 { if (x == 0.0 && y == 0.0) { return select(0.0, PI, (bitcast<u32>(x) >> 31u) == 1u) * select(1.0, -1.0, (bitcast<u32>(y) >> 31u) == 1u); } return atan2(y, x); }`,
     code: (w, p) => `{
 var ini: vec3f;
 ini = vec3f(t.x, t.y, z_);
@@ -8980,6 +10119,8 @@ pz_ += ${p[4]};
   "oscilloscope2": {
     params: [{ name: "separation", def: 1 }, { name: "frequencyx", def: 3.141592653589793 }, { name: "frequencyy", def: 3.141592653589793 }, { name: "amplitude", def: 1 }, { name: "perturbation", def: 1 }, { name: "damping", def: 0 }],
     verified: true, priority: 0, flags: [], types: ["2D"],
+    funcNames: ["atan2j"],
+    funcs: `fn atan2j(y: f32, x: f32) -> f32 { if (x == 0.0 && y == 0.0) { return select(0.0, PI, (bitcast<u32>(x) >> 31u) == 1u) * select(1.0, -1.0, (bitcast<u32>(y) >> 31u) == 1u); } return atan2(y, x); }`,
     code: (w, p) => `{
 var _tpf: f32 = ((2.0 * PI) * ${p[1]});
 var _tpf2: f32 = ((2.0 * PI) * ${p[2]});
@@ -9003,8 +10144,10 @@ if ((abs(t.y) <= t_)) {
   "scry2": {
     params: [{ name: "sides", def: 4 }, { name: "star", def: 0 }, { name: "circle", def: 0 }],
     verified: true, priority: 0, flags: [], types: ["2D"],
-    funcNames: ["roundc"],
-    funcs: `fn roundc(x: f32) -> f32 { return sign(x) * floor(abs(x) + 0.5); }`,
+    funcNames: ["roundc","atan2j"],
+    funcs: `fn roundc(x: f32) -> f32 { return sign(x) * floor(abs(x) + 0.5); }
+
+fn atan2j(y: f32, x: f32) -> f32 { if (x == 0.0 && y == 0.0) { return select(0.0, PI, (bitcast<u32>(x) >> 31u) == 1u) * select(1.0, -1.0, (bitcast<u32>(y) >> 31u) == 1u); } return atan2(y, x); }`,
     code: (w, p) => `{
 var _sina: f32;
 var _cosa: f32;
@@ -9053,14 +10196,16 @@ if ((d != 0)) {
   "ztwister": {
     params: [{ name: "twist", def: 4.2 }, { name: "base", def: 2.718281828459045 }],
     verified: true, priority: 0, flags: ["z"], types: ["2D"],
-    funcNames: ["powc"],
+    funcNames: ["powc","atan2j"],
     funcs: `fn powc(x: f32, y: f32) -> f32 {
   if (x >= 0.0) { return pow(x, y); }
   let yi = round(y);
   if (abs(y - yi) > 1e-6) { return pow(x, y); }
   let m = pow(-x, y);
   return select(m, -m, (i32(yi) & 1) != 0);
-}`,
+}
+
+fn atan2j(y: f32, x: f32) -> f32 { if (x == 0.0 && y == 0.0) { return select(0.0, PI, (bitcast<u32>(x) >> 31u) == 1u) * select(1.0, -1.0, (bitcast<u32>(y) >> 31u) == 1u); } return atan2(y, x); }`,
     code: (w, p) => `{
 var ez: f32 = (${p[0]} * pz_);
 if ((${p[1]} != 1.0)) {
@@ -9077,8 +10222,10 @@ v.y += (${w} * ny);
   "asteria": {
     params: [{ name: "alpha", def: 0 }],
     verified: true, priority: 0, flags: [], types: ["2D"],
-    funcNames: ["sqrf"],
-    funcs: `fn sqrf(x: f32) -> f32 {
+    funcNames: ["atan2j","sqrf"],
+    funcs: `fn atan2j(y: f32, x: f32) -> f32 { if (x == 0.0 && y == 0.0) { return select(0.0, PI, (bitcast<u32>(x) >> 31u) == 1u) * select(1.0, -1.0, (bitcast<u32>(y) >> 31u) == 1u); } return atan2(y, x); }
+
+fn sqrf(x: f32) -> f32 {
   return (x * x);
 }`,
     code: (w, p) => `{
@@ -9116,8 +10263,10 @@ if ((in1 != 0)) {
   "log_db": {
     params: [{ name: "base", def: 1 }, { name: "fix_period", def: 1 }],
     verified: true, priority: 0, flags: [], types: ["2D"],
-    funcNames: ["roundc"],
-    funcs: `fn roundc(x: f32) -> f32 { return sign(x) * floor(abs(x) + 0.5); }`,
+    funcNames: ["roundc","atan2j"],
+    funcs: `fn roundc(x: f32) -> f32 { return sign(x) * floor(abs(x) + 0.5); }
+
+fn atan2j(y: f32, x: f32) -> f32 { if (x == 0.0 && y == 0.0) { return select(0.0, PI, (bitcast<u32>(x) >> 31u) == 1u) * select(1.0, -1.0, (bitcast<u32>(y) >> 31u) == 1u); } return atan2(y, x); }`,
     code: (w, p) => `{
 var _denom: f32 = 0.5;
 if ((${p[0]} > 1.0e-20)) {
@@ -9146,6 +10295,8 @@ v.y += (${w} * (ph + fix_atan_period));
   "sph3D": {
     params: [{ name: "x", def: 0.75 }, { name: "y", def: 1 }, { name: "z", def: 0.5 }],
     verified: true, priority: 0, flags: ["3d","z"], types: ["3D"],
+    funcNames: ["atan2j"],
+    funcs: `fn atan2j(y: f32, x: f32) -> f32 { if (x == 0.0 && y == 0.0) { return select(0.0, PI, (bitcast<u32>(x) >> 31u) == 1u) * select(1.0, -1.0, (bitcast<u32>(y) >> 31u) == 1u); } return atan2(y, x); }`,
     code: (w, p) => `{
 var epsilon: f32 = 1.0e-29;
 var tx: f32 = t.x;
@@ -9163,6 +10314,8 @@ pz_ += (tz * r_);
   "xheart_blur_wf": {
     params: [{ name: "angle", def: 0 }, { name: "ratio", def: 0 }],
     verified: true, priority: 0, flags: [], types: ["BASE_SHAPE"],
+    funcNames: ["atan2j"],
+    funcs: `fn atan2j(y: f32, x: f32) -> f32 { if (x == 0.0 && y == 0.0) { return select(0.0, PI, (bitcast<u32>(x) >> 31u) == 1u) * select(1.0, -1.0, (bitcast<u32>(y) >> 31u) == 1u); } return atan2(y, x); }`,
     code: (w, p) => `{
 var rat: f32;
 var cosa: f32;
@@ -9193,6 +10346,8 @@ if ((x > 0)) {
   "dinis_surface_wf": {
     params: [{ name: "a", def: 0.8 }, { name: "b", def: 0.2 }],
     verified: true, priority: 0, flags: ["3d","hide","z"], types: ["3D"],
+    funcNames: ["atan2j"],
+    funcs: `fn atan2j(y: f32, x: f32) -> f32 { if (x == 0.0 && y == 0.0) { return select(0.0, PI, (bitcast<u32>(x) >> 31u) == 1u) * select(1.0, -1.0, (bitcast<u32>(y) >> 31u) == 1u); } return atan2(y, x); }`,
     code: (w, p) => `{
 var u: f32 = t.x;
 var v_: f32 = t.y;
@@ -9211,6 +10366,8 @@ if ((abs(v_) > 0.000001)) {
   "pre_rect_wf": {
     params: [{ name: "x0", def: -0.5 }, { name: "x1", def: 0.5 }, { name: "y0", def: -0.5 }, { name: "y1", def: 0.5 }],
     verified: true, priority: -1, flags: [], types: ["2D","BASE_SHAPE","PRE"],
+    funcNames: ["atan2j"],
+    funcs: `fn atan2j(y: f32, x: f32) -> f32 { if (x == 0.0 && y == 0.0) { return select(0.0, PI, (bitcast<u32>(x) >> 31u) == 1u) * select(1.0, -1.0, (bitcast<u32>(y) >> 31u) == 1u); } return atan2(y, x); }`,
     code: (w, p) => `{
 var rinv_: f32 = 1.0 / r;
 var dx: f32 = (${p[1]} - ${p[0]});
@@ -9220,7 +10377,7 @@ t.y = (${w} * (${p[2]} + (dy * rnd(rs))));
 r2 = ((t.x * t.x) + (t.y * t.y));
 r = sqrt(r2);
 rinv_ = (1.0 / r);
-th = atan2(t.x, t.y);
+th = atan2j(t.x, t.y);
 ph = ((0.5 * PI) - th);
 if ((ph > PI)) {
   ph -= (2.0 * PI);
@@ -9230,8 +10387,10 @@ if ((ph > PI)) {
   "ennepers2": {
     params: [{ name: "a", def: 1 }, { name: "b", def: 0.3333 }, { name: "c", def: 0.075 }],
     verified: true, priority: 0, flags: ["3d","z"], types: ["3D"],
-    funcNames: ["sqrf"],
-    funcs: `fn sqrf(x: f32) -> f32 {
+    funcNames: ["atan2j","sqrf"],
+    funcs: `fn atan2j(y: f32, x: f32) -> f32 { if (x == 0.0 && y == 0.0) { return select(0.0, PI, (bitcast<u32>(x) >> 31u) == 1u) * select(1.0, -1.0, (bitcast<u32>(y) >> 31u) == 1u); } return atan2(y, x); }
+
+fn sqrf(x: f32) -> f32 {
   return (x * x);
 }`,
     code: (w, p) => `{
@@ -9247,6 +10406,8 @@ pz_ += (((${w} * dxy) * 0.5) * sqrt(r2_));
   "whitney_umbrella": {
     params: [],
     verified: true, priority: 0, flags: ["3d","z"], types: ["3D"],
+    funcNames: ["atan2j"],
+    funcs: `fn atan2j(y: f32, x: f32) -> f32 { if (x == 0.0 && y == 0.0) { return select(0.0, PI, (bitcast<u32>(x) >> 31u) == 1u) * select(1.0, -1.0, (bitcast<u32>(y) >> 31u) == 1u); } return atan2(y, x); }`,
     code: (w, _p) => `{
 var u: f32 = t.x;
 var v_: f32 = t.y;
@@ -9258,6 +10419,8 @@ pz_ += ((${w} * v_) * v_);
   "bsplit": {
     params: [{ name: "x", def: 0 }, { name: "y", def: 0 }],
     verified: true, priority: 0, flags: ["hide"], types: ["2D"],
+    funcNames: ["atan2j"],
+    funcs: `fn atan2j(y: f32, x: f32) -> f32 { if (x == 0.0 && y == 0.0) { return select(0.0, PI, (bitcast<u32>(x) >> 31u) == 1u) * select(1.0, -1.0, (bitcast<u32>(y) >> 31u) == 1u); } return atan2(y, x); }`,
     code: (w, p) => `{
 if ((((t.x + ${p[0]}) == 0) || ((t.x + ${p[0]}) == PI))) {
   (*hd) = true;
@@ -9271,7 +10434,7 @@ if ((((t.x + ${p[0]}) == 0) || ((t.x + ${p[0]}) == PI))) {
   "polylogarithm": {
     params: [{ name: "n", def: 2 }, { name: "zpow", def: 1 }],
     verified: true, priority: 0, flags: [], types: ["2D"],
-    funcNames: ["Complex","powc","polylogarithm_HarmonicS","Complex_Init","Complex_One","Complex_Mag2","Complex_MagInv","Complex_Recip","Complex_Radius","Complex_Neg","Complex_Sqrt","Complex_Sqr","Complex_Arg","Complex_ToP","Complex_UnP","Complex_Copy","Complex_Pow","Complex_DivR","Complex_Add","Complex_Scale","Complex_Mul","Complex_Mag2eps","Complex_Log","polylogarithm_Riemann_Z","polylogarithm_factorial"],
+    funcNames: ["Complex","powc","atan2j","polylogarithm_HarmonicS","Complex_Init","Complex_One","Complex_Mag2","Complex_MagInv","Complex_Recip","Complex_Radius","Complex_Neg","Complex_Sqrt","Complex_Sqr","Complex_Arg","Complex_ToP","Complex_UnP","Complex_Copy","Complex_Pow","Complex_DivR","Complex_Add","Complex_Scale","Complex_Mul","Complex_Mag2eps","Complex_Log","polylogarithm_Riemann_Z","polylogarithm_factorial"],
     funcs: `struct Complex {
   per_fix: f32,
   re: f32,
@@ -9287,6 +10450,8 @@ fn powc(x: f32, y: f32) -> f32 {
   let m = pow(-x, y);
   return select(m, -m, (i32(yi) & 1) != 0);
 }
+
+fn atan2j(y: f32, x: f32) -> f32 { if (x == 0.0 && y == 0.0) { return select(0.0, PI, (bitcast<u32>(x) >> 31u) == 1u) * select(1.0, -1.0, (bitcast<u32>(y) >> 31u) == 1u); } return atan2(y, x); }
 
 fn polylogarithm_HarmonicS(N: i32) -> f32 {
   if ((N < 1)) {
@@ -9355,7 +10520,7 @@ fn Complex_Sqr(c: ptr<function, Complex>) {
 }
 
 fn Complex_Arg(c: ptr<function, Complex>) -> f32 {
-  return ((*c).per_fix + atan2((*c).im, (*c).re));
+  return ((*c).per_fix + atan2j((*c).im, (*c).re));
 }
 
 fn Complex_ToP(c: ptr<function, Complex>, dst: ptr<function, Complex>) {
@@ -9533,14 +10698,16 @@ if (((Complex_Mag2(&(z)) > 250000.0) || (N >= 20))) {
   "devil_warp": {
     params: [{ name: "a", def: 2 }, { name: "b", def: 1 }, { name: "effect", def: 1 }, { name: "warp", def: 0.5 }, { name: "rmin", def: -0.24 }, { name: "rmax", def: 100 }],
     verified: true, priority: 0, flags: [], types: ["2D"],
-    funcNames: ["powc"],
+    funcNames: ["powc","atan2j"],
     funcs: `fn powc(x: f32, y: f32) -> f32 {
   if (x >= 0.0) { return pow(x, y); }
   let yi = round(y);
   if (abs(y - yi) > 1e-6) { return pow(x, y); }
   let m = pow(-x, y);
   return select(m, -m, (i32(yi) & 1) != 0);
-}`,
+}
+
+fn atan2j(y: f32, x: f32) -> f32 { if (x == 0.0 && y == 0.0) { return select(0.0, PI, (bitcast<u32>(x) >> 31u) == 1u) * select(1.0, -1.0, (bitcast<u32>(y) >> 31u) == 1u); } return atan2(y, x); }`,
     code: (_w, p) => `{
 var xx: f32 = t.x;
 var yy: f32 = t.y;
@@ -9559,8 +10726,10 @@ v.y += (yy * (1 + r_));
   "yin_yang": {
     params: [{ name: "radius", def: 0.5 }, { name: "ang1", def: 0 }, { name: "ang2", def: 0 }, { name: "dual_t", def: 1 }, { name: "outside", def: 0 }],
     verified: true, priority: 0, flags: [], types: ["2D"],
-    funcNames: ["roundc"],
-    funcs: `fn roundc(x: f32) -> f32 { return sign(x) * floor(abs(x) + 0.5); }`,
+    funcNames: ["roundc","atan2j"],
+    funcs: `fn roundc(x: f32) -> f32 { return sign(x) * floor(abs(x) + 0.5); }
+
+fn atan2j(y: f32, x: f32) -> f32 { if (x == 0.0 && y == 0.0) { return select(0.0, PI, (bitcast<u32>(x) >> 31u) == 1u) * select(1.0, -1.0, (bitcast<u32>(y) >> 31u) == 1u); } return atan2(y, x); }`,
     code: (w, p) => `{
 var sina: f32 = sin((PI * ${p[1]}));
 var cosa: f32 = cos((PI * ${p[1]}));
@@ -9608,11 +10777,13 @@ if ((R2 < 1.0)) {
   "target_sp": {
     params: [{ name: "twist", def: 0 }, { name: "n_of_sp", def: 1 }, { name: "size", def: 2.062080971874641 }, { name: "tightness", def: 0.5152404038564685 }],
     verified: true, priority: 0, flags: [], types: ["2D"],
+    funcNames: ["atan2j"],
+    funcs: `fn atan2j(y: f32, x: f32) -> f32 { if (x == 0.0 && y == 0.0) { return select(0.0, PI, (bitcast<u32>(x) >> 31u) == 1u) * select(1.0, -1.0, (bitcast<u32>(y) >> 31u) == 1u); } return atan2(y, x); }`,
     code: (_w, p) => `{
 var t_size_2: f32 = (0.5 * ${p[2]});
 var _rota: f32 = (PI * ${p[0]});
 var _rotb: f32 = (-PI + _rota);
-var a: f32 = atan2(t.y, t.x);
+var a: f32 = atan2j(t.y, t.x);
 var r_: f32 = sqrt(((t.x * t.x) + (t.y * t.y)));
 var t_: f32 = ((${p[3]} * log(r_)) + ((f32(i32(${p[1]})) * (a + PI)) / PI));
 if ((t_ < 0.0)) {
@@ -9633,14 +10804,16 @@ v.y += (r_ * s);
   "exblur": {
     params: [{ name: "dist", def: 0.5 }, { name: "r", def: 0.25 }, { name: "x_origin", def: 0 }, { name: "y_origin", def: 0 }, { name: "z_origin", def: 0 }],
     verified: true, priority: 0, flags: ["z"], types: ["BLUR"],
-    funcNames: ["powc"],
+    funcNames: ["powc","atan2j"],
     funcs: `fn powc(x: f32, y: f32) -> f32 {
   if (x >= 0.0) { return pow(x, y); }
   let yi = round(y);
   if (abs(y - yi) > 1e-6) { return pow(x, y); }
   let m = pow(-x, y);
   return select(m, -m, (i32(yi) & 1) != 0);
-}`,
+}
+
+fn atan2j(y: f32, x: f32) -> f32 { if (x == 0.0 && y == 0.0) { return select(0.0, PI, (bitcast<u32>(x) >> 31u) == 1u) * select(1.0, -1.0, (bitcast<u32>(y) >> 31u) == 1u); } return atan2(y, x); }`,
     code: (w, p) => `{
 var rr: f32;
 var theta: f32;
@@ -9663,7 +10836,7 @@ oy = (t.y + ${p[3]});
 oz = (z_ - ${p[4]});
 n = (((ox * ox) + (oy * oy)) + (oz * oz));
 rr = ((${w} * powc(n, ${p[0]})) * ((((rnd(rs) + rnd(rs)) + rnd(rs)) + rnd(rs)) - 2.0));
-theta = atan2(oy, ox);
+theta = atan2j(oy, ox);
 phi = acos((oz / sqrt(n)));
 su = sin(theta);
 cu = cos(theta);
@@ -9681,11 +10854,51 @@ v.y += (rr * ((sv * su) + (rsrv * sru)));
 pz_ += (rr * (cv + (${p[1]} * crv)));
 }`,
   },
+  "pow_block": {
+    params: [{ name: "numerator", def: 5.0014522959541345 }, { name: "denominator", def: 3.2120636509338425 }, { name: "root", def: 1 }, { name: "correctn", def: 1 }, { name: "correctd", def: 1 }],
+    verified: true, priority: 0, flags: ["z"], types: ["2D"],
+    funcNames: ["powc","atan2j"],
+    funcs: `fn powc(x: f32, y: f32) -> f32 {
+  if (x >= 0.0) { return pow(x, y); }
+  let yi = round(y);
+  if (abs(y - yi) > 1e-6) { return pow(x, y); }
+  let m = pow(-x, y);
+  return select(m, -m, (i32(yi) & 1) != 0);
+}
+
+fn atan2j(y: f32, x: f32) -> f32 { if (x == 0.0 && y == 0.0) { return select(0.0, PI, (bitcast<u32>(x) >> 31u) == 1u) * select(1.0, -1.0, (bitcast<u32>(y) >> 31u) == 1u); } return atan2(y, x); }`,
+    code: (w, p) => `{
+var _power: f32 = 0;
+var _deneps: f32 = 0;
+{
+  _power = (((${p[1]} * ${p[3]}) * 1.0) / (abs(${p[4]}) + 1.0e-30));
+  if ((abs(_power) <= 1.0e-30)) {
+    _power = 1.0e-30;
+  }
+  _power = ((${p[0]} * 0.5) / _power);
+  _deneps = ${p[1]};
+  if ((abs(_deneps) <= 1.0e-30)) {
+    _deneps = 1.0e-30;
+  }
+  _deneps = (1.0 / _deneps);
+}
+var theta: f32 = ph;
+var r2_: f32 = (powc(r2, _power) * ${w});
+var ran: f32 = (((theta * _deneps) + (((${p[2]} * (2.0 * PI)) * floor((rnd(rs) * ${p[1]}))) * _deneps)) * ${p[0]});
+v.x += (r2_ * cos(ran));
+v.y += (r2_ * sin(ran));
+if (false) {
+  pz_ += (${w} * z_);
+}
+}`,
+  },
   "vogel": {
     params: [{ name: "n", def: 20 }, { name: "scale", def: 1 }],
     verified: true, priority: 0, flags: [], types: ["2D"],
-    funcNames: ["roundc"],
-    funcs: `fn roundc(x: f32) -> f32 { return sign(x) * floor(abs(x) + 0.5); }`,
+    funcNames: ["roundc","atan2j"],
+    funcs: `fn roundc(x: f32) -> f32 { return sign(x) * floor(abs(x) + 0.5); }
+
+fn atan2j(y: f32, x: f32) -> f32 { if (x == 0.0 && y == 0.0) { return select(0.0, PI, (bitcast<u32>(x) >> 31u) == 1u) * select(1.0, -1.0, (bitcast<u32>(y) >> 31u) == 1u); } return atan2(y, x); }`,
     code: (w, p) => `{
 var M_PHI: f32 = 1.618033988749895;
 var M_2PI_PHI2: f32 = ((2.0 * PI) / (M_PHI * M_PHI));
@@ -9703,8 +10916,10 @@ v.y += (r_ * (sina + (${p[1]} * t.y)));
   "curl_sp": {
     params: [{ name: "pow", def: 1 }, { name: "c1", def: -0.01 }, { name: "c2", def: 0.03 }, { name: "sx", def: 0 }, { name: "sy", def: 0 }, { name: "dc", def: 0 }],
     verified: true, priority: 0, flags: ["3d","dc","z"], types: ["3D","DC"],
-    funcNames: ["powc","curl_sp_powq4","curl_sp_powq4c","curl_sp_spread"],
-    funcs: `fn powc(x: f32, y: f32) -> f32 {
+    funcNames: ["atan2j","powc","curl_sp_powq4","curl_sp_powq4c","curl_sp_spread"],
+    funcs: `fn atan2j(y: f32, x: f32) -> f32 { if (x == 0.0 && y == 0.0) { return select(0.0, PI, (bitcast<u32>(x) >> 31u) == 1u) * select(1.0, -1.0, (bitcast<u32>(y) >> 31u) == 1u); } return atan2(y, x); }
+
+fn powc(x: f32, y: f32) -> f32 {
   if (x >= 0.0) { return pow(x, y); }
   let yi = round(y);
   if (abs(y - yi) > 1e-6) { return pow(x, y); }
@@ -9757,6 +10972,8 @@ if (((*cp) < 0)) {
   "dc_linear": {
     params: [{ name: "offset", def: 0 }, { name: "angle", def: 0.3 }, { name: "scale", def: 0.8 }],
     verified: true, priority: 0, flags: ["dc"], types: ["2D","DC"],
+    funcNames: ["atan2j"],
+    funcs: `fn atan2j(y: f32, x: f32) -> f32 { if (x == 0.0 && y == 0.0) { return select(0.0, PI, (bitcast<u32>(x) >> 31u) == 1u) * select(1.0, -1.0, (bitcast<u32>(y) >> 31u) == 1u); } return atan2(y, x); }`,
     code: (w, p) => `{
 var ldcs: f32 = (1.0 / select(${p[2]}, 0.00001, (${p[2]} == 0.0)));
 v.x += (${w} * t.x);
@@ -9769,6 +10986,8 @@ var c: f32 = cos(${p[1]});
   "dc_carpet": {
     params: [{ name: "origin", def: 1 }],
     verified: true, priority: 0, flags: ["affine","dc"], types: ["2D","DC"],
+    funcNames: ["atan2j"],
+    funcs: `fn atan2j(y: f32, x: f32) -> f32 { if (x == 0.0 && y == 0.0) { return select(0.0, PI, (bitcast<u32>(x) >> 31u) == 1u) * select(1.0, -1.0, (bitcast<u32>(y) >> 31u) == 1u); } return atan2(y, x); }`,
     code: (w, p, A) => `{
 var H: f32 = (0.1 * ${p[0]});
 var x0: i32 = select(1, -1, (rnd(rs) < 0.5));
@@ -9782,11 +11001,33 @@ v.y += (${w} * (((${A(3)} * x) + (${A(4)} * y)) + ${A(5)}));
 (*cp) = (abs(((((*cp) * 0.5) * (1.0 + h)) + ((x0_xor_y0 * (1.0 - h)) * 0.5))) % 1.0);
 }`,
   },
+  "dc_bubble": {
+    params: [{ name: "centerx", def: 0 }, { name: "centery", def: 0 }, { name: "scale", def: 1 }, { name: "invert", def: 1 }],
+    verified: true, priority: 0, flags: ["dc","z"], types: ["2D","DC","BASE_SHAPE"],
+    funcNames: ["sqr","atan2j"],
+    funcs: `fn sqr(x: f32) -> f32 { return x * x; }
+
+fn atan2j(y: f32, x: f32) -> f32 { if (x == 0.0 && y == 0.0) { return select(0.0, PI, (bitcast<u32>(x) >> 31u) == 1u) * select(1.0, -1.0, (bitcast<u32>(y) >> 31u) == 1u); } return atan2(y, x); }`,
+    code: (w, p) => `{
+var bdcs: f32 = 0;
+{
+  bdcs = (1.0 / select(${p[2]}, 0.00001, (${p[2]} == 0.0)));
+}
+var r_: f32 = ((((t.x * t.x) + (t.y * t.y)) / 4.0) + 1.0);
+var t_: f32 = (${w} / r_);
+v.x += (t_ * t.x);
+v.y += (t_ * t.y);
+pz_ += (${w} * ((2.0 / select(r_, t_, (${p[3]} == 1))) - 1.0));
+(*cp) = (abs((bdcs * (sqr((v.x + ${p[0]})) + sqr((v.y + ${p[1]}))))) % 1.0);
+}`,
+  },
   "waveblur_wf": {
     params: [{ name: "count", def: 5 }, { name: "phase", def: 0 }, { name: "amplitude_z", def: 0.5 }, { name: "damping_z", def: 0 }, { name: "direct_color", def: 0 }, { name: "color_scale", def: 0.5 }, { name: "color_offset", def: 0 }],
     verified: true, priority: 0, flags: ["3d","dc","z"], types: ["3D","BASE_SHAPE","DC"],
-    funcNames: ["roundc"],
-    funcs: `fn roundc(x: f32) -> f32 { return sign(x) * floor(abs(x) + 0.5); }`,
+    funcNames: ["roundc","atan2j"],
+    funcs: `fn roundc(x: f32) -> f32 { return sign(x) * floor(abs(x) + 0.5); }
+
+fn atan2j(y: f32, x: f32) -> f32 { if (x == 0.0 && y == 0.0) { return select(0.0, PI, (bitcast<u32>(x) >> 31u) == 1u) * select(1.0, -1.0, (bitcast<u32>(y) >> 31u) == 1u); } return atan2(y, x); }`,
     code: (w, p) => `{
 var ang: f32 = ((rnd(rs) * 2.0) * PI);
 var rnd_: f32 = (1.0 - (2.0 * rnd(rs)));
@@ -9823,6 +11064,8 @@ if ((${p[2]} != 0.0)) {
   "post_heat": {
     params: [{ name: "theta_period", def: 0 }, { name: "theta_phase", def: 0 }, { name: "theta_amp", def: 0 }, { name: "phi_period", def: 0 }, { name: "phi_phase", def: 0 }, { name: "phi_amp", def: 0 }, { name: "r_period", def: 0 }, { name: "r_phase", def: 0 }, { name: "r_amp", def: 0 }],
     verified: true, priority: 1, flags: ["3d","z"], types: ["3D","POST"],
+    funcNames: ["atan2j"],
+    funcs: `fn atan2j(y: f32, x: f32) -> f32 { if (x == 0.0 && y == 0.0) { return select(0.0, PI, (bitcast<u32>(x) >> 31u) == 1u) * select(1.0, -1.0, (bitcast<u32>(y) >> 31u) == 1u); } return atan2(y, x); }`,
     code: (w, p) => `{
 var tx: f32 = select((1.0 / ${p[0]}), 0.0, (${p[0]} == 0));
 var px: f32 = select((1.0 / ${p[3]}), 0.0, (${p[3]} == 0));
@@ -9852,7 +11095,7 @@ var sinp: f32;
 var cosp: f32;
 var atant: f32;
 var acosp: f32;
-atant = atan2(v.y, v.x);
+atant = atan2j(v.y, v.x);
 r_ += (ar * sin(((br * r_) + cr)));
 sint = ((at * sin(((bt * r_) + ct))) + atant);
 cost = cos(sint);
@@ -9873,8 +11116,10 @@ pz_ = (r_ * cosp);
   "cpow3": {
     params: [{ name: "r", def: 1 }, { name: "d", def: 1 }, { name: "divisor", def: 1 }, { name: "spread", def: 1 }],
     verified: true, priority: 0, flags: [], types: ["2D"],
-    funcNames: ["roundc"],
-    funcs: `fn roundc(x: f32) -> f32 { return sign(x) * floor(abs(x) + 0.5); }`,
+    funcNames: ["atan2j","roundc"],
+    funcs: `fn atan2j(y: f32, x: f32) -> f32 { if (x == 0.0 && y == 0.0) { return select(0.0, PI, (bitcast<u32>(x) >> 31u) == 1u) * select(1.0, -1.0, (bitcast<u32>(y) >> 31u) == 1u); } return atan2(y, x); }
+
+fn roundc(x: f32) -> f32 { return sign(x) * floor(abs(x) + 0.5); }`,
     code: (w, p) => `{
 var ang: f32;
 var p_a: f32;
@@ -9884,7 +11129,7 @@ var td: f32;
 var half_d: f32;
 var coeff: f32;
 ang = ((2.0 * PI) / ${p[2]});
-p_a = atan2((select(log(${p[1]}), -(log(-(${p[1]}))), (${p[1]} < 0)) * ${p[0]}), (2 * PI));
+p_a = atan2j((select(log(${p[1]}), -(log(-(${p[1]}))), (${p[1]} < 0)) * ${p[0]}), (2 * PI));
 tc = (((cos(p_a) * ${p[0]}) * cos(p_a)) / ${p[2]});
 td = (((cos(p_a) * ${p[0]}) * sin(p_a)) / ${p[2]});
 half_c = (tc / 2.0);
@@ -9908,6 +11153,8 @@ v.y += (r_ * sin(th_));
   "rational3": {
     params: [{ name: "a", def: 0.5 }, { name: "b", def: 0 }, { name: "c", def: 0.25 }, { name: "d", def: 1 }, { name: "e", def: 0 }, { name: "f", def: 0.9 }, { name: "g", def: 0 }, { name: "h", def: 1 }],
     verified: true, priority: 0, flags: [], types: ["2D"],
+    funcNames: ["atan2j"],
+    funcs: `fn atan2j(y: f32, x: f32) -> f32 { if (x == 0.0 && y == 0.0) { return select(0.0, PI, (bitcast<u32>(x) >> 31u) == 1u) * select(1.0, -1.0, (bitcast<u32>(y) >> 31u) == 1u); } return atan2(y, x); }`,
     code: (w, p) => `{
 var xsqr: f32 = (t.x * t.x);
 var ysqr: f32 = (t.y * t.y);
@@ -9929,6 +11176,8 @@ v.y += ((${w} * ((ti * br) - (tr * bi))) * r3den);
   "stwin": {
     params: [{ name: "distort", def: 1 }, { name: "offset_xy", def: 0 }, { name: "offset_x2", def: 0 }, { name: "offset_y2", def: 0 }],
     verified: true, priority: 0, flags: [], types: ["2D"],
+    funcNames: ["atan2j"],
+    funcs: `fn atan2j(y: f32, x: f32) -> f32 { if (x == 0.0 && y == 0.0) { return select(0.0, PI, (bitcast<u32>(x) >> 31u) == 1u) * select(1.0, -1.0, (bitcast<u32>(y) >> 31u) == 1u); } return atan2(y, x); }`,
     code: (w, p) => `{
 var multiplier: f32 = 0.05;
 var multiplier2: f32 = 0.0001;
@@ -9950,6 +11199,8 @@ v.y += ((${w} * t.y) + result);
   "flower_db": {
     params: [{ name: "petals", def: 6 }, { name: "petal_split", def: 0 }, { name: "petal_spread", def: 1 }, { name: "stem_thickness", def: 1 }, { name: "stem_length", def: 0 }, { name: "petal_fold_strength", def: 0 }, { name: "petal_fold_radius", def: 1 }],
     verified: true, priority: 0, flags: ["z"], types: ["2D"],
+    funcNames: ["atan2j"],
+    funcs: `fn atan2j(y: f32, x: f32) -> f32 { if (x == 0.0 && y == 0.0) { return select(0.0, PI, (bitcast<u32>(x) >> 31u) == 1u) * select(1.0, -1.0, (bitcast<u32>(y) >> 31u) == 1u); } return atan2(y, x); }`,
     code: (w, p) => `{
 var r_: f32 = (${w} * sqrt(r2));
 var t_: f32 = ph;
@@ -9966,9 +11217,97 @@ if (((${p[4]} != 0) && (pz_ <= (-1 * ${p[4]})))) {
 }
 }`,
   },
+  "rosoni": {
+    params: [{ name: "maxiter", def: 25 }, { name: "sweetiter", def: 3 }, { name: "altshapes", def: 0 }, { name: "cutoff", def: 1 }, { name: "radius", def: 0.4 }, { name: "dx", def: 0.6 }, { name: "dy", def: 0 }],
+    verified: true, priority: 0, flags: ["z"], types: ["2D"],
+    funcNames: ["sqr","atan2j"],
+    funcs: `fn sqr(x: f32) -> f32 { return x * x; }
+
+fn atan2j(y: f32, x: f32) -> f32 { if (x == 0.0 && y == 0.0) { return select(0.0, PI, (bitcast<u32>(x) >> 31u) == 1u) * select(1.0, -1.0, (bitcast<u32>(y) >> 31u) == 1u); } return atan2(y, x); }`,
+    code: (w, p) => `{
+loop {
+var _sina: f32 = 0;
+var _cosa: f32 = 0;
+{
+  var phi: f32 = ((2.0 * PI) / min(max(${p[0]}, 1.0), 1024.0));
+  _sina = sin(phi);
+  _cosa = cos(phi);
+}
+var x: f32 = t.x;
+var y: f32 = t.y;
+var r_: f32 = (sqrt((sqr(x) + sqr(y))) - ${p[3]});
+if ((${p[3]} < 0.0)) {
+  r_ = (max(abs(x), abs(y)) + ${p[3]});
+}
+var cerc: bool = (r_ > 0.0);
+if (cerc) {
+  v.x += (${w} * x);
+  v.y += (${w} * y);
+  if (false) {
+    pz_ += (${w} * z_);
+  }
+  break;
+}
+cerc = (${p[5]} > 0.0);
+var i: i32;
+var xrt: f32 = x;
+var yrt: f32 = y;
+var swp: f32;
+var r2_: f32 = xrt;
+var sweetx: f32 = xrt;
+var sweety: f32 = yrt;
+for (i = 0; (f32(i) < min(max(${p[0]}, 1.0), 1024.0)); i++) {
+  if ((i32(${p[2]}) == 0)) {
+    r2_ = ((sqr((xrt - ${p[5]})) + sqr((yrt - ${p[6]}))) - sqr(${p[4]}));
+    if ((${p[4]} < 0.0)) {
+      r2_ = (max(abs((xrt - ${p[5]})), abs((yrt - ${p[6]}))) + ${p[4]});
+    }
+  } else {
+    r2_ = select((sqr((yrt - ${p[6]})) - (sqr((xrt - ${p[5]})) * (sqr(${p[4]}) - sqr((xrt - ${p[5]}))))), -(xrt - ${p[5]}), ((xrt - ${p[5]}) < 0.0));
+    if ((${p[4]} < 0.0)) {
+      r2_ = ((abs(atan2j((yrt - ${p[6]}), (xrt - ${p[5]}))) * (1.0 / PI)) + ${p[4]});
+    }
+  }
+  cerc = (cerc != (r2_ <= 0.0));
+  if ((f32(i) == min(max(${p[1]}, 0.0), 1023.0))) {
+    sweetx = xrt;
+    sweety = yrt;
+  }
+  swp = ((xrt * _cosa) - (yrt * _sina));
+  yrt = ((xrt * _sina) + (yrt * _cosa));
+  xrt = swp;
+}
+if (cerc) {
+  if ((min(max(${p[1]}, 0.0), 1023.0) == 0)) {
+    if ((${p[6]} != 0)) {
+      v.x -= (${w} * sweetx);
+    } else {
+      v.x += (${w} * sweetx);
+    }
+    v.y -= (${w} * sweety);
+  } else {
+    v.x += (${w} * sweetx);
+    v.y += (${w} * sweety);
+  }
+  if (false) {
+    pz_ += (${w} * z_);
+  }
+  break;
+}
+v.x += (${w} * x);
+v.y += (${w} * y);
+if (false) {
+  pz_ += (${w} * z_);
+}
+break;
+}
+}`,
+  },
   "glynnia3": {
     params: [{ name: "rscale", def: 1 }, { name: "dscale", def: 1 }, { name: "rthresh", def: 0 }, { name: "ythresh", def: 0 }],
     verified: true, priority: 0, flags: [], types: ["2D"],
+    funcNames: ["atan2j"],
+    funcs: `fn atan2j(y: f32, x: f32) -> f32 { if (x == 0.0 && y == 0.0) { return select(0.0, PI, (bitcast<u32>(x) >> 31u) == 1u) * select(1.0, -1.0, (bitcast<u32>(y) >> 31u) == 1u); } return atan2(y, x); }`,
     code: (w, p) => `{
 var _vvar2: f32 = ((${w} * sqrt(2.0)) / 2.0);
 var r_: f32 = (${p[0]} * sqrt(((t.x * t.x) + (t.y * t.y))));
@@ -10011,8 +11350,10 @@ if (((r_ > ${p[2]}) && (t.y > ${p[3]}))) {
   "mask": {
     params: [{ name: "xshift", def: 0 }, { name: "yshift", def: 0 }, { name: "ushift", def: 1 }, { name: "xscale", def: 1 }, { name: "yscale", def: 1 }],
     verified: true, priority: 0, flags: ["hide"], types: ["2D"],
-    funcNames: ["sqrf"],
-    funcs: `fn sqrf(x: f32) -> f32 {
+    funcNames: ["atan2j","sqrf"],
+    funcs: `fn atan2j(y: f32, x: f32) -> f32 { if (x == 0.0 && y == 0.0) { return select(0.0, PI, (bitcast<u32>(x) >> 31u) == 1u) * select(1.0, -1.0, (bitcast<u32>(y) >> 31u) == 1u); } return atan2(y, x); }
+
+fn sqrf(x: f32) -> f32 {
   return (x * x);
 }`,
     code: (w, p) => `{
@@ -10031,9 +11372,11 @@ if ((sumsq == 0)) {
   "fdisc": {
     params: [{ name: "ashift", def: 1 }, { name: "rshift", def: 1 }, { name: "xshift", def: 0 }, { name: "yshift", def: 0 }, { name: "term1", def: 1 }, { name: "term2", def: 0 }, { name: "term3", def: 0 }, { name: "term4", def: 0 }],
     verified: true, priority: 0, flags: [], types: ["2D"],
+    funcNames: ["atan2j"],
+    funcs: `fn atan2j(y: f32, x: f32) -> f32 { if (x == 0.0 && y == 0.0) { return select(0.0, PI, (bitcast<u32>(x) >> 31u) == 1u) * select(1.0, -1.0, (bitcast<u32>(y) >> 31u) == 1u); } return atan2(y, x); }`,
     code: (w, p) => `{
 var afactor: f32 = ((2.0 * PI) / (r + ${p[0]}));
-var r_: f32 = (((atan2(t.y, t.x) / PI) + ${p[1]}) * 0.5);
+var r_: f32 = (((atan2j(t.y, t.x) / PI) + ${p[1]}) * 0.5);
 var xfactor: f32 = cos((afactor + ${p[2]}));
 var yfactor: f32 = sin((afactor + ${p[3]}));
 var pr: f32 = (${w} * r_);
@@ -10046,8 +11389,10 @@ v.y += ((((${p[4]} * pry) + ((${p[5]} * t.y) * pry)) + ((${p[6]} * t.y) * pr)) +
   "butterfly_fay": {
     params: [{ name: "offset", def: 0 }, { name: "unified_inner_outer", def: 1 }, { name: "outer_mode", def: 1 }, { name: "inner_mode", def: 1 }, { name: "outer_spread", def: 0 }, { name: "inner_spread", def: 0 }, { name: "outer_spread_ratio", def: 1 }, { name: "inner_spread_ratio", def: 1 }, { name: "spread_split", def: 1 }, { name: "cycles", def: 0 }, { name: "fill", def: 0 }],
     verified: true, priority: 0, flags: [], types: ["BASE_SHAPE"],
-    funcNames: ["powc"],
-    funcs: `fn powc(x: f32, y: f32) -> f32 {
+    funcNames: ["atan2j","powc"],
+    funcs: `fn atan2j(y: f32, x: f32) -> f32 { if (x == 0.0 && y == 0.0) { return select(0.0, PI, (bitcast<u32>(x) >> 31u) == 1u) * select(1.0, -1.0, (bitcast<u32>(y) >> 31u) == 1u); } return atan2(y, x); }
+
+fn powc(x: f32, y: f32) -> f32 {
   if (x >= 0.0) { return pow(x, y); }
   let yi = round(y);
   if (abs(y - yi) > 1e-6) { return pow(x, y); }
@@ -10064,7 +11409,7 @@ if ((${p[9]} == 0.0)) {
 } else {
   number_of_cycles = ${p[9]};
 }
-var theta: f32 = atan2(t.y, t.x);
+var theta: f32 = atan2j(t.y, t.x);
 var t_: f32 = (number_of_cycles * theta);
 var rin: f32 = (${p[8]} * sqrt(((t.x * t.x) + (t.y * t.y))));
 var r_: f32 = (0.5 * (((exp(cos(t_)) - (2.0 * cos((4.0 * t_)))) - powc(abs(sin((t_ / 12.0))), 5.0)) + ${p[0]}));
@@ -10185,6 +11530,8 @@ if (((abs(rin) > abs(r_)) || (${p[1]} == 1.0))) {
   "blur_circle": {
     params: [],
     verified: true, priority: 0, flags: [], types: ["BASE_SHAPE"],
+    funcNames: ["atan2j"],
+    funcs: `fn atan2j(y: f32, x: f32) -> f32 { if (x == 0.0 && y == 0.0) { return select(0.0, PI, (bitcast<u32>(x) >> 31u) == 1u) * select(1.0, -1.0, (bitcast<u32>(y) >> 31u) == 1u); } return atan2(y, x); }`,
     code: (w, _p) => `{
 var x2: f32 = ((2.0 * rnd(rs)) - 1.0);
 var y2: f32 = ((2.0 * rnd(rs)) - 1.0);
@@ -10211,6 +11558,8 @@ v.y += (r_ * sina);
   "blur_pixelize": {
     params: [{ name: "size", def: 0.1 }, { name: "scale", def: 1 }],
     verified: true, priority: 0, flags: [], types: ["2D"],
+    funcNames: ["atan2j"],
+    funcs: `fn atan2j(y: f32, x: f32) -> f32 { if (x == 0.0 && y == 0.0) { return select(0.0, PI, (bitcast<u32>(x) >> 31u) == 1u) * select(1.0, -1.0, (bitcast<u32>(y) >> 31u) == 1u); } return atan2(y, x); }`,
     code: (w, p) => `{
 var inv_size: f32 = (1.0 / ${p[0]});
 var v_: f32 = (${w} * ${p[0]});
@@ -10223,8 +11572,10 @@ v.y += (v_ * ((y0 + (${p[1]} * (rnd(rs) - 0.5))) + 0.5));
   "circleLinear": {
     params: [{ name: "Sc", def: 1 }, { name: "K", def: 0.5 }, { name: "Dens1", def: 0.5 }, { name: "Dens2", def: 0.5 }, { name: "Reverse", def: 1 }, { name: "Seed", def: 0 }],
     verified: true, priority: 0, flags: [], types: ["2D"],
-    funcNames: ["circleLinear_DiscretNoise2"],
-    funcs: `fn circleLinear_DiscretNoise2(X: i32, Y: i32) -> f32 {
+    funcNames: ["atan2j","circleLinear_DiscretNoise2"],
+    funcs: `fn atan2j(y: f32, x: f32) -> f32 { if (x == 0.0 && y == 0.0) { return select(0.0, PI, (bitcast<u32>(x) >> 31u) == 1u) * select(1.0, -1.0, (bitcast<u32>(y) >> 31u) == 1u); } return atan2(y, x); }
+
+fn circleLinear_DiscretNoise2(X: i32, Y: i32) -> f32 {
   var AM: f32 = (1.0 / 2147483647);
   var n: i32 = (X + (Y * 57));
   n = ((n << 13) ^ n);
@@ -10274,8 +11625,10 @@ v.y += (${w} * (Y + (f32(((N * 2) + 1)) * ${p[0]})));
   "circleRand": {
     params: [{ name: "Sc", def: 1 }, { name: "Dens", def: 0.5 }, { name: "X", def: 10 }, { name: "Y", def: 10 }, { name: "Seed", def: 0 }],
     verified: true, priority: 0, flags: [], types: ["2D"],
-    funcNames: ["roundc","circleRand_AM","circleRand_DiscretNoise2"],
+    funcNames: ["roundc","atan2j","circleRand_AM","circleRand_DiscretNoise2"],
     funcs: `fn roundc(x: f32) -> f32 { return sign(x) * floor(abs(x) + 0.5); }
+
+fn atan2j(y: f32, x: f32) -> f32 { if (x == 0.0 && y == 0.0) { return select(0.0, PI, (bitcast<u32>(x) >> 31u) == 1u) * select(1.0, -1.0, (bitcast<u32>(y) >> 31u) == 1u); } return atan2(y, x); }
 
 const circleRand_AM: f32 = (1.0 / 2147483647);
 
@@ -10314,8 +11667,10 @@ v.y += (${w} * (Y + (f32(((N * 2) + 1)) * ${p[0]})));
   "circleTrans1": {
     params: [{ name: "Sc", def: 1 }, { name: "Dens", def: 0.5 }, { name: "X", def: 10 }, { name: "Y", def: 10 }, { name: "Seed", def: 0 }],
     verified: true, priority: 0, flags: [], types: ["2D"],
-    funcNames: ["circleTrans1_Trans","circleTrans1_DiscretNoise2","circleTrans1_CircleR"],
-    funcs: `fn circleTrans1_Trans(A_: f32, B: f32, X: f32, Y: f32) -> vec2f {
+    funcNames: ["atan2j","circleTrans1_Trans","circleTrans1_DiscretNoise2","circleTrans1_CircleR"],
+    funcs: `fn atan2j(y: f32, x: f32) -> f32 { if (x == 0.0 && y == 0.0) { return select(0.0, PI, (bitcast<u32>(x) >> 31u) == 1u) * select(1.0, -1.0, (bitcast<u32>(y) >> 31u) == 1u); } return atan2(y, x); }
+
+fn circleTrans1_Trans(A_: f32, B: f32, X: f32, Y: f32) -> vec2f {
   var v_: vec2f;
   v_.x = (((X - A_) * 0.5) + A_);
   v_.y = (((Y - B) * 0.5) + B);
@@ -10390,9 +11745,11 @@ v.y += (${w} * Uxy.y);
   "idisc": {
     params: [],
     verified: true, priority: 0, flags: [], types: ["2D"],
+    funcNames: ["atan2j"],
+    funcs: `fn atan2j(y: f32, x: f32) -> f32 { if (x == 0.0 && y == 0.0) { return select(0.0, PI, (bitcast<u32>(x) >> 31u) == 1u) * select(1.0, -1.0, (bitcast<u32>(y) >> 31u) == 1u); } return atan2(y, x); }`,
     code: (w, _p) => `{
 var a: f32 = (PI / (r + 1.0));
-var r_: f32 = ((atan2(t.y, t.x) * ${w}) * (1.0 / PI));
+var r_: f32 = ((atan2j(t.y, t.x) * ${w}) * (1.0 / PI));
 var c: f32;
 var s: f32;
 s = sin(a);
@@ -10404,9 +11761,11 @@ v.y += (r_ * s);
   "deltaA": {
     params: [],
     verified: true, priority: 0, flags: [], types: ["2D"],
+    funcNames: ["atan2j"],
+    funcs: `fn atan2j(y: f32, x: f32) -> f32 { if (x == 0.0 && y == 0.0) { return select(0.0, PI, (bitcast<u32>(x) >> 31u) == 1u) * select(1.0, -1.0, (bitcast<u32>(y) >> 31u) == 1u); } return atan2(y, x); }`,
     code: (w, _p) => `{
 var avgr: f32 = ((${w} * sqrt(((t.y * t.y) + ((t.x + 1.0) * (t.x + 1.0))))) / sqrt(((t.y * t.y) + ((t.x - 1.0) * (t.x - 1.0)))));
-var avga: f32 = ((atan2(t.y, (t.x - 1.0)) - atan2(t.y, (t.x + 1.0))) / 2.0);
+var avga: f32 = ((atan2j(t.y, (t.x - 1.0)) - atan2j(t.y, (t.x + 1.0))) / 2.0);
 var c: f32;
 var s: f32;
 s = sin(avga);
@@ -10418,9 +11777,11 @@ v.y += (avgr * s);
   "wdisc": {
     params: [],
     verified: true, priority: 0, flags: [], types: ["2D"],
+    funcNames: ["atan2j"],
+    funcs: `fn atan2j(y: f32, x: f32) -> f32 { if (x == 0.0 && y == 0.0) { return select(0.0, PI, (bitcast<u32>(x) >> 31u) == 1u) * select(1.0, -1.0, (bitcast<u32>(y) >> 31u) == 1u); } return atan2(y, x); }`,
     code: (w, _p) => `{
 var a: f32 = (PI / (r + 1.0));
-var r_: f32 = (atan2(t.y, t.x) * (1.0 / PI));
+var r_: f32 = (atan2j(t.y, t.x) * (1.0 / PI));
 if ((r_ > 0.0)) {
   a = (PI - a);
 }
@@ -10435,6 +11796,8 @@ v.y += ((${w} * r_) * s);
   "trade": {
     params: [{ name: "r1", def: 1 }, { name: "d1", def: 1 }, { name: "r2", def: 1 }, { name: "d2", def: 1 }],
     verified: true, priority: 0, flags: [], types: ["2D"],
+    funcNames: ["atan2j"],
+    funcs: `fn atan2j(y: f32, x: f32) -> f32 { if (x == 0.0 && y == 0.0) { return select(0.0, PI, (bitcast<u32>(x) >> 31u) == 1u) * select(1.0, -1.0, (bitcast<u32>(y) >> 31u) == 1u); } return atan2(y, x); }`,
     code: (w, p) => `{
 var _c1: f32;
 var _c2: f32;
@@ -10444,7 +11807,7 @@ if ((t.x > 0.0)) {
   var r_: f32 = sqrt((((_c1 - t.x) * (_c1 - t.x)) + (t.y * t.y)));
   if ((r_ <= ${p[0]})) {
     r_ *= (${p[2]} / ${p[0]});
-    var a: f32 = atan2(t.y, (_c1 - t.x));
+    var a: f32 = atan2j(t.y, (_c1 - t.x));
     var s: f32 = sin(a);
     var c: f32 = cos(a);
     v.x += (${w} * ((r_ * c) - _c2));
@@ -10457,7 +11820,7 @@ if ((t.x > 0.0)) {
   var r_: f32 = sqrt((((-_c2 - t.x) * (-_c2 - t.x)) + (t.y * t.y)));
   if ((r_ <= ${p[2]})) {
     r_ *= (${p[0]} / ${p[2]});
-    var a: f32 = atan2(t.y, (-_c2 - t.x));
+    var a: f32 = atan2j(t.y, (-_c2 - t.x));
     var s: f32 = sin(a);
     var c: f32 = cos(a);
     v.x += (${w} * ((r_ * c) + _c1));
@@ -10469,11 +11832,332 @@ if ((t.x > 0.0)) {
 }
 }`,
   },
+  "w": {
+    params: [{ name: "angle", def: 0.09781437082593158 }, { name: "hypergon", def: 0.1377259416851756 }, { name: "hypergon_n", def: 4 }, { name: "hypergon_r", def: 1 }, { name: "star", def: 0 }, { name: "star_n", def: 5 }, { name: "star_slope", def: 2 }, { name: "lituus", def: 0 }, { name: "lituus_a", def: 1 }, { name: "super", def: 0 }, { name: "super_m", def: 1 }, { name: "super_n1", def: 1 }, { name: "super_n2", def: 1 }, { name: "super_n3", def: 0 }],
+    verified: true, priority: 0, flags: ["z"], types: ["2D"],
+    funcNames: ["sqr","atan2j","powc"],
+    funcs: `fn sqr(x: f32) -> f32 { return x * x; }
+
+fn atan2j(y: f32, x: f32) -> f32 { if (x == 0.0 && y == 0.0) { return select(0.0, PI, (bitcast<u32>(x) >> 31u) == 1u) * select(1.0, -1.0, (bitcast<u32>(y) >> 31u) == 1u); } return atan2(y, x); }
+
+fn powc(x: f32, y: f32) -> f32 {
+  if (x >= 0.0) { return pow(x, y); }
+  let yi = round(y);
+  if (abs(y - yi) > 1e-6) { return pow(x, y); }
+  let m = pow(-x, y);
+  return select(m, -m, (i32(yi) & 1) != 0);
+}`,
+    code: (w, p) => `{
+var _hypergon_d: f32 = 0;
+var _hypergon_n: f32 = 0;
+var _lituus_a: f32 = 0;
+var _star_n: f32 = 0;
+var _star_slope: f32 = 0;
+var _super_m: f32 = 0;
+var _super_n1: f32 = 0;
+{
+  _hypergon_d = sqrt((1.0 + sqr(${p[3]})));
+  _hypergon_n = ${p[2]};
+  _lituus_a = -(${p[8]});
+  _star_n = ${p[5]};
+  _star_slope = tan(${p[6]});
+  _super_m = (${p[10]} / 4.0);
+  _super_n1 = (-1.0 / (${p[11]} + 1.0e-30));
+}
+var a: f32 = atan2j(t.y, t.x);
+var r_: f32 = sqrt((sqr(t.x) + sqr(t.y)));
+var a2: f32 = (a + ${p[0]});
+if ((a2 < -PI)) {
+  a2 += (2.0 * PI);
+}
+if ((a2 > PI)) {
+  a2 -= (2.0 * PI);
+}
+var s: f32;
+var c: f32;
+var total: f32 = 0.0;
+var total2: f32 = 0.0;
+var temp1: f32;
+var temp2: f32;
+if ((${p[1]} != 0.0)) {
+  temp1 = ((abs(a) % ((2.0 * PI) / _hypergon_n)) - (PI / _hypergon_n));
+  temp2 = (sqr(tan(temp1)) + 1.0);
+  if ((temp2 >= sqr(_hypergon_d))) {
+    total += ${p[1]};
+  } else {
+    total += ((${p[1]} * (_hypergon_d - sqrt((sqr(_hypergon_d) - temp2)))) / sqrt(temp2));
+  }
+}
+if ((${p[4]} != 0.0)) {
+  temp1 = tan(abs(((abs(a) % ((2.0 * PI) / _star_n)) - (PI / _star_n))));
+  total += (${p[4]} * sqrt(((sqr(_star_slope) * (1.0 + sqr(temp1))) / sqr((temp1 + _star_slope)))));
+}
+if ((${p[7]} != 0.0)) {
+  total += (${p[7]} * powc(((a / PI) + 1.0), _lituus_a));
+}
+if ((${p[9]} != 0.0)) {
+  var ang: f32 = (a * _super_m);
+  s = sin(ang);
+  c = cos(ang);
+  total += (${p[9]} * powc((powc(abs(c), ${p[12]}) + powc(abs(s), ${p[13]})), _super_n1));
+}
+if ((r_ <= total)) {
+  if ((${p[1]} != 0.0)) {
+    temp1 = ((abs(a2) % ((2.0 * PI) / _hypergon_n)) - (PI / _hypergon_n));
+    temp2 = (sqr(tan(temp1)) + 1.0);
+    if ((temp2 >= sqr(_hypergon_d))) {
+      total2 += ${p[1]};
+    } else {
+      total2 += ((${p[1]} * (_hypergon_d - sqrt((sqr(_hypergon_d) - temp2)))) / sqrt(temp2));
+    }
+  }
+  if ((${p[4]} != 0.0)) {
+    temp1 = tan(abs(((abs(a2) % ((2.0 * PI) / _star_n)) - (PI / _star_n))));
+    total2 += (${p[4]} * sqrt(((sqr(_star_slope) * (1.0 + sqr(temp1))) / sqr((temp1 + _star_slope)))));
+  }
+  if ((${p[7]} != 0.0)) {
+    total2 += (${p[7]} * powc(((a2 / PI) + 1.0), _lituus_a));
+  }
+  if ((${p[9]} != 0.0)) {
+    var ang: f32 = (a2 * _super_m);
+    s = sin(ang);
+    c = cos(ang);
+    total2 += (${p[9]} * powc((powc(abs(c), ${p[12]}) + powc(abs(s), ${p[13]})), _super_n1));
+  }
+  r_ = (((${w} * total2) * r_) / total);
+  s = sin(a2);
+  c = cos(a2);
+  v.x += (r_ * c);
+  v.y += (r_ * s);
+} else {
+  v.x += (${w} * t.x);
+  v.y += (${w} * t.y);
+}
+if (false) {
+  pz_ += (${w} * z_);
+}
+}`,
+  },
+  "x": {
+    params: [{ name: "hypergon", def: 0.17196723657259583 }, { name: "hypergon_n", def: 4 }, { name: "hypergon_r", def: 1 }, { name: "star", def: 0.6838208070780045 }, { name: "star_n", def: 5 }, { name: "star_slope", def: 2 }, { name: "lituus", def: 0 }, { name: "lituus_a", def: 1 }, { name: "super", def: 0 }, { name: "super_m", def: 1 }, { name: "super_n1", def: 1 }, { name: "super_n2", def: 1 }, { name: "super_n3", def: 0 }],
+    verified: true, priority: 0, flags: ["z"], types: ["2D"],
+    funcNames: ["sqr","atan2j","powc"],
+    funcs: `fn sqr(x: f32) -> f32 { return x * x; }
+
+fn atan2j(y: f32, x: f32) -> f32 { if (x == 0.0 && y == 0.0) { return select(0.0, PI, (bitcast<u32>(x) >> 31u) == 1u) * select(1.0, -1.0, (bitcast<u32>(y) >> 31u) == 1u); } return atan2(y, x); }
+
+fn powc(x: f32, y: f32) -> f32 {
+  if (x >= 0.0) { return pow(x, y); }
+  let yi = round(y);
+  if (abs(y - yi) > 1e-6) { return pow(x, y); }
+  let m = pow(-x, y);
+  return select(m, -m, (i32(yi) & 1) != 0);
+}`,
+    code: (w, p) => `{
+var _hypergon_d: f32 = 0;
+var _hypergon_n: f32 = 0;
+var _lituus_a: f32 = 0;
+var _star_n: f32 = 0;
+var _star_slope: f32 = 0;
+var _super_m: f32 = 0;
+var _super_n1: f32 = 0;
+{
+  _hypergon_d = sqrt((1.0 + sqr(${p[2]})));
+  _hypergon_n = ${p[1]};
+  _lituus_a = -(${p[7]});
+  _star_n = ${p[4]};
+  _star_slope = tan(${p[5]});
+  _super_m = (${p[9]} / 4.0);
+  _super_n1 = (-1.0 / (${p[10]} + 1.0e-30));
+}
+var a: f32 = atan2j(t.y, t.x);
+var r_: f32;
+var s: f32;
+var c: f32;
+var total: f32 = 0.0;
+var temp1: f32;
+var temp2: f32;
+if ((${p[0]} != 0.0)) {
+  temp1 = ((abs(a) % ((2.0 * PI) / _hypergon_n)) - (PI / _hypergon_n));
+  temp2 = (sqr(tan(temp1)) + 1.0);
+  if ((temp2 >= sqr(_hypergon_d))) {
+    total += ${p[0]};
+  } else {
+    total += ((${p[0]} * (_hypergon_d - sqrt((sqr(_hypergon_d) - temp2)))) / sqrt(temp2));
+  }
+}
+if ((${p[3]} != 0.0)) {
+  temp1 = tan(abs(((abs(a) % ((2.0 * PI) / _star_n)) - (PI / _star_n))));
+  total += (${p[3]} * sqrt(((sqr(_star_slope) * (1.0 + sqr(temp1))) / sqr((temp1 + _star_slope)))));
+}
+if ((${p[6]} != 0.0)) {
+  total += (${p[6]} * powc(((a / PI) + 1.0), _lituus_a));
+}
+if ((${p[8]} != 0.0)) {
+  var ang: f32 = (a * _super_m);
+  s = sin(ang);
+  c = cos(ang);
+  total += (${p[8]} * powc((powc(abs(c), ${p[11]}) + powc(abs(s), ${p[12]})), _super_n1));
+}
+r_ = (${w} * sqrt(((sqr(t.x) + sqr(t.y)) + sqr(total))));
+s = sin(a);
+c = cos(a);
+v.x += (r_ * c);
+v.y += (r_ * s);
+if (false) {
+  pz_ += (${w} * z_);
+}
+}`,
+  },
+  "y": {
+    params: [{ name: "hypergon", def: 0.34081247904676326 }, { name: "hypergon_n", def: 4 }, { name: "hypergon_r", def: 1 }, { name: "star", def: 0.38658797815496504 }, { name: "star_n", def: 5 }, { name: "star_slope", def: 2 }, { name: "lituus", def: 0 }, { name: "lituus_a", def: 1 }, { name: "super", def: 0 }, { name: "super_m", def: 1 }, { name: "super_n1", def: 1 }, { name: "super_n2", def: 1 }, { name: "super_n3", def: 0 }],
+    verified: true, priority: 0, flags: ["z"], types: ["2D"],
+    funcNames: ["sqr","atan2j","powc"],
+    funcs: `fn sqr(x: f32) -> f32 { return x * x; }
+
+fn atan2j(y: f32, x: f32) -> f32 { if (x == 0.0 && y == 0.0) { return select(0.0, PI, (bitcast<u32>(x) >> 31u) == 1u) * select(1.0, -1.0, (bitcast<u32>(y) >> 31u) == 1u); } return atan2(y, x); }
+
+fn powc(x: f32, y: f32) -> f32 {
+  if (x >= 0.0) { return pow(x, y); }
+  let yi = round(y);
+  if (abs(y - yi) > 1e-6) { return pow(x, y); }
+  let m = pow(-x, y);
+  return select(m, -m, (i32(yi) & 1) != 0);
+}`,
+    code: (w, p) => `{
+var _hypergon_d: f32 = 0;
+var _hypergon_n: f32 = 0;
+var _lituus_a: f32 = 0;
+var _star_n: f32 = 0;
+var _star_slope: f32 = 0;
+var _super_m: f32 = 0;
+var _super_n1: f32 = 0;
+{
+  _hypergon_d = sqrt((1.0 + sqr(${p[2]})));
+  _hypergon_n = ${p[1]};
+  _lituus_a = -(${p[7]});
+  _star_n = ${p[4]};
+  _star_slope = tan(${p[5]});
+  _super_m = (${p[9]} / 4.0);
+  _super_n1 = (-1.0 / (${p[10]} + 1.0e-30));
+}
+var a: f32 = atan2j(t.y, t.x);
+var r_: f32;
+var s: f32;
+var c: f32;
+var total: f32 = 0.0;
+var temp1: f32;
+var temp2: f32;
+if ((${p[0]} != 0.0)) {
+  temp1 = ((abs(a) % ((2.0 * PI) / _hypergon_n)) - (PI / _hypergon_n));
+  temp2 = (sqr(tan(temp1)) + 1.0);
+  if ((temp2 >= sqr(_hypergon_d))) {
+    total += ${p[0]};
+  } else {
+    total += ((${p[0]} * (_hypergon_d - sqrt((sqr(_hypergon_d) - temp2)))) / sqrt(temp2));
+  }
+}
+if ((${p[3]} != 0.0)) {
+  temp1 = tan(abs(((abs(a) % ((2.0 * PI) / _star_n)) - (PI / _star_n))));
+  total += (${p[3]} * sqrt(((sqr(_star_slope) * (1.0 + sqr(temp1))) / sqr((temp1 + _star_slope)))));
+}
+if ((${p[6]} != 0.0)) {
+  total += (${p[6]} * powc(((a / PI) + 1.0), _lituus_a));
+}
+if ((${p[8]} != 0.0)) {
+  var ang: f32 = (a * _super_m);
+  s = sin(ang);
+  c = cos(ang);
+  total += (${p[8]} * powc((powc(abs(c), ${p[11]}) + powc(abs(s), ${p[12]})), _super_n1));
+}
+r_ = ((${w} * sqr(total)) / sqrt((sqr(t.x) + sqr(t.y))));
+s = sin(a);
+c = cos(a);
+v.x += (r_ * c);
+v.y += (r_ * s);
+if (false) {
+  pz_ += (${w} * z_);
+}
+}`,
+  },
+  "z": {
+    params: [{ name: "hypergon", def: 0.35723087226661476 }, { name: "hypergon_n", def: 4 }, { name: "hypergon_r", def: 1 }, { name: "star", def: 0.2695635392890874 }, { name: "star_n", def: 5 }, { name: "star_slope", def: 2 }, { name: "lituus", def: 0 }, { name: "lituus_a", def: 1 }, { name: "super", def: 0 }, { name: "super_m", def: 1 }, { name: "super_n1", def: 1 }, { name: "super_n2", def: 1 }, { name: "super_n3", def: 0 }],
+    verified: true, priority: 0, flags: ["z"], types: ["2D"],
+    funcNames: ["sqr","atan2j","powc"],
+    funcs: `fn sqr(x: f32) -> f32 { return x * x; }
+
+fn atan2j(y: f32, x: f32) -> f32 { if (x == 0.0 && y == 0.0) { return select(0.0, PI, (bitcast<u32>(x) >> 31u) == 1u) * select(1.0, -1.0, (bitcast<u32>(y) >> 31u) == 1u); } return atan2(y, x); }
+
+fn powc(x: f32, y: f32) -> f32 {
+  if (x >= 0.0) { return pow(x, y); }
+  let yi = round(y);
+  if (abs(y - yi) > 1e-6) { return pow(x, y); }
+  let m = pow(-x, y);
+  return select(m, -m, (i32(yi) & 1) != 0);
+}`,
+    code: (w, p) => `{
+var _hypergon_d: f32 = 0;
+var _hypergon_n: f32 = 0;
+var _lituus_a: f32 = 0;
+var _star_n: f32 = 0;
+var _star_slope: f32 = 0;
+var _super_m: f32 = 0;
+var _super_n1: f32 = 0;
+{
+  _hypergon_d = sqrt((1.0 + sqr(${p[2]})));
+  _hypergon_n = ${p[1]};
+  _lituus_a = -(${p[7]});
+  _star_n = ${p[4]};
+  _star_slope = tan(${p[5]});
+  _super_m = (${p[9]} / 4.0);
+  _super_n1 = (-1.0 / (${p[10]} + 1.0e-30));
+}
+var a: f32 = atan2j(t.y, t.x);
+var r_: f32;
+var s: f32;
+var c: f32;
+var total: f32 = 0.0;
+var temp1: f32;
+var temp2: f32;
+if ((${p[0]} != 0.0)) {
+  temp1 = ((abs(a) % ((2.0 * PI) / _hypergon_n)) - (PI / _hypergon_n));
+  temp2 = (sqr(tan(temp1)) + 1.0);
+  if ((temp2 >= sqr(_hypergon_d))) {
+    total += ${p[0]};
+  } else {
+    total += ((${p[0]} * (_hypergon_d - sqrt((sqr(_hypergon_d) - temp2)))) / sqrt(temp2));
+  }
+}
+if ((${p[3]} != 0.0)) {
+  temp1 = tan(abs(((abs(a) % ((2.0 * PI) / _star_n)) - (PI / _star_n))));
+  total += (${p[3]} * sqrt(((sqr(_star_slope) * (1.0 + sqr(temp1))) / sqr((temp1 + _star_slope)))));
+}
+if ((${p[6]} != 0.0)) {
+  total += (${p[6]} * powc(((a / PI) + 1.0), _lituus_a));
+}
+if ((${p[8]} != 0.0)) {
+  var ang: f32 = (a * _super_m);
+  s = sin(ang);
+  c = cos(ang);
+  total += (${p[8]} * powc((powc(abs(c), ${p[11]}) + powc(abs(s), ${p[12]})), _super_n1));
+}
+r_ = (${w} * (sqrt((sqr(t.x) + sqr(t.y))) + total));
+s = sin(a);
+c = cos(a);
+v.x += (r_ * c);
+v.y += (r_ * s);
+if (false) {
+  pz_ += (${w} * z_);
+}
+}`,
+  },
   "post_point_symmetry_wf": {
     params: [{ name: "centre_x", def: 0.25 }, { name: "centre_y", def: 0.5 }, { name: "order", def: 3 }, { name: "colorshift", def: 0 }],
     verified: true, priority: 1, flags: ["dc"], types: ["2D","DC","POST"],
-    funcNames: ["roundc"],
-    funcs: `fn roundc(x: f32) -> f32 { return sign(x) * floor(abs(x) + 0.5); }`,
+    funcNames: ["roundc","atan2j"],
+    funcs: `fn roundc(x: f32) -> f32 { return sign(x) * floor(abs(x) + 0.5); }
+
+fn atan2j(y: f32, x: f32) -> f32 { if (x == 0.0 && y == 0.0) { return select(0.0, PI, (bitcast<u32>(x) >> 31u) == 1u) * select(1.0, -1.0, (bitcast<u32>(y) >> 31u) == 1u); } return atan2(y, x); }`,
     code: (w, p) => `{
 var order: i32 = i32(roundc(${p[2]}));
 if ((order > 36)) {
@@ -10502,8 +12186,10 @@ v.y = ((${p[1]} + (dy * _cosa[idx])) - (dx * _sina[idx]));
   "post_axis_symmetry_wf": {
     params: [{ name: "axis", def: 0 }, { name: "centre_x", def: 0.25 }, { name: "centre_y", def: 0.5 }, { name: "centre_z", def: 0.5 }, { name: "rotation", def: 30 }, { name: "x1colorshift", def: 0 }, { name: "y1colorshift", def: 0 }, { name: "z1colorshift", def: 0 }, { name: "x2colorshift", def: 0 }, { name: "y2colorshift", def: 0 }, { name: "z2colorshift", def: 0 }],
     verified: true, priority: 1, flags: ["dc","z"], types: ["2D","DC","POST"],
-    funcNames: ["roundc"],
-    funcs: `fn roundc(x: f32) -> f32 { return sign(x) * floor(abs(x) + 0.5); }`,
+    funcNames: ["roundc","atan2j"],
+    funcs: `fn roundc(x: f32) -> f32 { return sign(x) * floor(abs(x) + 0.5); }
+
+fn atan2j(y: f32, x: f32) -> f32 { if (x == 0.0 && y == 0.0) { return select(0.0, PI, (bitcast<u32>(x) >> 31u) == 1u) * select(1.0, -1.0, (bitcast<u32>(y) >> 31u) == 1u); } return atan2(y, x); }`,
     code: (w, p) => `{
 var _sina: f32;
 var _cosa: f32;
@@ -10614,17 +12300,124 @@ switch i32(roundc(${p[0]})) {
 }
 }`,
   },
+  "mobius_strip": {
+    params: [{ name: "radius", def: 1 }, { name: "width", def: 1 }, { name: "twists", def: 1 }, { name: "range x", def: 1 }, { name: "range y", def: 1 }, { name: "rotate x", def: 0 }, { name: "rotate y", def: 0 }, { name: "modify z", def: 1 }, { name: "width mode", def: 0 }, { name: "radial mode", def: 0 }],
+    verified: true, priority: 0, flags: ["3d","hide","z"], types: ["3D"],
+    funcNames: ["atan2j"],
+    funcs: `fn atan2j(y: f32, x: f32) -> f32 { if (x == 0.0 && y == 0.0) { return select(0.0, PI, (bitcast<u32>(x) >> 31u) == 1u) * select(1.0, -1.0, (bitcast<u32>(y) >> 31u) == 1u); } return atan2(y, x); }`,
+    code: (w, p) => `{
+loop {
+var WRAP: i32 = 0;
+var EDGE: i32 = 1;
+var HIDE: i32 = 2;
+var LEAVE: i32 = 3;
+var xmin: f32 = 0;
+var xmax: f32 = 0;
+var ymin: f32 = 0;
+var ymax: f32 = 0;
+var rotxSin: f32 = 0;
+var rotxCos: f32 = 0;
+var rotySin: f32 = 0;
+var rotyCos: f32 = 0;
+{
+  rotxSin = sin((${p[5]} * (2.0 * PI)));
+  rotxCos = cos((${p[5]} * (2.0 * PI)));
+  rotySin = sin((${p[6]} * (2.0 * PI)));
+  rotyCos = cos((${p[6]} * (2.0 * PI)));
+  xmin = (-(${p[3]}) / 2);
+  xmax = (${p[3]} / 2);
+  ymin = (-(${p[4]}) / 2);
+  ymax = (${p[4]} / 2);
+}
+var t_: f32;
+var s: f32;
+var Mx: f32;
+var My: f32;
+var Mz: f32;
+var Rx: f32;
+var Ry: f32;
+var Rz: f32;
+var x: f32 = t.x;
+var y: f32 = t.y;
+if (((${p[9]} == f32(HIDE)) && ((x > xmax) || (x < xmin)))) {
+  (*hd) = true;
+  break;
+}
+if (((${p[8]} == f32(HIDE)) && ((y > ymax) || (y < ymin)))) {
+  (*hd) = true;
+  break;
+}
+if (((${p[9]} == f32(LEAVE)) && ((x > xmax) || (x < xmin)))) {
+  v.x += t.x;
+  v.y += t.y;
+  break;
+}
+if (((${p[8]} == f32(LEAVE)) && ((y > ymax) || (y < ymin)))) {
+  v.x += t.x;
+  v.y += t.y;
+  break;
+}
+if ((${p[3]} == 0)) {
+  t_ = 0;
+} else {
+  if ((${p[9]} == f32(WRAP))) {
+    x = (x % (${p[3]} / 2));
+  } else if ((${p[9]} == f32(EDGE))) {
+    if ((x > xmax)) {
+      x = xmax;
+    } else if ((x < xmin)) {
+      x = xmin;
+    }
+  }
+  t_ = ((x * (PI / (${p[3]} / 2))) + PI);
+}
+if ((${p[4]} == 0)) {
+  s = 0;
+} else {
+  if ((${p[8]} == f32(WRAP))) {
+    y = (y % (${p[4]} / 2));
+  } else if ((${p[8]} == f32(EDGE))) {
+    if ((y > ymax)) {
+      y = ymax;
+    } else if ((y < ymin)) {
+      y = ymin;
+    }
+  }
+  s = (y * ((${p[1]} / 2) / (${p[4]} / 2)));
+}
+Mx = ((${p[0]} + (s * cos(((f32(i32(${p[2]})) * t_) / 2)))) * cos(t_));
+My = ((${p[0]} + (s * cos(((f32(i32(${p[2]})) * t_) / 2)))) * sin(t_));
+Mz = (s * sin(((f32(i32(${p[2]})) * t_) / 2)));
+Rx = Mx;
+Ry = ((My * rotyCos) + (Mz * rotySin));
+Rz = ((Mz * rotyCos) - (My * rotySin));
+Mx = ((Rx * rotxCos) - (Rz * rotxSin));
+My = Ry;
+Mz = ((Rz * rotxCos) + (Rx * rotxSin));
+v.x += (${w} * Mx);
+v.y += (${w} * My);
+if ((${p[7]} != 0)) {
+  pz_ += ((${w} * Mz) * ${p[7]});
+} else {
+  pz_ += (${w} * pz_);
+}
+break;
+}
+}`,
+  },
   "mobiusN": {
     params: [{ name: "re_a", def: 1.1 }, { name: "re_b", def: 0 }, { name: "re_c", def: 0.2 }, { name: "re_d", def: 0.9 }, { name: "im_a", def: 0.1 }, { name: "im_b", def: -0.22 }, { name: "im_c", def: -0.05 }, { name: "im_d", def: 0.1 }, { name: "power", def: 1.8 }, { name: "dist", def: 1 }],
     verified: true, priority: 0, flags: [], types: ["2D"],
-    funcNames: ["powc"],
+    funcNames: ["powc","atan2j"],
     funcs: `fn powc(x: f32, y: f32) -> f32 {
   if (x >= 0.0) { return pow(x, y); }
   let yi = round(y);
   if (abs(y - yi) > 1e-6) { return pow(x, y); }
   let m = pow(-x, y);
   return select(m, -m, (i32(yi) & 1) != 0);
-}`,
+}
+
+fn atan2j(y: f32, x: f32) -> f32 { if (x == 0.0 && y == 0.0) { return select(0.0, PI, (bitcast<u32>(x) >> 31u) == 1u) * select(1.0, -1.0, (bitcast<u32>(y) >> 31u) == 1u); } return atan2(y, x); }`,
     code: (w, p) => `{
 var power: f32 = ${p[8]};
 if ((abs(power) < 1.0)) {
@@ -10645,7 +12438,7 @@ var cosa: f32;
 var n: f32;
 z = ((4.0 * ${p[9]}) / power);
 r_ = powc(r, z);
-alpha = (atan2(t.y, t.x) * power);
+alpha = (atan2j(t.y, t.x) * power);
 sina = sin(alpha);
 cosa = cos(alpha);
 x = (r_ * cosa);
@@ -10660,7 +12453,7 @@ y = (((imagU * realV) - (realU * imagV)) / radV);
 z = (1.0 / z);
 r_ = powc(sqrt(((x * x) + (y * y))), z);
 n = floor((power * rnd(rs)));
-alpha = ((atan2(y, x) + ((n * 2.0) * PI)) / floor(power));
+alpha = ((atan2j(y, x) + ((n * 2.0) * PI)) / floor(power));
 sina = sin(alpha);
 cosa = cos(alpha);
 v.x += ((${w} * r_) * cosa);
@@ -10670,8 +12463,10 @@ v.y += ((${w} * r_) * sina);
   "checkerboard_wf": {
     params: [{ name: "position", def: 3 }, { name: "size", def: 10 }, { name: "axis", def: 2 }, { name: "checker_size", def: 0.1288059511246287 }, { name: "displ_amount", def: 0.05 }, { name: "checker_color1", def: 0.16441937783940141 }, { name: "checker_color2", def: 0.5191409549303291 }, { name: "side_color", def: 0.673703045064045 }, { name: "with_sides", def: 1 }],
     verified: true, priority: 0, flags: ["3d","dc","z"], types: ["3D","DC"],
-    funcNames: ["checkerboard_wf_getDisplacement","checkerboard_wf_getColor"],
-    funcs: `fn checkerboard_wf_getDisplacement(u: f32, v_: f32, checker_size: f32, displ_amount: f32) -> f32 {
+    funcNames: ["atan2j","checkerboard_wf_getDisplacement","checkerboard_wf_getColor"],
+    funcs: `fn atan2j(y: f32, x: f32) -> f32 { if (x == 0.0 && y == 0.0) { return select(0.0, PI, (bitcast<u32>(x) >> 31u) == 1u) * select(1.0, -1.0, (bitcast<u32>(y) >> 31u) == 1u); } return atan2(y, x); }
+
+fn checkerboard_wf_getDisplacement(u: f32, v_: f32, checker_size: f32, displ_amount: f32) -> f32 {
   return select(0.0, displ_amount, (((floor((u / checker_size)) + floor((v_ / checker_size))) % 2.0) < 1));
 }
 
@@ -10750,6 +12545,8 @@ switch i32(${p[2]}) {
   "waves2_radial": {
     params: [{ name: "w2r_scalex", def: 0.1 }, { name: "w2r_scaley", def: 0.1 }, { name: "w2r_freqx", def: 7 }, { name: "w2r_freqy", def: 13 }, { name: "w2r_null", def: 2 }, { name: "w2r_distance", def: 10 }],
     verified: true, priority: 0, flags: [], types: ["2D"],
+    funcNames: ["atan2j"],
+    funcs: `fn atan2j(y: f32, x: f32) -> f32 { if (x == 0.0 && y == 0.0) { return select(0.0, PI, (bitcast<u32>(x) >> 31u) == 1u) * select(1.0, -1.0, (bitcast<u32>(y) >> 31u) == 1u); } return atan2(y, x); }`,
     code: (w, p) => `{
 var x0: f32 = t.x;
 var y0: f32 = t.y;
@@ -10763,6 +12560,8 @@ v.y += (${w} * (y0 + ((factor * sin((x0 * ${p[3]}))) * ${p[1]})));
   "circlesplit": {
     params: [{ name: "cs_radius", def: 1 }, { name: "cs_split", def: 0.5 }],
     verified: true, priority: 0, flags: [], types: ["2D"],
+    funcNames: ["atan2j"],
+    funcs: `fn atan2j(y: f32, x: f32) -> f32 { if (x == 0.0 && y == 0.0) { return select(0.0, PI, (bitcast<u32>(x) >> 31u) == 1u) * select(1.0, -1.0, (bitcast<u32>(y) >> 31u) == 1u); } return atan2(y, x); }`,
     code: (w, p) => `{
 var x0: f32 = t.x;
 var y0: f32 = t.y;
@@ -10773,7 +12572,7 @@ if ((r_ < (${p[0]} - ${p[1]}))) {
   x1 = x0;
   y1 = y0;
 } else {
-  var a: f32 = atan2(y0, x0);
+  var a: f32 = atan2j(y0, x0);
   var len: f32 = (r_ + ${p[1]});
   x1 = (cos(a) * len);
   y1 = (sin(a) * len);
@@ -10785,8 +12584,10 @@ v.y += (${w} * y1);
   "log_tile2": {
     params: [{ name: "spreadx", def: 2 }, { name: "spready", def: 2 }, { name: "spreadz", def: 0 }],
     verified: true, priority: 0, flags: ["3d","z"], types: ["3D"],
-    funcNames: ["roundc"],
-    funcs: `fn roundc(x: f32) -> f32 { return sign(x) * floor(abs(x) + 0.5); }`,
+    funcNames: ["roundc","atan2j"],
+    funcs: `fn roundc(x: f32) -> f32 { return sign(x) * floor(abs(x) + 0.5); }
+
+fn atan2j(y: f32, x: f32) -> f32 { if (x == 0.0 && y == 0.0) { return select(0.0, PI, (bitcast<u32>(x) >> 31u) == 1u) * select(1.0, -1.0, (bitcast<u32>(y) >> 31u) == 1u); } return atan2(y, x); }`,
     code: (w, p) => `{
 var spreadx: f32 = -(${p[0]});
 if ((rnd(rs) < 0.5)) {
@@ -10808,6 +12609,8 @@ pz_ += (${w} * (z_ + (spreadz * roundc(log(rnd(rs))))));
   "mobiq": {
     params: [{ name: "qat", def: 1 }, { name: "qax", def: 0 }, { name: "qay", def: 0 }, { name: "qaz", def: 0 }, { name: "qbt", def: 0 }, { name: "qbx", def: 0 }, { name: "qby", def: 0 }, { name: "qbz", def: 0 }, { name: "qct", def: 0 }, { name: "qcx", def: 0 }, { name: "qcy", def: 0 }, { name: "qcz", def: 0 }, { name: "qdt", def: 1 }, { name: "qdx", def: 0 }, { name: "qdy", def: 0 }, { name: "qdz", def: 0 }],
     verified: true, priority: 0, flags: ["3d","z"], types: ["3D"],
+    funcNames: ["atan2j"],
+    funcs: `fn atan2j(y: f32, x: f32) -> f32 { if (x == 0.0 && y == 0.0) { return select(0.0, PI, (bitcast<u32>(x) >> 31u) == 1u) * select(1.0, -1.0, (bitcast<u32>(y) >> 31u) == 1u); } return atan2(y, x); }`,
     code: (w, p) => `{
 var t1: f32 = ${p[0]};
 var t2: f32 = t.x;
@@ -10845,6 +12648,8 @@ pz_ += (((((ny * dt) - (nt * dy)) - (nz * dx)) + (nx * dz)) * ni);
   "tile_hlp": {
     params: [{ name: "width", def: 1 }],
     verified: true, priority: 0, flags: [], types: ["2D"],
+    funcNames: ["atan2j"],
+    funcs: `fn atan2j(y: f32, x: f32) -> f32 { if (x == 0.0 && y == 0.0) { return select(0.0, PI, (bitcast<u32>(x) >> 31u) == 1u) * select(1.0, -1.0, (bitcast<u32>(y) >> 31u) == 1u); } return atan2(y, x); }`,
     code: (w, p) => `{
 var width2: f32 = (${p[0]} * ${w});
 var x: f32 = (t.x / ${p[0]});
@@ -10870,8 +12675,10 @@ v.y += (${w} * t.y);
   "spliptic_bs": {
     params: [{ name: "x", def: 0.05 }, { name: "y", def: 0.05 }],
     verified: true, priority: 0, flags: [], types: ["2D"],
-    funcNames: ["spliptic_bs_sqrt_safe"],
-    funcs: `fn spliptic_bs_sqrt_safe(x: f32) -> f32 {
+    funcNames: ["atan2j","spliptic_bs_sqrt_safe"],
+    funcs: `fn atan2j(y: f32, x: f32) -> f32 { if (x == 0.0 && y == 0.0) { return select(0.0, PI, (bitcast<u32>(x) >> 31u) == 1u) * select(1.0, -1.0, (bitcast<u32>(y) >> 31u) == 1u); } return atan2(y, x); }
+
+fn spliptic_bs_sqrt_safe(x: f32) -> f32 {
   return select(sqrt(x), 0.0, (x < 1.0e-9));
 }`,
     code: (w, p) => `{
@@ -10882,9 +12689,9 @@ var xmax: f32 = (0.5 * (sqrt((tmp + x2)) + sqrt((tmp - x2))));
 var a: f32 = (t.x / xmax);
 var b: f32 = spliptic_bs_sqrt_safe((1.0 - (a * a)));
 if ((t.x >= 0)) {
-  v.x += ((_v * atan2(a, b)) + ${p[0]});
+  v.x += ((_v * atan2j(a, b)) + ${p[0]});
 } else {
-  v.x += ((_v * atan2(a, b)) - ${p[0]});
+  v.x += ((_v * atan2j(a, b)) - ${p[0]});
 }
 if ((rnd(rs) < 0.5)) {
   v.y += ((_v * log((xmax + spliptic_bs_sqrt_safe((xmax - 1.0))))) + ${p[1]});
@@ -10896,8 +12703,10 @@ if ((rnd(rs) < 0.5)) {
   "tile_log": {
     params: [{ name: "spread", def: 1 }],
     verified: true, priority: 0, flags: ["3d","z"], types: ["3D"],
-    funcNames: ["roundc"],
-    funcs: `fn roundc(x: f32) -> f32 { return sign(x) * floor(abs(x) + 0.5); }`,
+    funcNames: ["roundc","atan2j"],
+    funcs: `fn roundc(x: f32) -> f32 { return sign(x) * floor(abs(x) + 0.5); }
+
+fn atan2j(y: f32, x: f32) -> f32 { if (x == 0.0 && y == 0.0) { return select(0.0, PI, (bitcast<u32>(x) >> 31u) == 1u) * select(1.0, -1.0, (bitcast<u32>(y) >> 31u) == 1u); } return atan2(y, x); }`,
     code: (w, p) => `{
 var x: f32 = -(${p[0]});
 if ((rnd(rs) < 0.5)) {
@@ -10911,6 +12720,8 @@ pz_ += (${w} * z_);
   "cos2_bs": {
     params: [{ name: "x1", def: 1 }, { name: "x2", def: 1 }, { name: "y1", def: 1 }, { name: "y2", def: 1 }],
     verified: true, priority: 0, flags: [], types: ["2D"],
+    funcNames: ["atan2j"],
+    funcs: `fn atan2j(y: f32, x: f32) -> f32 { if (x == 0.0 && y == 0.0) { return select(0.0, PI, (bitcast<u32>(x) >> 31u) == 1u) * select(1.0, -1.0, (bitcast<u32>(y) >> 31u) == 1u); } return atan2(y, x); }`,
     code: (w, p) => `{
 var cossin: f32 = sin((t.x * ${p[0]}));
 var coscos: f32 = cos((t.x * ${p[1]}));
@@ -10923,6 +12734,8 @@ v.y -= ((${w} * cossin) * cossinh);
   "cot2_bs": {
     params: [{ name: "x1", def: 2 }, { name: "x2", def: 2 }, { name: "y1", def: 2 }, { name: "y2", def: 2 }],
     verified: true, priority: 0, flags: [], types: ["2D"],
+    funcNames: ["atan2j"],
+    funcs: `fn atan2j(y: f32, x: f32) -> f32 { if (x == 0.0 && y == 0.0) { return select(0.0, PI, (bitcast<u32>(x) >> 31u) == 1u) * select(1.0, -1.0, (bitcast<u32>(y) >> 31u) == 1u); } return atan2(y, x); }`,
     code: (w, p) => `{
 var cotsin: f32 = sin((${p[0]} * t.x));
 var cotcos: f32 = cos((${p[1]} * t.x));
@@ -10936,6 +12749,8 @@ v.y += (((${w} * cotden) * -1) * cotsinh);
   "csc2_bs": {
     params: [{ name: "x1", def: 1 }, { name: "x2", def: 1 }, { name: "y1", def: 1 }, { name: "y2", def: 1 }],
     verified: true, priority: 0, flags: [], types: ["2D"],
+    funcNames: ["atan2j"],
+    funcs: `fn atan2j(y: f32, x: f32) -> f32 { if (x == 0.0 && y == 0.0) { return select(0.0, PI, (bitcast<u32>(x) >> 31u) == 1u) * select(1.0, -1.0, (bitcast<u32>(y) >> 31u) == 1u); } return atan2(y, x); }`,
     code: (w, p) => `{
 var cscsin: f32 = sin((t.x * ${p[0]}));
 var csccos: f32 = cos((t.x * ${p[1]}));
@@ -10952,6 +12767,8 @@ if ((d != 0)) {
   "tan2_bs": {
     params: [{ name: "x1", def: 2 }, { name: "x2", def: 2 }, { name: "y1", def: 2 }, { name: "y2", def: 2 }],
     verified: true, priority: 0, flags: [], types: ["2D"],
+    funcNames: ["atan2j"],
+    funcs: `fn atan2j(y: f32, x: f32) -> f32 { if (x == 0.0 && y == 0.0) { return select(0.0, PI, (bitcast<u32>(x) >> 31u) == 1u) * select(1.0, -1.0, (bitcast<u32>(y) >> 31u) == 1u); } return atan2(y, x); }`,
     code: (w, p) => `{
 var tansin: f32 = sin((${p[0]} * t.x));
 var tancos: f32 = cos((${p[1]} * t.x));
@@ -10968,6 +12785,8 @@ if ((d != 0)) {
   "sec2_bs": {
     params: [{ name: "x1", def: 1.25 }, { name: "x2", def: 0.75 }, { name: "y1", def: 1.5 }, { name: "y2", def: 0.5 }],
     verified: true, priority: 0, flags: [], types: ["2D"],
+    funcNames: ["atan2j"],
+    funcs: `fn atan2j(y: f32, x: f32) -> f32 { if (x == 0.0 && y == 0.0) { return select(0.0, PI, (bitcast<u32>(x) >> 31u) == 1u) * select(1.0, -1.0, (bitcast<u32>(y) >> 31u) == 1u); } return atan2(y, x); }`,
     code: (w, p) => `{
 var secsin: f32 = sin((t.x * ${p[0]}));
 var seccos: f32 = cos((t.x * ${p[1]}));
@@ -10981,9 +12800,27 @@ if ((d != 0)) {
 }
 }`,
   },
+  "exp2_bs": {
+    params: [{ name: "x1", def: 1 }, { name: "y1", def: 1 }, { name: "y2", def: 1 }],
+    verified: true, priority: 0, flags: ["z"], types: ["2D"],
+    funcNames: ["atan2j"],
+    funcs: `fn atan2j(y: f32, x: f32) -> f32 { if (x == 0.0 && y == 0.0) { return select(0.0, PI, (bitcast<u32>(x) >> 31u) == 1u) * select(1.0, -1.0, (bitcast<u32>(y) >> 31u) == 1u); } return atan2(y, x); }`,
+    code: (w, p) => `{
+var expe: f32 = exp((t.x * ${p[0]}));
+var expsin: f32 = sin((t.y * ${p[1]}));
+var expcos: f32 = cos((t.y * ${p[2]}));
+v.x += ((${w} * expe) * expcos);
+v.y += ((${w} * expe) * expsin);
+if (false) {
+  pz_ += (${w} * z_);
+}
+}`,
+  },
   "sin2_bs": {
     params: [{ name: "x1", def: 1 }, { name: "x2", def: 1 }, { name: "y1", def: 1 }, { name: "y2", def: 1 }],
     verified: true, priority: 0, flags: [], types: ["2D"],
+    funcNames: ["atan2j"],
+    funcs: `fn atan2j(y: f32, x: f32) -> f32 { if (x == 0.0 && y == 0.0) { return select(0.0, PI, (bitcast<u32>(x) >> 31u) == 1u) * select(1.0, -1.0, (bitcast<u32>(y) >> 31u) == 1u); } return atan2(y, x); }`,
     code: (w, p) => `{
 var sinsin: f32 = sin((t.x * ${p[0]}));
 var sincos: f32 = cos((t.x * ${p[1]}));
@@ -10996,6 +12833,8 @@ v.y += ((${w} * sincos) * sinsinh);
   "csch2_bs": {
     params: [{ name: "x1", def: 1 }, { name: "x2", def: 1 }, { name: "y1", def: 1 }, { name: "y2", def: 1 }],
     verified: true, priority: 0, flags: [], types: ["2D"],
+    funcNames: ["atan2j"],
+    funcs: `fn atan2j(y: f32, x: f32) -> f32 { if (x == 0.0 && y == 0.0) { return select(0.0, PI, (bitcast<u32>(x) >> 31u) == 1u) * select(1.0, -1.0, (bitcast<u32>(y) >> 31u) == 1u); } return atan2(y, x); }`,
     code: (w, p) => `{
 var cschsin: f32 = sin((t.y * ${p[2]}));
 var cschcos: f32 = cos((t.y * ${p[3]}));
@@ -11012,6 +12851,8 @@ if ((d != 0)) {
   "cosh2_bs": {
     params: [{ name: "x1", def: 1 }, { name: "x2", def: 1 }, { name: "y1", def: 1 }, { name: "y2", def: 1 }],
     verified: true, priority: 0, flags: [], types: ["2D"],
+    funcNames: ["atan2j"],
+    funcs: `fn atan2j(y: f32, x: f32) -> f32 { if (x == 0.0 && y == 0.0) { return select(0.0, PI, (bitcast<u32>(x) >> 31u) == 1u) * select(1.0, -1.0, (bitcast<u32>(y) >> 31u) == 1u); } return atan2(y, x); }`,
     code: (w, p) => `{
 var coshsin: f32 = sin((t.y * ${p[2]}));
 var coshcos: f32 = cos((t.y * ${p[3]}));
@@ -11024,6 +12865,8 @@ v.y += ((${w} * coshsinh) * coshsin);
   "sech2_bs": {
     params: [{ name: "x1", def: 1.25 }, { name: "x2", def: 0.75 }, { name: "y1", def: 1.5 }, { name: "y2", def: 0.75 }],
     verified: true, priority: 0, flags: [], types: ["2D"],
+    funcNames: ["atan2j"],
+    funcs: `fn atan2j(y: f32, x: f32) -> f32 { if (x == 0.0 && y == 0.0) { return select(0.0, PI, (bitcast<u32>(x) >> 31u) == 1u) * select(1.0, -1.0, (bitcast<u32>(y) >> 31u) == 1u); } return atan2(y, x); }`,
     code: (w, p) => `{
 var sechsin: f32 = sin((t.y * ${p[2]}));
 var sechcos: f32 = cos((t.y * ${p[3]}));
@@ -11040,6 +12883,8 @@ if ((d != 0)) {
   "coth2_bs": {
     params: [{ name: "x1", def: 2 }, { name: "x2", def: 2 }, { name: "y1", def: 2 }, { name: "y2", def: 2 }],
     verified: true, priority: 0, flags: [], types: ["2D"],
+    funcNames: ["atan2j"],
+    funcs: `fn atan2j(y: f32, x: f32) -> f32 { if (x == 0.0 && y == 0.0) { return select(0.0, PI, (bitcast<u32>(x) >> 31u) == 1u) * select(1.0, -1.0, (bitcast<u32>(y) >> 31u) == 1u); } return atan2(y, x); }`,
     code: (w, p) => `{
 var cothsin: f32 = sin((${p[2]} * t.y));
 var cothcos: f32 = cos((${p[3]} * t.y));
@@ -11056,6 +12901,8 @@ if ((d != 0)) {
   "sinh2_bs": {
     params: [{ name: "x1", def: 1 }, { name: "x2", def: 1 }, { name: "y1", def: 1 }, { name: "y2", def: 1 }],
     verified: true, priority: 0, flags: [], types: ["2D"],
+    funcNames: ["atan2j"],
+    funcs: `fn atan2j(y: f32, x: f32) -> f32 { if (x == 0.0 && y == 0.0) { return select(0.0, PI, (bitcast<u32>(x) >> 31u) == 1u) * select(1.0, -1.0, (bitcast<u32>(y) >> 31u) == 1u); } return atan2(y, x); }`,
     code: (w, p) => `{
 var sinhsin: f32 = sin((t.y * ${p[2]}));
 var sinhcos: f32 = cos((t.y * ${p[3]}));
@@ -11068,6 +12915,8 @@ v.y += ((${w} * sinhcosh) * sinhsin);
   "tanh2_bs": {
     params: [{ name: "x1", def: 2 }, { name: "x2", def: 2 }, { name: "y1", def: 2 }, { name: "y2", def: 2 }],
     verified: true, priority: 0, flags: [], types: ["2D"],
+    funcNames: ["atan2j"],
+    funcs: `fn atan2j(y: f32, x: f32) -> f32 { if (x == 0.0 && y == 0.0) { return select(0.0, PI, (bitcast<u32>(x) >> 31u) == 1u) * select(1.0, -1.0, (bitcast<u32>(y) >> 31u) == 1u); } return atan2(y, x); }`,
     code: (w, p) => `{
 var tanhsin: f32 = sin((${p[2]} * t.y));
 var tanhcos: f32 = cos((${p[3]} * t.y));
@@ -11084,6 +12933,8 @@ if ((d != 0)) {
   "cosq": {
     params: [],
     verified: true, priority: 0, flags: ["3d","z"], types: ["3D"],
+    funcNames: ["atan2j"],
+    funcs: `fn atan2j(y: f32, x: f32) -> f32 { if (x == 0.0 && y == 0.0) { return select(0.0, PI, (bitcast<u32>(x) >> 31u) == 1u) * select(1.0, -1.0, (bitcast<u32>(y) >> 31u) == 1u); } return atan2(y, x); }`,
     code: (w, _p) => `{
 var abs_v: f32 = length(vec2f(t.y, z_));
 var s: f32 = sin(t.x);
@@ -11099,6 +12950,8 @@ pz_ += (C * z_);
   "sinq": {
     params: [],
     verified: true, priority: 0, flags: ["3d","z"], types: ["3D"],
+    funcNames: ["atan2j"],
+    funcs: `fn atan2j(y: f32, x: f32) -> f32 { if (x == 0.0 && y == 0.0) { return select(0.0, PI, (bitcast<u32>(x) >> 31u) == 1u) * select(1.0, -1.0, (bitcast<u32>(y) >> 31u) == 1u); } return atan2(y, x); }`,
     code: (w, _p) => `{
 var abs_v: f32 = length(vec2f(t.y, z_));
 var s: f32 = sin(t.x);
@@ -11114,6 +12967,8 @@ pz_ += (C * z_);
   "tanq": {
     params: [],
     verified: true, priority: 0, flags: ["3d","z"], types: ["3D"],
+    funcNames: ["atan2j"],
+    funcs: `fn atan2j(y: f32, x: f32) -> f32 { if (x == 0.0 && y == 0.0) { return select(0.0, PI, (bitcast<u32>(x) >> 31u) == 1u) * select(1.0, -1.0, (bitcast<u32>(y) >> 31u) == 1u); } return atan2(y, x); }`,
     code: (w, _p) => `{
 var abs_v: f32 = length(vec2f(t.y, z_));
 var s: f32 = sin(t.x);
@@ -11135,6 +12990,8 @@ pz_ += ((((nstcv * B) * z_) + ((C * z_) * ctcv)) * ni);
   "tanhq": {
     params: [],
     verified: true, priority: 0, flags: ["3d","z"], types: ["3D"],
+    funcNames: ["atan2j"],
+    funcs: `fn atan2j(y: f32, x: f32) -> f32 { if (x == 0.0 && y == 0.0) { return select(0.0, PI, (bitcast<u32>(x) >> 31u) == 1u) * select(1.0, -1.0, (bitcast<u32>(y) >> 31u) == 1u); } return atan2(y, x); }`,
     code: (w, _p) => `{
 var abs_v: f32 = length(vec2f(t.y, z_));
 var sysz: f32 = ((t.y * t.y) + (z_ * z_));
@@ -11156,6 +13013,8 @@ pz_ += ((((nstcv * B) * z_) + ((C * z_) * ctcv)) * ni);
   "coshq": {
     params: [],
     verified: true, priority: 0, flags: ["3d","z"], types: ["3D"],
+    funcNames: ["atan2j"],
+    funcs: `fn atan2j(y: f32, x: f32) -> f32 { if (x == 0.0 && y == 0.0) { return select(0.0, PI, (bitcast<u32>(x) >> 31u) == 1u) * select(1.0, -1.0, (bitcast<u32>(y) >> 31u) == 1u); } return atan2(y, x); }`,
     code: (w, _p) => `{
 var abs_v: f32 = length(vec2f(t.y, z_));
 var s: f32 = sin(abs_v);
@@ -11171,6 +13030,8 @@ pz_ += (C * z_);
   "sinhq": {
     params: [],
     verified: true, priority: 0, flags: ["3d","z"], types: ["3D"],
+    funcNames: ["atan2j"],
+    funcs: `fn atan2j(y: f32, x: f32) -> f32 { if (x == 0.0 && y == 0.0) { return select(0.0, PI, (bitcast<u32>(x) >> 31u) == 1u) * select(1.0, -1.0, (bitcast<u32>(y) >> 31u) == 1u); } return atan2(y, x); }`,
     code: (w, _p) => `{
 var abs_v: f32 = length(vec2f(t.y, z_));
 var s: f32 = sin(abs_v);
@@ -11186,6 +13047,8 @@ pz_ += (C * z_);
   "cotq": {
     params: [],
     verified: true, priority: 0, flags: ["3d","z"], types: ["3D"],
+    funcNames: ["atan2j"],
+    funcs: `fn atan2j(y: f32, x: f32) -> f32 { if (x == 0.0 && y == 0.0) { return select(0.0, PI, (bitcast<u32>(x) >> 31u) == 1u) * select(1.0, -1.0, (bitcast<u32>(y) >> 31u) == 1u); } return atan2(y, x); }`,
     code: (w, _p) => `{
 var abs_v: f32 = length(vec2f(t.y, z_));
 var s: f32 = sin(t.x);
@@ -11207,6 +13070,8 @@ pz_ -= ((((nstcv * B) * z_) + ((C * z_) * ctcv)) * ni);
   "cothq": {
     params: [],
     verified: true, priority: 0, flags: ["3d","z"], types: ["3D"],
+    funcNames: ["atan2j"],
+    funcs: `fn atan2j(y: f32, x: f32) -> f32 { if (x == 0.0 && y == 0.0) { return select(0.0, PI, (bitcast<u32>(x) >> 31u) == 1u) * select(1.0, -1.0, (bitcast<u32>(y) >> 31u) == 1u); } return atan2(y, x); }`,
     code: (w, _p) => `{
 var abs_v: f32 = length(vec2f(t.y, z_));
 var s: f32 = sin(abs_v);
@@ -11228,6 +13093,8 @@ pz_ += ((((nstcv * B) * z_) + ((C * z_) * ctcv)) * ni);
   "cscq": {
     params: [],
     verified: true, priority: 0, flags: ["3d","z"], types: ["3D"],
+    funcNames: ["atan2j"],
+    funcs: `fn atan2j(y: f32, x: f32) -> f32 { if (x == 0.0 && y == 0.0) { return select(0.0, PI, (bitcast<u32>(x) >> 31u) == 1u) * select(1.0, -1.0, (bitcast<u32>(y) >> 31u) == 1u); } return atan2(y, x); }`,
     code: (w, _p) => `{
 var abs_v: f32 = length(vec2f(t.y, z_));
 var s: f32 = sin(t.x);
@@ -11244,6 +13111,8 @@ pz_ -= (C * z_);
   "cschq": {
     params: [],
     verified: true, priority: 0, flags: ["3d","z"], types: ["3D"],
+    funcNames: ["atan2j"],
+    funcs: `fn atan2j(y: f32, x: f32) -> f32 { if (x == 0.0 && y == 0.0) { return select(0.0, PI, (bitcast<u32>(x) >> 31u) == 1u) * select(1.0, -1.0, (bitcast<u32>(y) >> 31u) == 1u); } return atan2(y, x); }`,
     code: (w, _p) => `{
 var abs_v: f32 = length(vec2f(t.y, z_));
 var s: f32 = sin(abs_v);
@@ -11257,9 +13126,27 @@ v.y -= (C * t.y);
 pz_ -= (C * z_);
 }`,
   },
+  "estiq": {
+    params: [],
+    verified: true, priority: 0, flags: ["3d","z"], types: ["3D"],
+    funcNames: ["atan2j"],
+    funcs: `fn atan2j(y: f32, x: f32) -> f32 { if (x == 0.0 && y == 0.0) { return select(0.0, PI, (bitcast<u32>(x) >> 31u) == 1u) * select(1.0, -1.0, (bitcast<u32>(y) >> 31u) == 1u); } return atan2(y, x); }`,
+    code: (w, _p) => `{
+var e: f32 = exp(t.x);
+var abs_v: f32 = length(vec2f(t.y, z_));
+var s: f32 = sin(abs_v);
+var c: f32 = cos(abs_v);
+var a: f32 = ((e * s) / abs_v);
+v.x += ((${w} * e) * c);
+v.y += ((${w} * a) * t.y);
+pz_ += ((${w} * a) * z_);
+}`,
+  },
   "secq": {
     params: [],
     verified: true, priority: 0, flags: ["3d","z"], types: ["3D"],
+    funcNames: ["atan2j"],
+    funcs: `fn atan2j(y: f32, x: f32) -> f32 { if (x == 0.0 && y == 0.0) { return select(0.0, PI, (bitcast<u32>(x) >> 31u) == 1u) * select(1.0, -1.0, (bitcast<u32>(y) >> 31u) == 1u); } return atan2(y, x); }`,
     code: (w, _p) => `{
 var abs_v: f32 = length(vec2f(t.y, z_));
 var s: f32 = sin(-t.x);
@@ -11276,6 +13163,8 @@ pz_ -= (C * z_);
   "sechq": {
     params: [],
     verified: true, priority: 0, flags: ["3d","z"], types: ["3D"],
+    funcNames: ["atan2j"],
+    funcs: `fn atan2j(y: f32, x: f32) -> f32 { if (x == 0.0 && y == 0.0) { return select(0.0, PI, (bitcast<u32>(x) >> 31u) == 1u) * select(1.0, -1.0, (bitcast<u32>(y) >> 31u) == 1u); } return atan2(y, x); }`,
     code: (w, _p) => `{
 var abs_v: f32 = length(vec2f(t.y, z_));
 var s: f32 = sin(abs_v);
@@ -11292,10 +13181,12 @@ pz_ -= (C * z_);
   "loq": {
     params: [{ name: "base", def: 2.718281828459045 }],
     verified: true, priority: 0, flags: ["3d","z"], types: ["3D"],
+    funcNames: ["atan2j"],
+    funcs: `fn atan2j(y: f32, x: f32) -> f32 { if (x == 0.0 && y == 0.0) { return select(0.0, PI, (bitcast<u32>(x) >> 31u) == 1u) * select(1.0, -1.0, (bitcast<u32>(y) >> 31u) == 1u); } return atan2(y, x); }`,
     code: (w, p) => `{
 var denom: f32 = ((0.5 * ${w}) / log(${p[0]}));
 var abs_v: f32 = length(vec2f(t.y, z_));
-var C: f32 = ((${w} * atan2(abs_v, t.x)) / abs_v);
+var C: f32 = ((${w} * atan2j(abs_v, t.x)) / abs_v);
 v.x += (log(((t.x * t.x) + (abs_v * abs_v))) * denom);
 v.y += (C * t.y);
 pz_ += (C * z_);
@@ -11304,6 +13195,8 @@ pz_ += (C * z_);
   "spirograph3D": {
     params: [{ name: "a", def: 1 }, { name: "b", def: -0.3 }, { name: "c", def: 0.4 }, { name: "tmin", def: 0 }, { name: "tmax", def: 1000 }, { name: "width", def: 0 }, { name: "mode", def: 0 }, { name: "direct_color", def: 0 }],
     verified: true, priority: 0, flags: ["3d","dc","z"], types: ["3D","DC"],
+    funcNames: ["atan2j"],
+    funcs: `fn atan2j(y: f32, x: f32) -> f32 { if (x == 0.0 && y == 0.0) { return select(0.0, PI, (bitcast<u32>(x) >> 31u) == 1u) * select(1.0, -1.0, (bitcast<u32>(y) >> 31u) == 1u); } return atan2(y, x); }`,
     code: (w, p) => `{
 var t_: f32 = (((${p[4]} - ${p[3]}) * rnd(rs)) + ${p[3]});
 var w1: f32;
@@ -11356,6 +13249,8 @@ if ((min(max(${p[7]}, 0.0), 1.0) != 0)) {
   "hypershift": {
     params: [{ name: "shift", def: 2 }, { name: "stretch", def: 1 }],
     verified: true, priority: 0, flags: [], types: ["2D"],
+    funcNames: ["atan2j"],
+    funcs: `fn atan2j(y: f32, x: f32) -> f32 { if (x == 0.0 && y == 0.0) { return select(0.0, PI, (bitcast<u32>(x) >> 31u) == 1u) * select(1.0, -1.0, (bitcast<u32>(y) >> 31u) == 1u); } return atan2(y, x); }`,
     code: (w, p) => `{
 var scale: f32 = (1 - (${p[0]} * ${p[0]}));
 var rad: f32 = (1 / ((t.x * t.x) + (t.y * t.y)));
@@ -11369,6 +13264,8 @@ v.y += ((rad * y) * ${p[1]});
   "d_spherical": {
     params: [{ name: "d_spher_weight", def: 0.5 }],
     verified: true, priority: 0, flags: [], types: ["2D"],
+    funcNames: ["atan2j"],
+    funcs: `fn atan2j(y: f32, x: f32) -> f32 { if (x == 0.0 && y == 0.0) { return select(0.0, PI, (bitcast<u32>(x) >> 31u) == 1u) * select(1.0, -1.0, (bitcast<u32>(y) >> 31u) == 1u); } return atan2(y, x); }`,
     code: (w, p) => `{
 if ((rnd(rs) < ${p[0]})) {
   var r_: f32 = (${w} / ((t.x * t.x) + (t.y * t.y)));
@@ -11383,13 +13280,15 @@ if ((rnd(rs) < ${p[0]})) {
   "circular": {
     params: [{ name: "angle", def: 90 }, { name: "seed", def: 0 }],
     verified: true, priority: 0, flags: [], types: ["2D"],
+    funcNames: ["atan2j"],
+    funcs: `fn atan2j(y: f32, x: f32) -> f32 { if (x == 0.0 && y == 0.0) { return select(0.0, PI, (bitcast<u32>(x) >> 31u) == 1u) * select(1.0, -1.0, (bitcast<u32>(y) >> 31u) == 1u); } return atan2(y, x); }`,
     code: (w, p) => `{
 var c_a: f32 = ((${p[0]} * PI) / 180.0);
 var aux: f32 = (sin((((t.x * 12.9898) + (t.y * 78.233)) + ${p[1]})) * 43758.5453);
 aux = (aux - f32(i32(aux)));
 var rnd_: f32 = (((2 * (rnd(rs) + aux)) - 2.0) * c_a);
 var rad: f32 = sqrt(((t.x * t.x) + (t.y * t.y)));
-var ang: f32 = atan2(t.y, t.x);
+var ang: f32 = atan2j(t.y, t.x);
 var by: f32 = sin((ang + rnd_));
 var bx: f32 = cos((ang + rnd_));
 v.x += (${w} * (bx * rad));
@@ -11399,24 +13298,60 @@ v.y += (${w} * (by * rad));
   "circular2": {
     params: [{ name: "angle", def: 90 }, { name: "seed", def: 0 }, { name: "xx", def: 12.9898 }, { name: "yy", def: 78.233 }],
     verified: true, priority: 0, flags: [], types: ["2D"],
+    funcNames: ["atan2j"],
+    funcs: `fn atan2j(y: f32, x: f32) -> f32 { if (x == 0.0 && y == 0.0) { return select(0.0, PI, (bitcast<u32>(x) >> 31u) == 1u) * select(1.0, -1.0, (bitcast<u32>(y) >> 31u) == 1u); } return atan2(y, x); }`,
     code: (w, p) => `{
 var c_a: f32 = ((${p[0]} * PI) / 180.0);
 var aux: f32 = (sin((((t.x * ${p[2]}) + (t.y * ${p[3]})) + ${p[1]})) * 43758.5453);
 aux = (aux - f32(i32(aux)));
 var rnd_: f32 = (((2 * (rnd(rs) + aux)) - 2.0) * c_a);
 var rad: f32 = sqrt(((t.x * t.x) + (t.y * t.y)));
-var ang: f32 = atan2(t.y, t.x);
+var ang: f32 = atan2j(t.y, t.x);
 var by: f32 = sin((ang + rnd_));
 var bx: f32 = cos((ang + rnd_));
 v.x += (${w} * (bx * rad));
 v.y += (${w} * (by * rad));
 }`,
   },
+  "erf": {
+    params: [],
+    verified: true, priority: 0, flags: ["z"], types: ["2D"],
+    funcNames: ["erf","atan2j"],
+    funcs: `fn erf(x: f32) -> f32 { let s = sign(x); let a = abs(x); let t = 1.0 / (1.0 + 0.3275911 * a);
+  let y = 1.0 - (((((1.061405429 * t - 1.453152027) * t) + 1.421413741) * t - 0.284496736) * t + 0.254829592) * t * exp(-a * a);
+  return s * y; }
+
+fn atan2j(y: f32, x: f32) -> f32 { if (x == 0.0 && y == 0.0) { return select(0.0, PI, (bitcast<u32>(x) >> 31u) == 1u) * select(1.0, -1.0, (bitcast<u32>(y) >> 31u) == 1u); } return atan2(y, x); }`,
+    code: (w, _p) => `{
+v.x += (erf(t.x) * ${w});
+v.y += (erf(t.y) * ${w});
+if (false) {
+  pz_ += (${w} * z_);
+}
+}`,
+  },
+  "erf3D": {
+    params: [],
+    verified: true, priority: 0, flags: ["3d","z"], types: ["3D"],
+    funcNames: ["erf","atan2j"],
+    funcs: `fn erf(x: f32) -> f32 { let s = sign(x); let a = abs(x); let t = 1.0 / (1.0 + 0.3275911 * a);
+  let y = 1.0 - (((((1.061405429 * t - 1.453152027) * t) + 1.421413741) * t - 0.284496736) * t + 0.254829592) * t * exp(-a * a);
+  return s * y; }
+
+fn atan2j(y: f32, x: f32) -> f32 { if (x == 0.0 && y == 0.0) { return select(0.0, PI, (bitcast<u32>(x) >> 31u) == 1u) * select(1.0, -1.0, (bitcast<u32>(y) >> 31u) == 1u); } return atan2(y, x); }`,
+    code: (w, _p) => `{
+v.x += (erf(t.x) * ${w});
+v.y += (erf(t.y) * ${w});
+pz_ += (erf(z_) * ${w});
+}`,
+  },
   "xerf": {
     params: [],
     verified: true, priority: 0, flags: ["3d","z"], types: ["3D"],
-    funcNames: ["xerf_erf"],
-    funcs: `fn xerf_erf(z: f32) -> f32 {
+    funcNames: ["atan2j","xerf_erf"],
+    funcs: `fn atan2j(y: f32, x: f32) -> f32 { if (x == 0.0 && y == 0.0) { return select(0.0, PI, (bitcast<u32>(x) >> 31u) == 1u) * select(1.0, -1.0, (bitcast<u32>(y) >> 31u) == 1u); } return atan2(y, x); }
+
+fn xerf_erf(z: f32) -> f32 {
   var t_: f32 = (1.0 / (1.0 + (0.5 * abs(z))));
   var ans: f32 = (1 - (t_ * exp((((-z * z) - 1.26551223) + (t_ * (1.00002368 + (t_ * (0.37409196 + (t_ * (0.09678418 + (t_ * (-0.18628806 + (t_ * (0.27886807 + (t_ * (-1.13520398 + (t_ * (1.48851587 + (t_ * (-0.82215223 + (t_ * 0.17087277)))))))))))))))))))));
   if ((z >= 0)) {
@@ -11435,11 +13370,52 @@ v.y += (select(xerf_erf(t.y), (t.y / r2_), (abs(t.y) >= 2.0)) * ${w});
 pz_ += (select(xerf_erf(z_), (z_ / r2_), (abs(z_) >= 2.0)) * ${w});
 }`,
   },
+  "pressure_wave": {
+    params: [{ name: "x_freq", def: 1 }, { name: "y_freq", def: 1 }],
+    verified: true, priority: 0, flags: ["z"], types: ["2D","PRE"],
+    funcNames: ["atan2j"],
+    funcs: `fn atan2j(y: f32, x: f32) -> f32 { if (x == 0.0 && y == 0.0) { return select(0.0, PI, (bitcast<u32>(x) >> 31u) == 1u) * select(1.0, -1.0, (bitcast<u32>(y) >> 31u) == 1u); } return atan2(y, x); }`,
+    code: (w, p) => `{
+var p0_: f32 = ${p[0]};
+var p1_: f32 = ${p[1]};
+var pwx: f32 = 1.0;
+var pwy: f32 = 1.0;
+var ipwx: f32 = 1.0;
+var ipwy: f32 = 1.0;
+{
+  p0_ = p0_;
+  if ((p0_ == 0.0)) {
+    pwx = 1.0;
+    ipwx = pwx;
+  } else {
+    pwx = (p0_ * (2.0 * PI));
+    ipwx = (1.0 / pwx);
+  }
+}
+{
+  p1_ = p1_;
+  if ((p1_ == 0.0)) {
+    pwy = 1.0;
+    ipwy = pwy;
+  } else {
+    pwy = (p1_ * (2.0 * PI));
+    ipwy = (1.0 / pwy);
+  }
+}
+v.x += (${w} * (t.x + (ipwx * sin((pwx * t.x)))));
+v.y += (${w} * (t.y + (ipwy * sin((pwy * t.y)))));
+if (false) {
+  pz_ += (${w} * z_);
+}
+}`,
+  },
   "atan": {
     params: [{ name: "Mode", def: 0 }, { name: "Stretch", def: 1 }],
     verified: true, priority: 0, flags: [], types: ["2D"],
-    funcNames: ["roundc"],
-    funcs: `fn roundc(x: f32) -> f32 { return sign(x) * floor(abs(x) + 0.5); }`,
+    funcNames: ["roundc","atan2j"],
+    funcs: `fn roundc(x: f32) -> f32 { return sign(x) * floor(abs(x) + 0.5); }
+
+fn atan2j(y: f32, x: f32) -> f32 { if (x == 0.0 && y == 0.0) { return select(0.0, PI, (bitcast<u32>(x) >> 31u) == 1u) * select(1.0, -1.0, (bitcast<u32>(y) >> 31u) == 1u); } return atan2(y, x); }`,
     code: (w, p) => `{
 var norm: f32 = ((1.0 / (PI * 0.5)) * ${w});
 switch i32(roundc(min(max(${p[0]}, 0.0), 2.0))) {
@@ -11460,13 +13436,28 @@ switch i32(roundc(min(max(${p[0]}, 0.0), 2.0))) {
 }
 }`,
   },
+  "helix": {
+    params: [{ name: "frequency", def: 1 }, { name: "width", def: 0.5 }],
+    verified: true, priority: 0, flags: ["3d","z"], types: ["3D"],
+    funcNames: ["atan2j"],
+    funcs: `fn atan2j(y: f32, x: f32) -> f32 { if (x == 0.0 && y == 0.0) { return select(0.0, PI, (bitcast<u32>(x) >> 31u) == 1u) * select(1.0, -1.0, (bitcast<u32>(y) >> 31u) == 1u); } return atan2(y, x); }`,
+    code: (w, p) => `{
+var s: f32 = sin(((z_ * (2.0 * PI)) * ${p[0]}));
+var c: f32 = cos(((z_ * (2.0 * PI)) * ${p[0]}));
+v.x += (${w} * (t.x + (c * ${p[1]})));
+v.y += (${w} * (t.y + (s * ${p[1]})));
+pz_ += (${w} * z_);
+}`,
+  },
   "helicoid": {
     params: [{ name: "frequency", def: 1 }],
     verified: true, priority: 0, flags: ["3d","z"], types: ["3D"],
+    funcNames: ["atan2j"],
+    funcs: `fn atan2j(y: f32, x: f32) -> f32 { if (x == 0.0 && y == 0.0) { return select(0.0, PI, (bitcast<u32>(x) >> 31u) == 1u) * select(1.0, -1.0, (bitcast<u32>(y) >> 31u) == 1u); } return atan2(y, x); }`,
     code: (w, p) => `{
 var range: f32 = sqrt(((t.x * t.x) + (t.y * t.y)));
-var s: f32 = sin((((z_ * (2.0 * PI)) * ${p[0]}) + atan2(t.y, t.x)));
-var c: f32 = cos((((z_ * (2.0 * PI)) * ${p[0]}) + atan2(t.y, t.x)));
+var s: f32 = sin((((z_ * (2.0 * PI)) * ${p[0]}) + atan2j(t.y, t.x)));
+var c: f32 = cos((((z_ * (2.0 * PI)) * ${p[0]}) + atan2j(t.y, t.x)));
 v.x += ((${w} * c) * range);
 v.y += ((${w} * s) * range);
 pz_ += (${w} * z_);
@@ -11475,20 +13466,24 @@ pz_ += (${w} * z_);
   "gamma": {
     params: [],
     verified: true, priority: 0, flags: [], types: ["2D"],
-    funcNames: ["gamma_lgamma"],
-    funcs: `fn gamma_lgamma(x: f32) -> f32 {
+    funcNames: ["atan2j","gamma_lgamma"],
+    funcs: `fn atan2j(y: f32, x: f32) -> f32 { if (x == 0.0 && y == 0.0) { return select(0.0, PI, (bitcast<u32>(x) >> 31u) == 1u) * select(1.0, -1.0, (bitcast<u32>(y) >> 31u) == 1u); } return atan2(y, x); }
+
+fn gamma_lgamma(x: f32) -> f32 {
   var tmp: f32 = (((x - 0.5) * log((x + 4.5))) - (x + 4.5));
   var ser: f32 = ((((((1.0 + (76.18009173 / (x + 0.0))) - (86.50532033 / (x + 1.0))) + (24.01409822 / (x + 2.0))) - (1.231739516 / (x + 3.0))) + (0.00120858003 / (x + 4.0))) - (0.00000536382 / (x + 5.0)));
   return (tmp + log((ser * sqrt((2.0 * PI)))));
 }`,
     code: (w, _p) => `{
 v.x += (gamma_lgamma(length(vec2f(t.y, t.x))) * ${w});
-v.y += (atan2(t.y, t.x) * ${w});
+v.y += (atan2j(t.y, t.x) * ${w});
 }`,
   },
   "shift": {
     params: [{ name: "shift_x", def: 0.1 }, { name: "shift_y", def: 0.06 }, { name: "angle", def: 12.25 }],
     verified: true, priority: 0, flags: [], types: ["2D"],
+    funcNames: ["atan2j"],
+    funcs: `fn atan2j(y: f32, x: f32) -> f32 { if (x == 0.0 && y == 0.0) { return select(0.0, PI, (bitcast<u32>(x) >> 31u) == 1u) * select(1.0, -1.0, (bitcast<u32>(y) >> 31u) == 1u); } return atan2(y, x); }`,
     code: (w, p) => `{
 var ang: f32 = ((${p[2]} / 180.0) * PI);
 var sn: f32 = sin(ang);
@@ -11500,6 +13495,8 @@ v.y += (${w} * ((t.y - (cs * ${p[1]})) - (sn * ${p[0]})));
   "chunk": {
     params: [{ name: "a", def: 1 }, { name: "b", def: 0 }, { name: "c", def: 1 }, { name: "d", def: 0 }, { name: "e", def: 0 }, { name: "f", def: -1 }, { name: "mode", def: 0 }],
     verified: true, priority: 0, flags: [], types: ["2D"],
+    funcNames: ["atan2j"],
+    funcs: `fn atan2j(y: f32, x: f32) -> f32 { if (x == 0.0 && y == 0.0) { return select(0.0, PI, (bitcast<u32>(x) >> 31u) == 1u) * select(1.0, -1.0, (bitcast<u32>(y) >> 31u) == 1u); } return atan2(y, x); }`,
     code: (w, p) => `{
 var aa: f32 = (${w} * ${p[0]});
 var bb: f32 = (${w} * ${p[1]});
@@ -11529,14 +13526,16 @@ switch i32(min(max(${p[6]}, 0.0), 1.0)) {
   "crob": {
     params: [{ name: "top", def: -1 }, { name: "bottom", def: 1 }, { name: "left", def: -1 }, { name: "right", def: 1 }, { name: "blur", def: 1 }, { name: "ratioBlur", def: 0.05 }, { name: "directBlur", def: 2 }],
     verified: true, priority: 0, flags: [], types: ["CROP"],
-    funcNames: ["powc"],
+    funcNames: ["powc","atan2j"],
     funcs: `fn powc(x: f32, y: f32) -> f32 {
   if (x >= 0.0) { return pow(x, y); }
   let yi = round(y);
   if (abs(y - yi) > 1e-6) { return pow(x, y); }
   let m = pow(-x, y);
   return select(m, -m, (i32(yi) & 1) != 0);
-}`,
+}
+
+fn atan2j(y: f32, x: f32) -> f32 { if (x == 0.0 && y == 0.0) { return select(0.0, PI, (bitcast<u32>(x) >> 31u) == 1u) * select(1.0, -1.0, (bitcast<u32>(y) >> 31u) == 1u); } return atan2(y, x); }`,
     code: (_w, p) => `{
 var top_border: f32;
 var bottom_border: f32;
@@ -11669,7 +13668,7 @@ v.y += yTmp;
   "hole2": {
     params: [{ name: "a", def: 1 }, { name: "b", def: 2 }, { name: "c", def: 1 }, { name: "d", def: 1 }, { name: "inside", def: 0 }, { name: "shape", def: 0 }],
     verified: true, priority: 0, flags: [], types: ["2D"],
-    funcNames: ["roundc","powc"],
+    funcNames: ["roundc","powc","atan2j"],
     funcs: `fn roundc(x: f32) -> f32 { return sign(x) * floor(abs(x) + 0.5); }
 
 fn powc(x: f32, y: f32) -> f32 {
@@ -11678,7 +13677,9 @@ fn powc(x: f32, y: f32) -> f32 {
   if (abs(y - yi) > 1e-6) { return pow(x, y); }
   let m = pow(-x, y);
   return select(m, -m, (i32(yi) & 1) != 0);
-}`,
+}
+
+fn atan2j(y: f32, x: f32) -> f32 { if (x == 0.0 && y == 0.0) { return select(0.0, PI, (bitcast<u32>(x) >> 31u) == 1u) * select(1.0, -1.0, (bitcast<u32>(y) >> 31u) == 1u); } return atan2(y, x); }`,
     code: (w, p) => `{
 var inside: i32 = i32(roundc(min(max(${p[4]}, 0.0), 1.0)));
 var shape: i32 = i32(roundc(min(max(${p[5]}, 0.0), 9.0)));
@@ -11731,8 +13732,10 @@ v.y += (r1 * sin(theta));
   "cpow2": {
     params: [{ name: "r", def: 1 }, { name: "a", def: 0 }, { name: "divisor", def: 1 }, { name: "range", def: 1 }],
     verified: true, priority: 0, flags: [], types: ["2D"],
-    funcNames: ["roundc"],
-    funcs: `fn roundc(x: f32) -> f32 { return sign(x) * floor(abs(x) + 0.5); }`,
+    funcNames: ["roundc","atan2j"],
+    funcs: `fn roundc(x: f32) -> f32 { return sign(x) * floor(abs(x) + 0.5); }
+
+fn atan2j(y: f32, x: f32) -> f32 { if (x == 0.0 && y == 0.0) { return select(0.0, PI, (bitcast<u32>(x) >> 31u) == 1u) * select(1.0, -1.0, (bitcast<u32>(y) >> 31u) == 1u); } return atan2(y, x); }`,
     code: (w, p) => `{
 var range: i32 = i32(roundc(${p[3]}));
 var ang: f32 = ((2.0 * PI) / ${p[2]});
@@ -11761,6 +13764,8 @@ v.y += (r_ * sin(th_));
   "gridout": {
     params: [],
     verified: true, priority: 0, flags: [], types: ["2D"],
+    funcNames: ["atan2j"],
+    funcs: `fn atan2j(y: f32, x: f32) -> f32 { if (x == 0.0 && y == 0.0) { return select(0.0, PI, (bitcast<u32>(x) >> 31u) == 1u) * select(1.0, -1.0, (bitcast<u32>(y) >> 31u) == 1u); } return atan2(y, x); }`,
     code: (w, _p) => `{
 var x: f32 = f32(select(i32((t.x - 0.5)), i32((t.x + 0.5)), (t.x >= 0.0)));
 var y: f32 = f32(select(i32((t.y - 0.5)), i32((t.y + 0.5)), (t.y >= 0.0)));
@@ -11806,6 +13811,8 @@ if ((y <= 0.0)) {
   "gridout2": {
     params: [{ name: "a", def: 1 }, { name: "b", def: 1 }, { name: "c", def: 1 }, { name: "d", def: 1 }],
     verified: true, priority: 0, flags: [], types: ["2D"],
+    funcNames: ["atan2j"],
+    funcs: `fn atan2j(y: f32, x: f32) -> f32 { if (x == 0.0 && y == 0.0) { return select(0.0, PI, (bitcast<u32>(x) >> 31u) == 1u) * select(1.0, -1.0, (bitcast<u32>(y) >> 31u) == 1u); } return atan2(y, x); }`,
     code: (w, p) => `{
 var x: f32 = (round(t.x) * ${p[2]});
 var y: f32 = (round(t.y) * ${p[3]});
@@ -11851,6 +13858,8 @@ if ((y <= 0.0)) {
   "blur_linear": {
     params: [{ name: "length", def: 1 }, { name: "angle", def: 0.5 }],
     verified: true, priority: 0, flags: [], types: ["BLUR"],
+    funcNames: ["atan2j"],
+    funcs: `fn atan2j(y: f32, x: f32) -> f32 { if (x == 0.0 && y == 0.0) { return select(0.0, PI, (bitcast<u32>(x) >> 31u) == 1u) * select(1.0, -1.0, (bitcast<u32>(y) >> 31u) == 1u); } return atan2(y, x); }`,
     code: (w, p) => `{
 var cosa: f32;
 var sina: f32;
@@ -11864,6 +13873,8 @@ v.y += (${w} * (t.y + (r_ * sina)));
   "sigmoid": {
     params: [{ name: "shiftx", def: 1 }, { name: "shifty", def: 1 }],
     verified: true, priority: 0, flags: [], types: ["2D"],
+    funcNames: ["atan2j"],
+    funcs: `fn atan2j(y: f32, x: f32) -> f32 { if (x == 0.0 && y == 0.0) { return select(0.0, PI, (bitcast<u32>(x) >> 31u) == 1u) * select(1.0, -1.0, (bitcast<u32>(y) >> 31u) == 1u); } return atan2(y, x); }`,
     code: (w, p) => `{
 var ax: f32 = 1.0;
 var ay: f32 = 1.0;
@@ -11899,7 +13910,7 @@ v.y += (vv * y);
   "dc_cracklep_wf": {
     params: [{ name: "preset", def: 0 }, { name: "cellsize", def: 1 }, { name: "power", def: 0.2 }, { name: "distort", def: 0 }, { name: "scale", def: 1 }, { name: "z", def: 0 }, { name: "color_scale", def: 0.5 }, { name: "color_offset", def: 0 }],
     verified: true, priority: 0, flags: ["dc","stateful"], types: ["2D","SIMULATION","DC"],
-    funcNames: ["powc","F3","fastFloor","G3","G33","X_PRIME","Y_PRIME","Z_PRIME","GRAD_3D_x","GRAD_3D_y","GRAD_3D_z","gradCoord3D","singleSimplex","jw_state0_dc_cracklep_wf_position","jw_state0_dc_cracklep_wf_closest","jw_state0_dc_cracklep_wf_vratio","jw_state0_dc_cracklep_wf_voronoi"],
+    funcNames: ["powc","atan2j","F3","fastFloor","G3","G33","X_PRIME","Y_PRIME","Z_PRIME","GRAD_3D_x","GRAD_3D_y","GRAD_3D_z","gradCoord3D","singleSimplex","jw_state0_dc_cracklep_wf_position","jw_state0_dc_cracklep_wf_closest","jw_state0_dc_cracklep_wf_vratio","jw_state0_dc_cracklep_wf_voronoi"],
     funcs: `fn powc(x: f32, y: f32) -> f32 {
   if (x >= 0.0) { return pow(x, y); }
   let yi = round(y);
@@ -11907,6 +13918,8 @@ v.y += (vv * y);
   let m = pow(-x, y);
   return select(m, -m, (i32(yi) & 1) != 0);
 }
+
+fn atan2j(y: f32, x: f32) -> f32 { if (x == 0.0 && y == 0.0) { return select(0.0, PI, (bitcast<u32>(x) >> 31u) == 1u) * select(1.0, -1.0, (bitcast<u32>(y) >> 31u) == 1u); } return atan2(y, x); }
 
 const F3: f32 = (1.0 / 3.0);
 
@@ -12165,8 +14178,10 @@ if ((abs(${p[1]}) > 0.000001)) {
   "minkQM": {
     params: [{ name: "a", def: 1 }, { name: "b", def: 1 }, { name: "c", def: 1 }, { name: "dd", def: 1 }, { name: "e", def: 0.5 }, { name: "f", def: 20 }],
     verified: true, priority: 0, flags: [], types: ["2D"],
-    funcNames: ["minkQM_minkowski"],
-    funcs: `fn minkQM_minkowski(x: f32, a: f32, b: f32, c: f32, dd: f32, e: f32, f: f32) -> f32 {
+    funcNames: ["atan2j","minkQM_minkowski"],
+    funcs: `fn atan2j(y: f32, x: f32) -> f32 { if (x == 0.0 && y == 0.0) { return select(0.0, PI, (bitcast<u32>(x) >> 31u) == 1u) * select(1.0, -1.0, (bitcast<u32>(y) >> 31u) == 1u); } return atan2(y, x); }
+
+fn minkQM_minkowski(x: f32, a: f32, b: f32, c: f32, dd: f32, e: f32, f: f32) -> f32 {
   var p_: f32 = 0;
   var q: f32 = a;
   var r_: f32 = (p_ + b);
@@ -12222,8 +14237,10 @@ v.y += (${w} * mnkY);
   "minkowskope": {
     params: [{ name: "separation", def: 0.5 }, { name: "frequencyx", def: -2 }, { name: "frequencyy", def: 2 }, { name: "amplitude", def: 0.5 }, { name: "perturbation", def: 1 }, { name: "damping", def: 0 }],
     verified: true, priority: 0, flags: [], types: ["2D"],
-    funcNames: ["minkowski","minkosine","minkocosine"],
-    funcs: `fn minkowski(x: f32) -> f32 {
+    funcNames: ["atan2j","minkowski","minkosine","minkocosine"],
+    funcs: `fn atan2j(y: f32, x: f32) -> f32 { if (x == 0.0 && y == 0.0) { return select(0.0, PI, (bitcast<u32>(x) >> 31u) == 1u) * select(1.0, -1.0, (bitcast<u32>(y) >> 31u) == 1u); } return atan2(y, x); }
+
+fn minkowski(x: f32) -> f32 {
   var p_: f32 = 0.0;
   var q: f32 = 1.0;
   var r_: f32 = (p_ + 1.0);
@@ -12294,8 +14311,10 @@ if ((abs(t.y) <= t_)) {
   "r_circleblur": {
     params: [{ name: "n", def: 1 }, { name: "seed", def: 0 }, { name: "dist", def: 0.5 }, { name: "min", def: 0.1 }, { name: "max", def: 1 }],
     verified: true, priority: 0, flags: [], types: ["BASE_SHAPE","BLUR"],
-    funcNames: ["roundc","df_add","op_","df_qts","df_ts","df_mulf","hsin_","df_mul","df_sin","df_cos"],
-    funcs: `fn roundc(x: f32) -> f32 { return sign(x) * floor(abs(x) + 0.5); }
+    funcNames: ["atan2j","roundc","df_add","op_","df_qts","df_ts","df_mulf","hsin_","df_mul","df_sin","df_cos"],
+    funcs: `fn atan2j(y: f32, x: f32) -> f32 { if (x == 0.0 && y == 0.0) { return select(0.0, PI, (bitcast<u32>(x) >> 31u) == 1u) * select(1.0, -1.0, (bitcast<u32>(y) >> 31u) == 1u); } return atan2(y, x); }
+
+fn roundc(x: f32) -> f32 { return sign(x) * floor(abs(x) + 0.5); }
 
 fn df_add(x: vec2f, y: vec2f) -> vec2f { var s = df_ts(x.x, y.x); let t = df_ts(x.y, y.y); s.y = op_(s.y + t.x); s = df_qts(s.x, s.y); s.y = op_(s.y + t.y); return df_qts(s.x, s.y); }
 
@@ -12354,7 +14373,7 @@ fn df_cos(x: vec2f) -> vec2f {
 }`,
     code: (w, p) => `{
 var rcn: f32 = abs(${p[0]});
-var angle: f32 = atan2(t.y, t.x);
+var angle: f32 = atan2j(t.y, t.x);
 var rad: f32 = sqrt(((t.x * t.x) + (t.y * t.y)));
 rad = (rad % rcn);
 var by: f32 = sin((angle + rad));
@@ -12377,10 +14396,410 @@ v.x += (${w} * bx);
 v.y += (${w} * by);
 }`,
   },
+  "truchet_ae": {
+    params: [{ name: "seed", def: 0 }, { name: "step", def: 0.5 }, { name: "width", def: 0.25 }, { name: "angle", def: 0 }, { name: "layout", def: 0 }, { name: "style", def: 0 }, { name: "K01A", def: 0.5 }, { name: "K02A", def: 0.5 }, { name: "K01B", def: 0.5 }, { name: "K02B", def: 0.5 }, { name: "K11A", def: 0.5 }, { name: "K12A", def: 0.5 }, { name: "K11B", def: 0.5 }, { name: "K12B", def: 0.5 }, { name: "K21A", def: 0.5 }, { name: "K22A", def: 0.5 }, { name: "K21B", def: 0.5 }, { name: "K22B", def: 0.5 }, { name: "K31A", def: 0.5 }, { name: "K32A", def: 0.5 }, { name: "K31B", def: 0.5 }, { name: "K32B", def: 0.5 }],
+    verified: true, priority: 0, flags: ["dc","state","z"], types: ["BASE_SHAPE","DC","SIMULATION"],
+    funcNames: ["jwx_truchet_ae_inited_","jwx_truchet_ae_x","jwx_truchet_ae_y","jwx_truchet_ae_z1","jwx_truchet_ae_z2","jwx_truchet_ae_AM","atan2j","truchet_ae_fmod2","truchet_ae_dn1"],
+    funcs: `fn atan2j(y: f32, x: f32) -> f32 { if (x == 0.0 && y == 0.0) { return select(0.0, PI, (bitcast<u32>(x) >> 31u) == 1u) * select(1.0, -1.0, (bitcast<u32>(y) >> 31u) == 1u); } return atan2(y, x); }
+
+fn truchet_ae_fmod2(num: f32, den: f32) -> f32 {
+  var tmp: f32 = (num % den);
+  if (((tmp < 0) && (den > 0))) {
+    tmp += den;
+  }
+  return tmp;
+}
+
+fn truchet_ae_dn1(x: i32) -> f32 {
+  var n: i32 = x;
+  n = ((n << 13) ^ n);
+  return (f32((((n * (((n * n) * 15731) + 789221)) + 1376312589) & 2147483647)) * jwx_truchet_ae_AM);
+}
+
+var<private> jwx_truchet_ae_inited_: f32 = 0.0;
+
+var<private> jwx_truchet_ae_x: f32 = 0.0;
+
+var<private> jwx_truchet_ae_y: f32 = 0.0;
+
+var<private> jwx_truchet_ae_z1: f32 = 0.0;
+
+var<private> jwx_truchet_ae_z2: f32 = 0.0;
+
+var<private> jwx_truchet_ae_AM: f32 = 0.0;`,
+    code: (w, p) => `{
+var p3_: f32 = ${p[3]};
+var M_SQ3_2: f32 = 0.8660254037844386;
+var sinang: f32 = 0;
+var cosang: f32 = 0;
+if ((jwx_truchet_ae_inited_ == 0.0)) {
+  jwx_truchet_ae_inited_ = 1.0;
+  jwx_truchet_ae_AM = (1.0 / 2147483647);
+  jwx_truchet_ae_x = 0.0;
+  jwx_truchet_ae_y = 0.0;
+  jwx_truchet_ae_z1 = 0.0;
+  jwx_truchet_ae_z2 = 0.0;
+}
+jwx_truchet_ae_AM = (1.0 / 2147483647);
+{
+  p3_ = p3_;
+  sinang = sin((p3_ * PI));
+  cosang = cos((p3_ * PI));
+}
+var u1: f32 = 0;
+var v1: f32 = 0;
+var z: f32 = 0.0;
+var i: i32 = i32(floor((4 * rnd(rs))));
+if ((min(max(${p[4]}, 0.0), 4.0) == 1)) {
+  switch i {
+    case 0: {
+      u1 = ((-jwx_truchet_ae_x * 0.5) + 1.0);
+      v1 = ((jwx_truchet_ae_y * 0.5) + 1.0);
+      jwx_truchet_ae_z1 = truchet_ae_fmod2(((${p[6]} * jwx_truchet_ae_z1) + ${p[7]}), 1.0);
+      jwx_truchet_ae_z2 = truchet_ae_fmod2(((${p[8]} * jwx_truchet_ae_z2) + ${p[9]}), 1.0);
+    }
+    case 1: {
+      u1 = ((jwx_truchet_ae_x * 0.5) - 1.0);
+      v1 = ((jwx_truchet_ae_y * 0.5) + 1.0);
+      jwx_truchet_ae_z1 = truchet_ae_fmod2(((${p[10]} * jwx_truchet_ae_z1) + ${p[11]}), 1.0);
+      jwx_truchet_ae_z2 = truchet_ae_fmod2(((${p[12]} * jwx_truchet_ae_z2) + ${p[13]}), 1.0);
+    }
+    case 2: {
+      u1 = ((-jwx_truchet_ae_x * 0.5) + 1.0);
+      v1 = ((-jwx_truchet_ae_y * 0.5) - 1.0);
+      jwx_truchet_ae_z1 = truchet_ae_fmod2(((${p[14]} * jwx_truchet_ae_z1) + ${p[15]}), 1.0);
+      jwx_truchet_ae_z2 = truchet_ae_fmod2(((${p[16]} * jwx_truchet_ae_z2) + ${p[17]}), 0.5);
+    }
+    case 3: {
+      u1 = ((jwx_truchet_ae_x * 0.5) - 1.0);
+      v1 = ((-jwx_truchet_ae_y * 0.5) - 1.0);
+      jwx_truchet_ae_z1 = truchet_ae_fmod2(((${p[18]} * jwx_truchet_ae_z1) + ${p[19]}), 1.0);
+      jwx_truchet_ae_z2 = truchet_ae_fmod2(((${p[20]} * jwx_truchet_ae_z2) + ${p[21]}), 1.0);
+    }
+    default: {}
+  }
+} else if ((min(max(${p[4]}, 0.0), 4.0) == 2)) {
+  switch i {
+    case 0: {
+      u1 = ((jwx_truchet_ae_x * 0.5) + 1.0);
+      v1 = ((jwx_truchet_ae_y * 0.5) + 1.0);
+      jwx_truchet_ae_z1 = truchet_ae_fmod2(((${p[6]} * jwx_truchet_ae_z1) + ${p[7]}), 1.0);
+      jwx_truchet_ae_z2 = truchet_ae_fmod2(((${p[8]} * jwx_truchet_ae_z2) + ${p[9]}), 1.0);
+    }
+    case 1: {
+      u1 = ((jwx_truchet_ae_x * 0.5) - 1.0);
+      v1 = ((jwx_truchet_ae_y * 0.5) - 1.0);
+      jwx_truchet_ae_z1 = truchet_ae_fmod2(((${p[10]} * jwx_truchet_ae_z1) + ${p[11]}), 1.0);
+      jwx_truchet_ae_z2 = truchet_ae_fmod2(((${p[12]} * jwx_truchet_ae_z2) + ${p[13]}), 1.0);
+    }
+    case 2: {
+      u1 = ((jwx_truchet_ae_x * 0.5) - 1.0);
+      v1 = ((jwx_truchet_ae_y * 0.5) + 1.0);
+      jwx_truchet_ae_z1 = truchet_ae_fmod2(((${p[14]} * jwx_truchet_ae_z1) + ${p[15]}), 1.0);
+      jwx_truchet_ae_z2 = truchet_ae_fmod2(((${p[16]} * jwx_truchet_ae_z2) + ${p[17]}), 0.5);
+    }
+    case 3: {
+      u1 = ((-jwx_truchet_ae_x * 0.5) - 1.0);
+      v1 = ((-jwx_truchet_ae_y * 0.5) + 1.0);
+      jwx_truchet_ae_z1 = truchet_ae_fmod2(((${p[18]} * jwx_truchet_ae_z1) + ${p[19]}), 1.0);
+      jwx_truchet_ae_z2 = truchet_ae_fmod2(((${p[20]} * jwx_truchet_ae_z2) + ${p[21]}), 1.0);
+    }
+    default: {}
+  }
+} else if ((min(max(${p[4]}, 0.0), 4.0) == 3)) {
+  switch i {
+    case 0: {
+      u1 = (jwx_truchet_ae_x * 0.5);
+      v1 = (jwx_truchet_ae_y * 0.5);
+      jwx_truchet_ae_z1 = truchet_ae_fmod2(((${p[6]} * jwx_truchet_ae_z1) + ${p[7]}), 1.0);
+      jwx_truchet_ae_z2 = truchet_ae_fmod2(((${p[8]} * jwx_truchet_ae_z2) + ${p[9]}), 1.0);
+    }
+    case 1: {
+      u1 = ((jwx_truchet_ae_x * 0.5) - 1.0);
+      v1 = ((jwx_truchet_ae_y * 0.5) + 1.0);
+      jwx_truchet_ae_z1 = truchet_ae_fmod2(((${p[10]} * jwx_truchet_ae_z1) + ${p[11]}), 1.0);
+      jwx_truchet_ae_z2 = truchet_ae_fmod2(((${p[12]} * jwx_truchet_ae_z2) + ${p[13]}), 1.0);
+    }
+    case 2: {
+      u1 = ((-jwx_truchet_ae_y * 0.5) - 1.0);
+      v1 = ((jwx_truchet_ae_x * 0.5) - 1.0);
+      jwx_truchet_ae_z1 = truchet_ae_fmod2(((${p[14]} * jwx_truchet_ae_z1) + ${p[15]}), 1.0);
+      jwx_truchet_ae_z2 = truchet_ae_fmod2(((${p[16]} * jwx_truchet_ae_z2) + ${p[17]}), 0.5);
+    }
+    case 3: {
+      u1 = ((jwx_truchet_ae_y * 0.5) + 1.0);
+      v1 = ((-jwx_truchet_ae_x * 0.5) + 1.0);
+      jwx_truchet_ae_z1 = truchet_ae_fmod2(((${p[18]} * jwx_truchet_ae_z1) + ${p[19]}), 1.0);
+      jwx_truchet_ae_z2 = truchet_ae_fmod2(((${p[20]} * jwx_truchet_ae_z2) + ${p[21]}), 1.0);
+    }
+    default: {}
+  }
+} else if ((min(max(${p[4]}, 0.0), 4.0) == 4)) {
+  switch i {
+    case 0: {
+      u1 = ((jwx_truchet_ae_x * 0.5) + 1);
+      v1 = ((jwx_truchet_ae_y * 0.5) + M_SQ3_2);
+      jwx_truchet_ae_z1 = truchet_ae_fmod2(((${p[6]} * jwx_truchet_ae_z1) + ${p[7]}), 1.0);
+      jwx_truchet_ae_z2 = truchet_ae_fmod2(((${p[8]} * jwx_truchet_ae_z2) + ${p[9]}), 1.0);
+    }
+    case 1: {
+      u1 = ((jwx_truchet_ae_x * 0.5) - 1);
+      v1 = ((jwx_truchet_ae_y * 0.5) + M_SQ3_2);
+      jwx_truchet_ae_z1 = truchet_ae_fmod2(((${p[10]} * jwx_truchet_ae_z1) + ${p[11]}), 1.0);
+      jwx_truchet_ae_z2 = truchet_ae_fmod2(((${p[12]} * jwx_truchet_ae_z2) + ${p[13]}), 1.0);
+    }
+    case 2: {
+      u1 = (jwx_truchet_ae_x * 0.5);
+      v1 = ((jwx_truchet_ae_y * 0.5) - M_SQ3_2);
+      jwx_truchet_ae_z1 = truchet_ae_fmod2(((${p[14]} * jwx_truchet_ae_z1) + ${p[15]}), 1.0);
+      jwx_truchet_ae_z2 = truchet_ae_fmod2(((${p[16]} * jwx_truchet_ae_z2) + ${p[17]}), 0.5);
+    }
+    case 3: {
+      u1 = (jwx_truchet_ae_x * 0.5);
+      v1 = ((-jwx_truchet_ae_y * 0.5) + M_SQ3_2);
+      jwx_truchet_ae_z1 = truchet_ae_fmod2(((${p[18]} * jwx_truchet_ae_z1) + ${p[19]}), 1.0);
+      jwx_truchet_ae_z2 = truchet_ae_fmod2(((${p[20]} * jwx_truchet_ae_z2) + ${p[21]}), 1.0);
+    }
+    default: {}
+  }
+} else {
+  var j: f32;
+  switch i {
+    case 0: {
+      u1 = ((jwx_truchet_ae_x * 0.5) + 1.0);
+      v1 = ((jwx_truchet_ae_y * 0.5) + 1.0);
+      j = (v1 + 0.7);
+      if ((j > 2.0)) {
+        j = (j - 2.0);
+      }
+      v1 = j;
+      jwx_truchet_ae_z1 = truchet_ae_fmod2(((${p[6]} * jwx_truchet_ae_z1) + ${p[7]}), 1.0);
+      jwx_truchet_ae_z2 = truchet_ae_fmod2(((${p[8]} * jwx_truchet_ae_z2) + ${p[9]}), 1.0);
+    }
+    case 1: {
+      u1 = ((jwx_truchet_ae_x * 0.5) - 1.0);
+      v1 = ((jwx_truchet_ae_y * 0.5) + 1.0);
+      jwx_truchet_ae_z1 = truchet_ae_fmod2(((${p[10]} * jwx_truchet_ae_z1) + ${p[11]}), 1.0);
+      jwx_truchet_ae_z2 = truchet_ae_fmod2(((${p[12]} * jwx_truchet_ae_z2) + ${p[13]}), 1.0);
+    }
+    case 2: {
+      u1 = ((jwx_truchet_ae_x * 0.5) + 1.0);
+      v1 = ((jwx_truchet_ae_y * 0.5) - 1.0);
+      jwx_truchet_ae_z1 = truchet_ae_fmod2(((${p[14]} * jwx_truchet_ae_z1) + ${p[15]}), 1.0);
+      jwx_truchet_ae_z2 = truchet_ae_fmod2(((${p[16]} * jwx_truchet_ae_z2) + ${p[17]}), 0.5);
+    }
+    case 3: {
+      u1 = ((jwx_truchet_ae_x * 0.5) - 1.0);
+      v1 = ((jwx_truchet_ae_y * 0.5) - 1.0);
+      jwx_truchet_ae_z1 = truchet_ae_fmod2(((${p[18]} * jwx_truchet_ae_z1) + ${p[19]}), 1.0);
+      jwx_truchet_ae_z2 = truchet_ae_fmod2(((${p[20]} * jwx_truchet_ae_z2) + ${p[21]}), 1.0);
+    }
+    default: {}
+  }
+}
+var uu1: f32 = ((cosang * u1) - (sinang * v1));
+var vv1: f32 = ((sinang * u1) + (cosang * v1));
+var m: i32 = i32(floor((uu1 / ${p[1]})));
+var n: i32 = i32(floor((vv1 / ${p[1]})));
+var u: f32 = ((uu1 / ${p[1]}) - f32(m));
+var v_: f32 = ((vv1 / ${p[1]}) - f32(n));
+var chance: f32 = truchet_ae_dn1(((m + (34 * n)) + i32(${p[0]})));
+var cir: f32 = 0.0;
+var square: f32 = 0.0;
+var inv: bool = false;
+switch i32(min(max(${p[5]}, 0.0), 5.0)) {
+  case 0: {
+    if ((chance > 0.5)) {
+      if ((((v_ < ((u + 1) - ${p[2]})) && (v_ > (u + ${p[2]}))) || ((v_ < (u - ${p[2]})) && (v_ > ((u - 1) + ${p[2]}))))) {
+        z = jwx_truchet_ae_z1;
+      } else {
+        z = jwx_truchet_ae_z2;
+      }
+    } else {
+      if ((((v_ < ((-u + 1) - ${p[2]})) && (v_ > (-u + ${p[2]}))) || ((v_ > ((-u + 1) + ${p[2]})) && (v_ < ((-u + 2) - ${p[2]}))))) {
+        z = jwx_truchet_ae_z1;
+      } else {
+        z = jwx_truchet_ae_z2;
+      }
+    }
+  }
+  case 1: {
+    square = (max(abs((u - 0.5)), abs((v_ - 0.5))) - (0.5 * (1.0 - ${p[2]})));
+    if ((chance < 0.25)) {
+      if (((square < 0) != (u > v_))) {
+        z = jwx_truchet_ae_z1;
+      } else {
+        z = jwx_truchet_ae_z2;
+      }
+    } else if ((chance < 0.5)) {
+      if (((square < 0) != (u > (1.0 - v_)))) {
+        z = jwx_truchet_ae_z1;
+      } else {
+        z = jwx_truchet_ae_z2;
+      }
+    } else if ((chance < 0.75)) {
+      if (((square < 0) != (u < v_))) {
+        z = jwx_truchet_ae_z1;
+      } else {
+        z = jwx_truchet_ae_z2;
+      }
+    } else {
+      if (((square < 0) != (u < (1.0 - v_)))) {
+        z = jwx_truchet_ae_z1;
+      } else {
+        z = jwx_truchet_ae_z2;
+      }
+    }
+  }
+  case 2: {
+    if ((chance < 0.5)) {
+      cir = sqrt((((u - 1.0) * (u - 1.0)) + ((v_ - 1.0) * (v_ - 1.0))));
+      cir = min(cir, sqrt(((u * u) + (v_ * v_))));
+      cir = (abs((abs((cir - 0.5)) - 0.5)) - (0.5 * (1.0 - ${p[2]})));
+      if ((cir < 0)) {
+        z = jwx_truchet_ae_z1;
+      } else {
+        z = jwx_truchet_ae_z2;
+      }
+    } else {
+      cir = sqrt((((u - 1.0) * (u - 1.0)) + (v_ * v_)));
+      cir = min(cir, sqrt(((u * u) + ((v_ - 1.0) * (v_ - 1.0)))));
+      cir = (abs((abs((cir - 0.5)) - 0.5)) - (0.5 * (1.0 - ${p[2]})));
+      if ((cir < 0)) {
+        z = jwx_truchet_ae_z1;
+      } else {
+        z = jwx_truchet_ae_z2;
+      }
+    }
+  }
+  case 3: {
+    if ((chance < 0.333333)) {
+      cir = sqrt((((u - 1.0) * (u - 1.0)) + ((v_ - 1.0) * (v_ - 1.0))));
+      cir = min(cir, sqrt(((u * u) + (v_ * v_))));
+      cir = (abs((abs((cir - 0.5)) - 0.5)) - (0.5 * (1.0 - ${p[2]})));
+      if ((cir < 0)) {
+        z = jwx_truchet_ae_z1;
+      } else {
+        z = jwx_truchet_ae_z2;
+      }
+    } else if ((chance < 0.666666)) {
+      cir = sqrt((((u - 1.0) * (u - 1.0)) + (v_ * v_)));
+      cir = min(cir, sqrt(((u * u) + ((v_ - 1.0) * (v_ - 1.0)))));
+      cir = (abs((abs((cir - 0.5)) - 0.5)) - (0.5 * (1.0 - ${p[2]})));
+      if ((cir < 0)) {
+        z = jwx_truchet_ae_z1;
+      } else {
+        z = jwx_truchet_ae_z2;
+      }
+    } else {
+      cir = ((0.5 * ${p[2]}) - min(abs((u - 0.5)), abs((v_ - 0.5))));
+      if ((cir < 0)) {
+        z = jwx_truchet_ae_z1;
+      } else {
+        z = jwx_truchet_ae_z2;
+      }
+    }
+  }
+  case 4: {
+    square = (max(abs((u - 0.5)), abs((v_ - 0.5))) - (0.5 * (1.0 - ${p[2]})));
+    if ((chance < 0.125)) {
+      if (((square < 0) != (u > v_))) {
+        z = jwx_truchet_ae_z1;
+      } else {
+        z = jwx_truchet_ae_z2;
+      }
+    } else if ((chance < 0.25)) {
+      if (((square < 0) != (u > (1.0 - v_)))) {
+        z = jwx_truchet_ae_z1;
+      } else {
+        z = jwx_truchet_ae_z2;
+      }
+    } else if ((chance < 0.375)) {
+      if (((square < 0) != (u < v_))) {
+        z = jwx_truchet_ae_z1;
+      } else {
+        z = jwx_truchet_ae_z2;
+      }
+    } else if ((chance < 0.5)) {
+      if (((square < 0) != (u < (1.0 - v_)))) {
+        z = jwx_truchet_ae_z1;
+      } else {
+        z = jwx_truchet_ae_z2;
+      }
+    } else if ((chance < 0.625)) {
+      if (((square < 0) != (u < 0.5))) {
+        z = jwx_truchet_ae_z1;
+      } else {
+        z = jwx_truchet_ae_z2;
+      }
+    } else if ((chance < 0.75)) {
+      if (((square < 0) != (v_ < 0.5))) {
+        z = jwx_truchet_ae_z1;
+      } else {
+        z = jwx_truchet_ae_z2;
+      }
+    } else if ((chance < 0.875)) {
+      if (((square < 0) != (u > 0.5))) {
+        z = jwx_truchet_ae_z1;
+      } else {
+        z = jwx_truchet_ae_z2;
+      }
+    } else {
+      if (((square < 0) != (v_ > 0.5))) {
+        z = jwx_truchet_ae_z1;
+      } else {
+        z = jwx_truchet_ae_z2;
+      }
+    }
+  }
+  case 5: {
+    inv = (((m % 2) == 0) != ((n % 2) == 0));
+    if ((chance < 0.5)) {
+      cir = sqrt((((u - 1.0) * (u - 1.0)) + ((v_ - 1.0) * (v_ - 1.0))));
+      cir = min(cir, sqrt(((u * u) + (v_ * v_))));
+      square = cir;
+      cir = (abs(cir) - 0.5);
+      square = min(square, sqrt((((u - 1.0) * (u - 1.0)) + (v_ * v_))));
+      square = min(square, sqrt(((u * u) + ((v_ - 1.0) * (v_ - 1.0)))));
+      square = (abs(square) - ${p[2]});
+      if ((((cir < 0) != (square < 0)) != inv)) {
+        z = jwx_truchet_ae_z1;
+      } else {
+        z = jwx_truchet_ae_z2;
+      }
+    } else {
+      cir = sqrt((((u - 1.0) * (u - 1.0)) + (v_ * v_)));
+      cir = min(cir, sqrt(((u * u) + ((v_ - 1.0) * (v_ - 1.0)))));
+      square = cir;
+      cir = (abs(cir) - 0.5);
+      square = min(square, sqrt((((u - 1.0) * (u - 1.0)) + ((v_ - 1.0) * (v_ - 1.0)))));
+      square = min(square, sqrt(((u * u) + (v_ * v_))));
+      square = (abs(square) - ${p[2]});
+      if ((((cir < 0) != (square < 0)) != inv)) {
+        z = jwx_truchet_ae_z2;
+      } else {
+        z = jwx_truchet_ae_z1;
+      }
+    }
+  }
+  default: {}
+}
+jwx_truchet_ae_x = u1;
+jwx_truchet_ae_y = v1;
+v.x += u1;
+v.y += v1;
+if (false) {
+  pz_ += (${w} * z_);
+}
+(*cp) = z;
+jwx_truchet_ae_z1 = z;
+jwx_truchet_ae_z2 = z;
+}`,
+  },
   "truchet_fill": {
     params: [{ name: "exponent", def: 0 }, { name: "arc_width", def: 0 }, { name: "seed", def: 0 }],
     verified: true, priority: 0, flags: [], types: ["2D","SIMULATION"],
-    funcNames: ["powc","roundc"],
+    funcNames: ["powc","roundc","atan2j"],
     funcs: `fn powc(x: f32, y: f32) -> f32 {
   if (x >= 0.0) { return pow(x, y); }
   let yi = round(y);
@@ -12389,7 +14808,9 @@ v.y += (${w} * by);
   return select(m, -m, (i32(yi) & 1) != 0);
 }
 
-fn roundc(x: f32) -> f32 { return sign(x) * floor(abs(x) + 0.5); }`,
+fn roundc(x: f32) -> f32 { return sign(x) * floor(abs(x) + 0.5); }
+
+fn atan2j(y: f32, x: f32) -> f32 { if (x == 0.0 && y == 0.0) { return select(0.0, PI, (bitcast<u32>(x) >> 31u) == 1u) * select(1.0, -1.0, (bitcast<u32>(y) >> 31u) == 1u); } return atan2(y, x); }`,
     code: (w, p) => `{
 var pexponent: f32;
 var width: f32 = 0.5;
@@ -12458,30 +14879,36 @@ if ((r11 < 1.0)) {
   "panorama1": {
     params: [],
     verified: true, priority: 0, flags: [], types: ["2D"],
+    funcNames: ["atan2j"],
+    funcs: `fn atan2j(y: f32, x: f32) -> f32 { if (x == 0.0 && y == 0.0) { return select(0.0, PI, (bitcast<u32>(x) >> 31u) == 1u) * select(1.0, -1.0, (bitcast<u32>(y) >> 31u) == 1u); } return atan2(y, x); }`,
     code: (w, _p) => `{
 var aux: f32 = (1.0 / sqrt((((t.x * t.x) + (t.y * t.y)) + 1.0)));
 var x1: f32 = (t.x * aux);
 var y1: f32 = (t.y * aux);
 aux = sqrt(((x1 * x1) + (y1 * y1)));
-v.x += (((${w} * atan2(x1, y1)) * 1.0) / PI);
+v.x += (((${w} * atan2j(x1, y1)) * 1.0) / PI);
 v.y += (${w} * (aux - 0.5));
 }`,
   },
   "panorama2": {
     params: [],
     verified: true, priority: 0, flags: [], types: ["2D"],
+    funcNames: ["atan2j"],
+    funcs: `fn atan2j(y: f32, x: f32) -> f32 { if (x == 0.0 && y == 0.0) { return select(0.0, PI, (bitcast<u32>(x) >> 31u) == 1u) * select(1.0, -1.0, (bitcast<u32>(y) >> 31u) == 1u); } return atan2(y, x); }`,
     code: (w, _p) => `{
 var aux: f32 = (1.0 / (sqrt(((t.x * t.x) + (t.y * t.y))) + 1.0));
 var x1: f32 = (t.x * aux);
 var y1: f32 = (t.y * aux);
 aux = sqrt(((x1 * x1) + (y1 * y1)));
-v.x += (((${w} * atan2(x1, y1)) * 1.0) / PI);
+v.x += (((${w} * atan2j(x1, y1)) * 1.0) / PI);
 v.y += (${w} * (aux - 0.5));
 }`,
   },
   "cpow3_wf": {
     params: [{ name: "r", def: 1 }, { name: "a", def: 0.1 }, { name: "divisor", def: 1 }, { name: "spread", def: 1 }, { name: "discrete_spread", def: 1 }, { name: "spread2", def: 0 }, { name: "offset2", def: 1 }],
     verified: true, priority: 0, flags: [], types: ["2D"],
+    funcNames: ["atan2j"],
+    funcs: `fn atan2j(y: f32, x: f32) -> f32 { if (x == 0.0 && y == 0.0) { return select(0.0, PI, (bitcast<u32>(x) >> 31u) == 1u) * select(1.0, -1.0, (bitcast<u32>(y) >> 31u) == 1u); } return atan2(y, x); }`,
     code: (w, p) => `{
 var c: f32;
 var d: f32;
@@ -12516,9 +14943,51 @@ v.x += (ri * cos(ang2));
 v.y += (ri * sin(ang2));
 }`,
   },
+  "dc_cylinder2": {
+    params: [{ name: "offset", def: 0 }, { name: "angle", def: 0 }, { name: "scale", def: 0.5 }, { name: "x", def: 0.125 }, { name: "y", def: 0.125 }, { name: "blur", def: 1 }],
+    verified: true, priority: 0, flags: ["dc","state","z"], types: ["2D","DC","BASE_SHAPE"],
+    funcNames: ["jwx_dc_cylinder2_inited_","jwx_dc_cylinder2_n","jwx_dc_cylinder2_ldcs","jwx_dc_cylinder2_ldca","atan2j"],
+    funcs: `fn atan2j(y: f32, x: f32) -> f32 { if (x == 0.0 && y == 0.0) { return select(0.0, PI, (bitcast<u32>(x) >> 31u) == 1u) * select(1.0, -1.0, (bitcast<u32>(y) >> 31u) == 1u); } return atan2(y, x); }
+
+var<private> jwx_dc_cylinder2_inited_: f32 = 0.0;
+
+var<private> jwx_dc_cylinder2_n: f32 = 0.0;
+
+var<private> jwx_dc_cylinder2_ldcs: f32 = 0.0;
+
+var<private> jwx_dc_cylinder2_ldca: f32 = 0.0;`,
+    code: (w, p) => `{
+var r_: array<f32, 4> = array<f32, 4>(0.0, 0.0, 0.0, 0.0);
+if ((jwx_dc_cylinder2_inited_ == 0.0)) {
+  jwx_dc_cylinder2_inited_ = 1.0;
+  jwx_dc_cylinder2_n = 0;
+  jwx_dc_cylinder2_ldcs = 0;
+  jwx_dc_cylinder2_ldca = 0;
+  {
+    jwx_dc_cylinder2_n = 0;
+    r_[0] = rnd(rs);
+    r_[1] = rnd(rs);
+    r_[2] = rnd(rs);
+    r_[3] = rnd(rs);
+    jwx_dc_cylinder2_ldcs = (1.0 / select(${p[2]}, 0.00001, (${p[2]} == 0)));
+    jwx_dc_cylinder2_ldca = (${p[0]} * PI);
+  }
+}
+var a: f32 = (rnd(rs) * (2.0 * PI));
+var sr: f32 = sin(a);
+var cr: f32 = cos(a);
+var rr: f32 = (${p[5]} * ((((rnd(rs) + rnd(rs)) + rnd(rs)) + rnd(rs)) - 2.0));
+v.x += ((${w} * sin((t.x + (rr * sr)))) * ${p[3]});
+v.y += ((rr * t.y) * ${p[4]});
+pz_ += (${w} * cos((t.x + (rr * cr))));
+(*cp) = (abs((0.5 * ((jwx_dc_cylinder2_ldcs * (((cos(${p[1]}) * v.x) + (sin(${p[1]}) * v.y)) + ${p[0]})) + 1.0))) % 1.0);
+}`,
+  },
   "swirl3": {
     params: [{ name: "shift", def: 0.5 }],
     verified: true, priority: 0, flags: [], types: ["2D"],
+    funcNames: ["atan2j"],
+    funcs: `fn atan2j(y: f32, x: f32) -> f32 { if (x == 0.0 && y == 0.0) { return select(0.0, PI, (bitcast<u32>(x) >> 31u) == 1u) * select(1.0, -1.0, (bitcast<u32>(y) >> 31u) == 1u); } return atan2(y, x); }`,
     code: (w, p) => `{
 var rad: f32 = r;
 var ang: f32 = (ph + (log(rad) * ${p[0]}));
@@ -12531,13 +15000,15 @@ v.y += ((${w} * rad) * s);
   "cardioid": {
     params: [{ name: "a", def: 1 }],
     verified: true, priority: 0, flags: [], types: ["2D"],
+    funcNames: ["atan2j"],
+    funcs: `fn atan2j(y: f32, x: f32) -> f32 { if (x == 0.0 && y == 0.0) { return select(0.0, PI, (bitcast<u32>(x) >> 31u) == 1u) * select(1.0, -1.0, (bitcast<u32>(y) >> 31u) == 1u); } return atan2(y, x); }`,
     code: (w, p) => `{
-var a: f32 = atan2(t.y, t.x);
+var a: f32 = atan2j(t.y, t.x);
 var r_: f32 = (${w} * sqrt(((((t.x * t.x) + (t.y * t.y)) + sin((a * ${p[0]}))) + 1.0)));
 var c: f32;
 var s: f32;
-s = sin(atan2(t.y, t.x));
-c = cos(atan2(t.y, t.x));
+s = sin(atan2j(t.y, t.x));
+c = cos(atan2j(t.y, t.x));
 v.x += (r_ * c);
 v.y += (r_ * s);
 }`,
@@ -12545,11 +15016,13 @@ v.y += (r_ * s);
   "shredrad": {
     params: [{ name: "n", def: 4 }, { name: "width", def: 0.5 }],
     verified: true, priority: 0, flags: [], types: ["2D"],
+    funcNames: ["atan2j"],
+    funcs: `fn atan2j(y: f32, x: f32) -> f32 { if (x == 0.0 && y == 0.0) { return select(0.0, PI, (bitcast<u32>(x) >> 31u) == 1u) * select(1.0, -1.0, (bitcast<u32>(y) >> 31u) == 1u); } return atan2(y, x); }`,
     code: (w, p) => `{
 var sa: f32 = ((2.0 * PI) / ${p[0]});
 var sw: f32 = min(max(${p[1]}, -1.0), 1.0);
 var vv: f32 = ${w};
-var ang: f32 = atan2(t.y, t.x);
+var ang: f32 = atan2j(t.y, t.x);
 var rad: f32 = sqrt(((t.x * t.x) + (t.y * t.y)));
 var xang: f32 = (((ang + 9.42477796077) + (sa / 2.0)) / sa);
 var zang: f32 = ((((((xang - f32(i32(xang))) * sw) + f32(i32(xang))) * sa) - PI) - ((sa / 2.0) * sw));
@@ -12561,9 +15034,93 @@ v.x += ((vv * rad) * c);
 v.y += ((vv * rad) * s);
 }`,
   },
+  "jubiQ": {
+    params: [{ name: "power", def: 3 }, { name: "dist", def: 1 }, { name: "a", def: 1 }, { name: "b", def: 0 }, { name: "c", def: 0 }, { name: "d", def: 1 }, { name: "e", def: 0 }, { name: "f", def: 0 }, { name: "qat", def: 0 }, { name: "qax", def: 0 }, { name: "qay", def: 0 }, { name: "qaz", def: 0 }, { name: "qbt", def: 0 }, { name: "qbx", def: 0 }, { name: "qby", def: 0 }, { name: "qbz", def: 0 }, { name: "qct", def: 0 }, { name: "qcx", def: 0 }, { name: "qcy", def: 0 }, { name: "qcz", def: 0 }, { name: "qdt", def: 1 }, { name: "qdx", def: 0 }, { name: "qdy", def: 0 }, { name: "qdz", def: 0 }, { name: "zmode", def: 0 }],
+    verified: true, priority: 0, flags: ["3d","z"], types: ["3D"],
+    funcNames: ["roundc","sqr","atan2j","powc"],
+    funcs: `fn roundc(x: f32) -> f32 { return sign(x) * floor(abs(x) + 0.5); }
+
+fn sqr(x: f32) -> f32 { return x * x; }
+
+fn atan2j(y: f32, x: f32) -> f32 { if (x == 0.0 && y == 0.0) { return select(0.0, PI, (bitcast<u32>(x) >> 31u) == 1u) * select(1.0, -1.0, (bitcast<u32>(y) >> 31u) == 1u); } return atan2(y, x); }
+
+fn powc(x: f32, y: f32) -> f32 {
+  if (x >= 0.0) { return pow(x, y); }
+  let yi = round(y);
+  if (abs(y - yi) > 1e-6) { return pow(x, y); }
+  let m = pow(-x, y);
+  return select(m, -m, (i32(yi) & 1) != 0);
+}`,
+    code: (w, p) => `{
+var _absN: i32 = 0;
+var _cN: f32 = 0;
+var absPower: f32 = 0;
+var cPower: f32 = 0;
+{
+  absPower = abs(f32(i32(${p[0]})));
+  cPower = (((1.0 / f32(i32(${p[0]}))) - 1.0) * 0.5);
+  _absN = abs(i32(roundc(f32(i32(${p[0]})))));
+  _cN = ((${p[1]} / f32(i32(${p[0]}))) * 0.5);
+}
+var t1: f32 = ${p[8]};
+var t2: f32 = t.x;
+var t3: f32 = ${p[12]};
+var t4: f32 = ${p[16]};
+var t5: f32 = ${p[20]};
+var x1: f32 = ${p[9]};
+var x2: f32 = t.y;
+var x3: f32 = ${p[13]};
+var x4: f32 = ${p[17]};
+var x5: f32 = ${p[21]};
+var y1: f32 = ${p[10]};
+var y2: f32 = z_;
+var y3: f32 = ${p[14]};
+var y4: f32 = ${p[18]};
+var y5: f32 = ${p[22]};
+var z1: f32 = ${p[11]};
+var z3: f32 = ${p[15]};
+var z4: f32 = ${p[19]};
+var z5: f32 = ${p[23]};
+var nt: f32 = ((((t1 * t2) - (x1 * x2)) - (y1 * y2)) + t3);
+var nx: f32 = ((((t1 * x2) + (x1 * t2)) - (z1 * y2)) + x3);
+var ny: f32 = ((((t1 * y2) + (y1 * t2)) + (z1 * x2)) + y3);
+var nz: f32 = ((((z1 * t2) + (x1 * y2)) - (y1 * x2)) + z3);
+var dt: f32 = ((((t4 * t2) - (x4 * x2)) - (y4 * y2)) + t5);
+var dx: f32 = ((((t4 * x2) + (x4 * t2)) - (z4 * y2)) + x5);
+var dy: f32 = ((((t4 * y2) + (y4 * t2)) + (z4 * x2)) + y5);
+var dz: f32 = ((((z4 * t2) + (x4 * y2)) - (y4 * x2)) + z5);
+var ni: f32 = (${w} / (((sqr(dt) + sqr(dx)) + sqr(dy)) + sqr(dz)));
+var x: f32 = ((((${p[2]} * t.x) + (${p[3]} * t.y)) + (((((nt * dt) + (nx * dx)) + (ny * dy)) + (nz * dz)) * ni)) + ${p[6]});
+var y: f32 = ((((${p[4]} * t.x) + (${p[5]} * t.y)) + (((((nx * dt) - (nt * dx)) - (ny * dz)) + (nz * dy)) * ni)) + ${p[7]});
+var sina: f32 = 0.0;
+var cosa: f32 = 0.0;
+var angle: f32 = ((atan2j(y, x) + ((2.0 * PI) * f32((i32((rnd(rs) * abs(f32(i32(${p[0]}))))) % _absN)))) / f32(i32(${p[0]})));
+var r_: f32 = (${w} * powc((sqr(x) + sqr(y)), _cN));
+sina = sin(angle);
+cosa = cos(angle);
+v.x += (r_ * cosa);
+v.y += (r_ * sina);
+if ((min(max(${p[24]}, 0.0), 2.0) == 0)) {
+  var z: f32 = (z_ / 2);
+  var r2d: f32 = (sqr(t.x) + sqr(t.y));
+  var r3d: f32 = sqrt((r2d + sqr(z)));
+  var r2_: f32 = (${w} / (sqrt(r3d) * r3d));
+  pz_ += ((((((ny * dt) - (nt * dy)) - (nz * dx)) + (nx * dz)) * ni) + (r2_ * z));
+} else if ((min(max(${p[24]}, 0.0), 2.0) == 1)) {
+  var z: f32 = (z_ / absPower);
+  var r2d: f32 = (sqr(t.x) + sqr(t.y));
+  var r2_: f32 = (${w} * powc((r2d + (z * z)), cPower));
+  pz_ += ((((((ny * dt) - (nt * dy)) - (nz * dx)) + (nx * dz)) * ni) + (r2_ * z));
+} else if ((min(max(${p[24]}, 0.0), 2.0) == 2)) {
+  pz_ += ((((((ny * dt) - (nt * dy)) - (nz * dx)) + (nx * dz)) * ni) + z_);
+}
+}`,
+  },
   "complex": {
     params: [{ name: "cospow", def: 1 }, { name: "cosx1", def: 1 }, { name: "cosx2", def: 1 }, { name: "cosy1", def: 1 }, { name: "cosy2", def: 1 }, { name: "coshpow", def: 0 }, { name: "coshx1", def: 1 }, { name: "coshx2", def: 1 }, { name: "coshy1", def: 1 }, { name: "coshy2", def: 1 }, { name: "cotpow", def: 0 }, { name: "cotx1", def: 2 }, { name: "cotx2", def: 2 }, { name: "coty1", def: 2 }, { name: "coty2", def: 2 }, { name: "cothpow", def: 0 }, { name: "cothx1", def: 2 }, { name: "cothx2", def: 2 }, { name: "cothy1", def: 2 }, { name: "cothy2", def: 2 }, { name: "cscpow", def: 0 }, { name: "cscx1", def: 1 }, { name: "cscx2", def: 1 }, { name: "cscy1", def: 1 }, { name: "cscy2", def: 1 }, { name: "cschpow", def: 0 }, { name: "cschx1", def: 1 }, { name: "cschx2", def: 1 }, { name: "cschy1", def: 1 }, { name: "cschy2", def: 1 }, { name: "exppow", def: 0 }, { name: "expx1", def: 1 }, { name: "expy1", def: 1 }, { name: "expy2", def: 1 }, { name: "secpow", def: 0 }, { name: "secx1", def: 1 }, { name: "secx2", def: 1 }, { name: "secy1", def: 1 }, { name: "secy2", def: 1 }, { name: "sechpow", def: 0 }, { name: "sechx1", def: 1 }, { name: "sechx2", def: 1 }, { name: "sechy1", def: 1 }, { name: "sechy2", def: 1 }, { name: "sinpow", def: 0 }, { name: "sinx1", def: 1 }, { name: "sinx2", def: 1 }, { name: "siny1", def: 1 }, { name: "siny2", def: 1 }, { name: "sinhpow", def: 0 }, { name: "sinhx1", def: 1 }, { name: "sinhx2", def: 1 }, { name: "sinhy1", def: 1 }, { name: "sinhy2", def: 1 }, { name: "tanpow", def: 0 }, { name: "tanx1", def: 2 }, { name: "tanx2", def: 2 }, { name: "tany1", def: 2 }, { name: "tany2", def: 2 }, { name: "tanhpow", def: 0 }, { name: "tanhx1", def: 2 }, { name: "tanhx2", def: 2 }, { name: "tanhy1", def: 2 }, { name: "tanhy2", def: 2 }],
     verified: true, priority: 0, flags: [], types: ["2D"],
+    funcNames: ["atan2j"],
+    funcs: `fn atan2j(y: f32, x: f32) -> f32 { if (x == 0.0 && y == 0.0) { return select(0.0, PI, (bitcast<u32>(x) >> 31u) == 1u) * select(1.0, -1.0, (bitcast<u32>(y) >> 31u) == 1u); } return atan2(y, x); }`,
     code: (w, p) => `{
 var x: f32 = 0.0;
 var y: f32 = 0.0;
@@ -12706,6 +15263,8 @@ v.y += (${w} * y);
   "quaternion": {
     params: [{ name: "cosqpow", def: 1 }, { name: "cosqx1", def: 1 }, { name: "cosqx2", def: 1 }, { name: "cosqy1", def: 1 }, { name: "cosqy2", def: 1 }, { name: "cosqz1", def: 1 }, { name: "cosqz2", def: 1 }, { name: "coshqpow", def: 0 }, { name: "coshqx1", def: 1 }, { name: "coshqx2", def: 1 }, { name: "coshqy1", def: 1 }, { name: "coshqy2", def: 1 }, { name: "coshqz1", def: 1 }, { name: "coshqz2", def: 1 }, { name: "cotqpow", def: 0 }, { name: "cotqx1", def: 1 }, { name: "cotqx2", def: 1 }, { name: "cotqy1", def: 1 }, { name: "cotqy2", def: 1 }, { name: "cotqz1", def: 1 }, { name: "cotqz2", def: 1 }, { name: "cothqpow", def: 0 }, { name: "cothqx1", def: 1 }, { name: "cothqx2", def: 1 }, { name: "cothqy1", def: 1 }, { name: "cothqy2", def: 1 }, { name: "cothqz1", def: 1 }, { name: "cothqz2", def: 1 }, { name: "cscqpow", def: 0 }, { name: "cscqx1", def: 1 }, { name: "cscqx2", def: 1 }, { name: "cscqy1", def: 1 }, { name: "cscqy2", def: 1 }, { name: "cscqz1", def: 1 }, { name: "cscqz2", def: 1 }, { name: "cschqpow", def: 0 }, { name: "cschqx1", def: 1 }, { name: "cschqx2", def: 1 }, { name: "cschqy1", def: 1 }, { name: "cschqy2", def: 1 }, { name: "cschqz1", def: 1 }, { name: "cschqz2", def: 1 }, { name: "estiqpow", def: 0 }, { name: "estiqx1", def: 1 }, { name: "estiqy1", def: 1 }, { name: "estiqy2", def: 1 }, { name: "estiqz1", def: 1 }, { name: "estiqz2", def: 1 }, { name: "logqpow", def: 0 }, { name: "logqbase", def: 2.718281828459045 }, { name: "secqpow", def: 0 }, { name: "secqx1", def: 1 }, { name: "secqx2", def: 1 }, { name: "secqy1", def: 1 }, { name: "secqy2", def: 1 }, { name: "secqz1", def: 1 }, { name: "secqz2", def: 1 }, { name: "sechqpow", def: 0 }, { name: "sechqx1", def: 1 }, { name: "sechqx2", def: 1 }, { name: "sechqy1", def: 1 }, { name: "sechqy2", def: 1 }, { name: "sechqz1", def: 1 }, { name: "sechqz2", def: 1 }, { name: "sinqpow", def: 0 }, { name: "sinqx1", def: 1 }, { name: "sinqx2", def: 1 }, { name: "sinqy1", def: 1 }, { name: "sinqy2", def: 1 }, { name: "sinqz1", def: 1 }, { name: "sinqz2", def: 1 }, { name: "sinhqpow", def: 0 }, { name: "sinhqx1", def: 1 }, { name: "sinhqx2", def: 1 }, { name: "sinhqy1", def: 1 }, { name: "sinhqy2", def: 1 }, { name: "sinhqz1", def: 1 }, { name: "sinhqz2", def: 1 }, { name: "tanqpow", def: 0 }, { name: "tanqx1", def: 1 }, { name: "tanqx2", def: 1 }, { name: "tanqy1", def: 1 }, { name: "tanqy2", def: 1 }, { name: "tanqz1", def: 1 }, { name: "tanqz2", def: 1 }, { name: "tanhqpow", def: 0 }, { name: "tanhqx1", def: 1 }, { name: "tanhqx2", def: 1 }, { name: "tanhqy1", def: 1 }, { name: "tanhqy2", def: 1 }, { name: "tanhqz1", def: 1 }, { name: "tanhqz2", def: 1 }],
     verified: true, priority: 0, flags: ["3d","z"], types: ["3D"],
+    funcNames: ["atan2j"],
+    funcs: `fn atan2j(y: f32, x: f32) -> f32 { if (x == 0.0 && y == 0.0) { return select(0.0, PI, (bitcast<u32>(x) >> 31u) == 1u) * select(1.0, -1.0, (bitcast<u32>(y) >> 31u) == 1u); } return atan2(y, x); }`,
     code: (w, p) => `{
 var x: f32 = 0.0;
 var y: f32 = 0.0;
@@ -12803,7 +15362,7 @@ if ((${p[42]} != 0)) {
 }
 if ((${p[48]} != 0)) {
   var logqabs_v: f32 = length(vec2f(t.y, z_));
-  var logqC: f32 = ((${w} * atan2(logqabs_v, t.x)) / logqabs_v);
+  var logqC: f32 = ((${w} * atan2j(logqabs_v, t.x)) / logqabs_v);
   x += ((${p[48]} * log(((t.x * t.x) + (logqabs_v * logqabs_v)))) * denom);
   y += ((${p[48]} * logqC) * t.y);
   z += ((${p[48]} * logqC) * z_);
@@ -12893,9 +15452,72 @@ v.y += y;
 pz_ += z;
 }`,
   },
+  "crop3D": {
+    params: [{ name: "left", def: -1 }, { name: "right", def: 1 }, { name: "top", def: -1 }, { name: "bottom", def: 1 }, { name: "floor", def: -1 }, { name: "ceiling", def: 1 }, { name: "scatter_area", def: 0 }, { name: "zero", def: 0 }],
+    verified: true, priority: 0, flags: ["hide","z"], types: ["CROP"],
+    funcNames: ["atan2j"],
+    funcs: `fn atan2j(y: f32, x: f32) -> f32 { if (x == 0.0 && y == 0.0) { return select(0.0, PI, (bitcast<u32>(x) >> 31u) == 1u) * select(1.0, -1.0, (bitcast<u32>(y) >> 31u) == 1u); } return atan2(y, x); }`,
+    code: (w, p) => `{
+loop {
+var xmin: f32 = 0;
+var xmax: f32 = 0;
+var ymin: f32 = 0;
+var ymax: f32 = 0;
+var zmin: f32 = 0;
+var zmax: f32 = 0;
+var w_: f32 = 0;
+var h: f32 = 0;
+var l: f32 = 0;
+{
+  xmin = min(${p[0]}, ${p[1]});
+  ymin = min(${p[2]}, ${p[3]});
+  zmin = min(${p[4]}, ${p[5]});
+  xmax = max(${p[0]}, ${p[1]});
+  ymax = max(${p[2]}, ${p[3]});
+  zmax = max(${p[4]}, ${p[5]});
+  w_ = (((xmax - xmin) * 0.5) * min(max(${p[6]}, -1.0), 1.0));
+  h = (((ymax - ymin) * 0.5) * min(max(${p[6]}, -1.0), 1.0));
+  l = (((zmax - zmin) * 0.5) * min(max(${p[6]}, -1.0), 1.0));
+}
+var x: f32 = t.x;
+var y: f32 = t.y;
+var z: f32 = z_;
+if ((((((((x < xmin) || (x > xmax)) || (y < ymin)) || (y > ymax)) || (z < zmin)) || (z > zmax)) && (min(max(${p[7]}, 0.0), 1.0) != 0))) {
+  pz_ = 0;
+  v.y = pz_;
+  v.x = v.y;
+  (*hd) = true;
+  break;
+} else {
+  (*hd) = false;
+  if ((x < xmin)) {
+    x = (xmin + (rnd(rs) * w_));
+  } else if ((x > xmax)) {
+    x = (xmax - (rnd(rs) * w_));
+  }
+  if ((y < ymin)) {
+    y = (ymin + (rnd(rs) * h));
+  } else if ((y > ymax)) {
+    y = (ymax - (rnd(rs) * h));
+  }
+  if ((z < zmin)) {
+    z = (zmin + (rnd(rs) * l));
+  } else if ((z > zmax)) {
+    z = (zmax - (rnd(rs) * l));
+  }
+}
+v.x = (${w} * x);
+v.y = (${w} * y);
+pz_ = (${w} * z);
+break;
+}
+}`,
+  },
   "spherecrop": {
     params: [{ name: "radius", def: 1 }, { name: "x", def: 0 }, { name: "y", def: 0 }, { name: "z", def: 0 }, { name: "scatter_area", def: 0 }, { name: "zero", def: 1 }],
     verified: true, priority: 0, flags: ["3d","hide","z"], types: ["3D","CROP"],
+    funcNames: ["atan2j"],
+    funcs: `fn atan2j(y: f32, x: f32) -> f32 { if (x == 0.0 && y == 0.0) { return select(0.0, PI, (bitcast<u32>(x) >> 31u) == 1u) * select(1.0, -1.0, (bitcast<u32>(y) >> 31u) == 1u); } return atan2(y, x); }`,
     code: (w, p) => `{
 var cA: f32 = max(-1.0, min(${p[4]}, 1.0));
 var x0: f32 = ${p[1]};
@@ -12908,7 +15530,7 @@ t.x -= x0;
 t.y -= y0;
 z_ -= z0;
 var rad: f32 = sqrt((((t.x * t.x) + (t.y * t.y)) + (z_ * z_)));
-var ang: f32 = atan2(t.y, t.x);
+var ang: f32 = atan2j(t.y, t.x);
 var az: f32 = acos((z_ / rad));
 var rdc: f32 = (cr + ((rnd(rs) * 0.5) * ca));
 var esc: bool = (rad > cr);
@@ -12941,6 +15563,8 @@ if ((cr0 && esc)) {
   "sattractor_js": {
     params: [{ name: "m", def: 10 }],
     verified: true, priority: 0, flags: [], types: ["2D"],
+    funcNames: ["atan2j"],
+    funcs: `fn atan2j(y: f32, x: f32) -> f32 { if (x == 0.0 && y == 0.0) { return select(0.0, PI, (bitcast<u32>(x) >> 31u) == 1u) * select(1.0, -1.0, (bitcast<u32>(y) >> 31u) == 1u); } return atan2(y, x); }`,
     code: (w, p) => `{
 var a: array<f32, 13>;
 var b: array<f32, 13>;
@@ -12964,9 +15588,29 @@ v.x += (x * ${w});
 v.y += (y * ${w});
 }`,
   },
+  "wallpaper_js": {
+    params: [{ name: "a", def: 1.156 }, { name: "b", def: -0.28 }, { name: "c", def: 21.288 }],
+    verified: true, priority: 0, flags: ["z"], types: ["2D"],
+    funcNames: ["atan2j"],
+    funcs: `fn atan2j(y: f32, x: f32) -> f32 { if (x == 0.0 && y == 0.0) { return select(0.0, PI, (bitcast<u32>(x) >> 31u) == 1u) * select(1.0, -1.0, (bitcast<u32>(y) >> 31u) == 1u); } return atan2(y, x); }`,
+    code: (w, p) => `{
+if ((rnd(rs) < 0.5)) {
+  v.x += (t.y - (sign(f32(i32(t.x))) * sqrt(abs(((${p[1]} * t.x) - ${p[2]})))));
+  v.y += (${p[0]} - t.x);
+} else {
+  v.x = t.x;
+  v.y = t.y;
+}
+if (false) {
+  pz_ += (${w} * z_);
+}
+}`,
+  },
   "hadamard_js": {
     params: [],
     verified: true, priority: 0, flags: [], types: ["2D"],
+    funcNames: ["atan2j"],
+    funcs: `fn atan2j(y: f32, x: f32) -> f32 { if (x == 0.0 && y == 0.0) { return select(0.0, PI, (bitcast<u32>(x) >> 31u) == 1u) * select(1.0, -1.0, (bitcast<u32>(y) >> 31u) == 1u); } return atan2(y, x); }`,
     code: (w, _p) => `{
 var x: f32;
 var y: f32;
@@ -12987,7 +15631,7 @@ v.y += (y * ${w});
   "crown_js": {
     params: [{ name: "a", def: 5 }, { name: "b", def: 0.6309297535714575 }],
     verified: true, priority: 0, flags: ["3d","dc","z"], types: ["3D","DC","BASE_SHAPE"],
-    funcNames: ["Complex","powc","Complex_Init","Complex_Add","Complex_Mag2"],
+    funcNames: ["Complex","powc","atan2j","Complex_Init","Complex_Add","Complex_Mag2"],
     funcs: `struct Complex {
   per_fix: f32,
   re: f32,
@@ -13003,6 +15647,8 @@ fn powc(x: f32, y: f32) -> f32 {
   let m = pow(-x, y);
   return select(m, -m, (i32(yi) & 1) != 0);
 }
+
+fn atan2j(y: f32, x: f32) -> f32 { if (x == 0.0 && y == 0.0) { return select(0.0, PI, (bitcast<u32>(x) >> 31u) == 1u) * select(1.0, -1.0, (bitcast<u32>(y) >> 31u) == 1u); } return atan2(y, x); }
 
 fn Complex_Init(c: ptr<function, Complex>, Rp: f32, Ip: f32) {
   (*c).re = Rp;
@@ -13048,6 +15694,8 @@ pz_ += (z * ${w});
   "apocarpet_js": {
     params: [],
     verified: true, priority: 0, flags: [], types: ["2D"],
+    funcNames: ["atan2j"],
+    funcs: `fn atan2j(y: f32, x: f32) -> f32 { if (x == 0.0 && y == 0.0) { return select(0.0, PI, (bitcast<u32>(x) >> 31u) == 1u) * select(1.0, -1.0, (bitcast<u32>(y) >> 31u) == 1u); } return atan2(y, x); }`,
     code: (w, _p) => `{
 var x: f32 = 0;
 var y: f32 = 0;
@@ -13088,6 +15736,8 @@ v.y += (y * ${w});
   "invtree_js": {
     params: [],
     verified: true, priority: 0, flags: [], types: ["2D"],
+    funcNames: ["atan2j"],
+    funcs: `fn atan2j(y: f32, x: f32) -> f32 { if (x == 0.0 && y == 0.0) { return select(0.0, PI, (bitcast<u32>(x) >> 31u) == 1u) * select(1.0, -1.0, (bitcast<u32>(y) >> 31u) == 1u); } return atan2(y, x); }`,
     code: (w, _p) => `{
 var x: f32;
 var y: f32;
@@ -13108,6 +15758,8 @@ v.y += (y * ${w});
   "siercarpet_js": {
     params: [{ name: "m", def: 3 }],
     verified: true, priority: 0, flags: [], types: ["2D","SIMULATION"],
+    funcNames: ["atan2j"],
+    funcs: `fn atan2j(y: f32, x: f32) -> f32 { if (x == 0.0 && y == 0.0) { return select(0.0, PI, (bitcast<u32>(x) >> 31u) == 1u) * select(1.0, -1.0, (bitcast<u32>(y) >> 31u) == 1u); } return atan2(y, x); }`,
     code: (w, p) => `{
 var x: f32 = 1.0;
 var y: f32 = 1.0;
@@ -13131,6 +15783,8 @@ v.y += (y * ${w});
   "woggle_js": {
     params: [{ name: "m", def: 2 }],
     verified: true, priority: 0, flags: [], types: ["2D"],
+    funcNames: ["atan2j"],
+    funcs: `fn atan2j(y: f32, x: f32) -> f32 { if (x == 0.0 && y == 0.0) { return select(0.0, PI, (bitcast<u32>(x) >> 31u) == 1u) * select(1.0, -1.0, (bitcast<u32>(y) >> 31u) == 1u); } return atan2(y, x); }`,
     code: (w, p) => `{
 var x: f32;
 var y: f32;
@@ -13157,6 +15811,8 @@ v.y += (y * ${w});
   "lace_js": {
     params: [],
     verified: true, priority: 0, flags: [], types: ["2D"],
+    funcNames: ["atan2j"],
+    funcs: `fn atan2j(y: f32, x: f32) -> f32 { if (x == 0.0 && y == 0.0) { return select(0.0, PI, (bitcast<u32>(x) >> 31u) == 1u) * select(1.0, -1.0, (bitcast<u32>(y) >> 31u) == 1u); } return atan2(y, x); }`,
     code: (w, _p) => `{
 var x: f32 = 0.5;
 var y: f32 = 0.75;
@@ -13165,19 +15821,19 @@ var r_: f32 = 2.0;
 var r0: f32 = sqrt(((t.x * t.x) + (t.y * t.y)));
 var weight: f32 = rnd(rs);
 if ((weight > 0.75)) {
-  w_ = atan2(t.y, (t.x - 1.0));
+  w_ = atan2j(t.y, (t.x - 1.0));
   y = (((-r0 * cos(w_)) / r_) + 1.0);
   x = ((-r0 * sin(w_)) / r_);
 } else if ((weight > 0.5)) {
-  w_ = atan2((t.y - (sqrt(3.0) / 2.0)), (t.x + 0.5));
+  w_ = atan2j((t.y - (sqrt(3.0) / 2.0)), (t.x + 0.5));
   y = (((-r0 * cos(w_)) / r_) - 0.5);
   x = (((-r0 * sin(w_)) / r_) + (sqrt(3.0) / 2.0));
 } else if ((weight > 0.25)) {
-  w_ = atan2((t.y + (sqrt(3.0) / 2.0)), (t.x + 0.5));
+  w_ = atan2j((t.y + (sqrt(3.0) / 2.0)), (t.x + 0.5));
   y = (((-r0 * cos(w_)) / r_) - 0.5);
   x = (((-r0 * sin(w_)) / r_) - (sqrt(3.0) / 2.0));
 } else {
-  w_ = atan2(t.y, t.x);
+  w_ = atan2j(t.y, t.x);
   y = ((-r0 * cos(w_)) / r_);
   x = ((-r0 * sin(w_)) / r_);
 }
@@ -13188,8 +15844,10 @@ v.y += (y * ${w});
   "harmonograph_js": {
     params: [{ name: "seed", def: 1234 }, { name: "time", def: 100 }, { name: "a1", def: 128 }, { name: "f1", def: 5 }, { name: "p1", def: 113 }, { name: "d1", def: 0.001301650295393377 }, { name: "a2", def: 0 }, { name: "f2", def: 3 }, { name: "p2", def: 33 }, { name: "d2", def: 0.0013211574142884402 }, { name: "a3", def: 49 }, { name: "f3", def: -4 }, { name: "p3", def: 57 }, { name: "d3", def: 0.001107815803330482 }, { name: "a4", def: 97 }, { name: "f4", def: 1 }, { name: "p4", def: 68 }, { name: "d4", def: 0.0011498156833428647 }],
     verified: true, priority: 0, flags: [], types: ["2D","BASE_SHAPE"],
-    funcNames: ["harmonograph_js_mo"],
-    funcs: `fn harmonograph_js_mo(t_: f32, a1: f32, f1: f32, p_1: f32, d1: f32, a2: f32, f2: f32, p_2: f32, d2: f32) -> f32 {
+    funcNames: ["atan2j","harmonograph_js_mo"],
+    funcs: `fn atan2j(y: f32, x: f32) -> f32 { if (x == 0.0 && y == 0.0) { return select(0.0, PI, (bitcast<u32>(x) >> 31u) == 1u) * select(1.0, -1.0, (bitcast<u32>(y) >> 31u) == 1u); } return atan2(y, x); }
+
+fn harmonograph_js_mo(t_: f32, a1: f32, f1: f32, p_1: f32, d1: f32, a2: f32, f2: f32, p_2: f32, d2: f32) -> f32 {
   var p1: f32 = ((p_1 * PI) / 180.0);
   var p2: f32 = ((p_2 * PI) / 180.0);
   return (((a1 * sin(((t_ * f1) + p1))) * exp(((-1 * d1) * t_))) + ((a2 * sin(((t_ * f2) + p2))) * exp(((-1 * d2) * t_))));
@@ -13207,6 +15865,8 @@ v.y += (y * ${w});
   "clifford_js": {
     params: [{ name: "a", def: -1.4 }, { name: "b", def: 1.6 }, { name: "c", def: 1 }, { name: "d", def: 0.7 }],
     verified: true, priority: 0, flags: [], types: ["2D"],
+    funcNames: ["atan2j"],
+    funcs: `fn atan2j(y: f32, x: f32) -> f32 { if (x == 0.0 && y == 0.0) { return select(0.0, PI, (bitcast<u32>(x) >> 31u) == 1u) * select(1.0, -1.0, (bitcast<u32>(y) >> 31u) == 1u); } return atan2(y, x); }`,
     code: (w, p) => `{
 var x: f32 = (sin((${p[0]} * t.y)) + (${p[2]} * cos((${p[0]} * t.x))));
 var y: f32 = (sin((${p[1]} * t.x)) + (${p[3]} * cos((${p[1]} * t.y))));
@@ -13217,6 +15877,8 @@ v.y += (y * ${w});
   "svensson_js": {
     params: [{ name: "a", def: 1.4 }, { name: "b", def: 1.56 }, { name: "c", def: 1.4 }, { name: "d", def: -6.56 }],
     verified: true, priority: 0, flags: [], types: ["2D"],
+    funcNames: ["atan2j"],
+    funcs: `fn atan2j(y: f32, x: f32) -> f32 { if (x == 0.0 && y == 0.0) { return select(0.0, PI, (bitcast<u32>(x) >> 31u) == 1u) * select(1.0, -1.0, (bitcast<u32>(y) >> 31u) == 1u); } return atan2(y, x); }`,
     code: (w, p) => `{
 var x: f32 = ((${p[3]} * sin((${p[0]} * t.x))) - sin((${p[1]} * t.y)));
 var y: f32 = ((${p[2]} * cos((${p[0]} * t.x))) + cos((${p[1]} * t.y)));
@@ -13227,6 +15889,8 @@ v.y = (y * ${w});
   "lorenz_js": {
     params: [{ name: "a", def: 10 }, { name: "b", def: 28 }, { name: "c", def: 1.66 }, { name: "h", def: 0.00001 }, { name: "centerx", def: 0 }, { name: "centery", def: 0 }, { name: "scale", def: 1000 }],
     verified: true, priority: 0, flags: ["3d","dc","z"], types: ["3D","DC"],
+    funcNames: ["atan2j"],
+    funcs: `fn atan2j(y: f32, x: f32) -> f32 { if (x == 0.0 && y == 0.0) { return select(0.0, PI, (bitcast<u32>(x) >> 31u) == 1u) * select(1.0, -1.0, (bitcast<u32>(y) >> 31u) == 1u); } return atan2(y, x); }`,
     code: (w, p) => `{
 var bdcs: f32 = (1.0 / select(${p[6]}, 0.00001, (${p[6]} == 0.0)));
 var x: f32 = (t.x + ((${p[3]} * ${p[0]}) * (t.y - t.x)));
@@ -13241,6 +15905,8 @@ pz_ += (z * ${w});
   "pre_spherical": {
     params: [],
     verified: true, priority: -1, flags: [], types: ["2D","PRE"],
+    funcNames: ["atan2j"],
+    funcs: `fn atan2j(y: f32, x: f32) -> f32 { if (x == 0.0 && y == 0.0) { return select(0.0, PI, (bitcast<u32>(x) >> 31u) == 1u) * select(1.0, -1.0, (bitcast<u32>(y) >> 31u) == 1u); } return atan2(y, x); }`,
     code: (w, _p) => `{
 var rinv_: f32 = 1.0 / r;
 var r_: f32 = (${w} / (((t.x * t.x) + (t.y * t.y)) + 0.000001));
@@ -13249,7 +15915,7 @@ t.y = (t.y * r_);
 r2 = ((t.x * t.x) + (t.y * t.y));
 r = sqrt(r2);
 rinv_ = (1.0 / r);
-th = atan2(t.x, t.y);
+th = atan2j(t.x, t.y);
 ph = ((0.5 * PI) - th);
 if ((ph > PI)) {
   ph -= (2.0 * PI);
@@ -13259,6 +15925,8 @@ if ((ph > PI)) {
   "post_spherical": {
     params: [],
     verified: true, priority: 1, flags: [], types: ["2D","POST"],
+    funcNames: ["atan2j"],
+    funcs: `fn atan2j(y: f32, x: f32) -> f32 { if (x == 0.0 && y == 0.0) { return select(0.0, PI, (bitcast<u32>(x) >> 31u) == 1u) * select(1.0, -1.0, (bitcast<u32>(y) >> 31u) == 1u); } return atan2(y, x); }`,
     code: (w, _p) => `{
 var r_: f32 = (${w} / (((v.x * v.x) + (v.y * v.y)) + 0.000001));
 v.x = (v.x * r_);
@@ -13268,8 +15936,10 @@ v.y = (v.y * r_);
   "pTransform": {
     params: [{ name: "rotate", def: 0.3 }, { name: "power", def: 2 }, { name: "move", def: 0.4 }, { name: "split", def: 0 }, { name: "use_log", def: 1 }],
     verified: true, priority: 0, flags: [], types: ["2D"],
-    funcNames: ["roundc"],
-    funcs: `fn roundc(x: f32) -> f32 { return sign(x) * floor(abs(x) + 0.5); }`,
+    funcNames: ["roundc","atan2j"],
+    funcs: `fn roundc(x: f32) -> f32 { return sign(x) * floor(abs(x) + 0.5); }
+
+fn atan2j(y: f32, x: f32) -> f32 { if (x == 0.0 && y == 0.0) { return select(0.0, PI, (bitcast<u32>(x) >> 31u) == 1u) * select(1.0, -1.0, (bitcast<u32>(y) >> 31u) == 1u); } return atan2(y, x); }`,
     code: (w, p) => `{
 var use_log: i32 = i32(roundc(min(max(${p[4]}, 0.0), 1.0)));
 var power: i32 = i32(roundc(${p[1]}));
@@ -13287,17 +15957,175 @@ v.x += ((${w} * rho) * cos(theta));
 v.y += ((${w} * rho) * sin(theta));
 }`,
   },
+  "dc_dmodulus": {
+    params: [{ name: "x", def: 2 }, { name: "y", def: 2 }, { name: "angle", def: 45 }, { name: "shiftx", def: 0 }, { name: "shifty", def: 0 }, { name: "color1", def: 0 }, { name: "speed1", def: 0 }, { name: "color2", def: 1 }, { name: "speed2", def: 0 }, { name: "square", def: 1 }],
+    verified: true, priority: 0, flags: ["dc","state","z"], types: ["2D","DC"],
+    funcNames: ["jwx_dc_dmodulus_inited_","jwx_dc_dmodulus_oldColor","jwx_dc_dmodulus_newColor","jwx_dc_dmodulus__xr","jwx_dc_dmodulus__yr","jwx_dc_dmodulus_c11","jwx_dc_dmodulus_c12","jwx_dc_dmodulus_c21","jwx_dc_dmodulus_c22","atan2j"],
+    funcs: `fn atan2j(y: f32, x: f32) -> f32 { if (x == 0.0 && y == 0.0) { return select(0.0, PI, (bitcast<u32>(x) >> 31u) == 1u) * select(1.0, -1.0, (bitcast<u32>(y) >> 31u) == 1u); } return atan2(y, x); }
+
+var<private> jwx_dc_dmodulus_inited_: f32 = 0.0;
+
+var<private> jwx_dc_dmodulus_oldColor: f32 = 0.0;
+
+var<private> jwx_dc_dmodulus_newColor: f32 = 0.0;
+
+var<private> jwx_dc_dmodulus__xr: f32 = 0.0;
+
+var<private> jwx_dc_dmodulus__yr: f32 = 0.0;
+
+var<private> jwx_dc_dmodulus_c11: f32 = 0.0;
+
+var<private> jwx_dc_dmodulus_c12: f32 = 0.0;
+
+var<private> jwx_dc_dmodulus_c21: f32 = 0.0;
+
+var<private> jwx_dc_dmodulus_c22: f32 = 0.0;`,
+    code: (w, p) => `{
+var p2_: f32 = ${p[2]};
+var coscos: f32 = 0;
+var sincos: f32 = 0;
+var sinsin: f32 = 0;
+var rangle: f32 = 0;
+if ((jwx_dc_dmodulus_inited_ == 0.0)) {
+  jwx_dc_dmodulus_inited_ = 1.0;
+  jwx_dc_dmodulus__xr = 0;
+  jwx_dc_dmodulus__yr = 0;
+  jwx_dc_dmodulus_c11 = 0;
+  jwx_dc_dmodulus_c12 = 0;
+  jwx_dc_dmodulus_c21 = 0;
+  jwx_dc_dmodulus_c22 = 0;
+  jwx_dc_dmodulus_oldColor = 0;
+  jwx_dc_dmodulus_newColor = 0;
+  {
+    jwx_dc_dmodulus__xr = (2.0 * ${p[0]});
+    jwx_dc_dmodulus__yr = (2.0 * ${p[1]});
+    jwx_dc_dmodulus_c11 = ((1 + ${p[6]}) / 2);
+    jwx_dc_dmodulus_c12 = ((${p[5]} * (1 - ${p[6]})) / 2);
+    jwx_dc_dmodulus_c21 = ((1 + ${p[8]}) / 2);
+    jwx_dc_dmodulus_c22 = ((${p[7]} * (1 - ${p[8]})) / 2);
+    jwx_dc_dmodulus_oldColor = 0.5;
+  }
+}
+{
+  p2_ = p2_;
+  rangle = ((PI * p2_) / 180.0);
+  coscos = (cos(rangle) * cos(rangle));
+  sinsin = (sin(rangle) * sin(rangle));
+  sincos = (sin(rangle) * cos(rangle));
+}
+var xnew: f32;
+var ynew: f32;
+var xt: f32;
+var yt: f32;
+var p2: f32 = (coscos / (coscos + sinsin));
+var p1: f32 = (sinsin / (coscos + sinsin));
+if ((t.x > ${p[0]})) {
+  xnew = (-(${p[0]}) + ((t.x + ${p[0]}) % jwx_dc_dmodulus__xr));
+} else if ((t.x < -(${p[0]}))) {
+  xnew = (${p[0]} - ((${p[0]} - t.x) % jwx_dc_dmodulus__xr));
+} else {
+  xnew = t.x;
+}
+if ((t.y > ${p[1]})) {
+  ynew = (-(${p[1]}) + ((t.y + ${p[1]}) % jwx_dc_dmodulus__yr));
+} else if ((t.y < -(${p[1]}))) {
+  ynew = (${p[1]} - ((${p[1]} - t.y) % jwx_dc_dmodulus__yr));
+} else {
+  ynew = t.y;
+}
+var p_: f32 = rnd(rs);
+if ((p2_ <= 45.0)) {
+  if ((p_ < p2)) {
+    xt = (((xnew * coscos) + (ynew * sincos)) + ${p[0]});
+    yt = (((-xnew * sincos) + (ynew * coscos)) - ${p[1]});
+    jwx_dc_dmodulus_newColor = ((jwx_dc_dmodulus_oldColor * jwx_dc_dmodulus_c11) + jwx_dc_dmodulus_c12);
+  } else {
+    xt = ((xnew * sincos) + (ynew * sinsin));
+    yt = ((-xnew * sinsin) + (ynew * sincos));
+    jwx_dc_dmodulus_newColor = ((jwx_dc_dmodulus_oldColor * jwx_dc_dmodulus_c21) + jwx_dc_dmodulus_c22);
+  }
+} else {
+  if ((p_ < p1)) {
+    xt = ((xnew * sincos) + (ynew * sinsin));
+    yt = ((-xnew * sinsin) + (ynew * sincos));
+    jwx_dc_dmodulus_newColor = ((jwx_dc_dmodulus_oldColor * jwx_dc_dmodulus_c21) + jwx_dc_dmodulus_c22);
+  } else {
+    xt = (((xnew * coscos) + (ynew * sincos)) + ${p[0]});
+    yt = (((-xnew * sincos) + (ynew * coscos)) - ${p[1]});
+    jwx_dc_dmodulus_newColor = ((jwx_dc_dmodulus_oldColor * jwx_dc_dmodulus_c11) + jwx_dc_dmodulus_c12);
+  }
+}
+xt += ${p[3]};
+yt += ${p[4]};
+if ((min(max(${p[9]}, 0.0), 1.0) == 0)) {
+  v.x += (${w} * xt);
+  v.y += (${w} * yt);
+} else {
+  if ((xt > ${p[0]})) {
+    v.x += (${w} * (-(${p[0]}) + ((xt + ${p[0]}) % jwx_dc_dmodulus__xr)));
+  } else if ((xt < -(${p[0]}))) {
+    v.x += (${w} * (${p[0]} - ((${p[0]} - xt) % jwx_dc_dmodulus__xr)));
+  } else {
+    v.x += (${w} * xt);
+  }
+  if ((yt > ${p[1]})) {
+    v.y += (${w} * (-(${p[1]}) + ((yt + ${p[1]}) % jwx_dc_dmodulus__yr)));
+  } else if ((yt < -(${p[1]}))) {
+    v.y += (${w} * (${p[1]} - ((${p[1]} - yt) % jwx_dc_dmodulus__yr)));
+  } else {
+    v.y += (${w} * yt);
+  }
+}
+if (false) {
+  pz_ += (${w} * z_);
+}
+(*cp) = (jwx_dc_dmodulus_newColor % 1);
+jwx_dc_dmodulus_oldColor = jwx_dc_dmodulus_newColor;
+}`,
+  },
+  "dustpoint": {
+    params: [],
+    verified: true, priority: 0, flags: ["z"], types: ["2D","SIMULATION","BASE_SHAPE"],
+    funcNames: ["atan2j"],
+    funcs: `fn atan2j(y: f32, x: f32) -> f32 { if (x == 0.0 && y == 0.0) { return select(0.0, PI, (bitcast<u32>(x) >> 31u) == 1u) * select(1.0, -1.0, (bitcast<u32>(y) >> 31u) == 1u); } return atan2(y, x); }`,
+    code: (w, _p) => `{
+var x: f32;
+var y: f32;
+var p_: f32;
+var r_: f32;
+p_ = f32(select(-1, 1, (rnd(rs) < 0.5)));
+r_ = sqrt(((t.x * t.x) + (t.y * t.y)));
+var w_: f32 = rnd(rs);
+if ((w_ < 0.5)) {
+  x = ((t.x / r_) - 1);
+  y = ((p_ * t.y) / r_);
+} else if ((w_ < 0.75)) {
+  x = (t.x / 3.0);
+  y = (t.y / 3.0);
+} else {
+  x = ((t.x / 3.0) + (2.0 / 3.0));
+  y = (t.y / 3.0);
+}
+v.x += (x * ${w});
+v.y += (y * ${w});
+if (false) {
+  pz_ += (${w} * z_);
+}
+}`,
+  },
   "apollony": {
     params: [],
     verified: true, priority: 0, flags: [], types: ["2D"],
-    funcNames: ["powc"],
+    funcNames: ["powc","atan2j"],
     funcs: `fn powc(x: f32, y: f32) -> f32 {
   if (x >= 0.0) { return pow(x, y); }
   let yi = round(y);
   if (abs(y - yi) > 1e-6) { return pow(x, y); }
   let m = pow(-x, y);
   return select(m, -m, (i32(yi) & 1) != 0);
-}`,
+}
+
+fn atan2j(y: f32, x: f32) -> f32 { if (x == 0.0 && y == 0.0) { return select(0.0, PI, (bitcast<u32>(x) >> 31u) == 1u) * select(1.0, -1.0, (bitcast<u32>(y) >> 31u) == 1u); } return atan2(y, x); }`,
     code: (w, _p) => `{
 var x: f32;
 var y: f32;
@@ -13328,6 +16156,8 @@ v.y += (y * ${w});
   "chrysanthemum": {
     params: [],
     verified: true, priority: 0, flags: [], types: ["BASE_SHAPE"],
+    funcNames: ["atan2j"],
+    funcs: `fn atan2j(y: f32, x: f32) -> f32 { if (x == 0.0 && y == 0.0) { return select(0.0, PI, (bitcast<u32>(x) >> 31u) == 1u) * select(1.0, -1.0, (bitcast<u32>(y) >> 31u) == 1u); } return atan2(y, x); }`,
     code: (w, _p) => `{
 var u: f32 = ((21.0 * PI) * rnd(rs));
 var p4: f32 = sin(((17.0 * u) / 3.0));
@@ -13341,8 +16171,10 @@ v.y += (r_ * sin(u));
   "seashell3D": {
     params: [{ name: "final_radius", def: 0.25 }, { name: "height", def: 3.5 }, { name: "inner_radius", def: 0.4 }, { name: "nSpirals", def: 3 }],
     verified: true, priority: 0, flags: ["z"], types: ["BASE_SHAPE"],
-    funcNames: ["roundc"],
-    funcs: `fn roundc(x: f32) -> f32 { return sign(x) * floor(abs(x) + 0.5); }`,
+    funcNames: ["roundc","atan2j"],
+    funcs: `fn roundc(x: f32) -> f32 { return sign(x) * floor(abs(x) + 0.5); }
+
+fn atan2j(y: f32, x: f32) -> f32 { if (x == 0.0 && y == 0.0) { return select(0.0, PI, (bitcast<u32>(x) >> 31u) == 1u) * select(1.0, -1.0, (bitcast<u32>(y) >> 31u) == 1u); } return atan2(y, x); }`,
     code: (w, p) => `{
 var nSpirals: i32 = i32(roundc(f32(i32(${p[3]}))));
 var s: f32;
@@ -13360,6 +16192,8 @@ pz_ += (z * ${w});
   "threepoint_js": {
     params: [],
     verified: true, priority: 0, flags: [], types: ["2D"],
+    funcNames: ["atan2j"],
+    funcs: `fn atan2j(y: f32, x: f32) -> f32 { if (x == 0.0 && y == 0.0) { return select(0.0, PI, (bitcast<u32>(x) >> 31u) == 1u) * select(1.0, -1.0, (bitcast<u32>(y) >> 31u) == 1u); } return atan2(y, x); }`,
     code: (w, _p) => `{
 var x: f32;
 var y: f32;
@@ -13377,9 +16211,110 @@ v.x += (x * ${w});
 v.y += (y * ${w});
 }`,
   },
+  "macmillan": {
+    params: [{ name: "a", def: 1.6 }, { name: "b", def: 0.4 }, { name: "startx", def: 0.1 }, { name: "starty", def: 0.1 }],
+    verified: true, priority: 0, flags: ["state"], types: ["2D"],
+    funcNames: ["jwx_macmillan_inited_","jwx_macmillan_xa","jwx_macmillan_x","jwx_macmillan_y","atan2j"],
+    funcs: `fn atan2j(y: f32, x: f32) -> f32 { if (x == 0.0 && y == 0.0) { return select(0.0, PI, (bitcast<u32>(x) >> 31u) == 1u) * select(1.0, -1.0, (bitcast<u32>(y) >> 31u) == 1u); } return atan2(y, x); }
+
+var<private> jwx_macmillan_inited_: f32 = 0.0;
+
+var<private> jwx_macmillan_xa: f32 = 0.0;
+
+var<private> jwx_macmillan_x: f32 = 0.0;
+
+var<private> jwx_macmillan_y: f32 = 0.0;`,
+    code: (w, p) => `{
+var N: f32 = 1;
+if ((jwx_macmillan_inited_ == 0.0)) {
+  jwx_macmillan_inited_ = 1.0;
+  jwx_macmillan_xa = 0;
+  jwx_macmillan_x = 0;
+  jwx_macmillan_y = 0;
+  {
+    jwx_macmillan_xa = ${p[2]};
+    jwx_macmillan_y = ${p[3]};
+  }
+}
+jwx_macmillan_x = jwx_macmillan_y;
+jwx_macmillan_y = ((-jwx_macmillan_xa + ((2.0 * ${p[0]}) * (jwx_macmillan_y / (1 + (jwx_macmillan_y * jwx_macmillan_y))))) + (${p[1]} * jwx_macmillan_y));
+jwx_macmillan_xa = jwx_macmillan_x;
+jwx_macmillan_x = jwx_macmillan_y;
+jwx_macmillan_y = ((-jwx_macmillan_xa + ((2 * ${p[0]}) * (jwx_macmillan_y / (1 + (jwx_macmillan_y * jwx_macmillan_y))))) + (${p[1]} * jwx_macmillan_y));
+v.x += (${w} * jwx_macmillan_x);
+v.y += (${w} * jwx_macmillan_y);
+jwx_macmillan_xa = jwx_macmillan_x;
+}`,
+  },
+  "disc3": {
+    params: [{ name: "a", def: 1 }, { name: "b", def: 1 }, { name: "c", def: 1 }, { name: "d", def: 1 }, { name: "e", def: 1 }, { name: "f", def: 1 }, { name: "g", def: 1 }, { name: "h", def: 1 }],
+    verified: true, priority: 0, flags: ["z"], types: ["2D"],
+    funcNames: ["atan2j"],
+    funcs: `fn atan2j(y: f32, x: f32) -> f32 { if (x == 0.0 && y == 0.0) { return select(0.0, PI, (bitcast<u32>(x) >> 31u) == 1u) * select(1.0, -1.0, (bitcast<u32>(y) >> 31u) == 1u); } return atan2(y, x); }`,
+    code: (w, p) => `{
+var rPI: f32 = (PI * sqrt(((((t.x * ${p[3]}) * t.x) * ${p[4]}) + (((t.y * ${p[5]}) * t.y) * ${p[6]}))));
+var sinr: f32 = (sin(rPI) * ${p[0]});
+var cosr: f32 = (cos(rPI) * ${p[1]});
+var r_: f32 = (((${w} * th) / PI) * ${p[2]});
+v.x += ((sinr * ${p[7]}) * r_);
+v.y += ((cosr * ${p[7]}) * r_);
+if (false) {
+  pz_ += (${w} * z_);
+}
+}`,
+  },
+  "lazysensen": {
+    params: [{ name: "scale_x", def: 1 }, { name: "scale_y", def: 1 }, { name: "scale_z", def: 0 }],
+    verified: true, priority: 0, flags: ["3d","z"], types: ["3D"],
+    funcNames: ["atan2j"],
+    funcs: `fn atan2j(y: f32, x: f32) -> f32 { if (x == 0.0 && y == 0.0) { return select(0.0, PI, (bitcast<u32>(x) >> 31u) == 1u) * select(1.0, -1.0, (bitcast<u32>(y) >> 31u) == 1u); } return atan2(y, x); }`,
+    code: (w, p) => `{
+if ((${p[0]} != 0.0)) {
+  var nr: f32 = f32(i32(floor((t.x * ${p[0]}))));
+  if ((nr >= 0)) {
+    if (((nr % 2) == 1)) {
+      t.x = -t.x;
+    }
+  } else {
+    if (((nr % 2) == 0)) {
+      t.x = -t.x;
+    }
+  }
+}
+if ((${p[1]} != 0.0)) {
+  var nr: f32 = f32(i32(floor((t.y * ${p[1]}))));
+  if ((nr >= 0)) {
+    if (((nr % 2) == 1)) {
+      t.y = -t.y;
+    }
+  } else {
+    if (((nr % 2) == 0)) {
+      t.y = -t.y;
+    }
+  }
+}
+if ((${p[2]} != 0.0)) {
+  var nr: f32 = f32(i32(floor((z_ * ${p[2]}))));
+  if ((nr >= 0)) {
+    if (((nr % 2) == 1)) {
+      z_ = -z_;
+    }
+  } else {
+    if (((nr % 2) == 0)) {
+      z_ = -z_;
+    }
+  }
+}
+v.x += (${w} * t.x);
+v.y += (${w} * t.y);
+pz_ += (${w} * z_);
+}`,
+  },
   "projective": {
     params: [{ name: "A", def: 0 }, { name: "B", def: -0.4 }, { name: "C", def: 1 }, { name: "A1", def: 1 }, { name: "B1", def: 0.1 }, { name: "C1", def: 0 }, { name: "A2", def: 0 }, { name: "B2", def: 1.2 }, { name: "C2", def: 0 }],
     verified: true, priority: 0, flags: [], types: ["2D"],
+    funcNames: ["atan2j"],
+    funcs: `fn atan2j(y: f32, x: f32) -> f32 { if (x == 0.0 && y == 0.0) { return select(0.0, PI, (bitcast<u32>(x) >> 31u) == 1u) * select(1.0, -1.0, (bitcast<u32>(y) >> 31u) == 1u); } return atan2(y, x); }`,
     code: (w, p) => `{
 var U: f32 = (((${p[0]} * t.x) + (${p[1]} * t.y)) + ${p[2]});
 v.x += ((${w} * (((${p[3]} * t.x) + (${p[4]} * t.y)) + ${p[5]})) / U);
@@ -13389,6 +16324,8 @@ v.y += ((${w} * (((${p[6]} * t.x) + (${p[7]} * t.y)) + ${p[8]})) / U);
   "lozi": {
     params: [{ name: "a", def: 0.5 }, { name: "b", def: 1 }, { name: "c", def: 1 }],
     verified: true, priority: 0, flags: [], types: ["2D"],
+    funcNames: ["atan2j"],
+    funcs: `fn atan2j(y: f32, x: f32) -> f32 { if (x == 0.0 && y == 0.0) { return select(0.0, PI, (bitcast<u32>(x) >> 31u) == 1u) * select(1.0, -1.0, (bitcast<u32>(y) >> 31u) == 1u); } return atan2(y, x); }`,
     code: (w, p) => `{
 v.x += (((${p[2]} - (${p[0]} * abs(t.x))) + t.y) * ${w});
 v.y += ((${p[1]} * t.x) * ${w});
@@ -13397,8 +16334,10 @@ v.y += ((${p[1]} * t.x) * ${w});
   "vibration2": {
     params: [{ name: "dir", def: 0 }, { name: "angle", def: 1.5708 }, { name: "freq", def: 1 }, { name: "amp", def: 0.25 }, { name: "phase", def: 0 }, { name: "dir2", def: 1.5708 }, { name: "angle2", def: 1.5708 }, { name: "freq2", def: 1 }, { name: "amp2", def: 0.25 }, { name: "phase2", def: 0 }, { name: "dm", def: 0 }, { name: "dmfreq", def: 0.1 }, { name: "tm", def: 0 }, { name: "tmfreq", def: 0.1 }, { name: "fm", def: 0 }, { name: "fmfreq", def: 0.1 }, { name: "am", def: 0 }, { name: "amfreq", def: 0.1 }, { name: "d2m", def: 0 }, { name: "d2mfreq", def: 0.1 }, { name: "t2m", def: 0 }, { name: "t2mfreq", def: 0.1 }, { name: "f2m", def: 0 }, { name: "f2mfreq", def: 0.1 }, { name: "a2m", def: 0 }, { name: "a2mfreq", def: 0.1 }],
     verified: true, priority: 0, flags: [], types: ["2D"],
-    funcNames: ["vibration2_modulate"],
-    funcs: `fn vibration2_modulate(amp: f32, freq: f32, x: f32) -> f32 {
+    funcNames: ["atan2j","vibration2_modulate"],
+    funcs: `fn atan2j(y: f32, x: f32) -> f32 { if (x == 0.0 && y == 0.0) { return select(0.0, PI, (bitcast<u32>(x) >> 31u) == 1u) * select(1.0, -1.0, (bitcast<u32>(y) >> 31u) == 1u); } return atan2(y, x); }
+
+fn vibration2_modulate(amp: f32, freq: f32, x: f32) -> f32 {
   return (amp * cos((((x * freq) * PI) * 2.0)));
 }`,
     code: (w, p) => `{
@@ -13441,6 +16380,8 @@ v.y += (${w} * y);
   "pulse": {
     params: [{ name: "freqx", def: 2 }, { name: "freqy", def: 2 }, { name: "scalex", def: 1 }, { name: "scaley", def: 1 }],
     verified: true, priority: 0, flags: [], types: ["2D"],
+    funcNames: ["atan2j"],
+    funcs: `fn atan2j(y: f32, x: f32) -> f32 { if (x == 0.0 && y == 0.0) { return select(0.0, PI, (bitcast<u32>(x) >> 31u) == 1u) * select(1.0, -1.0, (bitcast<u32>(y) >> 31u) == 1u); } return atan2(y, x); }`,
     code: (w, p) => `{
 v.x += (${w} * (t.x + (${p[2]} * sin((t.x * ${p[0]})))));
 v.y += (${w} * (t.y + (${p[3]} * sin((t.y * ${p[1]})))));
@@ -13449,6 +16390,8 @@ v.y += (${w} * (t.y + (${p[3]} * sin((t.y * ${p[1]})))));
   "anamorphcyl": {
     params: [{ name: "a", def: 1 }, { name: "b", def: 1.3 }, { name: "k", def: 3 }],
     verified: true, priority: 0, flags: [], types: ["2D"],
+    funcNames: ["atan2j"],
+    funcs: `fn atan2j(y: f32, x: f32) -> f32 { if (x == 0.0 && y == 0.0) { return select(0.0, PI, (bitcast<u32>(x) >> 31u) == 1u) * select(1.0, -1.0, (bitcast<u32>(y) >> 31u) == 1u); } return atan2(y, x); }`,
     code: (w, p) => `{
 var xt: f32 = ((${p[0]} * (t.y + ${p[1]})) * cos((${p[2]} * t.x)));
 var yt: f32 = ((${p[0]} * (t.y + ${p[1]})) * sin((${p[2]} * t.x)));
@@ -13459,6 +16402,8 @@ v.y = (yt * ${w});
   "hyperbolicellipse": {
     params: [{ name: "a", def: 1 }],
     verified: true, priority: 0, flags: [], types: ["2D"],
+    funcNames: ["atan2j"],
+    funcs: `fn atan2j(y: f32, x: f32) -> f32 { if (x == 0.0 && y == 0.0) { return select(0.0, PI, (bitcast<u32>(x) >> 31u) == 1u) * select(1.0, -1.0, (bitcast<u32>(y) >> 31u) == 1u); } return atan2(y, x); }`,
     code: (w, p) => `{
 var xt: f32;
 var yt: f32;
@@ -13471,6 +16416,8 @@ v.y = (yt * ${w});
   "cylinder2": {
     params: [],
     verified: true, priority: 0, flags: [], types: ["2D"],
+    funcNames: ["atan2j"],
+    funcs: `fn atan2j(y: f32, x: f32) -> f32 { if (x == 0.0 && y == 0.0) { return select(0.0, PI, (bitcast<u32>(x) >> 31u) == 1u) * select(1.0, -1.0, (bitcast<u32>(y) >> 31u) == 1u); } return atan2(y, x); }`,
     code: (w, _p) => `{
 v.x += ((${w} * t.x) / sqrt(((t.x * t.x) + 1.0)));
 v.y += (${w} * t.y);
@@ -13479,6 +16426,8 @@ v.y += (${w} * t.y);
   "affine3D": {
     params: [{ name: "translateX", def: 0 }, { name: "translateY", def: 0 }, { name: "translateZ", def: 0 }, { name: "scaleX", def: 1 }, { name: "scaleY", def: 1 }, { name: "scaleZ", def: 1 }, { name: "rotateX", def: 0 }, { name: "rotateY", def: 0 }, { name: "rotateZ", def: 0 }, { name: "shearXY", def: 0 }, { name: "shearXZ", def: 0 }, { name: "shearYX", def: 0 }, { name: "shearYZ", def: 0 }, { name: "shearZX", def: 0 }, { name: "shearZY", def: 0 }],
     verified: true, priority: 0, flags: ["3d","z"], types: ["3D"],
+    funcNames: ["atan2j"],
+    funcs: `fn atan2j(y: f32, x: f32) -> f32 { if (x == 0.0 && y == 0.0) { return select(0.0, PI, (bitcast<u32>(x) >> 31u) == 1u) * select(1.0, -1.0, (bitcast<u32>(y) >> 31u) == 1u); } return atan2(y, x); }`,
     code: (w, p) => `{
 var xa: f32 = ((${p[6]} * PI) / 180.0);
 var _sinX: f32 = sin(xa);
@@ -13504,6 +16453,8 @@ if (_hasShear) {
   "q_ode": {
     params: [{ name: "q_ode01", def: 0 }, { name: "q_ode02", def: 1 }, { name: "q_ode03", def: 0.20339418816290045 }, { name: "q_ode04", def: 0.37074980026044746 }, { name: "q_ode05", def: 0.33656602220251086 }, { name: "q_ode06", def: 0.25094292096967874 }, { name: "q_ode07", def: 0 }, { name: "q_ode08", def: 1 }, { name: "q_ode09", def: -0.500623620900182 }, { name: "q_ode10", def: 0.17642536291683664 }, { name: "q_ode11", def: -0.6801785648842082 }, { name: "q_ode12", def: 0.7037435393116376 }],
     verified: true, priority: 0, flags: [], types: ["2D"],
+    funcNames: ["atan2j"],
+    funcs: `fn atan2j(y: f32, x: f32) -> f32 { if (x == 0.0 && y == 0.0) { return select(0.0, PI, (bitcast<u32>(x) >> 31u) == 1u) * select(1.0, -1.0, (bitcast<u32>(y) >> 31u) == 1u); } return atan2(y, x); }`,
     code: (w, p) => `{
 v.x += ((${p[0]} + ((${w} * ${p[1]}) * t.x)) + ((${p[2]} * t.x) * t.x));
 v.x += ((((${p[3]} * t.x) * t.y) + (${p[4]} * t.y)) + ((${p[5]} * t.y) * t.y));
@@ -13514,6 +16465,8 @@ v.y += ((((${p[9]} * t.x) * t.y) + ((${w} * ${p[10]}) * t.y)) + ((${p[11]} * t.y
   "starfractal": {
     params: [{ name: "m", def: 3 }],
     verified: true, priority: 0, flags: [], types: ["2D","SIMULATION","BASE_SHAPE"],
+    funcNames: ["atan2j"],
+    funcs: `fn atan2j(y: f32, x: f32) -> f32 { if (x == 0.0 && y == 0.0) { return select(0.0, PI, (bitcast<u32>(x) >> 31u) == 1u) * select(1.0, -1.0, (bitcast<u32>(y) >> 31u) == 1u); } return atan2(y, x); }`,
     code: (w, p) => `{
 var a: array<f32, 25>;
 var b: array<f32, 25>;
@@ -13543,6 +16496,8 @@ v.y = (y * ${w});
   "swirl3D_wf": {
     params: [{ name: "n", def: 0 }],
     verified: true, priority: 0, flags: ["3d","dc","z"], types: ["3D","DC"],
+    funcNames: ["atan2j"],
+    funcs: `fn atan2j(y: f32, x: f32) -> f32 { if (x == 0.0 && y == 0.0) { return select(0.0, PI, (bitcast<u32>(x) >> 31u) == 1u) * select(1.0, -1.0, (bitcast<u32>(y) >> 31u) == 1u); } return atan2(y, x); }`,
     code: (w, p) => `{
 var rad: f32 = r;
 var ang: f32 = ph;
@@ -13555,7 +16510,7 @@ pz_ += (${w} * sin(((6.0 * cos(rad)) - (f32(i32(${p[0]})) * ang))));
   "jac_asn": {
     params: [{ name: "kr", def: 0.5 }, { name: "ki", def: 0 }, { name: "type", def: 1 }],
     verified: true, priority: 0, flags: [], types: ["2D"],
-    funcNames: ["Complex","Complex_Init","Complex_sin","Complex_times_ov1","Complex_minus","Complex_mag","Complex_arg","Complex_sqrt","Complex_plus","Complex_ln","Complex_times","Complex_asin","Complex_acos","Complex_asinh","Complex_Copy","Complex_norm","Complex_divideBy","Complex_tan"],
+    funcNames: ["Complex","atan2j","Complex_Init","Complex_sin","Complex_times_ov1","Complex_minus","Complex_mag","Complex_arg","Complex_sqrt","Complex_plus","Complex_ln","Complex_times","Complex_asin","Complex_acos","Complex_asinh","Complex_Copy","Complex_norm","Complex_divideBy","Complex_tan"],
     funcs: `struct Complex {
   per_fix: f32,
   re: f32,
@@ -13563,6 +16518,8 @@ pz_ += (${w} * sin(((6.0 * cos(rad)) - (f32(i32(${p[0]})) * ang))));
   save_re: f32,
   save_im: f32,
 }
+
+fn atan2j(y: f32, x: f32) -> f32 { if (x == 0.0 && y == 0.0) { return select(0.0, PI, (bitcast<u32>(x) >> 31u) == 1u) * select(1.0, -1.0, (bitcast<u32>(y) >> 31u) == 1u); } return atan2(y, x); }
 
 fn Complex_Init(c: ptr<function, Complex>, Rp: f32, Ip: f32) {
   (*c).re = Rp;
@@ -13598,7 +16555,7 @@ fn Complex_mag(z: Complex) -> f32 {
 
 fn Complex_arg(z: Complex) -> f32 {
   var result: f32;
-  result = atan2(z.im, z.re);
+  result = atan2j(z.im, z.re);
   return result;
 }
 
@@ -13763,6 +16720,8 @@ v.y += phi.im;
   "invsquircular": {
     params: [],
     verified: true, priority: 0, flags: [], types: ["2D"],
+    funcNames: ["atan2j"],
+    funcs: `fn atan2j(y: f32, x: f32) -> f32 { if (x == 0.0 && y == 0.0) { return select(0.0, PI, (bitcast<u32>(x) >> 31u) == 1u) * select(1.0, -1.0, (bitcast<u32>(y) >> 31u) == 1u); } return atan2(y, x); }`,
     code: (w, _p) => `{
 var M_SQRT2: f32 = sqrt(2.0);
 if ((${w} != 0.0)) {
@@ -13779,6 +16738,8 @@ if ((${w} != 0.0)) {
   "squircular": {
     params: [],
     verified: true, priority: 0, flags: [], types: ["2D"],
+    funcNames: ["atan2j"],
+    funcs: `fn atan2j(y: f32, x: f32) -> f32 { if (x == 0.0 && y == 0.0) { return select(0.0, PI, (bitcast<u32>(x) >> 31u) == 1u) * select(1.0, -1.0, (bitcast<u32>(y) >> 31u) == 1u); } return atan2(y, x); }`,
     code: (w, _p) => `{
 var u: f32 = t.x;
 var v_: f32 = t.y;
@@ -13795,6 +16756,8 @@ v.y += ((v_ / u) * r_);
   "pyramid": {
     params: [],
     verified: true, priority: 0, flags: ["z"], types: ["2D"],
+    funcNames: ["atan2j"],
+    funcs: `fn atan2j(y: f32, x: f32) -> f32 { if (x == 0.0 && y == 0.0) { return select(0.0, PI, (bitcast<u32>(x) >> 31u) == 1u) * select(1.0, -1.0, (bitcast<u32>(y) >> 31u) == 1u); } return atan2(y, x); }`,
     code: (w, _p) => `{
 var x: f32 = t.x;
 x = ((x * x) * x);
@@ -13811,14 +16774,16 @@ pz_ += (z * r_);
   "corners": {
     params: [{ name: "x", def: 1 }, { name: "y", def: 1 }, { name: "mult_x", def: 1 }, { name: "mult_y", def: 1 }, { name: "x_power", def: 0.75 }, { name: "y_power", def: 0.75 }, { name: "xy_power_add", def: 0 }, { name: "log_mode", def: 0 }, { name: "log_base", def: 2.71828 }],
     verified: true, priority: 0, flags: [], types: ["2D"],
-    funcNames: ["powc"],
+    funcNames: ["powc","atan2j"],
     funcs: `fn powc(x: f32, y: f32) -> f32 {
   if (x >= 0.0) { return pow(x, y); }
   let yi = round(y);
   if (abs(y - yi) > 1e-6) { return pow(x, y); }
   let m = pow(-x, y);
   return select(m, -m, (i32(yi) & 1) != 0);
-}`,
+}
+
+fn atan2j(y: f32, x: f32) -> f32 { if (x == 0.0 && y == 0.0) { return select(0.0, PI, (bitcast<u32>(x) >> 31u) == 1u) * select(1.0, -1.0, (bitcast<u32>(y) >> 31u) == 1u); } return atan2(y, x); }`,
     code: (w, p) => `{
 var xs: f32 = (t.x * t.x);
 var ys: f32 = (t.y * t.y);
@@ -13846,14 +16811,16 @@ if ((t.y > 0)) {
   "csc_squared": {
     params: [{ name: "csc_div", def: 1 }, { name: "cos_div", def: 1 }, { name: "tan_div", def: 1 }, { name: "csc_pow", def: 0.5 }, { name: "pi_mult", def: 0.5 }, { name: "csc_add", def: 0.25 }, { name: "scale_y", def: 1 }],
     verified: true, priority: 0, flags: [], types: ["2D"],
-    funcNames: ["powc"],
+    funcNames: ["powc","atan2j"],
     funcs: `fn powc(x: f32, y: f32) -> f32 {
   if (x >= 0.0) { return pow(x, y); }
   let yi = round(y);
   if (abs(y - yi) > 1e-6) { return pow(x, y); }
   let m = pow(-x, y);
   return select(m, -m, (i32(yi) & 1) != 0);
-}`,
+}
+
+fn atan2j(y: f32, x: f32) -> f32 { if (x == 0.0 && y == 0.0) { return select(0.0, PI, (bitcast<u32>(x) >> 31u) == 1u) * select(1.0, -1.0, (bitcast<u32>(y) >> 31u) == 1u); } return atan2(y, x); }`,
     code: (w, p) => `{
 var x: f32 = t.x;
 var y: f32 = t.y;
@@ -13866,14 +16833,16 @@ v.y += (((${w} * y) * fx) * ${p[6]});
   "atan2_spirals": {
     params: [{ name: "r_mult", def: 1.5 }, { name: "r_add", def: 1 }, { name: "xy2_mult", def: 1.125 }, { name: "xy2_add", def: 0.132 }, { name: "x_mult", def: 2 }, { name: "x_add", def: 0.25 }, { name: "yx_div", def: 1 }, { name: "yx_add", def: 0 }, { name: "yy_div", def: 1.25 }, { name: "yy_add", def: 0 }, { name: "sin_add", def: 0 }, { name: "y_mult", def: 1 }, { name: "r_power", def: 0.5 }, { name: "x2y2_power", def: 1 }],
     verified: true, priority: 0, flags: [], types: ["2D"],
-    funcNames: ["powc"],
+    funcNames: ["powc","atan2j"],
     funcs: `fn powc(x: f32, y: f32) -> f32 {
   if (x >= 0.0) { return pow(x, y); }
   let yi = round(y);
   if (abs(y - yi) > 1e-6) { return pow(x, y); }
   let m = pow(-x, y);
   return select(m, -m, (i32(yi) & 1) != 0);
-}`,
+}
+
+fn atan2j(y: f32, x: f32) -> f32 { if (x == 0.0 && y == 0.0) { return select(0.0, PI, (bitcast<u32>(x) >> 31u) == 1u) * select(1.0, -1.0, (bitcast<u32>(y) >> 31u) == 1u); } return atan2(y, x); }`,
     code: (w, p) => `{
 var x: f32 = t.x;
 var y: f32 = t.y;
@@ -13881,8 +16850,8 @@ var xs: f32 = (x * x);
 var ys: f32 = (y * y);
 var xy2: f32 = powc((xs + ys), ${p[13]});
 var r_: f32 = powc((xs + ys), ${p[12]});
-var fx: f32 = ((${p[4]} * atan2(((r_ * ${p[0]}) + ${p[1]}), ((xy2 * ${p[2]}) + ${p[3]}))) + ${p[5]});
-var fy: f32 = (sin((atan2(((y / ${p[8]}) + ${p[9]}), ((x / ${p[6]}) + ${p[7]})) + ${p[10]})) * ${p[11]});
+var fx: f32 = ((${p[4]} * atan2j(((r_ * ${p[0]}) + ${p[1]}), ((xy2 * ${p[2]}) + ${p[3]}))) + ${p[5]});
+var fy: f32 = (sin((atan2j(((y / ${p[8]}) + ${p[9]}), ((x / ${p[6]}) + ${p[7]})) + ${p[10]})) * ${p[11]});
 if ((x >= 0)) {
   v.x += (${w} * (-fx + PI));
 } else {
@@ -13894,8 +16863,10 @@ v.y += (${w} * fy);
   "intersection": {
     params: [{ name: "xwidth", def: 5 }, { name: "xtilesize", def: 0.5 }, { name: "xmod1", def: 0.3 }, { name: "xmod2", def: 1 }, { name: "xheight", def: 0.5 }, { name: "yheight", def: 5 }, { name: "ytilesize", def: 0.5 }, { name: "ymod1", def: 0.3 }, { name: "ymod2", def: 1 }, { name: "ywidth", def: 0.5 }],
     verified: true, priority: 0, flags: [], types: ["2D"],
-    funcNames: ["roundc"],
-    funcs: `fn roundc(x: f32) -> f32 { return sign(x) * floor(abs(x) + 0.5); }`,
+    funcNames: ["roundc","atan2j"],
+    funcs: `fn roundc(x: f32) -> f32 { return sign(x) * floor(abs(x) + 0.5); }
+
+fn atan2j(y: f32, x: f32) -> f32 { if (x == 0.0 && y == 0.0) { return select(0.0, PI, (bitcast<u32>(x) >> 31u) == 1u) * select(1.0, -1.0, (bitcast<u32>(y) >> 31u) == 1u); } return atan2(y, x); }`,
     code: (_w, p) => `{
 var _xr1: f32 = (${p[3]} * ${p[2]});
 var _yr1: f32 = (${p[8]} * ${p[7]});
@@ -13931,6 +16902,8 @@ if ((rnd(rs) < 0.5)) {
   "invpolar": {
     params: [],
     verified: true, priority: 0, flags: [], types: ["2D"],
+    funcNames: ["atan2j"],
+    funcs: `fn atan2j(y: f32, x: f32) -> f32 { if (x == 0.0 && y == 0.0) { return select(0.0, PI, (bitcast<u32>(x) >> 31u) == 1u) * select(1.0, -1.0, (bitcast<u32>(y) >> 31u) == 1u); } return atan2(y, x); }`,
     code: (w, _p) => `{
 var ny: f32 = (1 + t.y);
 v.x += ((${w} * ny) * sin((t.x * PI)));
@@ -13940,6 +16913,8 @@ v.y += ((${w} * ny) * cos((t.x * PI)));
   "stripfit": {
     params: [{ name: "dx", def: 1 }],
     verified: true, priority: 0, flags: [], types: ["2D"],
+    funcNames: ["atan2j"],
+    funcs: `fn atan2j(y: f32, x: f32) -> f32 { if (x == 0.0 && y == 0.0) { return select(0.0, PI, (bitcast<u32>(x) >> 31u) == 1u) * select(1.0, -1.0, (bitcast<u32>(y) >> 31u) == 1u); } return atan2(y, x); }`,
     code: (w, p) => `{
 var fity: f32;
 var dxp: f32 = (-0.5 * ${p[0]});
@@ -13959,9 +16934,46 @@ if ((${w} != 0.0)) {
 }
 }`,
   },
+  "hypershift2": {
+    params: [{ name: "p", def: 3 }, { name: "q", def: 7 }],
+    verified: true, priority: 0, flags: ["3d","z"], types: ["3D"],
+    funcNames: ["sqr","rndi","atan2j"],
+    funcs: `fn sqr(x: f32) -> f32 { return x * x; }
+
+fn rndi(state: ptr<function, u32>) -> u32 { var x = *state; x ^= x << 13u; x ^= x >> 17u; x ^= x << 5u; *state = x; return x; }
+
+fn atan2j(y: f32, x: f32) -> f32 { if (x == 0.0 && y == 0.0) { return select(0.0, PI, (bitcast<u32>(x) >> 31u) == 1u) * select(1.0, -1.0, (bitcast<u32>(y) >> 31u) == 1u); } return atan2(y, x); }`,
+    code: (w, p) => `{
+var pq: f32 = (PI / f32(i32(${p[1]})));
+var pp: f32 = (PI / f32(i32(${p[0]})));
+var spq: f32 = sin(pq);
+var spp: f32 = sin(pp);
+var shift: f32 = sin((((PI * 0.5) - pq) - pp));
+shift = (shift / sqrt(((1 - sqr(spq)) - sqr(spp))));
+var scale2: f32 = (1 / sqrt(((sqr(sin(((PI / 2) + pp))) / sqr(spq)) - 1.0)));
+scale2 = (scale2 * ((sin(((PI / 2) + pp)) / spq) - 1.0));
+var scale: f32 = (1 - (shift * shift));
+var FX: f32 = (t.x * scale2);
+var FY: f32 = (t.y * scale2);
+var rad: f32 = (1 / ((FX * FX) + (FY * FY)));
+var x: f32 = ((rad * FX) + shift);
+var y: f32 = (rad * FY);
+rad = ((${w} * scale) / ((x * x) + (y * y)));
+var angle: f32 = ((((f32((i32((rndi(rs) >> 1)) % i32(${p[0]}))) * 2.0) + 1.0) * PI) / f32(i32(${p[0]})));
+var X: f32 = ((rad * x) + shift);
+var Y: f32 = (rad * y);
+var cosa: f32 = cos(angle);
+var sina: f32 = sin(angle);
+v.x = ((cosa * X) - (sina * Y));
+v.y = ((sina * X) + (cosa * Y));
+pz_ = (z_ * rad);
+}`,
+  },
   "hypercrop": {
     params: [{ name: "n", def: 4 }, { name: "rad", def: 1 }, { name: "zero", def: 0 }],
     verified: true, priority: 0, flags: ["3d","z"], types: ["3D","CROP"],
+    funcNames: ["atan2j"],
+    funcs: `fn atan2j(y: f32, x: f32) -> f32 { if (x == 0.0 && y == 0.0) { return select(0.0, PI, (bitcast<u32>(x) >> 31u) == 1u) * select(1.0, -1.0, (bitcast<u32>(y) >> 31u) == 1u); } return atan2(y, x); }`,
     code: (w, p) => `{
 var coef: f32 = ((f32(i32(${p[0]})) * 0.5) / PI);
 var FX: f32 = t.x;
@@ -13970,7 +16982,7 @@ var FZ: f32 = z_;
 var a0: f32 = (PI / f32(i32(${p[0]})));
 var len: f32 = (1.0 / cos(a0));
 var d: f32 = ((${p[1]} * sin(a0)) * len);
-var angle: f32 = atan2(t.y, t.x);
+var angle: f32 = atan2j(t.y, t.x);
 angle = ((floor((angle * coef)) / coef) + (PI / f32(i32(${p[0]}))));
 var x0: f32 = (cos(angle) * len);
 var y0: f32 = (sin(angle) * len);
@@ -13985,7 +16997,7 @@ if ((sqrt((((t.x - x0) * (t.x - x0)) + ((t.y - y0) * (t.y - y0)))) < d)) {
       FY = 0.0;
       FZ = 0.0;
     } else {
-      var rangle: f32 = atan2((t.y - y0), (t.x - x0));
+      var rangle: f32 = atan2j((t.y - y0), (t.x - x0));
       FX = (x0 + (cos(rangle) * d));
       FY = (y0 + (sin(rangle) * d));
       FZ = 0.0;
@@ -14000,7 +17012,7 @@ pz_ += (FZ * ${w});
   "truchet2": {
     params: [{ name: "exponent1", def: 1 }, { name: "exponent2", def: 2 }, { name: "width1", def: 0.5 }, { name: "width2", def: 0.5 }, { name: "scale", def: 10 }, { name: "seed", def: 50 }, { name: "inverse", def: 0 }],
     verified: true, priority: 0, flags: [], types: ["SIMULATION"],
-    funcNames: ["roundc","powc"],
+    funcNames: ["roundc","powc","atan2j"],
     funcs: `fn roundc(x: f32) -> f32 { return sign(x) * floor(abs(x) + 0.5); }
 
 fn powc(x: f32, y: f32) -> f32 {
@@ -14009,7 +17021,9 @@ fn powc(x: f32, y: f32) -> f32 {
   if (abs(y - yi) > 1e-6) { return pow(x, y); }
   let m = pow(-x, y);
   return select(m, -m, (i32(yi) & 1) != 0);
-}`,
+}
+
+fn atan2j(y: f32, x: f32) -> f32 { if (x == 0.0 && y == 0.0) { return select(0.0, PI, (bitcast<u32>(x) >> 31u) == 1u) * select(1.0, -1.0, (bitcast<u32>(y) >> 31u) == 1u); } return atan2(y, x); }`,
     code: (w, p) => `{
 var p5_: f32 = ${p[5]};
 var xp: f32 = (abs((((t.x / ${p[4]}) - floor((t.x / ${p[4]}))) - 0.5)) * 2.0);
@@ -14096,7 +17110,7 @@ if ((width <= 0.0)) {
   "arcsinh": {
     params: [],
     verified: true, priority: 0, flags: [], types: ["2D"],
-    funcNames: ["Complex","powc","Complex_Init","Complex_Sqr","Complex_Inc","Complex_One","Complex_Mag2","Complex_MagInv","Complex_Recip","Complex_Radius","Complex_Neg","Complex_Sqrt","Complex_Arg","Complex_ToP","Complex_UnP","Complex_Copy","Complex_Pow","Complex_Add","Complex_Mag2eps","Complex_Log","Complex_AsinH","Complex_Scale"],
+    funcNames: ["Complex","atan2j","powc","Complex_Init","Complex_Sqr","Complex_Inc","Complex_One","Complex_Mag2","Complex_MagInv","Complex_Recip","Complex_Radius","Complex_Neg","Complex_Sqrt","Complex_Arg","Complex_ToP","Complex_UnP","Complex_Copy","Complex_Pow","Complex_Add","Complex_Mag2eps","Complex_Log","Complex_AsinH","Complex_Scale"],
     funcs: `struct Complex {
   per_fix: f32,
   re: f32,
@@ -14104,6 +17118,8 @@ if ((width <= 0.0)) {
   save_re: f32,
   save_im: f32,
 }
+
+fn atan2j(y: f32, x: f32) -> f32 { if (x == 0.0 && y == 0.0) { return select(0.0, PI, (bitcast<u32>(x) >> 31u) == 1u) * select(1.0, -1.0, (bitcast<u32>(y) >> 31u) == 1u); } return atan2(y, x); }
 
 fn powc(x: f32, y: f32) -> f32 {
   if (x >= 0.0) { return pow(x, y); }
@@ -14172,7 +17188,7 @@ fn Complex_Sqrt(c: ptr<function, Complex>) {
 }
 
 fn Complex_Arg(c: ptr<function, Complex>) -> f32 {
-  return ((*c).per_fix + atan2((*c).im, (*c).re));
+  return ((*c).per_fix + atan2j((*c).im, (*c).re));
 }
 
 fn Complex_ToP(c: ptr<function, Complex>, dst: ptr<function, Complex>) {
@@ -14258,7 +17274,7 @@ v.y += z.im;
   "arcsech2": {
     params: [],
     verified: true, priority: 0, flags: [], types: ["2D"],
-    funcNames: ["Complex","Complex_Init","Complex_Mag2","Complex_MagInv","Complex_Recip","Complex_Dec","Complex_Radius","Complex_Neg","Complex_Sqrt","Complex_Inc","Complex_Scale","Complex_Mul","Complex_Add","Complex_Mag2eps","Complex_Arg","Complex_Copy","Complex_Log"],
+    funcNames: ["Complex","atan2j","Complex_Init","Complex_Mag2","Complex_MagInv","Complex_Recip","Complex_Dec","Complex_Radius","Complex_Neg","Complex_Sqrt","Complex_Inc","Complex_Scale","Complex_Mul","Complex_Add","Complex_Mag2eps","Complex_Arg","Complex_Copy","Complex_Log"],
     funcs: `struct Complex {
   per_fix: f32,
   re: f32,
@@ -14266,6 +17282,8 @@ v.y += z.im;
   save_re: f32,
   save_im: f32,
 }
+
+fn atan2j(y: f32, x: f32) -> f32 { if (x == 0.0 && y == 0.0) { return select(0.0, PI, (bitcast<u32>(x) >> 31u) == 1u) * select(1.0, -1.0, (bitcast<u32>(y) >> 31u) == 1u); } return atan2(y, x); }
 
 fn Complex_Init(c: ptr<function, Complex>, Rp: f32, Ip: f32) {
   (*c).re = Rp;
@@ -14343,7 +17361,7 @@ fn Complex_Mag2eps(c: ptr<function, Complex>) -> f32 {
 }
 
 fn Complex_Arg(c: ptr<function, Complex>) -> f32 {
-  return ((*c).per_fix + atan2((*c).im, (*c).re));
+  return ((*c).per_fix + atan2j((*c).im, (*c).re));
 }
 
 fn Complex_Copy(c: ptr<function, Complex>, zz: ptr<function, Complex>) {
@@ -14385,7 +17403,7 @@ if ((z.im < 0)) {
   "arctanh": {
     params: [],
     verified: true, priority: 0, flags: [], types: ["2D"],
-    funcNames: ["Complex","Complex_Init","Complex_Scale","Complex_Inc","Complex_Mag2","Complex_MagInv","Complex_Div","Complex_Mag2eps","Complex_Arg","Complex_Copy","Complex_Log"],
+    funcNames: ["Complex","atan2j","Complex_Init","Complex_Scale","Complex_Inc","Complex_Mag2","Complex_MagInv","Complex_Div","Complex_Mag2eps","Complex_Arg","Complex_Copy","Complex_Log"],
     funcs: `struct Complex {
   per_fix: f32,
   re: f32,
@@ -14393,6 +17411,8 @@ if ((z.im < 0)) {
   save_re: f32,
   save_im: f32,
 }
+
+fn atan2j(y: f32, x: f32) -> f32 { if (x == 0.0 && y == 0.0) { return select(0.0, PI, (bitcast<u32>(x) >> 31u) == 1u) * select(1.0, -1.0, (bitcast<u32>(y) >> 31u) == 1u); } return atan2(y, x); }
 
 fn Complex_Init(c: ptr<function, Complex>, Rp: f32, Ip: f32) {
   (*c).re = Rp;
@@ -14433,7 +17453,7 @@ fn Complex_Mag2eps(c: ptr<function, Complex>) -> f32 {
 }
 
 fn Complex_Arg(c: ptr<function, Complex>) -> f32 {
-  return ((*c).per_fix + atan2((*c).im, (*c).re));
+  return ((*c).per_fix + atan2j((*c).im, (*c).re));
 }
 
 fn Complex_Copy(c: ptr<function, Complex>, zz: ptr<function, Complex>) {
@@ -14466,21 +17486,23 @@ v.y += z3.im;
   "inverted_julia": {
     params: [{ name: "power", def: 0.25 }, { name: "y2_mult", def: 1 }, { name: "a2x_mult", def: 1 }, { name: "a2y_mult", def: 1 }, { name: "a2y_add", def: 0 }, { name: "cos_mult", def: 0 }, { name: "y_mult", def: 1 }, { name: "center", def: 3.14 }, { name: "x2y2_add", def: 0 }],
     verified: true, priority: 0, flags: [], types: ["2D"],
-    funcNames: ["powc"],
+    funcNames: ["powc","atan2j"],
     funcs: `fn powc(x: f32, y: f32) -> f32 {
   if (x >= 0.0) { return pow(x, y); }
   let yi = round(y);
   if (abs(y - yi) > 1e-6) { return pow(x, y); }
   let m = pow(-x, y);
   return select(m, -m, (i32(yi) & 1) != 0);
-}`,
+}
+
+fn atan2j(y: f32, x: f32) -> f32 { if (x == 0.0 && y == 0.0) { return select(0.0, PI, (bitcast<u32>(x) >> 31u) == 1u) * select(1.0, -1.0, (bitcast<u32>(y) >> 31u) == 1u); } return atan2(y, x); }`,
     code: (w, p) => `{
 var x: f32 = t.x;
 var y: f32 = t.y;
 var xs: f32 = (x * x);
 var ys: f32 = (y * y);
 var z: f32 = (powc((xs + (ys * ${p[1]})), ${p[0]}) + ${p[8]});
-var q: f32 = ((atan2((x * ${p[2]}), ((y * ${p[3]}) + ${p[4]})) * 0.5) + (PI * f32(i32((2 * rnd(rs))))));
+var q: f32 = ((atan2j((x * ${p[2]}), ((y * ${p[3]}) + ${p[4]})) * 0.5) + (PI * f32(i32((2 * rnd(rs))))));
 v.x += ((${w} * cos((z * ${p[5]}))) * ((sin(q) / z) / ${p[7]}));
 v.y += (((${w} * cos((z * ${p[5]}))) * ((cos(q) / z) / ${p[7]})) * ${p[6]});
 }`,
@@ -14488,7 +17510,7 @@ v.y += (((${w} * cos((z * ${p[5]}))) * ((cos(q) / z) / ${p[7]})) * ${p[6]});
   "acosech": {
     params: [],
     verified: true, priority: 0, flags: [], types: ["2D"],
-    funcNames: ["Complex","powc","Complex_Init","Complex_Mag2","Complex_MagInv","Complex_Recip","Complex_Sqr","Complex_Dec","Complex_One","Complex_Radius","Complex_Neg","Complex_Sqrt","Complex_Arg","Complex_ToP","Complex_UnP","Complex_Copy","Complex_Pow","Complex_Add","Complex_Mag2eps","Complex_Log","Complex_AcosH","Complex_AcosecH","Complex_Flip","Complex_Scale"],
+    funcNames: ["Complex","atan2j","powc","Complex_Init","Complex_Mag2","Complex_MagInv","Complex_Recip","Complex_Sqr","Complex_Dec","Complex_One","Complex_Radius","Complex_Neg","Complex_Sqrt","Complex_Arg","Complex_ToP","Complex_UnP","Complex_Copy","Complex_Pow","Complex_Add","Complex_Mag2eps","Complex_Log","Complex_AcosH","Complex_AcosecH","Complex_Flip","Complex_Scale"],
     funcs: `struct Complex {
   per_fix: f32,
   re: f32,
@@ -14496,6 +17518,8 @@ v.y += (((${w} * cos((z * ${p[5]}))) * ((cos(q) / z) / ${p[7]})) * ${p[6]});
   save_re: f32,
   save_im: f32,
 }
+
+fn atan2j(y: f32, x: f32) -> f32 { if (x == 0.0 && y == 0.0) { return select(0.0, PI, (bitcast<u32>(x) >> 31u) == 1u) * select(1.0, -1.0, (bitcast<u32>(y) >> 31u) == 1u); } return atan2(y, x); }
 
 fn powc(x: f32, y: f32) -> f32 {
   if (x >= 0.0) { return pow(x, y); }
@@ -14564,7 +17588,7 @@ fn Complex_Sqrt(c: ptr<function, Complex>) {
 }
 
 fn Complex_Arg(c: ptr<function, Complex>) -> f32 {
-  return ((*c).per_fix + atan2((*c).im, (*c).re));
+  return ((*c).per_fix + atan2j((*c).im, (*c).re));
 }
 
 fn Complex_ToP(c: ptr<function, Complex>, dst: ptr<function, Complex>) {
@@ -14668,7 +17692,7 @@ if ((rnd(rs) < 0.5)) {
   "acoth": {
     params: [],
     verified: true, priority: 0, flags: [], types: ["2D"],
-    funcNames: ["Complex","Complex_Init","Complex_Mag2","Complex_MagInv","Complex_Recip","Complex_Dec","Complex_Neg","Complex_Inc","Complex_Div","Complex_Mag2eps","Complex_Arg","Complex_Copy","Complex_Log","Complex_Scale","Complex_AtanH","Complex_AcotH","Complex_Flip"],
+    funcNames: ["Complex","atan2j","Complex_Init","Complex_Mag2","Complex_MagInv","Complex_Recip","Complex_Dec","Complex_Neg","Complex_Inc","Complex_Div","Complex_Mag2eps","Complex_Arg","Complex_Copy","Complex_Log","Complex_Scale","Complex_AtanH","Complex_AcotH","Complex_Flip"],
     funcs: `struct Complex {
   per_fix: f32,
   re: f32,
@@ -14676,6 +17700,8 @@ if ((rnd(rs) < 0.5)) {
   save_re: f32,
   save_im: f32,
 }
+
+fn atan2j(y: f32, x: f32) -> f32 { if (x == 0.0 && y == 0.0) { return select(0.0, PI, (bitcast<u32>(x) >> 31u) == 1u) * select(1.0, -1.0, (bitcast<u32>(y) >> 31u) == 1u); } return atan2(y, x); }
 
 fn Complex_Init(c: ptr<function, Complex>, Rp: f32, Ip: f32) {
   (*c).re = Rp;
@@ -14726,7 +17752,7 @@ fn Complex_Mag2eps(c: ptr<function, Complex>) -> f32 {
 }
 
 fn Complex_Arg(c: ptr<function, Complex>) -> f32 {
-  return ((*c).per_fix + atan2((*c).im, (*c).re));
+  return ((*c).per_fix + atan2j((*c).im, (*c).re));
 }
 
 fn Complex_Copy(c: ptr<function, Complex>, zz: ptr<function, Complex>) {
@@ -14780,7 +17806,7 @@ v.x += z.re;
   "acosh": {
     params: [],
     verified: true, priority: 0, flags: [], types: ["2D"],
-    funcNames: ["Complex","powc","Complex_Init","Complex_Sqr","Complex_Dec","Complex_One","Complex_Mag2","Complex_MagInv","Complex_Recip","Complex_Radius","Complex_Neg","Complex_Sqrt","Complex_Arg","Complex_ToP","Complex_UnP","Complex_Copy","Complex_Pow","Complex_Add","Complex_Mag2eps","Complex_Log","Complex_AcosH","Complex_Scale"],
+    funcNames: ["Complex","atan2j","powc","Complex_Init","Complex_Sqr","Complex_Dec","Complex_One","Complex_Mag2","Complex_MagInv","Complex_Recip","Complex_Radius","Complex_Neg","Complex_Sqrt","Complex_Arg","Complex_ToP","Complex_UnP","Complex_Copy","Complex_Pow","Complex_Add","Complex_Mag2eps","Complex_Log","Complex_AcosH","Complex_Scale"],
     funcs: `struct Complex {
   per_fix: f32,
   re: f32,
@@ -14788,6 +17814,8 @@ v.x += z.re;
   save_re: f32,
   save_im: f32,
 }
+
+fn atan2j(y: f32, x: f32) -> f32 { if (x == 0.0 && y == 0.0) { return select(0.0, PI, (bitcast<u32>(x) >> 31u) == 1u) * select(1.0, -1.0, (bitcast<u32>(y) >> 31u) == 1u); } return atan2(y, x); }
 
 fn powc(x: f32, y: f32) -> f32 {
   if (x >= 0.0) { return pow(x, y); }
@@ -14856,7 +17884,7 @@ fn Complex_Sqrt(c: ptr<function, Complex>) {
 }
 
 fn Complex_Arg(c: ptr<function, Complex>) -> f32 {
-  return ((*c).per_fix + atan2((*c).im, (*c).re));
+  return ((*c).per_fix + atan2j((*c).im, (*c).re));
 }
 
 fn Complex_ToP(c: ptr<function, Complex>, dst: ptr<function, Complex>) {
@@ -14947,12 +17975,14 @@ if ((rnd(rs) < 0.5)) {
   "bipolar2": {
     params: [{ name: "shift", def: 0 }, { name: "a", def: 1 }, { name: "b", def: 2 }, { name: "c", def: 0.5 }, { name: "d", def: 1 }, { name: "e", def: 2 }, { name: "f1", def: 0.25 }, { name: "g1", def: 1 }, { name: "h", def: 1 }],
     verified: true, priority: 0, flags: [], types: ["2D"],
+    funcNames: ["atan2j"],
+    funcs: `fn atan2j(y: f32, x: f32) -> f32 { if (x == 0.0 && y == 0.0) { return select(0.0, PI, (bitcast<u32>(x) >> 31u) == 1u) * select(1.0, -1.0, (bitcast<u32>(y) >> 31u) == 1u); } return atan2(y, x); }`,
     code: (w, p) => `{
 var x2y2: f32 = (((t.x * t.x) + (t.y * t.y)) * ${p[7]});
 var t_: f32 = (x2y2 + ${p[1]});
 var x2: f32 = (${p[2]} * t.x);
 var ps: f32 = (-(PI * 0.5) * ${p[0]});
-var y: f32 = ((${p[3]} * atan2((${p[5]} * t.y), (x2y2 - ${p[4]}))) + ps);
+var y: f32 = ((${p[3]} * atan2j((${p[5]} * t.y), (x2y2 - ${p[4]}))) + ps);
 if ((y > (PI * 0.5))) {
   y = (-(PI * 0.5) + ((y + (PI * 0.5)) % PI));
 } else if ((y < -(PI * 0.5))) {
@@ -14969,8 +17999,10 @@ if (!((g == 0) || ((f / g) <= 0))) {
   "elliptic2": {
     params: [{ name: "a1", def: 1 }, { name: "a2", def: 1 }, { name: "a3", def: 0 }, { name: "b1", def: 2 }, { name: "b2", def: 1 }, { name: "c", def: 0.5 }, { name: "d", def: 1 }, { name: "e", def: 0.5 }, { name: "f", def: 1 }, { name: "g", def: 1 }, { name: "h", def: 2 }],
     verified: true, priority: 0, flags: [], types: ["2D"],
-    funcNames: ["sqrtf_safe"],
-    funcs: `fn sqrtf_safe(x: f32) -> f32 {
+    funcNames: ["atan2j","sqrtf_safe"],
+    funcs: `fn atan2j(y: f32, x: f32) -> f32 { if (x == 0.0 && y == 0.0) { return select(0.0, PI, (bitcast<u32>(x) >> 31u) == 1u) * select(1.0, -1.0, (bitcast<u32>(y) >> 31u) == 1u); } return atan2(y, x); }
+
+fn sqrtf_safe(x: f32) -> f32 {
   if ((x <= 0.0)) {
     return 0.0;
   } else {
@@ -14985,7 +18017,7 @@ var xmax: f32 = (${p[5]} * (sqrt((tmp + x2)) + sqrt((tmp - x2))));
 var a: f32 = ((t.x / xmax) * ${p[1]});
 var b: f32 = (sqrtf_safe((${p[6]} - (a * a))) * ${p[4]});
 var ps: f32 = ((-PI * 0.5) * ${p[2]});
-v.x += ((_v * atan2(a, b)) + ps);
+v.x += ((_v * atan2j(a, b)) + ps);
 if ((rnd(rs) < ${p[7]})) {
   v.y += (_v * log((xmax + sqrtf_safe((xmax - ${p[8]})))));
 } else {
@@ -14996,7 +18028,7 @@ if ((rnd(rs) < ${p[7]})) {
   "julia_outside": {
     params: [{ name: "re_div", def: 1 }, { name: "im_div", def: 0 }, { name: "mode", def: 0 }],
     verified: true, priority: 0, flags: [], types: ["2D"],
-    funcNames: ["Complex","Complex_Init","Complex_Radius","Complex_Neg","Complex_Sqrt","Complex_Inc","Complex_Sqr","Complex_Dec","Complex_Mag2","Complex_MagInv","Complex_Div"],
+    funcNames: ["Complex","atan2j","Complex_Init","Complex_Radius","Complex_Neg","Complex_Sqrt","Complex_Inc","Complex_Sqr","Complex_Dec","Complex_Mag2","Complex_MagInv","Complex_Div"],
     funcs: `struct Complex {
   per_fix: f32,
   re: f32,
@@ -15004,6 +18036,8 @@ if ((rnd(rs) < ${p[7]})) {
   save_re: f32,
   save_im: f32,
 }
+
+fn atan2j(y: f32, x: f32) -> f32 { if (x == 0.0 && y == 0.0) { return select(0.0, PI, (bitcast<u32>(x) >> 31u) == 1u) * select(1.0, -1.0, (bitcast<u32>(y) >> 31u) == 1u); } return atan2(y, x); }
 
 fn Complex_Init(c: ptr<function, Complex>, Rp: f32, Ip: f32) {
   (*c).re = Rp;
@@ -15106,8 +18140,10 @@ if (((min(max(${p[2]}, 0.0), 2.0) == 0.0) || (min(max(${p[2]}, 0.0), 2.0) == 1.0
   "pointgrid_wf": {
     params: [{ name: "xmin", def: -3 }, { name: "xmax", def: 3 }, { name: "xcount", def: 32 }, { name: "ymin", def: -3 }, { name: "ymax", def: 3 }, { name: "ycount", def: 32 }, { name: "distortion", def: 2.3 }, { name: "seed", def: 1234 }],
     verified: true, priority: 0, flags: [], types: ["2D"],
-    funcNames: ["pointgrid_u","pointgrid_v","pointgrid_randomize","pointgrid_random"],
-    funcs: `var<private> pointgrid_u: i32 = 12244355;
+    funcNames: ["atan2j","pointgrid_u","pointgrid_v","pointgrid_randomize","pointgrid_random"],
+    funcs: `fn atan2j(y: f32, x: f32) -> f32 { if (x == 0.0 && y == 0.0) { return select(0.0, PI, (bitcast<u32>(x) >> 31u) == 1u) * select(1.0, -1.0, (bitcast<u32>(y) >> 31u) == 1u); } return atan2(y, x); }
+
+var<private> pointgrid_u: i32 = 12244355;
 
 var<private> pointgrid_v: i32 = 34384;
 
@@ -15147,8 +18183,10 @@ v.y += (y * ${w});
   "pointgrid3d_wf": {
     params: [{ name: "xmin", def: -3 }, { name: "xmax", def: 3 }, { name: "xcount", def: 10 }, { name: "ymin", def: -3 }, { name: "ymax", def: 3 }, { name: "ycount", def: 10 }, { name: "zmin", def: -1 }, { name: "zmax", def: 1 }, { name: "zcount", def: 10 }, { name: "distortion", def: 2.3 }, { name: "seed", def: 1234 }],
     verified: true, priority: 0, flags: ["3d","z"], types: ["3D"],
-    funcNames: ["pointgrid3d_u","pointgrid3d_v","pointgrid3d_randomize","pointgrid3d_random"],
-    funcs: `var<private> pointgrid3d_u: i32 = 12244355;
+    funcNames: ["atan2j","pointgrid3d_u","pointgrid3d_v","pointgrid3d_randomize","pointgrid3d_random"],
+    funcs: `fn atan2j(y: f32, x: f32) -> f32 { if (x == 0.0 && y == 0.0) { return select(0.0, PI, (bitcast<u32>(x) >> 31u) == 1u) * select(1.0, -1.0, (bitcast<u32>(y) >> 31u) == 1u); } return atan2(y, x); }
+
+var<private> pointgrid3d_u: i32 = 12244355;
 
 var<private> pointgrid3d_v: i32 = 34384;
 
@@ -15196,6 +18234,8 @@ pz_ += (z * ${w});
   "tile_reverse": {
     params: [{ name: "space", def: 1 }, { name: "reversal", def: 1 }, { name: "vertical", def: 0 }],
     verified: true, priority: 0, flags: [], types: ["2D"],
+    funcNames: ["atan2j"],
+    funcs: `fn atan2j(y: f32, x: f32) -> f32 { if (x == 0.0 && y == 0.0) { return select(0.0, PI, (bitcast<u32>(x) >> 31u) == 1u) * select(1.0, -1.0, (bitcast<u32>(y) >> 31u) == 1u); } return atan2(y, x); }`,
     code: (w, p) => `{
 var rev: f32 = -1;
 var n: f32 = rnd(rs);
@@ -15222,7 +18262,7 @@ if (((n < 0.5) && (i32(${p[2]}) != 1))) {
   "sqrt_acoth": {
     params: [],
     verified: true, priority: 0, flags: [], types: ["2D"],
-    funcNames: ["Complex","Complex_Init","Complex_Radius","Complex_Neg","Complex_Sqrt","Complex_Mag2","Complex_MagInv","Complex_Recip","Complex_Dec","Complex_Inc","Complex_Div","Complex_Mag2eps","Complex_Arg","Complex_Copy","Complex_Log","Complex_Scale","Complex_AtanH","Complex_AcotH"],
+    funcNames: ["Complex","atan2j","Complex_Init","Complex_Radius","Complex_Neg","Complex_Sqrt","Complex_Mag2","Complex_MagInv","Complex_Recip","Complex_Dec","Complex_Inc","Complex_Div","Complex_Mag2eps","Complex_Arg","Complex_Copy","Complex_Log","Complex_Scale","Complex_AtanH","Complex_AcotH"],
     funcs: `struct Complex {
   per_fix: f32,
   re: f32,
@@ -15230,6 +18270,8 @@ if (((n < 0.5) && (i32(${p[2]}) != 1))) {
   save_re: f32,
   save_im: f32,
 }
+
+fn atan2j(y: f32, x: f32) -> f32 { if (x == 0.0 && y == 0.0) { return select(0.0, PI, (bitcast<u32>(x) >> 31u) == 1u) * select(1.0, -1.0, (bitcast<u32>(y) >> 31u) == 1u); } return atan2(y, x); }
 
 fn Complex_Init(c: ptr<function, Complex>, Rp: f32, Ip: f32) {
   (*c).re = Rp;
@@ -15294,7 +18336,7 @@ fn Complex_Mag2eps(c: ptr<function, Complex>) -> f32 {
 }
 
 fn Complex_Arg(c: ptr<function, Complex>) -> f32 {
-  return ((*c).per_fix + atan2((*c).im, (*c).re));
+  return ((*c).per_fix + atan2j((*c).im, (*c).re));
 }
 
 fn Complex_Copy(c: ptr<function, Complex>, zz: ptr<function, Complex>) {
@@ -15346,7 +18388,7 @@ if ((rnd(rs) < 0.5)) {
   "sqrt_acosh": {
     params: [],
     verified: true, priority: 0, flags: [], types: ["2D"],
-    funcNames: ["Complex","powc","Complex_Init","Complex_Radius","Complex_Neg","Complex_Sqrt","Complex_Sqr","Complex_Dec","Complex_One","Complex_Mag2","Complex_MagInv","Complex_Recip","Complex_Arg","Complex_ToP","Complex_UnP","Complex_Copy","Complex_Pow","Complex_Add","Complex_Mag2eps","Complex_Log","Complex_AcosH","Complex_Scale"],
+    funcNames: ["Complex","atan2j","powc","Complex_Init","Complex_Radius","Complex_Neg","Complex_Sqrt","Complex_Sqr","Complex_Dec","Complex_One","Complex_Mag2","Complex_MagInv","Complex_Recip","Complex_Arg","Complex_ToP","Complex_UnP","Complex_Copy","Complex_Pow","Complex_Add","Complex_Mag2eps","Complex_Log","Complex_AcosH","Complex_Scale"],
     funcs: `struct Complex {
   per_fix: f32,
   re: f32,
@@ -15354,6 +18396,8 @@ if ((rnd(rs) < 0.5)) {
   save_re: f32,
   save_im: f32,
 }
+
+fn atan2j(y: f32, x: f32) -> f32 { if (x == 0.0 && y == 0.0) { return select(0.0, PI, (bitcast<u32>(x) >> 31u) == 1u) * select(1.0, -1.0, (bitcast<u32>(y) >> 31u) == 1u); } return atan2(y, x); }
 
 fn powc(x: f32, y: f32) -> f32 {
   if (x >= 0.0) { return pow(x, y); }
@@ -15422,7 +18466,7 @@ fn Complex_Recip(c: ptr<function, Complex>) {
 }
 
 fn Complex_Arg(c: ptr<function, Complex>) -> f32 {
-  return ((*c).per_fix + atan2((*c).im, (*c).re));
+  return ((*c).per_fix + atan2j((*c).im, (*c).re));
 }
 
 fn Complex_ToP(c: ptr<function, Complex>, dst: ptr<function, Complex>) {
@@ -15514,7 +18558,7 @@ if ((rnd(rs) < 0.5)) {
   "sqrt_asech": {
     params: [],
     verified: true, priority: 0, flags: [], types: ["2D"],
-    funcNames: ["Complex","powc","Complex_Init","Complex_Radius","Complex_Neg","Complex_Sqrt","Complex_Mag2","Complex_MagInv","Complex_Recip","Complex_Sqr","Complex_Inc","Complex_One","Complex_Arg","Complex_ToP","Complex_UnP","Complex_Copy","Complex_Pow","Complex_Add","Complex_Mag2eps","Complex_Log","Complex_AsinH","Complex_AsecH","Complex_Scale"],
+    funcNames: ["Complex","atan2j","powc","Complex_Init","Complex_Radius","Complex_Neg","Complex_Sqrt","Complex_Mag2","Complex_MagInv","Complex_Recip","Complex_Sqr","Complex_Inc","Complex_One","Complex_Arg","Complex_ToP","Complex_UnP","Complex_Copy","Complex_Pow","Complex_Add","Complex_Mag2eps","Complex_Log","Complex_AsinH","Complex_AsecH","Complex_Scale"],
     funcs: `struct Complex {
   per_fix: f32,
   re: f32,
@@ -15522,6 +18566,8 @@ if ((rnd(rs) < 0.5)) {
   save_re: f32,
   save_im: f32,
 }
+
+fn atan2j(y: f32, x: f32) -> f32 { if (x == 0.0 && y == 0.0) { return select(0.0, PI, (bitcast<u32>(x) >> 31u) == 1u) * select(1.0, -1.0, (bitcast<u32>(y) >> 31u) == 1u); } return atan2(y, x); }
 
 fn powc(x: f32, y: f32) -> f32 {
   if (x >= 0.0) { return pow(x, y); }
@@ -15590,7 +18636,7 @@ fn Complex_One(c: ptr<function, Complex>) {
 }
 
 fn Complex_Arg(c: ptr<function, Complex>) -> f32 {
-  return ((*c).per_fix + atan2((*c).im, (*c).re));
+  return ((*c).per_fix + atan2j((*c).im, (*c).re));
 }
 
 fn Complex_ToP(c: ptr<function, Complex>, dst: ptr<function, Complex>) {
@@ -15687,7 +18733,7 @@ if ((rnd(rs) < 0.5)) {
   "sqrt_atanh": {
     params: [],
     verified: true, priority: 0, flags: [], types: ["2D"],
-    funcNames: ["Complex","Complex_Init","Complex_Radius","Complex_Neg","Complex_Sqrt","Complex_Dec","Complex_Inc","Complex_Mag2","Complex_MagInv","Complex_Div","Complex_Mag2eps","Complex_Arg","Complex_Copy","Complex_Log","Complex_Scale","Complex_AtanH"],
+    funcNames: ["Complex","atan2j","Complex_Init","Complex_Radius","Complex_Neg","Complex_Sqrt","Complex_Dec","Complex_Inc","Complex_Mag2","Complex_MagInv","Complex_Div","Complex_Mag2eps","Complex_Arg","Complex_Copy","Complex_Log","Complex_Scale","Complex_AtanH"],
     funcs: `struct Complex {
   per_fix: f32,
   re: f32,
@@ -15695,6 +18741,8 @@ if ((rnd(rs) < 0.5)) {
   save_re: f32,
   save_im: f32,
 }
+
+fn atan2j(y: f32, x: f32) -> f32 { if (x == 0.0 && y == 0.0) { return select(0.0, PI, (bitcast<u32>(x) >> 31u) == 1u) * select(1.0, -1.0, (bitcast<u32>(y) >> 31u) == 1u); } return atan2(y, x); }
 
 fn Complex_Init(c: ptr<function, Complex>, Rp: f32, Ip: f32) {
   (*c).re = Rp;
@@ -15753,7 +18801,7 @@ fn Complex_Mag2eps(c: ptr<function, Complex>) -> f32 {
 }
 
 fn Complex_Arg(c: ptr<function, Complex>) -> f32 {
-  return ((*c).per_fix + atan2((*c).im, (*c).re));
+  return ((*c).per_fix + atan2j((*c).im, (*c).re));
 }
 
 fn Complex_Copy(c: ptr<function, Complex>, zz: ptr<function, Complex>) {
@@ -15800,7 +18848,7 @@ if ((rnd(rs) < 0.5)) {
   "sqrt_asinh": {
     params: [],
     verified: true, priority: 0, flags: [], types: ["2D"],
-    funcNames: ["Complex","powc","Complex_Init","Complex_Radius","Complex_Neg","Complex_Sqrt","Complex_Sqr","Complex_Inc","Complex_One","Complex_Mag2","Complex_MagInv","Complex_Recip","Complex_Arg","Complex_ToP","Complex_UnP","Complex_Copy","Complex_Pow","Complex_Add","Complex_Mag2eps","Complex_Log","Complex_AsinH","Complex_Scale"],
+    funcNames: ["Complex","atan2j","powc","Complex_Init","Complex_Radius","Complex_Neg","Complex_Sqrt","Complex_Sqr","Complex_Inc","Complex_One","Complex_Mag2","Complex_MagInv","Complex_Recip","Complex_Arg","Complex_ToP","Complex_UnP","Complex_Copy","Complex_Pow","Complex_Add","Complex_Mag2eps","Complex_Log","Complex_AsinH","Complex_Scale"],
     funcs: `struct Complex {
   per_fix: f32,
   re: f32,
@@ -15808,6 +18856,8 @@ if ((rnd(rs) < 0.5)) {
   save_re: f32,
   save_im: f32,
 }
+
+fn atan2j(y: f32, x: f32) -> f32 { if (x == 0.0 && y == 0.0) { return select(0.0, PI, (bitcast<u32>(x) >> 31u) == 1u) * select(1.0, -1.0, (bitcast<u32>(y) >> 31u) == 1u); } return atan2(y, x); }
 
 fn powc(x: f32, y: f32) -> f32 {
   if (x >= 0.0) { return pow(x, y); }
@@ -15876,7 +18926,7 @@ fn Complex_Recip(c: ptr<function, Complex>) {
 }
 
 fn Complex_Arg(c: ptr<function, Complex>) -> f32 {
-  return ((*c).per_fix + atan2((*c).im, (*c).re));
+  return ((*c).per_fix + atan2j((*c).im, (*c).re));
 }
 
 fn Complex_ToP(c: ptr<function, Complex>, dst: ptr<function, Complex>) {
@@ -15968,7 +19018,7 @@ if ((rnd(rs) < 0.5)) {
   "sqrt_acosech": {
     params: [],
     verified: true, priority: 0, flags: [], types: ["2D"],
-    funcNames: ["Complex","powc","Complex_Init","Complex_Radius","Complex_Neg","Complex_Sqrt","Complex_Mag2","Complex_MagInv","Complex_Recip","Complex_Sqr","Complex_Dec","Complex_One","Complex_Arg","Complex_ToP","Complex_UnP","Complex_Copy","Complex_Pow","Complex_Add","Complex_Mag2eps","Complex_Log","Complex_AcosH","Complex_AcosecH","Complex_Scale"],
+    funcNames: ["Complex","atan2j","powc","Complex_Init","Complex_Radius","Complex_Neg","Complex_Sqrt","Complex_Mag2","Complex_MagInv","Complex_Recip","Complex_Sqr","Complex_Dec","Complex_One","Complex_Arg","Complex_ToP","Complex_UnP","Complex_Copy","Complex_Pow","Complex_Add","Complex_Mag2eps","Complex_Log","Complex_AcosH","Complex_AcosecH","Complex_Scale"],
     funcs: `struct Complex {
   per_fix: f32,
   re: f32,
@@ -15976,6 +19026,8 @@ if ((rnd(rs) < 0.5)) {
   save_re: f32,
   save_im: f32,
 }
+
+fn atan2j(y: f32, x: f32) -> f32 { if (x == 0.0 && y == 0.0) { return select(0.0, PI, (bitcast<u32>(x) >> 31u) == 1u) * select(1.0, -1.0, (bitcast<u32>(y) >> 31u) == 1u); } return atan2(y, x); }
 
 fn powc(x: f32, y: f32) -> f32 {
   if (x >= 0.0) { return pow(x, y); }
@@ -16044,7 +19096,7 @@ fn Complex_One(c: ptr<function, Complex>) {
 }
 
 fn Complex_Arg(c: ptr<function, Complex>) -> f32 {
-  return ((*c).per_fix + atan2((*c).im, (*c).re));
+  return ((*c).per_fix + atan2j((*c).im, (*c).re));
 }
 
 fn Complex_ToP(c: ptr<function, Complex>, dst: ptr<function, Complex>) {
@@ -16141,6 +19193,8 @@ if ((rnd(rs) < 0.5)) {
   "holesq": {
     params: [],
     verified: true, priority: 0, flags: [], types: ["2D"],
+    funcNames: ["atan2j"],
+    funcs: `fn atan2j(y: f32, x: f32) -> f32 { if (x == 0.0 && y == 0.0) { return select(0.0, PI, (bitcast<u32>(x) >> 31u) == 1u) * select(1.0, -1.0, (bitcast<u32>(y) >> 31u) == 1u); } return atan2(y, x); }`,
     code: (w, _p) => `{
 var x: f32 = (${w} * t.x);
 var y: f32 = (${w} * t.y);
@@ -16172,6 +19226,8 @@ if (((fax + fay) > 1)) {
   "spligon": {
     params: [{ name: "sides", def: 3 }, { name: "r", def: 1 }, { name: "i", def: 1 }],
     verified: true, priority: 0, flags: [], types: ["2D"],
+    funcNames: ["atan2j"],
+    funcs: `fn atan2j(y: f32, x: f32) -> f32 { if (x == 0.0 && y == 0.0) { return select(0.0, PI, (bitcast<u32>(x) >> 31u) == 1u) * select(1.0, -1.0, (bitcast<u32>(y) >> 31u) == 1u); } return atan2(y, x); }`,
     code: (w, p) => `{
 var j: f32 = 0;
 var th_: f32 = 0;
@@ -16191,6 +19247,8 @@ v.y += (${w} * (t.y + (dx * ${p[1]})));
   "henon": {
     params: [{ name: "a", def: 0.5 }, { name: "b", def: 1 }, { name: "c", def: 1 }],
     verified: true, priority: 0, flags: [], types: ["2D"],
+    funcNames: ["atan2j"],
+    funcs: `fn atan2j(y: f32, x: f32) -> f32 { if (x == 0.0 && y == 0.0) { return select(0.0, PI, (bitcast<u32>(x) >> 31u) == 1u) * select(1.0, -1.0, (bitcast<u32>(y) >> 31u) == 1u); } return atan2(y, x); }`,
     code: (w, p) => `{
 v.x += (((${p[2]} - ((${p[0]} * t.x) * t.x)) + t.y) * ${w});
 v.y += ((${p[1]} * t.x) * ${w});
@@ -16199,7 +19257,7 @@ v.y += ((${p[1]} * t.x) * ${w});
   "plusrecip": {
     params: [{ name: "ar", def: 4 }, { name: "ai", def: 0 }],
     verified: true, priority: 0, flags: [], types: ["2D"],
-    funcNames: ["Complex","Complex_Init","Complex_Mag2eps","Complex_Sqr","Complex_Sub","Complex_Radius","Complex_Neg","Complex_Sqrt","Complex_Add","Complex_Copy","Complex_Conj","Complex_Scale","Complex_Mul"],
+    funcNames: ["Complex","atan2j","Complex_Init","Complex_Mag2eps","Complex_Sqr","Complex_Sub","Complex_Radius","Complex_Neg","Complex_Sqrt","Complex_Add","Complex_Copy","Complex_Conj","Complex_Scale","Complex_Mul"],
     funcs: `struct Complex {
   per_fix: f32,
   re: f32,
@@ -16207,6 +19265,8 @@ v.y += ((${p[1]} * t.x) * ${w});
   save_re: f32,
   save_im: f32,
 }
+
+fn atan2j(y: f32, x: f32) -> f32 { if (x == 0.0 && y == 0.0) { return select(0.0, PI, (bitcast<u32>(x) >> 31u) == 1u) * select(1.0, -1.0, (bitcast<u32>(y) >> 31u) == 1u); } return atan2(y, x); }
 
 fn Complex_Init(c: ptr<function, Complex>, Rp: f32, Ip: f32) {
   (*c).re = Rp;
@@ -16310,6 +19370,8 @@ v.y += k.im;
   "tqmirror": {
     params: [{ name: "preset", def: 0 }, { name: "a", def: 1 }, { name: "b", def: 1 }, { name: "c", def: 1 }, { name: "d", def: 1 }, { name: "e", def: 1 }, { name: "f", def: 1 }, { name: "g", def: 1 }, { name: "h", def: 1 }, { name: "i", def: 1 }, { name: "j", def: 1 }, { name: "k", def: 1 }, { name: "l", def: 0 }, { name: "m", def: 0 }, { name: "n", def: 0 }, { name: "o", def: 0 }, { name: "p", def: 0 }, { name: "q", def: 0 }, { name: "r", def: 1 }, { name: "s", def: 1 }, { name: "type", def: 0 }, { name: "mode", def: 0 }],
     verified: true, priority: 0, flags: [], types: ["2D"],
+    funcNames: ["atan2j"],
+    funcs: `fn atan2j(y: f32, x: f32) -> f32 { if (x == 0.0 && y == 0.0) { return select(0.0, PI, (bitcast<u32>(x) >> 31u) == 1u) * select(1.0, -1.0, (bitcast<u32>(y) >> 31u) == 1u); } return atan2(y, x); }`,
     code: (w, p) => `{
 var x: f32 = t.x;
 var y: f32 = t.y;
@@ -16375,6 +19437,8 @@ if (((((${w} * d) + x) < l) || (((${w} * e) + y) < m))) {
   "cone": {
     params: [{ name: "radius1", def: 0.5 }, { name: "radius2", def: 1 }, { name: "size1", def: 0.5 }, { name: "size2", def: 2 }, { name: "ywave", def: 1 }, { name: "xwave", def: 1 }, { name: "height", def: 1 }, { name: "warp", def: 1 }, { name: "weight", def: 2 }],
     verified: true, priority: 0, flags: ["3d","z"], types: ["3D","BASE_SHAPE"],
+    funcNames: ["atan2j"],
+    funcs: `fn atan2j(y: f32, x: f32) -> f32 { if (x == 0.0 && y == 0.0) { return select(0.0, PI, (bitcast<u32>(x) >> 31u) == 1u) * select(1.0, -1.0, (bitcast<u32>(y) >> 31u) == 1u); } return atan2(y, x); }`,
     code: (w, p) => `{
 var r_: f32 = ((${w} / sqrt(((((t.x * t.x) * ${p[7]}) + (t.y * t.y)) + ${p[2]}))) * ${p[3]});
 var xx: f32 = ((th * ${p[0]}) + ((PI * f32(i32((${p[8]} * rnd(rs))))) * ${p[1]}));
@@ -16388,6 +19452,8 @@ pz_ += (r_ * ${p[6]});
   "gridout3D": {
     params: [{ name: "xx", def: 1 }, { name: "yy", def: 1 }, { name: "xa", def: 1 }, { name: "xb", def: 0 }, { name: "xc", def: 1 }, { name: "xd", def: 0 }, { name: "xe", def: 1 }, { name: "xf", def: 0 }, { name: "xg", def: 1 }, { name: "xh", def: 0 }, { name: "ya", def: 0 }, { name: "yb", def: 1 }, { name: "yc", def: 0 }, { name: "yd", def: 1 }, { name: "ye", def: 0 }, { name: "yf", def: 1 }, { name: "yg", def: 0 }, { name: "yh", def: 1 }, { name: "za", def: 0 }, { name: "zb", def: 0 }, { name: "zc", def: 0 }, { name: "zd", def: 0 }, { name: "ze", def: 1 }, { name: "zf", def: 1 }, { name: "zg", def: 1 }, { name: "zh", def: 1 }],
     verified: true, priority: 0, flags: ["3d","z"], types: ["3D"],
+    funcNames: ["atan2j"],
+    funcs: `fn atan2j(y: f32, x: f32) -> f32 { if (x == 0.0 && y == 0.0) { return select(0.0, PI, (bitcast<u32>(x) >> 31u) == 1u) * select(1.0, -1.0, (bitcast<u32>(y) >> 31u) == 1u); } return atan2(y, x); }`,
     code: (w, p) => `{
 var x: f32 = (round(t.x) * ${p[0]});
 var y: f32 = (round(t.y) * ${p[1]});
@@ -16441,8 +19507,10 @@ if ((y <= 0.0)) {
   "dc_mandelbox2D": {
     params: [{ name: "zoom", def: 7 }, { name: "seed", def: 10000 }, { name: "time", def: 0 }, { name: "ColorOnly", def: 0 }, { name: "Gradient", def: 0 }, { name: "scale_z", def: 0 }, { name: "offset_z", def: 0 }, { name: "reset_z", def: 1 }],
     verified: true, priority: 0, flags: ["dc","rgb","z"], types: ["SIMULATION","DC","BASE_SHAPE"],
-    funcNames: ["read_imageStepMode","powc","dc_mandelbox2D_getRGBColor","dbl2int","greyscale","distance_color"],
+    funcNames: ["read_imageStepMode","atan2j","powc","dc_mandelbox2D_getRGBColor","dbl2int","greyscale","distance_color"],
     funcs: `fn read_imageStepMode(base: u32, n: i32, t: f32) -> vec4f { return pal[base + u32(clamp(t, 0.0, 0.99999) * f32(max(n, 1)))]; }
+
+fn atan2j(y: f32, x: f32) -> f32 { if (x == 0.0 && y == 0.0) { return select(0.0, PI, (bitcast<u32>(x) >> 31u) == 1u) * select(1.0, -1.0, (bitcast<u32>(y) >> 31u) == 1u); } return atan2(y, x); }
 
 fn powc(x: f32, y: f32) -> f32 {
   if (x >= 0.0) { return pow(x, y); }
@@ -16562,13 +19630,15 @@ if ((${p[7]} == 1)) {
   "dc_mandala": {
     params: [{ name: "mX", def: 0.025 }, { name: "mY", def: -0.001245675 }, { name: "scale", def: 2 }, { name: "sides", def: 12 }, { name: "multiply", def: 1 }, { name: "loops", def: 64 }, { name: "iR", def: 0 }, { name: "iG", def: 0 }, { name: "iB", def: 1 }, { name: "ColorOnly", def: 0 }, { name: "Gradient", def: 0 }, { name: "scale_z", def: 0 }, { name: "offset_z", def: 0 }, { name: "reset_z", def: 1 }],
     verified: true, priority: 0, flags: ["dc","rgb","z"], types: ["SIMULATION","DC","BASE_SHAPE"],
-    funcNames: ["read_imageStepMode","mmod2","dc_mandala_kscope","dc_mandala_getRGBColor","dbl2int","greyscale","distance_color"],
+    funcNames: ["read_imageStepMode","atan2j","mmod2","dc_mandala_kscope","dc_mandala_getRGBColor","dbl2int","greyscale","distance_color"],
     funcs: `fn read_imageStepMode(base: u32, n: i32, t: f32) -> vec4f { return pal[base + u32(clamp(t, 0.0, 0.99999) * f32(max(n, 1)))]; }
+
+fn atan2j(y: f32, x: f32) -> f32 { if (x == 0.0 && y == 0.0) { return select(0.0, PI, (bitcast<u32>(x) >> 31u) == 1u) * select(1.0, -1.0, (bitcast<u32>(y) >> 31u) == 1u); } return atan2(y, x); }
 
 fn mmod2(a: vec2f, b: vec2f) -> vec2f { return a - b * floor(a / b); }
 
 fn dc_mandala_kscope(uv: vec2f, k: f32) -> vec2f {
-  var t_: f32 = mmod(atan2(uv.y, uv.x), (2.0 * k));
+  var t_: f32 = mmod(atan2j(uv.y, uv.x), (2.0 * k));
   var angle: f32 = abs((t_ - k));
   var t4: f32 = length(uv);
   var t1: vec2f = vec2f(t4, t4);
@@ -16705,7 +19775,7 @@ if ((${p[13]} == 1)) {
   "dc_apollonian": {
     params: [{ name: "seed", def: 10000 }, { name: "time", def: 0 }, { name: "ColorOnly", def: 0 }, { name: "Gradient", def: 0 }, { name: "scale_z", def: 0 }, { name: "offset_z", def: 0 }, { name: "reset_z", def: 1 }],
     verified: true, priority: 0, flags: ["dc","rgb","z"], types: ["SIMULATION","DC","BASE_SHAPE"],
-    funcNames: ["Mat3","read_imageStepMode","Mat3_Init_ov1","dc_apollonian_rot","times_ov1","times_ov2","dc_apollonian_app","dc_apollonian_getRGBColor","dbl2int","greyscale","distance_color"],
+    funcNames: ["Mat3","read_imageStepMode","atan2j","Mat3_Init_ov1","dc_apollonian_rot","times_ov1","times_ov2","dc_apollonian_app","dc_apollonian_getRGBColor","dbl2int","greyscale","distance_color"],
     funcs: `struct Mat3 {
   a00: f32,
   a10: f32,
@@ -16719,6 +19789,8 @@ if ((${p[13]} == 1)) {
 }
 
 fn read_imageStepMode(base: u32, n: i32, t: f32) -> vec4f { return pal[base + u32(clamp(t, 0.0, 0.99999) * f32(max(n, 1)))]; }
+
+fn atan2j(y: f32, x: f32) -> f32 { if (x == 0.0 && y == 0.0) { return select(0.0, PI, (bitcast<u32>(x) >> 31u) == 1u) * select(1.0, -1.0, (bitcast<u32>(y) >> 31u) == 1u); } return atan2(y, x); }
 
 fn Mat3_Init_ov1(m: ptr<function, Mat3>, v1: vec3f, v2: vec3f, v3: vec3f) {
   (*m).a00 = v1.x;
@@ -16868,8 +19940,10 @@ if ((${p[6]} == 1)) {
   "dc_fractaldots": {
     params: [{ name: "iterations", def: 9 }, { name: "dotsize", def: 400 }, { name: "maxiterations", def: 10 }, { name: "complexity", def: 0.001245675 }, { name: "pattern", def: 2.5 }, { name: "spacing", def: 12 }, { name: "rotate1", def: 1.5 }, { name: "rotate2", def: 64 }, { name: "zoom", def: 64 }, { name: "ColorOnly", def: 0 }, { name: "Gradient", def: 0 }, { name: "scale_z", def: 0 }, { name: "offset_z", def: 0 }, { name: "reset_z", def: 1 }],
     verified: true, priority: 0, flags: ["dc","rgb","z"], types: ["SIMULATION","DC","BASE_SHAPE"],
-    funcNames: ["read_imageStepMode","powc","dc_fractaldots_rot","dc_fractaldots_getRGBColor","dbl2int","greyscale","distance_color"],
+    funcNames: ["read_imageStepMode","atan2j","powc","dc_fractaldots_rot","dc_fractaldots_getRGBColor","dbl2int","greyscale","distance_color"],
     funcs: `fn read_imageStepMode(base: u32, n: i32, t: f32) -> vec4f { return pal[base + u32(clamp(t, 0.0, 0.99999) * f32(max(n, 1)))]; }
+
+fn atan2j(y: f32, x: f32) -> f32 { if (x == 0.0 && y == 0.0) { return select(0.0, PI, (bitcast<u32>(x) >> 31u) == 1u) * select(1.0, -1.0, (bitcast<u32>(y) >> 31u) == 1u); } return atan2(y, x); }
 
 fn powc(x: f32, y: f32) -> f32 {
   if (x >= 0.0) { return pow(x, y); }
@@ -16992,8 +20066,10 @@ if ((${p[13]} == 1)) {
   "dc_hoshi": {
     params: [{ name: "seed", def: 100000 }, { name: "time", def: 10 }, { name: "steps", def: 28 }, { name: "scale", def: 1.25 }, { name: "translate", def: 1.5 }, { name: "ColorOnly", def: 0 }, { name: "Gradient", def: 0 }, { name: "scale_z", def: 0 }, { name: "offset_z", def: 0 }, { name: "reset_z", def: 1 }],
     verified: true, priority: 0, flags: ["dc","rgb","z"], types: ["SIMULATION","DC","BASE_SHAPE"],
-    funcNames: ["read_imageStepMode","mmod2","smoothstepc","dc_hoshi_rotate","dc_hoshi_hsv","dc_hoshi_getRGBColor","dbl2int","greyscale","distance_color"],
+    funcNames: ["read_imageStepMode","atan2j","mmod2","smoothstepc","dc_hoshi_rotate","dc_hoshi_hsv","dc_hoshi_getRGBColor","dbl2int","greyscale","distance_color"],
     funcs: `fn read_imageStepMode(base: u32, n: i32, t: f32) -> vec4f { return pal[base + u32(clamp(t, 0.0, 0.99999) * f32(max(n, 1)))]; }
+
+fn atan2j(y: f32, x: f32) -> f32 { if (x == 0.0 && y == 0.0) { return select(0.0, PI, (bitcast<u32>(x) >> 31u) == 1u) * select(1.0, -1.0, (bitcast<u32>(y) >> 31u) == 1u); } return atan2(y, x); }
 
 fn mmod2(a: vec2f, b: vec2f) -> vec2f { return a - b * floor(a / b); }
 
@@ -17023,7 +20099,7 @@ fn dc_hoshi_getRGBColor(p__in: vec2f, time: f32, steps: f32, scale: f32, transla
     p_ = ((p_ * vec2f(scale)) - vec2f(translate));
     p_ = dc_hoshi_rotate(p_, (3.14159 / ((((0.1 + (sin(((time * 0.0005) + (f32(i) * 0.5000001))) * 0.4999)) + 0.5) + (10.0 / time)) + (sin(time) / 100.0))));
   }
-  var i: f32 = (((x * x) + atan2(p_.y, p_.x)) + (time * 0.02));
+  var i: f32 = (((x * x) + atan2j(p_.y, p_.x)) + (time * 0.02));
   var h: f32 = ((floor((i * 4.0)) / 8.0) + 1.107);
   h += ((smoothstepc(-0.1, 0.8, (mmod(((i * 2.0) / 5.0), (1.0 / 4.0)) * 900.0)) / 0.01) - 0.5);
   var color: vec3f = dc_hoshi_hsv(h, 1.0, smoothstepc(-3.0, 3.0, (length(p_) * 1.0)));
@@ -17117,8 +20193,10 @@ if ((${p[9]} == 1)) {
   "dc_kaleidocomplex": {
     params: [{ name: "seed", def: 1000000 }, { name: "time", def: 0 }, { name: "iMax", def: 12 }, { name: "color", def: 2 }, { name: "redF", def: 1 }, { name: "greenF", def: 1 }, { name: "blueF", def: 1 }, { name: "ColorOnly", def: 0 }, { name: "Gradient", def: 0 }, { name: "scale_z", def: 0 }, { name: "offset_z", def: 0 }, { name: "reset_z", def: 1 }],
     verified: true, priority: 0, flags: ["dc","rgb","z"], types: ["SIMULATION","DC","BASE_SHAPE"],
-    funcNames: ["read_imageStepMode","dc_kaleidocomplex_cmult","dc_kaleidocomplex_getRGBColor","dbl2int","greyscale","distance_color"],
+    funcNames: ["read_imageStepMode","atan2j","dc_kaleidocomplex_cmult","dc_kaleidocomplex_getRGBColor","dbl2int","greyscale","distance_color"],
     funcs: `fn read_imageStepMode(base: u32, n: i32, t: f32) -> vec4f { return pal[base + u32(clamp(t, 0.0, 0.99999) * f32(max(n, 1)))]; }
+
+fn atan2j(y: f32, x: f32) -> f32 { if (x == 0.0 && y == 0.0) { return select(0.0, PI, (bitcast<u32>(x) >> 31u) == 1u) * select(1.0, -1.0, (bitcast<u32>(y) >> 31u) == 1u); } return atan2(y, x); }
 
 fn dc_kaleidocomplex_cmult(a: vec2f, b: vec2f) -> vec2f {
   return vec2f(((a.x * b.x) - (a.y * b.y)), ((a.x * b.y) + (a.y * b.x)));
@@ -17253,7 +20331,7 @@ if ((${p[11]} == 1)) {
   "dc_starsfield": {
     params: [{ name: "seed", def: 10000 }, { name: "time", def: 0 }, { name: "zdistance", def: 2 }, { name: "glow", def: 1 }, { name: "ColorOnly", def: 0 }, { name: "Gradient", def: 0 }, { name: "scale_z", def: 0 }, { name: "offset_z", def: 0 }, { name: "reset_z", def: 1 }],
     verified: true, priority: 0, flags: ["dc","rgb","z"], types: ["SIMULATION","DC","BASE_SHAPE"],
-    funcNames: ["Mat2","read_imageStepMode","smoothstepc","Mat2_Init","dc_starsfield_rotate","times","dc_starsfield_hash11","dc_starsfield_hash22","hash21","dc_starsfield_layer","dc_starsfield_render","dc_starsfield_getRGBColor","dbl2int","greyscale","distance_color"],
+    funcNames: ["Mat2","read_imageStepMode","atan2j","smoothstepc","Mat2_Init","dc_starsfield_rotate","times","dc_starsfield_hash11","dc_starsfield_hash22","hash21","dc_starsfield_layer","dc_starsfield_render","dc_starsfield_getRGBColor","dbl2int","greyscale","distance_color"],
     funcs: `struct Mat2 {
   a00: f32,
   a01: f32,
@@ -17262,6 +20340,8 @@ if ((${p[11]} == 1)) {
 }
 
 fn read_imageStepMode(base: u32, n: i32, t: f32) -> vec4f { return pal[base + u32(clamp(t, 0.0, 0.99999) * f32(max(n, 1)))]; }
+
+fn atan2j(y: f32, x: f32) -> f32 { if (x == 0.0 && y == 0.0) { return select(0.0, PI, (bitcast<u32>(x) >> 31u) == 1u) * select(1.0, -1.0, (bitcast<u32>(y) >> 31u) == 1u); } return atan2(y, x); }
 
 fn smoothstepc(a: f32, b: f32, x: f32) -> f32 { if (a == b) { return step(a, x); } let t = clamp((x - a) / (b - a), 0.0, 1.0); return t * t * (3.0 - 2.0 * t); }
 
@@ -17433,12 +20513,14 @@ if ((${p[8]} == 1)) {
   "dc_kaleidoscopic": {
     params: [{ name: "seed", def: 10000 }, { name: "time", def: 0 }, { name: "sides", def: 8 }, { name: "zoom", def: 1 }, { name: "p1", def: 0 }, { name: "radial", def: 1 }, { name: "ColorOnly", def: 0 }, { name: "Gradient", def: 0 }, { name: "scale_z", def: 0 }, { name: "offset_z", def: 0 }, { name: "reset_z", def: 1 }],
     verified: true, priority: 0, flags: ["dc","rgb","z"], types: ["SIMULATION","DC","BASE_SHAPE"],
-    funcNames: ["read_imageStepMode","dc_kaleidoscopic_smallKoleidoscope","dc_kaleidoscopic_getRGBColor","dbl2int","greyscale","distance_color"],
+    funcNames: ["read_imageStepMode","atan2j","dc_kaleidoscopic_smallKoleidoscope","dc_kaleidoscopic_getRGBColor","dbl2int","greyscale","distance_color"],
     funcs: `fn read_imageStepMode(base: u32, n: i32, t: f32) -> vec4f { return pal[base + u32(clamp(t, 0.0, 0.99999) * f32(max(n, 1)))]; }
+
+fn atan2j(y: f32, x: f32) -> f32 { if (x == 0.0 && y == 0.0) { return select(0.0, PI, (bitcast<u32>(x) >> 31u) == 1u) * select(1.0, -1.0, (bitcast<u32>(y) >> 31u) == 1u); } return atan2(y, x); }
 
 fn dc_kaleidoscopic_smallKoleidoscope(uv: vec2f, time: f32, sides: f32) -> vec2f {
   var KA: f32 = (PI / sides);
-  var angle: f32 = (abs((mmod(atan2(uv.y, uv.x), (2.0 * KA)) - KA)) + (0.1 * time));
+  var angle: f32 = (abs((mmod(atan2j(uv.y, uv.x), (2.0 * KA)) - KA)) + (0.1 * time));
   var uvr: vec2f = (vec2f(cos(angle), sin(angle)) * vec2f(length(uv)));
   return uvr;
 }
@@ -17545,7 +20627,7 @@ if ((${p[10]} == 1)) {
   "dc_randomoctree": {
     params: [{ name: "seed", def: 10000 }, { name: "time", def: 0 }, { name: "steps", def: 10 }, { name: "rotLR", def: 0 }, { name: "rotUD", def: 0 }, { name: "grid", def: 0 }, { name: "borders", def: 1 }, { name: "bBorders", def: 1 }, { name: "ColorOnly", def: 0 }, { name: "Gradient", def: 0 }, { name: "scale_z", def: 0 }, { name: "offset_z", def: 0 }, { name: "reset_z", def: 1 }],
     verified: true, priority: 0, flags: ["dc","rgb","z"], types: ["SIMULATION","DC","BASE_SHAPE"],
-    funcNames: ["Mat2","read_imageStepMode","mmod3","Mat2_Init","dc_randomoctree_rot","times","dc_randomoctree_rnd","getvoxel","dc_randomoctree_voxel","dc_randomoctree_getRGBColor","dbl2int","greyscale","distance_color"],
+    funcNames: ["Mat2","read_imageStepMode","atan2j","mmod3","Mat2_Init","dc_randomoctree_rot","times","dc_randomoctree_rnd","getvoxel","dc_randomoctree_voxel","dc_randomoctree_getRGBColor","dbl2int","greyscale","distance_color"],
     funcs: `struct Mat2 {
   a00: f32,
   a01: f32,
@@ -17554,6 +20636,8 @@ if ((${p[10]} == 1)) {
 }
 
 fn read_imageStepMode(base: u32, n: i32, t: f32) -> vec4f { return pal[base + u32(clamp(t, 0.0, 0.99999) * f32(max(n, 1)))]; }
+
+fn atan2j(y: f32, x: f32) -> f32 { if (x == 0.0 && y == 0.0) { return select(0.0, PI, (bitcast<u32>(x) >> 31u) == 1u) * select(1.0, -1.0, (bitcast<u32>(y) >> 31u) == 1u); } return atan2(y, x); }
 
 fn mmod3(a: vec3f, b: vec3f) -> vec3f { return a - b * floor(a / b); }
 
@@ -17796,8 +20880,10 @@ if ((${p[12]} == 1)) {
   "dc_acrilic": {
     params: [{ name: "seed", def: 10000 }, { name: "time", def: 0 }, { name: "zoom", def: 0.7 }, { name: "steps", def: 10 }, { name: "p1", def: 12 }, { name: "p2", def: 12 }, { name: "p3", def: 12 }, { name: "p4", def: 12 }, { name: "p5", def: 75 }, { name: "p6", def: 75 }, { name: "redf", def: 1 }, { name: "greenf", def: 1 }, { name: "bluef", def: 1 }, { name: "ColorOnly", def: 0 }, { name: "Gradient", def: 0 }, { name: "scale_z", def: 0 }, { name: "offset_z", def: 0 }, { name: "reset_z", def: 1 }],
     verified: true, priority: 0, flags: ["dc","rgb","z"], types: ["2D","SIMULATION","DC","BASE_SHAPE"],
-    funcNames: ["read_imageStepMode","dc_acrilic_sq","dc_acrilic_getRGBColor","dbl2int","greyscale","distance_color"],
+    funcNames: ["read_imageStepMode","atan2j","dc_acrilic_sq","dc_acrilic_getRGBColor","dbl2int","greyscale","distance_color"],
     funcs: `fn read_imageStepMode(base: u32, n: i32, t: f32) -> vec4f { return pal[base + u32(clamp(t, 0.0, 0.99999) * f32(max(n, 1)))]; }
+
+fn atan2j(y: f32, x: f32) -> f32 { if (x == 0.0 && y == 0.0) { return select(0.0, PI, (bitcast<u32>(x) >> 31u) == 1u) * select(1.0, -1.0, (bitcast<u32>(y) >> 31u) == 1u); } return atan2(y, x); }
 
 fn dc_acrilic_sq(x: f32) -> f32 {
   return (x * x);
@@ -17912,8 +20998,10 @@ if ((${p[17]} == 1)) {
   "dc_circlesblue": {
     params: [{ name: "seed", def: 10000 }, { name: "time", def: 1 }, { name: "zoom", def: 1 }, { name: "radius", def: 0.04 }, { name: "bubles", def: 40 }, { name: "ColorOnly", def: 0 }, { name: "Gradient", def: 0 }, { name: "scale_z", def: 0 }, { name: "offset_z", def: 0 }, { name: "reset_z", def: 1 }],
     verified: true, priority: 0, flags: ["dc","rgb","z"], types: ["SIMULATION","DC","BASE_SHAPE"],
-    funcNames: ["read_imageStepMode","powc","smoothstepc","dc_circlesblue_getRGBColor","dbl2int","greyscale","distance_color"],
+    funcNames: ["read_imageStepMode","atan2j","powc","smoothstepc","dc_circlesblue_getRGBColor","dbl2int","greyscale","distance_color"],
     funcs: `fn read_imageStepMode(base: u32, n: i32, t: f32) -> vec4f { return pal[base + u32(clamp(t, 0.0, 0.99999) * f32(max(n, 1)))]; }
+
+fn atan2j(y: f32, x: f32) -> f32 { if (x == 0.0 && y == 0.0) { return select(0.0, PI, (bitcast<u32>(x) >> 31u) == 1u) * select(1.0, -1.0, (bitcast<u32>(y) >> 31u) == 1u); } return atan2(y, x); }
 
 fn powc(x: f32, y: f32) -> f32 {
   if (x >= 0.0) { return pow(x, y); }
@@ -18027,8 +21115,10 @@ if ((${p[9]} == 1)) {
   "dc_kaliset": {
     params: [{ name: "Seed", def: 10000 }, { name: "time", def: 200 }, { name: "zoom", def: 0.5 }, { name: "N", def: 60 }, { name: "shiftX", def: -0.22 }, { name: "shiftY", def: -0.21 }, { name: "ColorOnly", def: 0 }, { name: "Gradient", def: 0 }, { name: "scale_z", def: 0 }, { name: "offset_z", def: 0 }, { name: "reset_z", def: 1 }],
     verified: true, priority: 0, flags: ["dc","rgb","z"], types: ["SIMULATION","DC","BASE_SHAPE"],
-    funcNames: ["read_imageStepMode","dc_kaliset_getRGBColor","dbl2int","greyscale","distance_color"],
+    funcNames: ["read_imageStepMode","atan2j","dc_kaliset_getRGBColor","dbl2int","greyscale","distance_color"],
     funcs: `fn read_imageStepMode(base: u32, n: i32, t: f32) -> vec4f { return pal[base + u32(clamp(t, 0.0, 0.99999) * f32(max(n, 1)))]; }
+
+fn atan2j(y: f32, x: f32) -> f32 { if (x == 0.0 && y == 0.0) { return select(0.0, PI, (bitcast<u32>(x) >> 31u) == 1u) * select(1.0, -1.0, (bitcast<u32>(y) >> 31u) == 1u); } return atan2(y, x); }
 
 fn dc_kaliset_getRGBColor(v__in: vec2f, time: f32, N: f32, shiftx: f32, shifty: f32) -> vec3f {
   var v_: vec2f = v__in;
@@ -18140,8 +21230,10 @@ if ((${p[10]} == 1)) {
   "dc_kaliset2": {
     params: [{ name: "seed", def: 5000 }, { name: "time", def: 85.5 }, { name: "zoom", def: 20 }, { name: "N", def: 100 }, { name: "radio", def: 1 }, { name: "shiftX", def: -0.356 }, { name: "shiftY", def: 0.686 }, { name: "redF", def: 1.8 }, { name: "greenF", def: 1.9 }, { name: "blueF", def: 2.2 }, { name: "ColorOnly", def: 0 }, { name: "Gradient", def: 0 }, { name: "scale_z", def: 0 }, { name: "offset_z", def: 0 }, { name: "reset_z", def: 1 }],
     verified: true, priority: 0, flags: ["dc","rgb","z"], types: ["SIMULATION","DC","BASE_SHAPE"],
-    funcNames: ["read_imageStepMode","dc_kaliset2_getRGBColor","dbl2int","greyscale","distance_color"],
+    funcNames: ["read_imageStepMode","atan2j","dc_kaliset2_getRGBColor","dbl2int","greyscale","distance_color"],
     funcs: `fn read_imageStepMode(base: u32, n: i32, t: f32) -> vec4f { return pal[base + u32(clamp(t, 0.0, 0.99999) * f32(max(n, 1)))]; }
+
+fn atan2j(y: f32, x: f32) -> f32 { if (x == 0.0 && y == 0.0) { return select(0.0, PI, (bitcast<u32>(x) >> 31u) == 1u) * select(1.0, -1.0, (bitcast<u32>(y) >> 31u) == 1u); } return atan2(y, x); }
 
 fn dc_kaliset2_getRGBColor(v__in: vec2f, time: f32, N: f32, rad2: f32, shiftx: f32, shifty: f32, FR: f32, FG: f32, FB: f32) -> vec3f {
   var v_: vec2f = v__in;
@@ -18253,7 +21345,7 @@ if ((${p[14]} == 1)) {
   "dc_grid3D": {
     params: [{ name: "zoom", def: 1 }, { name: "Seed", def: 10000 }, { name: "time", def: 200 }, { name: "ColorOnly", def: 0 }, { name: "Gradient", def: 0 }, { name: "scale_z", def: 0 }, { name: "offset_z", def: 0 }, { name: "reset_z", def: 1 }],
     verified: true, priority: 0, flags: ["dc","rgb","z"], types: ["SIMULATION","DC","BASE_SHAPE"],
-    funcNames: ["Mat3","read_imageStepMode","Mat3_Init","times_ov2","dc_grid3D_field","dc_grid3D_getRGBColor","dbl2int","greyscale","distance_color"],
+    funcNames: ["Mat3","read_imageStepMode","atan2j","Mat3_Init","times_ov2","dc_grid3D_field","dc_grid3D_getRGBColor","dbl2int","greyscale","distance_color"],
     funcs: `struct Mat3 {
   a00: f32,
   a10: f32,
@@ -18267,6 +21359,8 @@ if ((${p[14]} == 1)) {
 }
 
 fn read_imageStepMode(base: u32, n: i32, t: f32) -> vec4f { return pal[base + u32(clamp(t, 0.0, 0.99999) * f32(max(n, 1)))]; }
+
+fn atan2j(y: f32, x: f32) -> f32 { if (x == 0.0 && y == 0.0) { return select(0.0, PI, (bitcast<u32>(x) >> 31u) == 1u) * select(1.0, -1.0, (bitcast<u32>(y) >> 31u) == 1u); } return atan2(y, x); }
 
 fn Mat3_Init(m: ptr<function, Mat3>, v00: f32, v10: f32, v20: f32, v01: f32, v11: f32, v21: f32, v02: f32, v12: f32, v22: f32) {
   (*m).a00 = v00;
@@ -18409,12 +21503,14 @@ if ((${p[7]} == 1)) {
   "dc_hyperbolictile": {
     params: [{ name: "zoom", def: 1 }, { name: "ColorOnly", def: 0 }, { name: "Gradient", def: 0 }, { name: "scale_z", def: 0 }, { name: "offset_z", def: 0 }, { name: "reset_z", def: 1 }],
     verified: true, priority: 0, flags: ["dc","rgb","z"], types: ["SIMULATION","DC","BASE_SHAPE"],
-    funcNames: ["read_imageStepMode","dc_hyperbolictile_topolar","dc_hyperbolictile_tocart","dc_hyperbolictile_mirror","dc_hyperbolictile_getRGBColor","dbl2int","greyscale","distance_color"],
+    funcNames: ["read_imageStepMode","atan2j","dc_hyperbolictile_topolar","dc_hyperbolictile_tocart","dc_hyperbolictile_mirror","dc_hyperbolictile_getRGBColor","dbl2int","greyscale","distance_color"],
     funcs: `fn read_imageStepMode(base: u32, n: i32, t: f32) -> vec4f { return pal[base + u32(clamp(t, 0.0, 0.99999) * f32(max(n, 1)))]; }
+
+fn atan2j(y: f32, x: f32) -> f32 { if (x == 0.0 && y == 0.0) { return select(0.0, PI, (bitcast<u32>(x) >> 31u) == 1u) * select(1.0, -1.0, (bitcast<u32>(y) >> 31u) == 1u); } return atan2(y, x); }
 
 fn dc_hyperbolictile_topolar(cart: vec2f) -> vec2f {
   var r_: f32 = sqrt(((cart.x * cart.x) + (cart.y * cart.y)));
-  var alpha: f32 = atan2(cart.y, cart.x);
+  var alpha: f32 = atan2j(cart.y, cart.x);
   return vec2f(r_, alpha);
 }
 
@@ -18562,8 +21658,10 @@ if ((${p[5]} == 1)) {
   "dc_squares": {
     params: [{ name: "seed", def: 5000 }, { name: "time", def: 85.5 }, { name: "N", def: 3 }, { name: "direction", def: 1 }, { name: "redF", def: 1.8 }, { name: "greenF", def: 1.9 }, { name: "blueF", def: 2.2 }, { name: "ColorOnly", def: 0 }, { name: "Gradient", def: 0 }, { name: "scale_z", def: 0 }, { name: "offset_z", def: 0 }, { name: "reset_z", def: 1 }],
     verified: true, priority: 0, flags: ["dc","rgb","z"], types: ["SIMULATION","DC","BASE_SHAPE"],
-    funcNames: ["read_imageStepMode","powc","mmod2","dc_squares_hit","dc_squares_getRGBColor","dbl2int","greyscale","distance_color"],
+    funcNames: ["read_imageStepMode","atan2j","powc","mmod2","dc_squares_hit","dc_squares_getRGBColor","dbl2int","greyscale","distance_color"],
     funcs: `fn read_imageStepMode(base: u32, n: i32, t: f32) -> vec4f { return pal[base + u32(clamp(t, 0.0, 0.99999) * f32(max(n, 1)))]; }
+
+fn atan2j(y: f32, x: f32) -> f32 { if (x == 0.0 && y == 0.0) { return select(0.0, PI, (bitcast<u32>(x) >> 31u) == 1u) * select(1.0, -1.0, (bitcast<u32>(y) >> 31u) == 1u); } return atan2(y, x); }
 
 fn powc(x: f32, y: f32) -> f32 {
   if (x >= 0.0) { return pow(x, y); }
@@ -18695,7 +21793,7 @@ if ((${p[11]} == 1)) {
   "dc_mandbrot": {
     params: [{ name: "nIters", def: 250 }, { name: "N", def: 8 }, { name: "Complexity", def: 0.995 }, { name: "seed", def: 10000 }, { name: "time", def: 0 }, { name: "zoom", def: 4 }, { name: "red", def: 0.0314 }, { name: "green", def: 0.02 }, { name: "blue", def: 0.011 }, { name: "ColorOnly", def: 0 }, { name: "Gradient", def: 0 }, { name: "scale_z", def: 0 }, { name: "offset_z", def: 0 }, { name: "reset_z", def: 1 }],
     verified: true, priority: 0, flags: ["dc","rgb","z"], types: ["SIMULATION","DC","BASE_SHAPE"],
-    funcNames: ["Mat2","read_imageStepMode","powc","Mat2_Init","dc_mandbrot_fractalize2","dc_mandbrot_mandelbrot","dc_mandbrot_getRGBColor","dbl2int","greyscale","distance_color"],
+    funcNames: ["Mat2","read_imageStepMode","atan2j","powc","Mat2_Init","dc_mandbrot_fractalize2","dc_mandbrot_mandelbrot","dc_mandbrot_getRGBColor","dbl2int","greyscale","distance_color"],
     funcs: `struct Mat2 {
   a00: f32,
   a01: f32,
@@ -18704,6 +21802,8 @@ if ((${p[11]} == 1)) {
 }
 
 fn read_imageStepMode(base: u32, n: i32, t: f32) -> vec4f { return pal[base + u32(clamp(t, 0.0, 0.99999) * f32(max(n, 1)))]; }
+
+fn atan2j(y: f32, x: f32) -> f32 { if (x == 0.0 && y == 0.0) { return select(0.0, PI, (bitcast<u32>(x) >> 31u) == 1u) * select(1.0, -1.0, (bitcast<u32>(y) >> 31u) == 1u); } return atan2(y, x); }
 
 fn powc(x: f32, y: f32) -> f32 {
   if (x >= 0.0) { return pow(x, y); }
@@ -18850,11 +21950,13 @@ if ((${p[13]} == 1)) {
   "dc_ducks": {
     params: [{ name: "seed", def: 10000 }, { name: "time", def: 10 }, { name: "zoom", def: 1 }, { name: "ColorOnly", def: 0 }, { name: "Gradient", def: 0 }, { name: "scale_z", def: 0 }, { name: "offset_z", def: 0 }, { name: "reset_z", def: 1 }],
     verified: true, priority: 0, flags: ["dc","rgb","z"], types: ["SIMULATION","DC","BASE_SHAPE"],
-    funcNames: ["read_imageStepMode","dc_ducks_Bfunc","dc_ducks_Ffunc","dc_ducks_getRGBColor","dbl2int","greyscale","distance_color"],
+    funcNames: ["read_imageStepMode","atan2j","dc_ducks_Bfunc","dc_ducks_Ffunc","dc_ducks_getRGBColor","dbl2int","greyscale","distance_color"],
     funcs: `fn read_imageStepMode(base: u32, n: i32, t: f32) -> vec4f { return pal[base + u32(clamp(t, 0.0, 0.99999) * f32(max(n, 1)))]; }
 
+fn atan2j(y: f32, x: f32) -> f32 { if (x == 0.0 && y == 0.0) { return select(0.0, PI, (bitcast<u32>(x) >> 31u) == 1u) * select(1.0, -1.0, (bitcast<u32>(y) >> 31u) == 1u); } return atan2(y, x); }
+
 fn dc_ducks_Bfunc(a: vec2f) -> vec2f {
-  return vec2f(log(length(a)), (atan2(a.y, a.x) - 6.2));
+  return vec2f(log(length(a)), (atan2j(a.y, a.x) - 6.2));
 }
 
 fn dc_ducks_Ffunc(uv: vec2f, time: f32) -> vec3f {
@@ -18966,7 +22068,7 @@ if ((${p[7]} == 1)) {
   "dc_layers": {
     params: [{ name: "N", def: 8 }, { name: "Amplitude", def: 0.995 }, { name: "seed", def: 10000 }, { name: "time", def: 0 }, { name: "zoom", def: 8 }, { name: "ColorOnly", def: 0 }, { name: "Gradient", def: 0 }, { name: "scale_z", def: 0 }, { name: "offset_z", def: 0 }, { name: "reset_z", def: 1 }],
     verified: true, priority: 0, flags: ["dc","rgb","z"], types: ["SIMULATION","DC","BASE_SHAPE"],
-    funcNames: ["Mat3","read_imageStepMode","smoothstepc","Mat3_Init","times_ov2","dc_layers_rotate","dc_layers_snoise","dc_layers_getRGBColor","dbl2int","greyscale","distance_color"],
+    funcNames: ["Mat3","read_imageStepMode","atan2j","smoothstepc","Mat3_Init","times_ov2","dc_layers_rotate","dc_layers_snoise","dc_layers_getRGBColor","dbl2int","greyscale","distance_color"],
     funcs: `struct Mat3 {
   a00: f32,
   a10: f32,
@@ -18980,6 +22082,8 @@ if ((${p[7]} == 1)) {
 }
 
 fn read_imageStepMode(base: u32, n: i32, t: f32) -> vec4f { return pal[base + u32(clamp(t, 0.0, 0.99999) * f32(max(n, 1)))]; }
+
+fn atan2j(y: f32, x: f32) -> f32 { if (x == 0.0 && y == 0.0) { return select(0.0, PI, (bitcast<u32>(x) >> 31u) == 1u) * select(1.0, -1.0, (bitcast<u32>(y) >> 31u) == 1u); } return atan2(y, x); }
 
 fn smoothstepc(a: f32, b: f32, x: f32) -> f32 { if (a == b) { return step(a, x); } let t = clamp((x - a) / (b - a), 0.0, 1.0); return t * t * (3.0 - 2.0 * t); }
 
@@ -19115,13 +22219,15 @@ if ((${p[9]} == 1)) {
   "dc_tree": {
     params: [{ name: "levels", def: 20 }, { name: "thicknes", def: 1000 }, { name: "style", def: 50 }, { name: "shift", def: 1.5 }, { name: "seed", def: 10000 }, { name: "time", def: 0 }, { name: "zoom", def: 4 }, { name: "ColorOnly", def: 0 }, { name: "Gradient", def: 0 }, { name: "scale_z", def: 0 }, { name: "offset_z", def: 0 }, { name: "reset_z", def: 1 }],
     verified: true, priority: 0, flags: ["dc","rgb","z"], types: ["SIMULATION","DC","BASE_SHAPE"],
-    funcNames: ["read_imageStepMode","smoothstepc","dc_tree_po","dc_tree_ca","dc_tree_ln","dc_tree_getRGBColor","dbl2int","greyscale","distance_color"],
+    funcNames: ["read_imageStepMode","atan2j","smoothstepc","dc_tree_po","dc_tree_ca","dc_tree_ln","dc_tree_getRGBColor","dbl2int","greyscale","distance_color"],
     funcs: `fn read_imageStepMode(base: u32, n: i32, t: f32) -> vec4f { return pal[base + u32(clamp(t, 0.0, 0.99999) * f32(max(n, 1)))]; }
+
+fn atan2j(y: f32, x: f32) -> f32 { if (x == 0.0 && y == 0.0) { return select(0.0, PI, (bitcast<u32>(x) >> 31u) == 1u) * select(1.0, -1.0, (bitcast<u32>(y) >> 31u) == 1u); } return atan2(y, x); }
 
 fn smoothstepc(a: f32, b: f32, x: f32) -> f32 { if (a == b) { return step(a, x); } let t = clamp((x - a) / (b - a), 0.0, 1.0); return t * t * (3.0 - 2.0 * t); }
 
 fn dc_tree_po(v_: vec2f) -> vec2f {
-  return vec2f(length(v_), atan2(v_.y, v_.x));
+  return vec2f(length(v_), atan2j(v_.y, v_.x));
 }
 
 fn dc_tree_ca(u: vec2f) -> vec2f {
@@ -19247,8 +22353,10 @@ if ((${p[11]} == 1)) {
   "dc_tesla": {
     params: [{ name: "levels", def: 20 }, { name: "style", def: 10 }, { name: "seed", def: 10000 }, { name: "time", def: 0 }, { name: "zoom", def: 4 }, { name: "ColorOnly", def: 0 }, { name: "Gradient", def: 0 }, { name: "scale_z", def: 0 }, { name: "offset_z", def: 0 }, { name: "reset_z", def: 1 }],
     verified: true, priority: 0, flags: ["dc","rgb","z"], types: ["SIMULATION","DC","BASE_SHAPE"],
-    funcNames: ["read_imageStepMode","powc","dc_tesla_field21","dc_tesla_getRGBColor","dbl2int","greyscale","distance_color"],
+    funcNames: ["read_imageStepMode","atan2j","powc","dc_tesla_field21","dc_tesla_getRGBColor","dbl2int","greyscale","distance_color"],
     funcs: `fn read_imageStepMode(base: u32, n: i32, t: f32) -> vec4f { return pal[base + u32(clamp(t, 0.0, 0.99999) * f32(max(n, 1)))]; }
+
+fn atan2j(y: f32, x: f32) -> f32 { if (x == 0.0 && y == 0.0) { return select(0.0, PI, (bitcast<u32>(x) >> 31u) == 1u) * select(1.0, -1.0, (bitcast<u32>(y) >> 31u) == 1u); } return atan2(y, x); }
 
 fn powc(x: f32, y: f32) -> f32 {
   if (x >= 0.0) { return pow(x, y); }
@@ -19368,7 +22476,7 @@ if ((${p[9]} == 1)) {
   "dc_rotations": {
     params: [{ name: "levels", def: 20 }, { name: "seed", def: 10000 }, { name: "time", def: 0 }, { name: "zoom", def: 4 }, { name: "ColorOnly", def: 0 }, { name: "Gradient", def: 0 }, { name: "scale_z", def: 0 }, { name: "offset_z", def: 0 }, { name: "reset_z", def: 1 }],
     verified: true, priority: 0, flags: ["dc","rgb","z"], types: ["SIMULATION","DC","BASE_SHAPE"],
-    funcNames: ["Mat2","read_imageStepMode","mmod3","Mat2_Init","dc_rotations_rot","times","dc_rotations_rotate","dc_rotations_hsv2rgb_smooth","dc_rotations_getRGBColor","dbl2int","greyscale","distance_color"],
+    funcNames: ["Mat2","read_imageStepMode","atan2j","mmod3","Mat2_Init","dc_rotations_rot","times","dc_rotations_rotate","dc_rotations_hsv2rgb_smooth","dc_rotations_getRGBColor","dbl2int","greyscale","distance_color"],
     funcs: `struct Mat2 {
   a00: f32,
   a01: f32,
@@ -19377,6 +22485,8 @@ if ((${p[9]} == 1)) {
 }
 
 fn read_imageStepMode(base: u32, n: i32, t: f32) -> vec4f { return pal[base + u32(clamp(t, 0.0, 0.99999) * f32(max(n, 1)))]; }
+
+fn atan2j(y: f32, x: f32) -> f32 { if (x == 0.0 && y == 0.0) { return select(0.0, PI, (bitcast<u32>(x) >> 31u) == 1u) * select(1.0, -1.0, (bitcast<u32>(y) >> 31u) == 1u); } return atan2(y, x); }
 
 fn mmod3(a: vec3f, b: vec3f) -> vec3f { return a - b * floor(a / b); }
 
@@ -19522,7 +22632,7 @@ if ((${p[8]} == 1)) {
   "dc_hexagons": {
     params: [{ name: "shape", def: 0 }, { name: "seed", def: 10000 }, { name: "time", def: 0 }, { name: "zoom", def: 4 }, { name: "ColorOnly", def: 0 }, { name: "Gradient", def: 0 }, { name: "scale_z", def: 0 }, { name: "offset_z", def: 0 }, { name: "reset_z", def: 1 }],
     verified: true, priority: 0, flags: ["dc","rgb","z"], types: ["SIMULATION","DC","BASE_SHAPE"],
-    funcNames: ["Mat2","read_imageStepMode","mmod2","powc","smoothstepc","Mat2_Init","times","dc_hexagons_hex","dc_hexagons_getRGBColor","dbl2int","greyscale","distance_color"],
+    funcNames: ["Mat2","read_imageStepMode","atan2j","mmod2","powc","smoothstepc","Mat2_Init","times","dc_hexagons_hex","dc_hexagons_getRGBColor","dbl2int","greyscale","distance_color"],
     funcs: `struct Mat2 {
   a00: f32,
   a01: f32,
@@ -19531,6 +22641,8 @@ if ((${p[8]} == 1)) {
 }
 
 fn read_imageStepMode(base: u32, n: i32, t: f32) -> vec4f { return pal[base + u32(clamp(t, 0.0, 0.99999) * f32(max(n, 1)))]; }
+
+fn atan2j(y: f32, x: f32) -> f32 { if (x == 0.0 && y == 0.0) { return select(0.0, PI, (bitcast<u32>(x) >> 31u) == 1u) * select(1.0, -1.0, (bitcast<u32>(y) >> 31u) == 1u); } return atan2(y, x); }
 
 fn mmod2(a: vec2f, b: vec2f) -> vec2f { return a - b * floor(a / b); }
 
@@ -19676,8 +22788,10 @@ if ((${p[8]} == 1)) {
   "dc_turbulence": {
     params: [{ name: "seed", def: 10000 }, { name: "time", def: 0 }, { name: "zoom", def: 8 }, { name: "level", def: 3 }, { name: "ColorOnly", def: 0 }, { name: "Gradient", def: 0 }, { name: "scale_z", def: 0 }, { name: "offset_z", def: 0 }, { name: "reset_z", def: 1 }],
     verified: true, priority: 0, flags: ["dc","rgb","z"], types: ["SIMULATION","DC","BASE_SHAPE"],
-    funcNames: ["read_imageStepMode","dc_turbulence_getRGBColor","dbl2int","greyscale","distance_color"],
+    funcNames: ["read_imageStepMode","atan2j","dc_turbulence_getRGBColor","dbl2int","greyscale","distance_color"],
     funcs: `fn read_imageStepMode(base: u32, n: i32, t: f32) -> vec4f { return pal[base + u32(clamp(t, 0.0, 0.99999) * f32(max(n, 1)))]; }
+
+fn atan2j(y: f32, x: f32) -> f32 { if (x == 0.0 && y == 0.0) { return select(0.0, PI, (bitcast<u32>(x) >> 31u) == 1u) * select(1.0, -1.0, (bitcast<u32>(y) >> 31u) == 1u); } return atan2(y, x); }
 
 fn dc_turbulence_getRGBColor(p_: vec2f, time: f32, level: f32) -> vec3f {
   var ik: vec2f = p_;
@@ -19781,8 +22895,10 @@ if ((${p[8]} == 1)) {
   "dc_menger": {
     params: [{ name: "zoom", def: 1 }, { name: "level", def: 3 }, { name: "ColorOnly", def: 0 }, { name: "Gradient", def: 0 }, { name: "scale_z", def: 0 }, { name: "offset_z", def: 0 }, { name: "reset_z", def: 1 }],
     verified: true, priority: 0, flags: ["dc","rgb","z"], types: ["SIMULATION","DC","BASE_SHAPE"],
-    funcNames: ["read_imageStepMode","mmod2","dc_menger_sdBox","dc_menger_sdCross","dc_menger_sierpinskiCarpet","dc_menger_getRGBColor","dbl2int","greyscale","distance_color"],
+    funcNames: ["read_imageStepMode","atan2j","mmod2","dc_menger_sdBox","dc_menger_sdCross","dc_menger_sierpinskiCarpet","dc_menger_getRGBColor","dbl2int","greyscale","distance_color"],
     funcs: `fn read_imageStepMode(base: u32, n: i32, t: f32) -> vec4f { return pal[base + u32(clamp(t, 0.0, 0.99999) * f32(max(n, 1)))]; }
+
+fn atan2j(y: f32, x: f32) -> f32 { if (x == 0.0 && y == 0.0) { return select(0.0, PI, (bitcast<u32>(x) >> 31u) == 1u) * select(1.0, -1.0, (bitcast<u32>(y) >> 31u) == 1u); } return atan2(y, x); }
 
 fn mmod2(a: vec2f, b: vec2f) -> vec2f { return a - b * floor(a / b); }
 
@@ -19905,8 +23021,10 @@ if ((${p[6]} == 1)) {
   "dc_truchet": {
     params: [{ name: "type", def: 0 }, { name: "zoom", def: 10 }, { name: "ColorOnly", def: 0 }, { name: "Gradient", def: 0 }, { name: "scale_z", def: 0 }, { name: "offset_z", def: 0 }, { name: "reset_z", def: 1 }],
     verified: true, priority: 0, flags: ["dc","rgb","z"], types: ["SIMULATION","DC","BASE_SHAPE"],
-    funcNames: ["read_imageStepMode","smoothstepc","dc_truchet_random","dc_truchet_truchetPattern","dc_truchet_getRGBColor","dbl2int","greyscale","distance_color"],
+    funcNames: ["read_imageStepMode","atan2j","smoothstepc","dc_truchet_random","dc_truchet_truchetPattern","dc_truchet_getRGBColor","dbl2int","greyscale","distance_color"],
     funcs: `fn read_imageStepMode(base: u32, n: i32, t: f32) -> vec4f { return pal[base + u32(clamp(t, 0.0, 0.99999) * f32(max(n, 1)))]; }
+
+fn atan2j(y: f32, x: f32) -> f32 { if (x == 0.0 && y == 0.0) { return select(0.0, PI, (bitcast<u32>(x) >> 31u) == 1u) * select(1.0, -1.0, (bitcast<u32>(y) >> 31u) == 1u); } return atan2(y, x); }
 
 fn smoothstepc(a: f32, b: f32, x: f32) -> f32 { if (a == b) { return step(a, x); } let t = clamp((x - a) / (b - a), 0.0, 1.0); return t * t * (3.0 - 2.0 * t); }
 
@@ -20031,8 +23149,10 @@ if ((${p[6]} == 1)) {
   "dc_voronoise": {
     params: [{ name: "zoom", def: 8 }, { name: "deltaX", def: 0.5 }, { name: "deltaY", def: 0.5 }, { name: "ColorOnly", def: 0 }, { name: "Gradient", def: 0 }, { name: "scale_z", def: 0 }, { name: "offset_z", def: 0 }, { name: "reset_z", def: 1 }],
     verified: true, priority: 0, flags: ["dc","rgb","z"], types: ["SIMULATION","DC","BASE_SHAPE"],
-    funcNames: ["read_imageStepMode","powc","smoothstepc","dc_voronise_hash3","dc_voronise_iqnoise","dc_voronise_getRGBColor","dbl2int","greyscale","distance_color"],
+    funcNames: ["read_imageStepMode","atan2j","powc","smoothstepc","dc_voronise_hash3","dc_voronise_iqnoise","dc_voronise_getRGBColor","dbl2int","greyscale","distance_color"],
     funcs: `fn read_imageStepMode(base: u32, n: i32, t: f32) -> vec4f { return pal[base + u32(clamp(t, 0.0, 0.99999) * f32(max(n, 1)))]; }
+
+fn atan2j(y: f32, x: f32) -> f32 { if (x == 0.0 && y == 0.0) { return select(0.0, PI, (bitcast<u32>(x) >> 31u) == 1u) * select(1.0, -1.0, (bitcast<u32>(y) >> 31u) == 1u); } return atan2(y, x); }
 
 fn powc(x: f32, y: f32) -> f32 {
   if (x >= 0.0) { return pow(x, y); }
@@ -20163,7 +23283,7 @@ if ((${p[7]} == 1)) {
   "pre_recip": {
     params: [{ name: "reciprocalpow", def: 1 }, { name: "dividepow", def: 0 }, { name: "sqrtpow", def: 0 }, { name: "asinhpow", def: 0 }, { name: "acoshpow", def: 0 }, { name: "atanhpow", def: 0 }, { name: "asechpow", def: 0 }, { name: "acosechpow", def: 0 }, { name: "acothpow", def: 0 }, { name: "logpow", def: 0 }, { name: "exppow", def: 0 }, { name: "zx_mult", def: 1 }, { name: "zy_mult", def: 1 }, { name: "zx_add", def: 0 }, { name: "zy_add", def: 0 }],
     verified: true, priority: -1, flags: ["3d"], types: ["3D","PRE"],
-    funcNames: ["Complex","powc","Complex_Init","Complex_Mag2","Complex_MagInv","Complex_Recip","Complex_Scale","Complex_Dec","Complex_Inc","Complex_Div","Complex_Radius","Complex_Neg","Complex_Sqrt","Complex_Sqr","Complex_One","Complex_Arg","Complex_ToP","Complex_UnP","Complex_Copy","Complex_Pow","Complex_Add","Complex_Mag2eps","Complex_Log","Complex_AsinH","Complex_AcosH","Complex_AtanH","Complex_AsecH","Complex_AcosecH","Complex_AcotH","Complex_Exp"],
+    funcNames: ["Complex","atan2j","powc","Complex_Init","Complex_Mag2","Complex_MagInv","Complex_Recip","Complex_Scale","Complex_Dec","Complex_Inc","Complex_Div","Complex_Radius","Complex_Neg","Complex_Sqrt","Complex_Sqr","Complex_One","Complex_Arg","Complex_ToP","Complex_UnP","Complex_Copy","Complex_Pow","Complex_Add","Complex_Mag2eps","Complex_Log","Complex_AsinH","Complex_AcosH","Complex_AtanH","Complex_AsecH","Complex_AcosecH","Complex_AcotH","Complex_Exp"],
     funcs: `struct Complex {
   per_fix: f32,
   re: f32,
@@ -20171,6 +23291,8 @@ if ((${p[7]} == 1)) {
   save_re: f32,
   save_im: f32,
 }
+
+fn atan2j(y: f32, x: f32) -> f32 { if (x == 0.0 && y == 0.0) { return select(0.0, PI, (bitcast<u32>(x) >> 31u) == 1u) * select(1.0, -1.0, (bitcast<u32>(y) >> 31u) == 1u); } return atan2(y, x); }
 
 fn powc(x: f32, y: f32) -> f32 {
   if (x >= 0.0) { return pow(x, y); }
@@ -20256,7 +23378,7 @@ fn Complex_One(c: ptr<function, Complex>) {
 }
 
 fn Complex_Arg(c: ptr<function, Complex>) -> f32 {
-  return ((*c).per_fix + atan2((*c).im, (*c).re));
+  return ((*c).per_fix + atan2j((*c).im, (*c).re));
 }
 
 fn Complex_ToP(c: ptr<function, Complex>, dst: ptr<function, Complex>) {
@@ -20492,7 +23614,7 @@ if (((((((((${p[3]} + ${p[4]}) + ${p[5]}) + ${p[6]}) + ${p[7]}) + ${p[8]}) + ${p
   "juliascope3Db": {
     params: [{ name: "power", def: 3 }, { name: "dist", def: 1 }, { name: "type", def: 0 }, { name: "warp", def: 0 }, { name: "za", def: 1 }, { name: "zb", def: 1 }, { name: "zamount", def: 1 }, { name: "zdist", def: 1 }, { name: "mode", def: 0 }, { name: "wave1", def: 1 }, { name: "wave2", def: 1 }],
     verified: true, priority: 0, flags: ["3d","z"], types: ["3D"],
-    funcNames: ["roundc","powc"],
+    funcNames: ["roundc","powc","atan2j"],
     funcs: `fn roundc(x: f32) -> f32 { return sign(x) * floor(abs(x) + 0.5); }
 
 fn powc(x: f32, y: f32) -> f32 {
@@ -20501,7 +23623,9 @@ fn powc(x: f32, y: f32) -> f32 {
   if (abs(y - yi) > 1e-6) { return pow(x, y); }
   let m = pow(-x, y);
   return select(m, -m, (i32(yi) & 1) != 0);
-}`,
+}
+
+fn atan2j(y: f32, x: f32) -> f32 { if (x == 0.0 && y == 0.0) { return select(0.0, PI, (bitcast<u32>(x) >> 31u) == 1u) * select(1.0, -1.0, (bitcast<u32>(y) >> 31u) == 1u); } return atan2(y, x); }`,
     code: (w, p) => `{
 var absPower: i32 = i32(roundc(abs(${p[0]})));
 var cPower: f32 = ((${p[1]} / ${p[0]}) * 0.5);
@@ -20511,9 +23635,9 @@ var rz: f32 = ((${w} * ${p[6]}) * powc((r2d + (z * z)), (cPower * ${p[7]})));
 var rnd_: i32 = i32((rnd(rs) * f32(absPower)));
 var a: f32;
 if (((rnd_ % 2) == 0)) {
-  a = ((((2 * PI) * f32(rnd_)) + atan2(t.y, t.x)) / ${p[0]});
+  a = ((((2 * PI) * f32(rnd_)) + atan2j(t.y, t.x)) / ${p[0]});
 } else {
-  a = ((((2 * PI) * f32(rnd_)) - atan2(t.y, t.x)) / ${p[0]});
+  a = ((((2 * PI) * f32(rnd_)) - atan2j(t.y, t.x)) / ${p[0]});
 }
 var r_: f32;
 if ((i32(roundc(min(max(${p[2]}, 0.0), 1.0))) != 0)) {
@@ -20536,7 +23660,7 @@ if ((i32(roundc(min(max(${p[8]}, 0.0), 1.0))) != 0)) {
   "dc_poincaredisc": {
     params: [{ name: "zoom", def: 2 }, { name: "MaxIter", def: 10 }, { name: "N", def: 4 }, { name: "P", def: 5 }, { name: "checkers0", def: 1 }, { name: "checkers1", def: 1 }, { name: "checkers2", def: 1 }, { name: "ColorOnly", def: 0 }, { name: "Gradient", def: 0 }, { name: "scale_z", def: 0 }, { name: "offset_z", def: 0 }, { name: "reset_z", def: 1 }],
     verified: true, priority: 0, flags: ["dc","rgb","z"], types: ["SIMULATION","DC","BASE_SHAPE"],
-    funcNames: ["Mat2","read_imageStepMode","powc","dc_poincaredisc_mbtpc","dc_poincaredisc_radians","Mat2_Init","times","dc_poincaredisc_getRGBColor","dbl2int","greyscale","distance_color"],
+    funcNames: ["Mat2","read_imageStepMode","atan2j","powc","dc_poincaredisc_mbtpc","dc_poincaredisc_radians","Mat2_Init","times","dc_poincaredisc_getRGBColor","dbl2int","greyscale","distance_color"],
     funcs: `struct Mat2 {
   a00: f32,
   a01: f32,
@@ -20545,6 +23669,8 @@ if ((i32(roundc(min(max(${p[8]}, 0.0), 1.0))) != 0)) {
 }
 
 fn read_imageStepMode(base: u32, n: i32, t: f32) -> vec4f { return pal[base + u32(clamp(t, 0.0, 0.99999) * f32(max(n, 1)))]; }
+
+fn atan2j(y: f32, x: f32) -> f32 { if (x == 0.0 && y == 0.0) { return select(0.0, PI, (bitcast<u32>(x) >> 31u) == 1u) * select(1.0, -1.0, (bitcast<u32>(y) >> 31u) == 1u); } return atan2(y, x); }
 
 fn powc(x: f32, y: f32) -> f32 {
   if (x >= 0.0) { return pow(x, y); }
@@ -20733,8 +23859,10 @@ if ((${p[11]} == 1)) {
   "dc_worley": {
     params: [{ name: "zoom", def: 7 }, { name: "pattern", def: 70 }, { name: "distort", def: 1 }, { name: "ColorOnly", def: 0 }, { name: "Gradient", def: 0 }, { name: "scale_z", def: 0 }, { name: "offset_z", def: 0 }, { name: "reset_z", def: 1 }],
     verified: true, priority: 0, flags: ["dc","rgb","z"], types: ["SIMULATION","DC","BASE_SHAPE"],
-    funcNames: ["read_imageStepMode","dc_worley_H","dc_worley_getRGBColor","dbl2int","greyscale","distance_color"],
+    funcNames: ["read_imageStepMode","atan2j","dc_worley_H","dc_worley_getRGBColor","dbl2int","greyscale","distance_color"],
     funcs: `fn read_imageStepMode(base: u32, n: i32, t: f32) -> vec4f { return pal[base + u32(clamp(t, 0.0, 0.99999) * f32(max(n, 1)))]; }
+
+fn atan2j(y: f32, x: f32) -> f32 { if (x == 0.0 && y == 0.0) { return select(0.0, PI, (bitcast<u32>(x) >> 31u) == 1u) * select(1.0, -1.0, (bitcast<u32>(y) >> 31u) == 1u); } return atan2(y, x); }
 
 fn dc_worley_H(n: vec2f, pattern: f32, distort: f32) -> vec2f {
   return (((fract((vec2f(1.0, 12.34) + vec2f((10000.0 * sin((n.x + (n.y / (pattern * 0.01)))))))) * vec2f(distort)) * vec2f(0.75)) + vec2f(0.3));
@@ -20854,8 +23982,10 @@ if ((${p[7]} == 1)) {
   "dc_glypho": {
     params: [{ name: "zoom", def: 7 }, { name: "seed", def: 10000 }, { name: "time", def: 0 }, { name: "f1", def: 0.115 }, { name: "f2", def: 0.75 }, { name: "f3", def: 1.5 }, { name: "ColorOnly", def: 0 }, { name: "Gradient", def: 0 }, { name: "scale_z", def: 0 }, { name: "offset_z", def: 0 }, { name: "reset_z", def: 1 }],
     verified: true, priority: 0, flags: ["dc","rgb","z"], types: ["SIMULATION","DC","BASE_SHAPE"],
-    funcNames: ["read_imageStepMode","smoothstepc","dc_glypho_getRGBColor","dbl2int","greyscale","distance_color"],
+    funcNames: ["read_imageStepMode","atan2j","smoothstepc","dc_glypho_getRGBColor","dbl2int","greyscale","distance_color"],
     funcs: `fn read_imageStepMode(base: u32, n: i32, t: f32) -> vec4f { return pal[base + u32(clamp(t, 0.0, 0.99999) * f32(max(n, 1)))]; }
+
+fn atan2j(y: f32, x: f32) -> f32 { if (x == 0.0 && y == 0.0) { return select(0.0, PI, (bitcast<u32>(x) >> 31u) == 1u) * select(1.0, -1.0, (bitcast<u32>(y) >> 31u) == 1u); } return atan2(y, x); }
 
 fn smoothstepc(a: f32, b: f32, x: f32) -> f32 { if (a == b) { return step(a, x); } let t = clamp((x - a) / (b - a), 0.0, 1.0); return t * t * (3.0 - 2.0 * t); }
 
@@ -20965,8 +24095,10 @@ if ((${p[10]} == 1)) {
   "dc_fingerprint": {
     params: [{ name: "zoom", def: 50 }, { name: "seed", def: 10000 }, { name: "time", def: 0 }, { name: "width", def: 0.8 }, { name: "ColorOnly", def: 0 }, { name: "Gradient", def: 0 }, { name: "scale_z", def: 0 }, { name: "offset_z", def: 0 }, { name: "reset_z", def: 1 }],
     verified: true, priority: 0, flags: ["dc","rgb","z"], types: ["SIMULATION","DC","BASE_SHAPE"],
-    funcNames: ["read_imageStepMode","smoothstepc","dc_fingerprint_hash2","dc_fingerprint_getRGBColor","dbl2int","greyscale","distance_color"],
+    funcNames: ["read_imageStepMode","atan2j","smoothstepc","dc_fingerprint_hash2","dc_fingerprint_getRGBColor","dbl2int","greyscale","distance_color"],
     funcs: `fn read_imageStepMode(base: u32, n: i32, t: f32) -> vec4f { return pal[base + u32(clamp(t, 0.0, 0.99999) * f32(max(n, 1)))]; }
+
+fn atan2j(y: f32, x: f32) -> f32 { if (x == 0.0 && y == 0.0) { return select(0.0, PI, (bitcast<u32>(x) >> 31u) == 1u) * select(1.0, -1.0, (bitcast<u32>(y) >> 31u) == 1u); } return atan2(y, x); }
 
 fn smoothstepc(a: f32, b: f32, x: f32) -> f32 { if (a == b) { return step(a, x); } let t = clamp((x - a) / (b - a), 0.0, 1.0); return t * t * (3.0 - 2.0 * t); }
 
@@ -20985,10 +24117,10 @@ fn dc_fingerprint_getRGBColor(uv_in: vec2f, time: f32, width: f32) -> vec3f {
   for (var i: i32 = 0; (i < 50); i++) {
     var s: f32 = sign(h.x);
     h = (dc_fingerprint_hash2(h) * vec2f(15.0, 20.0));
-    a += (s * atan2((uv.x - h.x), (uv.y - h.y)));
+    a += (s * atan2j((uv.x - h.x), (uv.y - h.y)));
   }
   uv = (uv + abs(dc_fingerprint_hash2(h)));
-  a += atan2(uv.y, uv.x);
+  a += atan2j(uv.y, uv.x);
   var p_: f32 = ((1.0 - bounds) * width);
   var s: f32 = min(0.3, p_);
   var l: f32 = (length(uv) + (0.319 * a));
@@ -21084,8 +24216,10 @@ if ((${p[8]} == 1)) {
   "dc_pentatiles": {
     params: [{ name: "zoom", def: 20 }, { name: "border", def: 1 }, { name: "width", def: 0.1 }, { name: "ColorOnly", def: 0 }, { name: "Gradient", def: 0 }, { name: "scale_z", def: 0 }, { name: "offset_z", def: 0 }, { name: "reset_z", def: 1 }],
     verified: true, priority: 0, flags: ["dc","rgb","z"], types: ["SIMULATION","DC","BASE_SHAPE"],
-    funcNames: ["read_imageStepMode","smoothstepc","mmod2","dc_pentatiles_lfun","dc_pentatiles_Pfun","dc_pentatiles_sfun","dc_pentatiles_Sfun","dc_pentatiles_Lfun","dc_pentatiles_getRGBColor","dbl2int","greyscale","distance_color"],
+    funcNames: ["read_imageStepMode","atan2j","smoothstepc","mmod2","dc_pentatiles_lfun","dc_pentatiles_Pfun","dc_pentatiles_sfun","dc_pentatiles_Sfun","dc_pentatiles_Lfun","dc_pentatiles_getRGBColor","dbl2int","greyscale","distance_color"],
     funcs: `fn read_imageStepMode(base: u32, n: i32, t: f32) -> vec4f { return pal[base + u32(clamp(t, 0.0, 0.99999) * f32(max(n, 1)))]; }
+
+fn atan2j(y: f32, x: f32) -> f32 { if (x == 0.0 && y == 0.0) { return select(0.0, PI, (bitcast<u32>(x) >> 31u) == 1u) * select(1.0, -1.0, (bitcast<u32>(y) >> 31u) == 1u); } return atan2(y, x); }
 
 fn smoothstepc(a: f32, b: f32, x: f32) -> f32 { if (a == b) { return step(a, x); } let t = clamp((x - a) / (b - a), 0.0, 1.0); return t * t * (3.0 - 2.0 * t); }
 
@@ -21228,8 +24362,10 @@ if ((${p[7]} == 1)) {
   "dc_quadtree": {
     params: [{ name: "zoom", def: 1 }, { name: "seed", def: 10000 }, { name: "time", def: 0 }, { name: "width", def: 1000 }, { name: "levels", def: 30 }, { name: "ColorOnly", def: 0 }, { name: "Gradient", def: 0 }, { name: "scale_z", def: 0 }, { name: "offset_z", def: 0 }, { name: "reset_z", def: 1 }],
     verified: true, priority: 0, flags: ["dc","rgb","z"], types: ["SIMULATION","DC","BASE_SHAPE"],
-    funcNames: ["read_imageStepMode","dc_quadtree_sfun","dc_quadtree_rnd","dc_quadtree_getRGBColor","dbl2int","greyscale","distance_color"],
+    funcNames: ["read_imageStepMode","atan2j","dc_quadtree_sfun","dc_quadtree_rnd","dc_quadtree_getRGBColor","dbl2int","greyscale","distance_color"],
     funcs: `fn read_imageStepMode(base: u32, n: i32, t: f32) -> vec4f { return pal[base + u32(clamp(t, 0.0, 0.99999) * f32(max(n, 1)))]; }
+
+fn atan2j(y: f32, x: f32) -> f32 { if (x == 0.0 && y == 0.0) { return select(0.0, PI, (bitcast<u32>(x) >> 31u) == 1u) * select(1.0, -1.0, (bitcast<u32>(y) >> 31u) == 1u); } return atan2(y, x); }
 
 fn dc_quadtree_sfun(a: f32) -> f32 {
   return sin(a);
@@ -21354,8 +24490,10 @@ if ((${p[9]} == 1)) {
   "dc_sunflower": {
     params: [{ name: "zoom", def: 7 }, { name: "step", def: 0.1 }, { name: "N", def: 30 }, { name: "Polar", def: 1 }, { name: "Dots", def: 1 }, { name: "GridX", def: 1 }, { name: "GridY", def: 1 }, { name: "ColorOnly", def: 0 }, { name: "Gradient", def: 0 }, { name: "scale_z", def: 0 }, { name: "offset_z", def: 0 }, { name: "reset_z", def: 1 }],
     verified: true, priority: 0, flags: ["dc","rgb","z"], types: ["SIMULATION","DC","BASE_SHAPE"],
-    funcNames: ["read_imageStepMode","smoothstepc","dc_sunflower_line","dc_sunflower_L","dc_sunflower_S","dc_sunflower_getRGBColor","dbl2int","greyscale","distance_color"],
+    funcNames: ["read_imageStepMode","atan2j","smoothstepc","dc_sunflower_line","dc_sunflower_L","dc_sunflower_S","dc_sunflower_getRGBColor","dbl2int","greyscale","distance_color"],
     funcs: `fn read_imageStepMode(base: u32, n: i32, t: f32) -> vec4f { return pal[base + u32(clamp(t, 0.0, 0.99999) * f32(max(n, 1)))]; }
+
+fn atan2j(y: f32, x: f32) -> f32 { if (x == 0.0 && y == 0.0) { return select(0.0, PI, (bitcast<u32>(x) >> 31u) == 1u) * select(1.0, -1.0, (bitcast<u32>(y) >> 31u) == 1u); } return atan2(y, x); }
 
 fn smoothstepc(a: f32, b: f32, x: f32) -> f32 { if (a == b) { return step(a, x); } let t = clamp((x - a) / (b - a), 0.0, 1.0); return t * t * (3.0 - 2.0 * t); }
 
@@ -21386,7 +24524,7 @@ fn dc_sunflower_getRGBColor(U_in: vec2f, N: f32, step_: f32, GridX: f32, GridY: 
   var O: vec3f = vec3f(0.0, 0.0, 0.0);
   l = length(U);
   J.x = (l * 6.28);
-  U = (vec2f((atan2(U.y, U.x) / 6.28), l) * vec2f(N));
+  U = (vec2f((atan2j(U.y, U.x) / 6.28), l) * vec2f(N));
   w_ = 0.1;
   U.x += (r_ * floor((U.y + 0.5)));
   if ((GridX == 1.0)) {
@@ -21501,7 +24639,7 @@ if ((${p[11]} == 1)) {
   "dc_gabornoise": {
     params: [{ name: "seed", def: 10000 }, { name: "time", def: 0 }, { name: "zoom", def: 20 }, { name: "ColorOnly", def: 0 }, { name: "Gradient", def: 0 }, { name: "scale_z", def: 0 }, { name: "offset_z", def: 0 }, { name: "reset_z", def: 1 }],
     verified: true, priority: 0, flags: ["dc","rgb","z"], types: ["SIMULATION","DC","BASE_SHAPE"],
-    funcNames: ["Mat2","read_imageStepMode","dc_gabornoise_hash","Mat2_Init","times","dc_gabornoise_getRGBColor","dbl2int","greyscale","distance_color"],
+    funcNames: ["Mat2","read_imageStepMode","atan2j","dc_gabornoise_hash","Mat2_Init","times","dc_gabornoise_getRGBColor","dbl2int","greyscale","distance_color"],
     funcs: `struct Mat2 {
   a00: f32,
   a01: f32,
@@ -21510,6 +24648,8 @@ if ((${p[11]} == 1)) {
 }
 
 fn read_imageStepMode(base: u32, n: i32, t: f32) -> vec4f { return pal[base + u32(clamp(t, 0.0, 0.99999) * f32(max(n, 1)))]; }
+
+fn atan2j(y: f32, x: f32) -> f32 { if (x == 0.0 && y == 0.0) { return select(0.0, PI, (bitcast<u32>(x) >> 31u) == 1u) * select(1.0, -1.0, (bitcast<u32>(y) >> 31u) == 1u); } return atan2(y, x); }
 
 fn dc_gabornoise_hash(p_: f32) -> vec3f {
   return ((fract((sin((vec3f(63.31, 395.467, 1) * vec3f(p_))) * vec3f(43141.59265))) * vec3f(2.0)) - vec3f(1.0));
@@ -21540,7 +24680,7 @@ fn dc_gabornoise_getRGBColor(V: vec2f, time: f32) -> vec3f {
     t_ = times(&(M), t_);
     h.x = t_.x;
     h.y = t_.y;
-    a += (s * atan2((U.x - h.x), (U.y - h.y)));
+    a += (s * atan2j((U.x - h.x), (U.y - h.y)));
   }
   O = ((cos((vec3f(0.0, 23.0, 21.0) + vec3f(a))) * vec3f(0.6)) + vec3f(0.6));
   return O;
@@ -21633,7 +24773,7 @@ if ((${p[7]} == 1)) {
   "dc_cairotiles": {
     params: [{ name: "zoom", def: 7 }, { name: "seed", def: 10000 }, { name: "time", def: 0 }, { name: "ColorOnly", def: 0 }, { name: "Gradient", def: 0 }, { name: "scale_z", def: 0 }, { name: "offset_z", def: 0 }, { name: "reset_z", def: 1 }],
     verified: true, priority: 0, flags: ["dc","rgb","z"], types: ["SIMULATION","DC","BASE_SHAPE"],
-    funcNames: ["Mat2","read_imageStepMode","mmod2","smoothstepc","Mat2_Init","times","dc_cairotiles_getRGBColor","dbl2int","greyscale","distance_color"],
+    funcNames: ["Mat2","read_imageStepMode","atan2j","mmod2","smoothstepc","Mat2_Init","times","dc_cairotiles_getRGBColor","dbl2int","greyscale","distance_color"],
     funcs: `struct Mat2 {
   a00: f32,
   a01: f32,
@@ -21642,6 +24782,8 @@ if ((${p[7]} == 1)) {
 }
 
 fn read_imageStepMode(base: u32, n: i32, t: f32) -> vec4f { return pal[base + u32(clamp(t, 0.0, 0.99999) * f32(max(n, 1)))]; }
+
+fn atan2j(y: f32, x: f32) -> f32 { if (x == 0.0 && y == 0.0) { return select(0.0, PI, (bitcast<u32>(x) >> 31u) == 1u) * select(1.0, -1.0, (bitcast<u32>(y) >> 31u) == 1u); } return atan2(y, x); }
 
 fn mmod2(a: vec2f, b: vec2f) -> vec2f { return a - b * floor(a / b); }
 
@@ -21778,7 +24920,7 @@ if ((${p[7]} == 1)) {
   "dc_moebiuslog": {
     params: [{ name: "zoom", def: 7 }, { name: "seed", def: 10000 }, { name: "time", def: 0 }, { name: "Log", def: 1 }, { name: "Moebius", def: 1 }, { name: "scale", def: 5 }, { name: "angle", def: 5 }, { name: "ColorOnly", def: 0 }, { name: "Gradient", def: 0 }, { name: "scale_z", def: 0 }, { name: "offset_z", def: 0 }, { name: "reset_z", def: 1 }],
     verified: true, priority: 0, flags: ["dc","rgb","z"], types: ["SIMULATION","DC","BASE_SHAPE"],
-    funcNames: ["Mat2","read_imageStepMode","Mat2_Init","times","dc_moebiuslog_getRGBColor","dbl2int","greyscale","distance_color"],
+    funcNames: ["Mat2","read_imageStepMode","atan2j","Mat2_Init","times","dc_moebiuslog_getRGBColor","dbl2int","greyscale","distance_color"],
     funcs: `struct Mat2 {
   a00: f32,
   a01: f32,
@@ -21787,6 +24929,8 @@ if ((${p[7]} == 1)) {
 }
 
 fn read_imageStepMode(base: u32, n: i32, t: f32) -> vec4f { return pal[base + u32(clamp(t, 0.0, 0.99999) * f32(max(n, 1)))]; }
+
+fn atan2j(y: f32, x: f32) -> f32 { if (x == 0.0 && y == 0.0) { return select(0.0, PI, (bitcast<u32>(x) >> 31u) == 1u) * select(1.0, -1.0, (bitcast<u32>(y) >> 31u) == 1u); } return atan2(y, x); }
 
 fn Mat2_Init(m: ptr<function, Mat2>, v00: f32, v10: f32, v01: f32, v11: f32) {
   (*m).a00 = v00;
@@ -21812,7 +24956,7 @@ fn dc_moebiuslog_getRGBColor(U_in: vec2f, Log: f32, Moebius: f32, angle: f32, sc
     U = (U + vec2f(0.5));
   }
   if ((Log == 1.0)) {
-    U = ((vec2f(0.5, -0.5) * vec2f(log(length((U + vec2f(0.5)))))) + (vec2f(angle, 1.0) * vec2f((atan2(U.y, U.x) / 6.3))));
+    U = ((vec2f(0.5, -0.5) * vec2f(log(length((U + vec2f(0.5)))))) + (vec2f(angle, 1.0) * vec2f((atan2j(U.y, U.x) / 6.3))));
   }
   var color: vec3f = vec3f(0.0, 0.0, 0.0);
   color = (color + vec3f(length(fract((U * vec2f(scale))))));
@@ -21906,8 +25050,10 @@ if ((${p[11]} == 1)) {
   "dc_inversion": {
     params: [{ name: "seed", def: 10000 }, { name: "time", def: 0 }, { name: "iterations", def: 50 }, { name: "scaleX", def: 1.5 }, { name: "scaleY", def: 1.5 }, { name: "ColorOnly", def: 0 }, { name: "Gradient", def: 0 }, { name: "scale_z", def: 0 }, { name: "offset_z", def: 0 }, { name: "reset_z", def: 1 }],
     verified: true, priority: 0, flags: ["dc","rgb","z"], types: ["SIMULATION","DC","BASE_SHAPE"],
-    funcNames: ["read_imageStepMode","powc","dc_inversion_CircleInversion","dc_inversion_Parabola","dc_inversion_getRGBColor","dbl2int","greyscale","distance_color"],
+    funcNames: ["read_imageStepMode","atan2j","powc","dc_inversion_CircleInversion","dc_inversion_Parabola","dc_inversion_getRGBColor","dbl2int","greyscale","distance_color"],
     funcs: `fn read_imageStepMode(base: u32, n: i32, t: f32) -> vec4f { return pal[base + u32(clamp(t, 0.0, 0.99999) * f32(max(n, 1)))]; }
+
+fn atan2j(y: f32, x: f32) -> f32 { if (x == 0.0 && y == 0.0) { return select(0.0, PI, (bitcast<u32>(x) >> 31u) == 1u) * select(1.0, -1.0, (bitcast<u32>(y) >> 31u) == 1u); } return atan2(y, x); }
 
 fn powc(x: f32, y: f32) -> f32 {
   if (x >= 0.0) { return pow(x, y); }
@@ -22040,14 +25186,16 @@ if ((${p[9]} == 1)) {
   "waves22": {
     params: [{ name: "scalex", def: 0.05 }, { name: "scaley", def: 0.05 }, { name: "freqx", def: 7 }, { name: "freqy", def: 13 }, { name: "modex", def: 0 }, { name: "modey", def: 0 }, { name: "powerx", def: 2 }, { name: "powery", def: 2 }],
     verified: true, priority: 0, flags: [], types: ["2D"],
-    funcNames: ["powc"],
+    funcNames: ["powc","atan2j"],
     funcs: `fn powc(x: f32, y: f32) -> f32 {
   if (x >= 0.0) { return pow(x, y); }
   let yi = round(y);
   if (abs(y - yi) > 1e-6) { return pow(x, y); }
   let m = pow(-x, y);
   return select(m, -m, (i32(yi) & 1) != 0);
-}`,
+}
+
+fn atan2j(y: f32, x: f32) -> f32 { if (x == 0.0 && y == 0.0) { return select(0.0, PI, (bitcast<u32>(x) >> 31u) == 1u) * select(1.0, -1.0, (bitcast<u32>(y) >> 31u) == 1u); } return atan2(y, x); }`,
     code: (w, p) => `{
 var x0: f32 = t.x;
 var y0: f32 = t.y;
@@ -22074,6 +25222,8 @@ v.y += (${w} * (y0 + offsety));
   "waves23": {
     params: [{ name: "scalex", def: 0.05 }, { name: "scaley", def: 0.05 }, { name: "freqx", def: 7 }, { name: "freqy", def: 13 }],
     verified: true, priority: 0, flags: [], types: ["2D"],
+    funcNames: ["atan2j"],
+    funcs: `fn atan2j(y: f32, x: f32) -> f32 { if (x == 0.0 && y == 0.0) { return select(0.0, PI, (bitcast<u32>(x) >> 31u) == 1u) * select(1.0, -1.0, (bitcast<u32>(y) >> 31u) == 1u); } return atan2(y, x); }`,
     code: (w, p) => `{
 var x0: f32 = t.x;
 var y0: f32 = t.y;
@@ -22094,6 +25244,8 @@ v.y += (${w} * (y0 + (fy * ${p[1]})));
   "waves3": {
     params: [{ name: "scalex", def: 0.05 }, { name: "scaley", def: 0.05 }, { name: "freqx", def: 7 }, { name: "freqy", def: 13 }, { name: "sx_freq", def: 0 }, { name: "sy_freq", def: 2 }],
     verified: true, priority: 0, flags: [], types: ["2D"],
+    funcNames: ["atan2j"],
+    funcs: `fn atan2j(y: f32, x: f32) -> f32 { if (x == 0.0 && y == 0.0) { return select(0.0, PI, (bitcast<u32>(x) >> 31u) == 1u) * select(1.0, -1.0, (bitcast<u32>(y) >> 31u) == 1u); } return atan2(y, x); }`,
     code: (w, p) => `{
 var x0: f32 = t.x;
 var y0: f32 = t.y;
@@ -22106,7 +25258,7 @@ v.y += (${w} * (y0 + (sin((x0 * ${p[3]})) * scaleyy)));
   "waves42": {
     params: [{ name: "scalex", def: 0.05 }, { name: "scaley", def: 0.05 }, { name: "freqx", def: 7 }, { name: "freqy", def: 13 }, { name: "cont", def: 0 }, { name: "yfact", def: 0.1 }, { name: "freqx2", def: 1 }],
     verified: true, priority: 0, flags: [], types: ["2D"],
-    funcNames: ["df_add","op_","df_qts","df_ts","df_mulf","hsin_","df_mul","df_sin","df_cos","roundc"],
+    funcNames: ["df_add","op_","df_qts","df_ts","df_mulf","hsin_","df_mul","df_sin","df_cos","roundc","atan2j"],
     funcs: `fn df_add(x: vec2f, y: vec2f) -> vec2f { var s = df_ts(x.x, y.x); let t = df_ts(x.y, y.y); s.y = op_(s.y + t.x); s = df_qts(s.x, s.y); s.y = op_(s.y + t.y); return df_qts(s.x, s.y); }
 
 fn op_(v: f32) -> f32 { return bitcast<f32>(bitcast<u32>(v) + df_zero); }
@@ -22163,7 +25315,9 @@ fn df_cos(x: vec2f) -> vec2f {
   return s;
 }
 
-fn roundc(x: f32) -> f32 { return sign(x) * floor(abs(x) + 0.5); }`,
+fn roundc(x: f32) -> f32 { return sign(x) * floor(abs(x) + 0.5); }
+
+fn atan2j(y: f32, x: f32) -> f32 { if (x == 0.0 && y == 0.0) { return select(0.0, PI, (bitcast<u32>(x) >> 31u) == 1u) * select(1.0, -1.0, (bitcast<u32>(y) >> 31u) == 1u); } return atan2(y, x); }`,
     code: (w, p) => `{
 var x0: f32 = t.x;
 var y0: f32 = t.y;
@@ -22180,7 +25334,7 @@ v.y += (${w} * (y0 + (sin((x0 * ${p[3]})) * ${p[1]})));
   "waves4": {
     params: [{ name: "scalex", def: 0.05 }, { name: "scaley", def: 0.05 }, { name: "freqx", def: 7 }, { name: "freqy", def: 13 }, { name: "cont", def: 0 }, { name: "yfact", def: 0.1 }],
     verified: true, priority: 0, flags: [], types: ["2D"],
-    funcNames: ["df_add","op_","df_qts","df_ts","df_mulf","hsin_","df_mul","df_sin","df_cos","roundc"],
+    funcNames: ["df_add","op_","df_qts","df_ts","df_mulf","hsin_","df_mul","df_sin","df_cos","roundc","atan2j"],
     funcs: `fn df_add(x: vec2f, y: vec2f) -> vec2f { var s = df_ts(x.x, y.x); let t = df_ts(x.y, y.y); s.y = op_(s.y + t.x); s = df_qts(s.x, s.y); s.y = op_(s.y + t.y); return df_qts(s.x, s.y); }
 
 fn op_(v: f32) -> f32 { return bitcast<f32>(bitcast<u32>(v) + df_zero); }
@@ -22237,7 +25391,9 @@ fn df_cos(x: vec2f) -> vec2f {
   return s;
 }
 
-fn roundc(x: f32) -> f32 { return sign(x) * floor(abs(x) + 0.5); }`,
+fn roundc(x: f32) -> f32 { return sign(x) * floor(abs(x) + 0.5); }
+
+fn atan2j(y: f32, x: f32) -> f32 { if (x == 0.0 && y == 0.0) { return select(0.0, PI, (bitcast<u32>(x) >> 31u) == 1u) * select(1.0, -1.0, (bitcast<u32>(y) >> 31u) == 1u); } return atan2(y, x); }`,
     code: (w, p) => `{
 var x0: f32 = t.x;
 var y0: f32 = t.y;
@@ -22254,8 +25410,10 @@ v.y += (${w} * (y0 + (sin((x0 * ${p[3]})) * ${p[1]})));
   "hex_modulus": {
     params: [{ name: "size", def: 1 }],
     verified: true, priority: 0, flags: [], types: ["2D"],
-    funcNames: ["roundc"],
-    funcs: `fn roundc(x: f32) -> f32 { return sign(x) * floor(abs(x) + 0.5); }`,
+    funcNames: ["roundc","atan2j"],
+    funcs: `fn roundc(x: f32) -> f32 { return sign(x) * floor(abs(x) + 0.5); }
+
+fn atan2j(y: f32, x: f32) -> f32 { if (x == 0.0 && y == 0.0) { return select(0.0, PI, (bitcast<u32>(x) >> 31u) == 1u) * select(1.0, -1.0, (bitcast<u32>(y) >> 31u) == 1u); } return atan2(y, x); }`,
     code: (w, p) => `{
 var M_SQRT3_2: f32 = 0.8660254037844386;
 var M_SQRT3: f32 = 1.7320508075688772;
@@ -22290,8 +25448,10 @@ v.y += (FY * weight);
   "truchet_hex_crop": {
     params: [{ name: "wd", def: 0.05 }, { name: "mode", def: 0 }, { name: "inv", def: 0 }, { name: "seed", def: 13 }],
     verified: true, priority: 0, flags: [], types: ["2D","CROP","SIMULATION"],
-    funcNames: ["roundc","sqrf"],
+    funcNames: ["roundc","atan2j","sqrf"],
     funcs: `fn roundc(x: f32) -> f32 { return sign(x) * floor(abs(x) + 0.5); }
+
+fn atan2j(y: f32, x: f32) -> f32 { if (x == 0.0 && y == 0.0) { return select(0.0, PI, (bitcast<u32>(x) >> 31u) == 1u) * select(1.0, -1.0, (bitcast<u32>(y) >> 31u) == 1u); } return atan2(y, x); }
 
 fn sqrf(x: f32) -> f32 {
   return (x * x);
@@ -22332,7 +25492,7 @@ if ((i32(${p[3]}) >= 2)) {
     add = 1.0471975511965979;
   }
 }
-var angle: f32 = ((atan2(FY, FX) + 0.5235987755982989) - add);
+var angle: f32 = ((atan2j(FY, FX) + 0.5235987755982989) - add);
 var coef: f32 = 0.477464829275686;
 var angle2: f32 = (((floor((angle * coef)) / coef) + 0.5235987755982989) + add);
 var x0: f32 = cos(angle2);
@@ -22350,7 +25510,7 @@ if ((min(max(${p[2]}, 0.0), 1.0) == 1)) {
         FX = x0;
         FY = y0;
       } else {
-        var rangle: f32 = atan2((FY - y0), (FX - x0));
+        var rangle: f32 = atan2j((FY - y0), (FX - x0));
         var D: f32 = 0;
         if ((rnd(rs) < 0.5)) {
           D = d1;
@@ -22372,7 +25532,7 @@ if ((min(max(${p[2]}, 0.0), 1.0) == 1)) {
         FX = x0;
         FY = y0;
       } else {
-        var rangle: f32 = atan2((FY - y0), (FX - x0));
+        var rangle: f32 = atan2j((FY - y0), (FX - x0));
         var D: f32 = 0;
         if ((rnd(rs) < 0.5)) {
           D = d1;
@@ -22392,6 +25552,8 @@ v.y += ((FY + FY_h) * ${w});
   "truchet_hex_fill": {
     params: [{ name: "n", def: 3 }, { name: "flipx", def: 1 }, { name: "flipy", def: 1 }, { name: "spreadx", def: 1 }, { name: "spready", def: 1 }, { name: "seed", def: 13 }],
     verified: true, priority: 0, flags: [], types: ["2D","SIMULATION"],
+    funcNames: ["atan2j"],
+    funcs: `fn atan2j(y: f32, x: f32) -> f32 { if (x == 0.0 && y == 0.0) { return select(0.0, PI, (bitcast<u32>(x) >> 31u) == 1u) * select(1.0, -1.0, (bitcast<u32>(y) >> 31u) == 1u); } return atan2(y, x); }`,
     code: (w, p) => `{
 var M_SQRT3_2: f32 = 0.8660254037844386;
 var M_SQRT3: f32 = 1.7320508075688772;
@@ -22426,7 +25588,7 @@ var cs: f32 = cos(((FY * PI) + rangle));
 var a: f32 = (k_factor * exp((FX * PI)));
 FX = (a * cs);
 FY = (a * sn);
-var A_: f32 = atan2(FY, FX);
+var A_: f32 = atan2j(FY, FX);
 if ((A_ < 0)) {
   A_ += (2.0 * PI);
 }
@@ -22450,8 +25612,10 @@ v.y += (${w} * ((FY * 0.5) + FY_h));
   "parallel": {
     params: [{ name: "x1width", def: 5 }, { name: "x1tilesize", def: 0.5 }, { name: "x1mod1", def: 0.3 }, { name: "x1mod2", def: 1 }, { name: "x1height", def: 0.5 }, { name: "x1move", def: 1 }, { name: "x2width", def: 5 }, { name: "x2tilesize", def: 0.5 }, { name: "x2mod1", def: 0.3 }, { name: "x2mod2", def: 1 }, { name: "x2height", def: 0.5 }, { name: "x2move", def: 1 }],
     verified: true, priority: 0, flags: [], types: ["2D"],
-    funcNames: ["roundc"],
-    funcs: `fn roundc(x: f32) -> f32 { return sign(x) * floor(abs(x) + 0.5); }`,
+    funcNames: ["roundc","atan2j"],
+    funcs: `fn roundc(x: f32) -> f32 { return sign(x) * floor(abs(x) + 0.5); }
+
+fn atan2j(y: f32, x: f32) -> f32 { if (x == 0.0 && y == 0.0) { return select(0.0, PI, (bitcast<u32>(x) >> 31u) == 1u) * select(1.0, -1.0, (bitcast<u32>(y) >> 31u) == 1u); } return atan2(y, x); }`,
     code: (w, p) => `{
 var _xr1: f32 = (${p[3]} * ${p[2]});
 var _xr2: f32 = (${p[9]} * ${p[8]});
@@ -22487,8 +25651,10 @@ if ((rnd(rs) < 0.5)) {
   "cut_truchet": {
     params: [{ name: "mode", def: 1 }, { name: "type", def: 0 }, { name: "seed", def: 1000 }, { name: "zoom", def: 10 }, { name: "invert", def: 0 }],
     verified: true, priority: 0, flags: ["hide"], types: ["2D","BASE_SHAPE","SIMULATION"],
-    funcNames: ["smoothstepc","cut_truchet_random2","cut_truchet_random","cut_truchet_truchetPattern"],
+    funcNames: ["smoothstepc","atan2j","cut_truchet_random2","cut_truchet_random","cut_truchet_truchetPattern"],
     funcs: `fn smoothstepc(a: f32, b: f32, x: f32) -> f32 { if (a == b) { return step(a, x); } let t = clamp((x - a) / (b - a), 0.0, 1.0); return t * t * (3.0 - 2.0 * t); }
+
+fn atan2j(y: f32, x: f32) -> f32 { if (x == 0.0 && y == 0.0) { return select(0.0, PI, (bitcast<u32>(x) >> 31u) == 1u) * select(1.0, -1.0, (bitcast<u32>(y) >> 31u) == 1u); } return atan2(y, x); }
 
 fn cut_truchet_random2(p_: vec2f) -> vec2f {
   return fract((sin(vec2f(dot(p_, vec2f(127.1, 311.7)), dot(p_, vec2f(269.5, 183.3)))) * vec2f(43758.5453)));
@@ -22555,8 +25721,10 @@ v.y = (${w} * y);
   "cut_fingerprint": {
     params: [{ name: "seed", def: 10000 }, { name: "mode", def: 1 }, { name: "zoom", def: 20 }, { name: "width", def: 0.8 }, { name: "invert", def: 0 }],
     verified: true, priority: 0, flags: ["hide"], types: ["BASE_SHAPE","SIMULATION"],
-    funcNames: ["smoothstepc","cut_fingerprint_hash2","cut_fingerprint_getRGBColor"],
-    funcs: `fn smoothstepc(a: f32, b: f32, x: f32) -> f32 { if (a == b) { return step(a, x); } let t = clamp((x - a) / (b - a), 0.0, 1.0); return t * t * (3.0 - 2.0 * t); }
+    funcNames: ["atan2j","smoothstepc","cut_fingerprint_hash2","cut_fingerprint_getRGBColor"],
+    funcs: `fn atan2j(y: f32, x: f32) -> f32 { if (x == 0.0 && y == 0.0) { return select(0.0, PI, (bitcast<u32>(x) >> 31u) == 1u) * select(1.0, -1.0, (bitcast<u32>(y) >> 31u) == 1u); } return atan2(y, x); }
+
+fn smoothstepc(a: f32, b: f32, x: f32) -> f32 { if (a == b) { return step(a, x); } let t = clamp((x - a) / (b - a), 0.0, 1.0); return t * t * (3.0 - 2.0 * t); }
 
 fn cut_fingerprint_hash2(p__in: vec2f) -> vec2f {
   var p_: vec2f = p__in;
@@ -22573,10 +25741,10 @@ fn cut_fingerprint_getRGBColor(uv_in: vec2f, seed: f32, width: f32) -> vec3f {
   for (var i: i32 = 0; (i < 50); i++) {
     var s: f32 = sign(h.x);
     h = (cut_fingerprint_hash2(h) * vec2f(15.0, 20.0));
-    a += (s * atan2((uv.x - h.x), (uv.y - h.y)));
+    a += (s * atan2j((uv.x - h.x), (uv.y - h.y)));
   }
   uv = (uv + abs(cut_fingerprint_hash2(h)));
-  a += atan2(uv.y, uv.x);
+  a += atan2j(uv.y, uv.x);
   var p_: f32 = ((1.0 - bounds) * width);
   var s: f32 = min(0.3, p_);
   var l: f32 = (length(uv) + (0.319 * a));
@@ -22626,8 +25794,10 @@ if (!(*hd)) {
   "cut_glypho": {
     params: [{ name: "mode", def: 1 }, { name: "zoom", def: 1 }, { name: "invert", def: 0 }, { name: "f1", def: 0.115 }, { name: "f2", def: 0.75 }, { name: "f3", def: 1.5 }],
     verified: true, priority: 0, flags: ["hide"], types: ["2D","BASE_SHAPE","SIMULATION"],
-    funcNames: ["smoothstepc"],
-    funcs: `fn smoothstepc(a: f32, b: f32, x: f32) -> f32 { if (a == b) { return step(a, x); } let t = clamp((x - a) / (b - a), 0.0, 1.0); return t * t * (3.0 - 2.0 * t); }`,
+    funcNames: ["smoothstepc","atan2j"],
+    funcs: `fn smoothstepc(a: f32, b: f32, x: f32) -> f32 { if (a == b) { return step(a, x); } let t = clamp((x - a) / (b - a), 0.0, 1.0); return t * t * (3.0 - 2.0 * t); }
+
+fn atan2j(y: f32, x: f32) -> f32 { if (x == 0.0 && y == 0.0) { return select(0.0, PI, (bitcast<u32>(x) >> 31u) == 1u) * select(1.0, -1.0, (bitcast<u32>(y) >> 31u) == 1u); } return atan2(y, x); }`,
     code: (w, p) => `{
 var x: f32;
 var y: f32;
@@ -22680,8 +25850,10 @@ if (!(*hd)) {
   "cut_metaballs": {
     params: [{ name: "mode", def: 1 }, { name: "zoom", def: 7 }, { name: "invert", def: 0 }, { name: "time", def: 0 }],
     verified: true, priority: 0, flags: ["hide"], types: ["2D","BASE_SHAPE","SIMULATION"],
-    funcNames: ["cut_metaballs_random2"],
-    funcs: `fn cut_metaballs_random2(p_: vec2f) -> vec2f {
+    funcNames: ["atan2j","cut_metaballs_random2"],
+    funcs: `fn atan2j(y: f32, x: f32) -> f32 { if (x == 0.0 && y == 0.0) { return select(0.0, PI, (bitcast<u32>(x) >> 31u) == 1u) * select(1.0, -1.0, (bitcast<u32>(y) >> 31u) == 1u); } return atan2(y, x); }
+
+fn cut_metaballs_random2(p_: vec2f) -> vec2f {
   var tm: vec2f = vec2f(dot(p_, vec2f(127.1, 311.7)), dot(p_, vec2f(269.5, 183.3)));
   return fract((sin(tm) * vec2f(43758.5453)));
 }`,
@@ -22739,8 +25911,10 @@ v.y = (${w} * (y - py_center));
   "cut_bricks": {
     params: [{ name: "seed", def: 1000 }, { name: "mode", def: 1 }, { name: "size", def: 0.9 }, { name: "zoom", def: 3 }, { name: "invert", def: 0 }],
     verified: true, priority: 0, flags: ["hide"], types: ["2D","BASE_SHAPE","SIMULATION"],
-    funcNames: ["cut_bricks_brickTile","cut_bricks_box"],
-    funcs: `fn cut_bricks_brickTile(_st_in: vec2f) -> vec2f {
+    funcNames: ["atan2j","cut_bricks_brickTile","cut_bricks_box"],
+    funcs: `fn atan2j(y: f32, x: f32) -> f32 { if (x == 0.0 && y == 0.0) { return select(0.0, PI, (bitcast<u32>(x) >> 31u) == 1u) * select(1.0, -1.0, (bitcast<u32>(y) >> 31u) == 1u); } return atan2(y, x); }
+
+fn cut_bricks_brickTile(_st_in: vec2f) -> vec2f {
   var _st: vec2f = _st_in;
   _st.x += (step(1.0, mmod(_st.y, 2.0)) * 0.5);
   return fract(_st);
@@ -22793,7 +25967,7 @@ v.y = (${w} * (y - py_center));
   "cut_shapes": {
     params: [{ name: "mode", def: 1 }, { name: "type", def: 0 }, { name: "contour", def: 1 }, { name: "zoom", def: 1 }, { name: "invert", def: 0 }, { name: "n", def: 3 }, { name: "thick", def: 0.01 }, { name: "time", def: 0.5 }],
     verified: true, priority: 0, flags: ["hide"], types: ["2D","BASE_SHAPE","SIMULATION"],
-    funcNames: ["Mat2","smoothstepc","cut_shapes_sdHexagram","cut_shapes_sdEquilateralTriangle","cut_shapes_sdStar","cut_shapes_sdCross","cut_shapes_sdOctogon","cut_shapes_sdHexagon","cut_shapes_sdPentagon","cut_shapes_sdVesica","cut_shapes_dot2","cut_shapes_sdTrapezoid","cut_shapes_sdTrapezoid_ov1","Mat2_Init","times","cut_shapes_sdArc","cut_shapes_ndot","cut_shapes_sdRhombus","cut_shapes_sdCircle","cut_shapes_sdBox"],
+    funcNames: ["Mat2","smoothstepc","atan2j","cut_shapes_sdHexagram","cut_shapes_sdEquilateralTriangle","cut_shapes_sdStar","cut_shapes_sdCross","cut_shapes_sdOctogon","cut_shapes_sdHexagon","cut_shapes_sdPentagon","cut_shapes_sdVesica","cut_shapes_dot2","cut_shapes_sdTrapezoid","cut_shapes_sdTrapezoid_ov1","Mat2_Init","times","cut_shapes_sdArc","cut_shapes_ndot","cut_shapes_sdRhombus","cut_shapes_sdCircle","cut_shapes_sdBox"],
     funcs: `struct Mat2 {
   a00: f32,
   a01: f32,
@@ -22802,6 +25976,8 @@ v.y = (${w} * (y - py_center));
 }
 
 fn smoothstepc(a: f32, b: f32, x: f32) -> f32 { if (a == b) { return step(a, x); } let t = clamp((x - a) / (b - a), 0.0, 1.0); return t * t * (3.0 - 2.0 * t); }
+
+fn atan2j(y: f32, x: f32) -> f32 { if (x == 0.0 && y == 0.0) { return select(0.0, PI, (bitcast<u32>(x) >> 31u) == 1u) * select(1.0, -1.0, (bitcast<u32>(y) >> 31u) == 1u); } return atan2(y, x); }
 
 fn cut_shapes_sdHexagram(p__in: vec2f, r_: f32) -> f32 {
   var p_: vec2f = p__in;
@@ -22835,7 +26011,7 @@ fn cut_shapes_sdStar(p__in: vec2f, r_: f32, n: i32, m: f32) -> f32 {
   var en: f32 = (6.283185 / m);
   var acs: vec2f = vec2f(cos(an), sin(an));
   var ecs: vec2f = vec2f(cos(en), sin(en));
-  var bn: f32 = (mmod(atan2(p_.x, p_.y), (2.0 * an)) - an);
+  var bn: f32 = (mmod(atan2j(p_.x, p_.y), (2.0 * an)) - an);
   p_ = (vec2f(cos(bn), abs(sin(bn))) * vec2f(length(p_)));
   p_ = (p_ - (acs * vec2f(r_)));
   p_ = (p_ + (ecs * vec2f(clamp(-(dot(p_, ecs)), 0.0, ((r_ * acs.y) / ecs.y)))));
@@ -23054,8 +26230,10 @@ v.y = (${w} * y);
   "cut_kaleido": {
     params: [{ name: "seed", def: 1000 }, { name: "mode", def: 1 }, { name: "time", def: 0 }, { name: "n", def: 6 }, { name: "zoom", def: 0.5 }, { name: "invert", def: 0 }],
     verified: true, priority: 0, flags: ["hide"], types: ["2D","BASE_SHAPE","SIMULATION"],
-    funcNames: ["cut_kaleido_distToColor"],
-    funcs: `fn cut_kaleido_distToColor(d: f32) -> f32 {
+    funcNames: ["atan2j","cut_kaleido_distToColor"],
+    funcs: `fn atan2j(y: f32, x: f32) -> f32 { if (x == 0.0 && y == 0.0) { return select(0.0, PI, (bitcast<u32>(x) >> 31u) == 1u) * select(1.0, -1.0, (bitcast<u32>(y) >> 31u) == 1u); } return atan2(y, x); }
+
+fn cut_kaleido_distToColor(d: f32) -> f32 {
   return (0.0 - cos((d * 13.0)));
 }`,
     code: (w, p) => `{
@@ -23101,13 +26279,15 @@ v.y = (${w} * y);
   "cut_pattern": {
     params: [{ name: "seed", def: 1000 }, { name: "mode", def: 1 }, { name: "time", def: 0.9 }, { name: "zoom", def: 0.5 }, { name: "invert", def: 0 }],
     verified: true, priority: 0, flags: ["hide"], types: ["2D","BASE_SHAPE","SIMULATION"],
-    funcNames: ["Mat2","Mat2_Init","times","cut_pattern_rotate2D","cut_pattern_rotateTilePattern"],
+    funcNames: ["Mat2","atan2j","Mat2_Init","times","cut_pattern_rotate2D","cut_pattern_rotateTilePattern"],
     funcs: `struct Mat2 {
   a00: f32,
   a01: f32,
   a10: f32,
   a11: f32,
 }
+
+fn atan2j(y: f32, x: f32) -> f32 { if (x == 0.0 && y == 0.0) { return select(0.0, PI, (bitcast<u32>(x) >> 31u) == 1u) * select(1.0, -1.0, (bitcast<u32>(y) >> 31u) == 1u); } return atan2(y, x); }
 
 fn Mat2_Init(m: ptr<function, Mat2>, v00: f32, v10: f32, v01: f32, v11: f32) {
   (*m).a00 = v00;
@@ -23163,7 +26343,7 @@ uv = fract(uv);
 uv = cut_pattern_rotateTilePattern(uv);
 var pos: vec2f = (vec2f(0.0, 5.0) - uv);
 var radius: f32 = length(pos);
-var angle: f32 = atan2(pos.x, pos.y);
+var angle: f32 = atan2j(pos.x, pos.y);
 var r_: f32 = sin((((radius * sin(((((uv.y * PI) * 5.0) + ${p[2]}) + cos((((sin(((uv.x * PI) * 3.0)) * PI) * 2.0) + sin(((uv.y * PI) * 15.0))))))) * 1.0) * sin(((uv.y * PI) + sin(((uv.x * PI) * 5.0))))));
 var b: f32 = ((cos((((r_ * PI) * 2.0) + (PI * 2.0))) * 0.9) + (sin((((r_ * PI) * 2.0) + (PI * 2.0))) * 0.7));
 var color: f32 = b;
@@ -23188,8 +26368,10 @@ v.y = (${w} * y);
   "cut_fun": {
     params: [{ name: "seed", def: 1000 }, { name: "mode", def: 1 }, { name: "zoom", def: 10 }, { name: "invert", def: 0 }],
     verified: true, priority: 0, flags: ["hide"], types: ["2D","BASE_SHAPE","SIMULATION"],
-    funcNames: ["smoothstepc","cut_fun_rand","cut_fun_pix","cut_fun_hm"],
-    funcs: `fn smoothstepc(a: f32, b: f32, x: f32) -> f32 { if (a == b) { return step(a, x); } let t = clamp((x - a) / (b - a), 0.0, 1.0); return t * t * (3.0 - 2.0 * t); }
+    funcNames: ["atan2j","smoothstepc","cut_fun_rand","cut_fun_pix","cut_fun_hm"],
+    funcs: `fn atan2j(y: f32, x: f32) -> f32 { if (x == 0.0 && y == 0.0) { return select(0.0, PI, (bitcast<u32>(x) >> 31u) == 1u) * select(1.0, -1.0, (bitcast<u32>(y) >> 31u) == 1u); } return atan2(y, x); }
+
+fn smoothstepc(a: f32, b: f32, x: f32) -> f32 { if (a == b) { return step(a, x); } let t = clamp((x - a) / (b - a), 0.0, 1.0); return t * t * (3.0 - 2.0 * t); }
 
 fn cut_fun_rand(co: vec2f) -> f32 {
   return fract((sin(dot(vec2f(co.x, co.y), vec2f(12.9898, 78.233))) * 43758.5453));
@@ -23256,6 +26438,8 @@ v.y = (${w} * (y - py_center));
   "cut_snowflake": {
     params: [{ name: "seed", def: 1000 }, { name: "mode", def: 1 }, { name: "time", def: 0 }, { name: "level", def: 10 }, { name: "zoom", def: 10 }, { name: "invert", def: 0 }],
     verified: true, priority: 0, flags: ["hide"], types: ["2D","BASE_SHAPE","SIMULATION"],
+    funcNames: ["atan2j"],
+    funcs: `fn atan2j(y: f32, x: f32) -> f32 { if (x == 0.0 && y == 0.0) { return select(0.0, PI, (bitcast<u32>(x) >> 31u) == 1u) * select(1.0, -1.0, (bitcast<u32>(y) >> 31u) == 1u); } return atan2(y, x); }`,
     code: (w, p) => `{
 var x: f32;
 var y: f32;
@@ -23299,6 +26483,8 @@ v.y = (${w} * y);
   "cut_circdes": {
     params: [{ name: "seed", def: 1000 }, { name: "mode", def: 1 }, { name: "time", def: 0 }, { name: "zoom", def: 10 }, { name: "invert", def: 0 }],
     verified: true, priority: 0, flags: ["hide"], types: ["2D","BASE_SHAPE","SIMULATION"],
+    funcNames: ["atan2j"],
+    funcs: `fn atan2j(y: f32, x: f32) -> f32 { if (x == 0.0 && y == 0.0) { return select(0.0, PI, (bitcast<u32>(x) >> 31u) == 1u) * select(1.0, -1.0, (bitcast<u32>(y) >> 31u) == 1u); } return atan2(y, x); }`,
     code: (w, p) => `{
 var x: f32;
 var y: f32;
@@ -23355,8 +26541,10 @@ v.y = (${w} * (y - py_center));
   "cut_sincos": {
     params: [{ name: "seed", def: 1000 }, { name: "mode", def: 1 }, { name: "time", def: 0.9 }, { name: "zoom", def: 0.5 }, { name: "invert", def: 0 }],
     verified: true, priority: 0, flags: ["hide"], types: ["2D","BASE_SHAPE","SIMULATION"],
-    funcNames: ["smoothstepc"],
-    funcs: `fn smoothstepc(a: f32, b: f32, x: f32) -> f32 { if (a == b) { return step(a, x); } let t = clamp((x - a) / (b - a), 0.0, 1.0); return t * t * (3.0 - 2.0 * t); }`,
+    funcNames: ["smoothstepc","atan2j"],
+    funcs: `fn smoothstepc(a: f32, b: f32, x: f32) -> f32 { if (a == b) { return step(a, x); } let t = clamp((x - a) / (b - a), 0.0, 1.0); return t * t * (3.0 - 2.0 * t); }
+
+fn atan2j(y: f32, x: f32) -> f32 { if (x == 0.0 && y == 0.0) { return select(0.0, PI, (bitcast<u32>(x) >> 31u) == 1u) * select(1.0, -1.0, (bitcast<u32>(y) >> 31u) == 1u); } return atan2(y, x); }`,
     code: (w, p) => `{
 var x: f32;
 var y: f32;
@@ -23399,8 +26587,10 @@ v.y = (${w} * y);
   "cut_swarp": {
     params: [{ name: "seed", def: 1000 }, { name: "mode", def: 1 }, { name: "time", def: 0 }, { name: "type", def: 0 }, { name: "zoom", def: 1 }, { name: "invert", def: 0 }],
     verified: true, priority: 0, flags: ["hide"], types: ["2D","BASE_SHAPE","SIMULATION"],
-    funcNames: ["cut_swarp_dist"],
-    funcs: `fn cut_swarp_dist(p__in: vec2f, type_: i32) -> f32 {
+    funcNames: ["atan2j","cut_swarp_dist"],
+    funcs: `fn atan2j(y: f32, x: f32) -> f32 { if (x == 0.0 && y == 0.0) { return select(0.0, PI, (bitcast<u32>(x) >> 31u) == 1u) * select(1.0, -1.0, (bitcast<u32>(y) >> 31u) == 1u); } return atan2(y, x); }
+
+fn cut_swarp_dist(p__in: vec2f, type_: i32) -> f32 {
   var p_: vec2f = p__in;
   var distance_: f32 = 0.0;
   if ((type_ == 0)) {
@@ -23461,8 +26651,10 @@ v.y = (${w} * y);
   "cut_sqsplits": {
     params: [{ name: "seed", def: 1000 }, { name: "mode", def: 1 }, { name: "time", def: 0.9 }, { name: "zoom", def: 2 }, { name: "invert", def: 0 }],
     verified: true, priority: 0, flags: ["hide"], types: ["2D","BASE_SHAPE","SIMULATION"],
-    funcNames: ["mmod2"],
-    funcs: `fn mmod2(a: vec2f, b: vec2f) -> vec2f { return a - b * floor(a / b); }`,
+    funcNames: ["mmod2","atan2j"],
+    funcs: `fn mmod2(a: vec2f, b: vec2f) -> vec2f { return a - b * floor(a / b); }
+
+fn atan2j(y: f32, x: f32) -> f32 { if (x == 0.0 && y == 0.0) { return select(0.0, PI, (bitcast<u32>(x) >> 31u) == 1u) * select(1.0, -1.0, (bitcast<u32>(y) >> 31u) == 1u); } return atan2(y, x); }`,
     code: (w, p) => `{
 var x: f32;
 var y: f32;
@@ -23477,7 +26669,7 @@ var U: vec2f = vec2f((x * ${p[3]}), (y * ${p[3]}));
 var Uf: vec2f = (fract(U) - vec2f(0.5));
 var Ui: vec2f = floor(mmod2(U, vec2f(2.0)));
 var t_: f32 = (${p[2]} * 0.35);
-var a: f32 = (atan2(Uf.x, Uf.y) / 6.3);
+var a: f32 = (atan2j(Uf.x, Uf.y) / 6.3);
 var r_: f32 = fract(((t_ + t_) + (2.0 * select((1.0 - a), a, (Ui.x != Ui.y)))));
 var sharp: f32 = (180.0 * length(Uf));
 var k: f32 = (clamp(((r_ - 0.5) * sharp), 0.0, 1.0) + clamp((1.0 - (r_ * sharp)), 0.0, 1.0));
@@ -23503,14 +26695,16 @@ v.y = (${w} * y);
   "cut_sqcir": {
     params: [{ name: "mode", def: 1 }, { name: "zoom", def: 2 }, { name: "invert", def: 0 }, { name: "power", def: 2 }],
     verified: true, priority: 0, flags: ["hide"], types: ["2D","BASE_SHAPE","SIMULATION"],
-    funcNames: ["powc"],
+    funcNames: ["powc","atan2j"],
     funcs: `fn powc(x: f32, y: f32) -> f32 {
   if (x >= 0.0) { return pow(x, y); }
   let yi = round(y);
   if (abs(y - yi) > 1e-6) { return pow(x, y); }
   let m = pow(-x, y);
   return select(m, -m, (i32(yi) & 1) != 0);
-}`,
+}
+
+fn atan2j(y: f32, x: f32) -> f32 { if (x == 0.0 && y == 0.0) { return select(0.0, PI, (bitcast<u32>(x) >> 31u) == 1u) * select(1.0, -1.0, (bitcast<u32>(y) >> 31u) == 1u); } return atan2(y, x); }`,
     code: (w, p) => `{
 var x: f32;
 var y: f32;
@@ -23547,6 +26741,8 @@ v.y = (${w} * y);
   "shredded": {
     params: [{ name: "x1", def: 1 }, { name: "x2", def: 3 }, { name: "x3", def: 1 }, { name: "x_blur_amount", def: 0.1 }, { name: "y1", def: 1 }, { name: "y2", def: 3 }, { name: "y3", def: 1 }, { name: "y_blur_amount", def: 0.1 }, { name: "z1", def: 1 }, { name: "z2", def: 3 }, { name: "z3", def: 1 }, { name: "z_blur_amount", def: 0.1 }, { name: "type", def: 0 }, { name: "blur", def: 0 }],
     verified: true, priority: 0, flags: ["3d","z"], types: ["3D"],
+    funcNames: ["atan2j"],
+    funcs: `fn atan2j(y: f32, x: f32) -> f32 { if (x == 0.0 && y == 0.0) { return select(0.0, PI, (bitcast<u32>(x) >> 31u) == 1u) * select(1.0, -1.0, (bitcast<u32>(y) >> 31u) == 1u); } return atan2(y, x); }`,
     code: (w, p) => `{
 if ((min(max(${p[13]}, 0.0), 1.0) != 0)) {
   if ((min(max(${p[12]}, 0.0), 2.0) == 2)) {
@@ -23582,7 +26778,7 @@ if ((min(max(${p[13]}, 0.0), 1.0) != 0)) {
   "cut_rgrid": {
     params: [{ name: "mode", def: 1 }, { name: "zoom", def: 7 }, { name: "invert", def: 0 }, { name: "angle", def: 0 }],
     verified: true, priority: 0, flags: ["hide"], types: ["2D","BASE_SHAPE","SIMULATION"],
-    funcNames: ["Mat2","mmod2","smoothstepc","Mat2_Init","times"],
+    funcNames: ["Mat2","mmod2","smoothstepc","atan2j","Mat2_Init","times"],
     funcs: `struct Mat2 {
   a00: f32,
   a01: f32,
@@ -23593,6 +26789,8 @@ if ((min(max(${p[13]}, 0.0), 1.0) != 0)) {
 fn mmod2(a: vec2f, b: vec2f) -> vec2f { return a - b * floor(a / b); }
 
 fn smoothstepc(a: f32, b: f32, x: f32) -> f32 { if (a == b) { return step(a, x); } let t = clamp((x - a) / (b - a), 0.0, 1.0); return t * t * (3.0 - 2.0 * t); }
+
+fn atan2j(y: f32, x: f32) -> f32 { if (x == 0.0 && y == 0.0) { return select(0.0, PI, (bitcast<u32>(x) >> 31u) == 1u) * select(1.0, -1.0, (bitcast<u32>(y) >> 31u) == 1u); } return atan2(y, x); }
 
 fn Mat2_Init(m: ptr<function, Mat2>, v00: f32, v10: f32, v01: f32, v11: f32) {
   (*m).a00 = v00;
@@ -23662,6 +26860,8 @@ v.y = (${w} * y);
   "cut_yuebing": {
     params: [{ name: "mode", def: 1 }, { name: "zoom", def: 0.25 }, { name: "invert", def: 0 }, { name: "p1", def: 2 }, { name: "p2", def: 25 }],
     verified: true, priority: 0, flags: ["hide"], types: ["2D","BASE_SHAPE","SIMULATION"],
+    funcNames: ["atan2j"],
+    funcs: `fn atan2j(y: f32, x: f32) -> f32 { if (x == 0.0 && y == 0.0) { return select(0.0, PI, (bitcast<u32>(x) >> 31u) == 1u) * select(1.0, -1.0, (bitcast<u32>(y) >> 31u) == 1u); } return atan2(y, x); }`,
     code: (w, p) => `{
 var x: f32;
 var y: f32;
@@ -23697,7 +26897,7 @@ v.y = (${w} * y);
   "cut_randomtile": {
     params: [{ name: "seed", def: 1000 }, { name: "mode", def: 1 }, { name: "zoom", def: 5 }, { name: "invert", def: 0 }],
     verified: true, priority: 0, flags: ["hide"], types: ["2D","BASE_SHAPE","SIMULATION"],
-    funcNames: ["Mat2","smoothstepc","cut_randomtile_hash21","Mat2_Init","cut_randomtile_rot2","times","cut_randomtile_TilePattern","Mat2_Init_ov1","cut_randomtile_n2D","cut_randomtile_sFract","cut_randomtile_GrungeTex","cut_randomtile_sstep"],
+    funcNames: ["Mat2","smoothstepc","atan2j","cut_randomtile_hash21","Mat2_Init","cut_randomtile_rot2","times","cut_randomtile_TilePattern","Mat2_Init_ov1","cut_randomtile_n2D","cut_randomtile_sFract","cut_randomtile_GrungeTex","cut_randomtile_sstep"],
     funcs: `struct Mat2 {
   a00: f32,
   a01: f32,
@@ -23706,6 +26906,8 @@ v.y = (${w} * y);
 }
 
 fn smoothstepc(a: f32, b: f32, x: f32) -> f32 { if (a == b) { return step(a, x); } let t = clamp((x - a) / (b - a), 0.0, 1.0); return t * t * (3.0 - 2.0 * t); }
+
+fn atan2j(y: f32, x: f32) -> f32 { if (x == 0.0 && y == 0.0) { return select(0.0, PI, (bitcast<u32>(x) >> 31u) == 1u) * select(1.0, -1.0, (bitcast<u32>(y) >> 31u) == 1u); } return atan2(y, x); }
 
 fn cut_randomtile_hash21(p_: vec2f) -> f32 {
   var n: f32 = dot(p_, vec2f(127.183, 157.927));
@@ -23863,8 +27065,10 @@ v.y = (${w} * (y - py_center));
   "cut_alientext": {
     params: [{ name: "seed", def: 1000 }, { name: "mode", def: 1 }, { name: "subdivisions", def: 3 }, { name: "zoom", def: 1 }, { name: "invert", def: 0 }],
     verified: true, priority: 0, flags: ["hide"], types: ["2D","BASE_SHAPE","SIMULATION"],
-    funcNames: ["cut_alientext_getCellIJ","cut_alientext_random2d","cut_alientext_letter"],
-    funcs: `fn cut_alientext_getCellIJ(uv: vec2f, gridDims: f32) -> vec2f {
+    funcNames: ["atan2j","cut_alientext_getCellIJ","cut_alientext_random2d","cut_alientext_letter"],
+    funcs: `fn atan2j(y: f32, x: f32) -> f32 { if (x == 0.0 && y == 0.0) { return select(0.0, PI, (bitcast<u32>(x) >> 31u) == 1u) * select(1.0, -1.0, (bitcast<u32>(y) >> 31u) == 1u); } return atan2(y, x); }
+
+fn cut_alientext_getCellIJ(uv: vec2f, gridDims: f32) -> vec2f {
   return (floor((uv * vec2f(gridDims))) / vec2f(gridDims));
 }
 
@@ -23938,7 +27142,7 @@ v.y = (${w} * (y - py_center));
   "cut_triantess": {
     params: [{ name: "mode", def: 1 }, { name: "Iters", def: 20 }, { name: "SRadius", def: 0.01 }, { name: "pParam", def: 3 }, { name: "qParam", def: 3 }, { name: "rParam", def: 4 }, { name: "uBaryc", def: 1 }, { name: "vBaryc", def: 1 }, { name: "wBaryc", def: 0 }, { name: "zoom", def: 2 }, { name: "invert", def: 0 }],
     verified: true, priority: 0, flags: ["hide"], types: ["2D","BASE_SHAPE","SIMULATION"],
-    funcNames: ["Mat2","smoothstepc","cut_triantess_hdott","hlengtht","cut_triantess_hnormalizet","cut_triantess_hdots","Mat2_Init","times","cut_triantess_hlengths","cut_triantess_DD","cut_triantess_dist2Segment","cut_triantess_dist2Segments"],
+    funcNames: ["Mat2","smoothstepc","atan2j","cut_triantess_hdott","hlengtht","cut_triantess_hnormalizet","cut_triantess_hdots","Mat2_Init","times","cut_triantess_hlengths","cut_triantess_DD","cut_triantess_dist2Segment","cut_triantess_dist2Segments"],
     funcs: `struct Mat2 {
   a00: f32,
   a01: f32,
@@ -23947,6 +27151,8 @@ v.y = (${w} * (y - py_center));
 }
 
 fn smoothstepc(a: f32, b: f32, x: f32) -> f32 { if (a == b) { return step(a, x); } let t = clamp((x - a) / (b - a), 0.0, 1.0); return t * t * (3.0 - 2.0 * t); }
+
+fn atan2j(y: f32, x: f32) -> f32 { if (x == 0.0 && y == 0.0) { return select(0.0, PI, (bitcast<u32>(x) >> 31u) == 1u) * select(1.0, -1.0, (bitcast<u32>(y) >> 31u) == 1u); } return atan2(y, x); }
 
 fn cut_triantess_hdott(a: vec3f, b: vec3f, spaceType: f32) -> f32 {
   return ((dot(vec2f(a.x, a.y), vec2f(b.x, b.y)) * spaceType) + (a.z * b.z));
@@ -24090,6 +27296,8 @@ v.y = (${w} * y);
   "cut_booleans": {
     params: [{ name: "seed", def: 1000 }, { name: "mode", def: 1 }, { name: "type", def: 0 }, { name: "zoom", def: 250 }, { name: "invert", def: 0 }],
     verified: true, priority: 0, flags: ["hide"], types: ["2D","BASE_SHAPE","SIMULATION"],
+    funcNames: ["atan2j"],
+    funcs: `fn atan2j(y: f32, x: f32) -> f32 { if (x == 0.0 && y == 0.0) { return select(0.0, PI, (bitcast<u32>(x) >> 31u) == 1u) * select(1.0, -1.0, (bitcast<u32>(y) >> 31u) == 1u); } return atan2(y, x); }`,
     code: (w, p) => `{
 var x: f32;
 var y: f32;
@@ -24138,8 +27346,10 @@ v.y = (${w} * (y - py_center));
   "cut_apollonian": {
     params: [{ name: "mode", def: 1 }, { name: "levels", def: 4 }, { name: "zoom", def: 2 }, { name: "invert", def: 0 }],
     verified: true, priority: 0, flags: ["hide"], types: ["2D","BASE_SHAPE","SIMULATION"],
-    funcNames: ["smoothstepc","cut_apollonian_apollo"],
-    funcs: `fn smoothstepc(a: f32, b: f32, x: f32) -> f32 { if (a == b) { return step(a, x); } let t = clamp((x - a) / (b - a), 0.0, 1.0); return t * t * (3.0 - 2.0 * t); }
+    funcNames: ["atan2j","smoothstepc","cut_apollonian_apollo"],
+    funcs: `fn atan2j(y: f32, x: f32) -> f32 { if (x == 0.0 && y == 0.0) { return select(0.0, PI, (bitcast<u32>(x) >> 31u) == 1u) * select(1.0, -1.0, (bitcast<u32>(y) >> 31u) == 1u); } return atan2(y, x); }
+
+fn smoothstepc(a: f32, b: f32, x: f32) -> f32 { if (a == b) { return step(a, x); } let t = clamp((x - a) / (b - a), 0.0, 1.0); return t * t * (3.0 - 2.0 * t); }
 
 fn cut_apollonian_apollo(xy: vec2f, n: i32) -> f32 {
   var scale: f32 = 1.0;
@@ -24192,7 +27402,7 @@ v.y = (${w} * y);
   "cut_truchetweaving": {
     params: [{ name: "randomize", def: 0 }, { name: "mode", def: 1 }, { name: "type", def: 0 }, { name: "width", def: 0.15 }, { name: "zoom", def: 8 }, { name: "invert", def: 0 }],
     verified: true, priority: 0, flags: ["hide"], types: ["2D","BASE_SHAPE","SIMULATION"],
-    funcNames: ["Mat2","mmod2","df_add","op_","df_qts","df_ts","df_mulf","hsin_","df_mul","df_sin","df_cos","smoothstepc","cut_truchetweaving_N21","Mat2_Init","times","cut_truchetweaving_UvCirc","cut_truchetweaving_UvBeam","cut_truchetweaving_Truchet"],
+    funcNames: ["Mat2","mmod2","atan2j","df_add","op_","df_qts","df_ts","df_mulf","hsin_","df_mul","df_sin","df_cos","smoothstepc","cut_truchetweaving_N21","Mat2_Init","times","cut_truchetweaving_UvCirc","cut_truchetweaving_UvBeam","cut_truchetweaving_Truchet"],
     funcs: `struct Mat2 {
   a00: f32,
   a01: f32,
@@ -24201,6 +27411,8 @@ v.y = (${w} * y);
 }
 
 fn mmod2(a: vec2f, b: vec2f) -> vec2f { return a - b * floor(a / b); }
+
+fn atan2j(y: f32, x: f32) -> f32 { if (x == 0.0 && y == 0.0) { return select(0.0, PI, (bitcast<u32>(x) >> 31u) == 1u) * select(1.0, -1.0, (bitcast<u32>(y) >> 31u) == 1u); } return atan2(y, x); }
 
 fn df_add(x: vec2f, y: vec2f) -> vec2f { var s = df_ts(x.x, y.x); let t = df_ts(x.y, y.y); s.y = op_(s.y + t.x); s = df_qts(s.x, s.y); s.y = op_(s.y + t.y); return df_qts(s.x, s.y); }
 
@@ -24276,7 +27488,7 @@ fn times(m: ptr<function, Mat2>, v_: vec2f) -> vec2f {
 }
 
 fn cut_truchetweaving_UvCirc(uv: vec2f, radius: f32, thickness: f32) -> vec4f {
-  var st: vec2f = vec2f(atan2(uv.x, uv.y), length(uv));
+  var st: vec2f = vec2f(atan2j(uv.x, uv.y), length(uv));
   var t_: f32 = (thickness / 2.0);
   var w_: f32 = 0.01;
   var r1: f32 = (radius - t_);
@@ -24421,8 +27633,10 @@ v.y = (${w} * y);
   "cut_hextruchetflow": {
     params: [{ name: "randomize", def: 0 }, { name: "mode", def: 1 }, { name: "grid", def: 0 }, { name: "zoom", def: 10 }, { name: "invert", def: 0 }],
     verified: true, priority: 0, flags: ["hide"], types: ["2D","BASE_SHAPE","SIMULATION"],
-    funcNames: ["smoothstepc","cut_hextruchetflow_PixToHex","cut_hextruchetflow_HexToPix","cut_hextruchetflow_Hashfv2","cut_hextruchetflow_HexEdgeDist","cut_hextruchetflow_ShowScene"],
-    funcs: `fn smoothstepc(a: f32, b: f32, x: f32) -> f32 { if (a == b) { return step(a, x); } let t = clamp((x - a) / (b - a), 0.0, 1.0); return t * t * (3.0 - 2.0 * t); }
+    funcNames: ["atan2j","smoothstepc","cut_hextruchetflow_PixToHex","cut_hextruchetflow_HexToPix","cut_hextruchetflow_Hashfv2","cut_hextruchetflow_HexEdgeDist","cut_hextruchetflow_ShowScene"],
+    funcs: `fn atan2j(y: f32, x: f32) -> f32 { if (x == 0.0 && y == 0.0) { return select(0.0, PI, (bitcast<u32>(x) >> 31u) == 1u) * select(1.0, -1.0, (bitcast<u32>(y) >> 31u) == 1u); } return atan2(y, x); }
+
+fn smoothstepc(a: f32, b: f32, x: f32) -> f32 { if (a == b) { return step(a, x); } let t = clamp((x - a) / (b - a), 0.0, 1.0); return t * t * (3.0 - 2.0 * t); }
 
 fn cut_hextruchetflow_PixToHex(p_: vec2f) -> vec2f {
   var sqrt3: f32 = 1.73205;
@@ -24529,8 +27743,10 @@ v.y = (${w} * y);
   "cut_hexdots": {
     params: [{ name: "mode", def: 1 }, { name: "size", def: 0.5 }, { name: "zoom", def: 4 }, { name: "invert", def: 0 }],
     verified: true, priority: 0, flags: ["hide"], types: ["2D","BASE_SHAPE","SIMULATION"],
-    funcNames: ["mmod2"],
-    funcs: `fn mmod2(a: vec2f, b: vec2f) -> vec2f { return a - b * floor(a / b); }`,
+    funcNames: ["mmod2","atan2j"],
+    funcs: `fn mmod2(a: vec2f, b: vec2f) -> vec2f { return a - b * floor(a / b); }
+
+fn atan2j(y: f32, x: f32) -> f32 { if (x == 0.0 && y == 0.0) { return select(0.0, PI, (bitcast<u32>(x) >> 31u) == 1u) * select(1.0, -1.0, (bitcast<u32>(y) >> 31u) == 1u); } return atan2(y, x); }`,
     code: (w, p) => `{
 var x: f32;
 var y: f32;
@@ -24568,8 +27784,10 @@ v.y = (${w} * y);
   "cut_jigsaw": {
     params: [{ name: "seed", def: 1000 }, { name: "time", def: 0 }, { name: "mode", def: 1 }, { name: "zoom", def: 4 }, { name: "invert", def: 0 }],
     verified: true, priority: 0, flags: ["hide"], types: ["2D","BASE_SHAPE","SIMULATION"],
-    funcNames: ["mmod2"],
-    funcs: `fn mmod2(a: vec2f, b: vec2f) -> vec2f { return a - b * floor(a / b); }`,
+    funcNames: ["mmod2","atan2j"],
+    funcs: `fn mmod2(a: vec2f, b: vec2f) -> vec2f { return a - b * floor(a / b); }
+
+fn atan2j(y: f32, x: f32) -> f32 { if (x == 0.0 && y == 0.0) { return select(0.0, PI, (bitcast<u32>(x) >> 31u) == 1u) * select(1.0, -1.0, (bitcast<u32>(y) >> 31u) == 1u); } return atan2(y, x); }`,
     code: (w, p) => `{
 var x: f32;
 var y: f32;
@@ -24613,8 +27831,10 @@ v.y = (${w} * y);
   "cut_chains": {
     params: [{ name: "shiftX", def: 0 }, { name: "shiftY", def: 0 }, { name: "mode", def: 1 }, { name: "zoom", def: 2.5 }, { name: "invert", def: 0 }],
     verified: true, priority: 0, flags: ["hide"], types: ["2D","BASE_SHAPE","SIMULATION"],
-    funcNames: ["smoothstepc"],
-    funcs: `fn smoothstepc(a: f32, b: f32, x: f32) -> f32 { if (a == b) { return step(a, x); } let t = clamp((x - a) / (b - a), 0.0, 1.0); return t * t * (3.0 - 2.0 * t); }`,
+    funcNames: ["smoothstepc","atan2j"],
+    funcs: `fn smoothstepc(a: f32, b: f32, x: f32) -> f32 { if (a == b) { return step(a, x); } let t = clamp((x - a) / (b - a), 0.0, 1.0); return t * t * (3.0 - 2.0 * t); }
+
+fn atan2j(y: f32, x: f32) -> f32 { if (x == 0.0 && y == 0.0) { return select(0.0, PI, (bitcast<u32>(x) >> 31u) == 1u) * select(1.0, -1.0, (bitcast<u32>(y) >> 31u) == 1u); } return atan2(y, x); }`,
     code: (w, p) => `{
 var x: f32;
 var y: f32;
@@ -24658,7 +27878,7 @@ v.y = (${w} * (y - py_center));
   "cut_wood": {
     params: [{ name: "shiftX", def: 0 }, { name: "shiftY", def: 0 }, { name: "freq", def: 1.8 }, { name: "smooth", def: 1 }, { name: "LineCount", def: 20 }, { name: "LineWidth", def: 0.2 }, { name: "mode", def: 1 }, { name: "zoom", def: 2.5 }, { name: "invert", def: 0 }],
     verified: true, priority: 0, flags: ["hide"], types: ["2D","BASE_SHAPE","SIMULATION"],
-    funcNames: ["Mat2","powc","df_add","op_","df_qts","df_ts","df_mulf","hsin_","df_mul","df_sin","df_cos","smoothstepc","cut_wood_random","cut_wood_noise","Mat2_Init","cut_wood_rotate","times","cut_wood_twist","cut_wood_line"],
+    funcNames: ["Mat2","powc","atan2j","df_add","op_","df_qts","df_ts","df_mulf","hsin_","df_mul","df_sin","df_cos","smoothstepc","cut_wood_random","cut_wood_noise","Mat2_Init","cut_wood_rotate","times","cut_wood_twist","cut_wood_line"],
     funcs: `struct Mat2 {
   a00: f32,
   a01: f32,
@@ -24673,6 +27893,8 @@ fn powc(x: f32, y: f32) -> f32 {
   let m = pow(-x, y);
   return select(m, -m, (i32(yi) & 1) != 0);
 }
+
+fn atan2j(y: f32, x: f32) -> f32 { if (x == 0.0 && y == 0.0) { return select(0.0, PI, (bitcast<u32>(x) >> 31u) == 1u) * select(1.0, -1.0, (bitcast<u32>(y) >> 31u) == 1u); } return atan2(y, x); }
 
 fn df_add(x: vec2f, y: vec2f) -> vec2f { var s = df_ts(x.x, y.x); let t = df_ts(x.y, y.y); s.y = op_(s.y + t.x); s = df_qts(s.x, s.y); s.y = op_(s.y + t.y); return df_qts(s.x, s.y); }
 
@@ -24825,8 +28047,10 @@ v.y = (${w} * (y - py_center));
   "dc_booleans": {
     params: [{ name: "randomize", def: 1000 }, { name: "type", def: 1 }, { name: "zoom", def: 1000 }, { name: "ColorOnly", def: 0 }, { name: "Gradient", def: 0 }, { name: "scale_z", def: 0 }, { name: "offset_z", def: 0 }, { name: "reset_z", def: 1 }],
     verified: true, priority: 0, flags: ["dc","rgb","z"], types: ["SIMULATION","DC","BASE_SHAPE"],
-    funcNames: ["read_imageStepMode","hsv2rgb","dc_booleans_getRGBColor","dbl2int","greyscale","distance_color"],
+    funcNames: ["read_imageStepMode","atan2j","hsv2rgb","dc_booleans_getRGBColor","dbl2int","greyscale","distance_color"],
     funcs: `fn read_imageStepMode(base: u32, n: i32, t: f32) -> vec4f { return pal[base + u32(clamp(t, 0.0, 0.99999) * f32(max(n, 1)))]; }
+
+fn atan2j(y: f32, x: f32) -> f32 { if (x == 0.0 && y == 0.0) { return select(0.0, PI, (bitcast<u32>(x) >> 31u) == 1u) * select(1.0, -1.0, (bitcast<u32>(y) >> 31u) == 1u); } return atan2(y, x); }
 
 fn hsv2rgb(c: vec3f) -> vec3f {
   var K: vec4f = vec4f(1.0, (2.0 / 3.0), (1.0 / 3.0), 3.0);
@@ -24935,7 +28159,7 @@ if ((${p[7]} == 1)) {
   "dc_spacefold": {
     params: [{ name: "randomize", def: 1000 }, { name: "time", def: 0 }, { name: "zoom", def: 2.5 }, { name: "ColorOnly", def: 0 }, { name: "Gradient", def: 0 }, { name: "scale_z", def: 0 }, { name: "offset_z", def: 0 }, { name: "reset_z", def: 1 }],
     verified: true, priority: 0, flags: ["dc","rgb","z"], types: ["SIMULATION","DC","BASE_SHAPE"],
-    funcNames: ["Mat2","read_imageStepMode","Mat2_Init","dc_spacefold_rot","times","dc_spacefold_palette","dc_spacefold_getRGBColor","dbl2int","greyscale","distance_color"],
+    funcNames: ["Mat2","read_imageStepMode","atan2j","Mat2_Init","dc_spacefold_rot","times","dc_spacefold_palette","dc_spacefold_getRGBColor","dbl2int","greyscale","distance_color"],
     funcs: `struct Mat2 {
   a00: f32,
   a01: f32,
@@ -24944,6 +28168,8 @@ if ((${p[7]} == 1)) {
 }
 
 fn read_imageStepMode(base: u32, n: i32, t: f32) -> vec4f { return pal[base + u32(clamp(t, 0.0, 0.99999) * f32(max(n, 1)))]; }
+
+fn atan2j(y: f32, x: f32) -> f32 { if (x == 0.0 && y == 0.0) { return select(0.0, PI, (bitcast<u32>(x) >> 31u) == 1u) * select(1.0, -1.0, (bitcast<u32>(y) >> 31u) == 1u); } return atan2(y, x); }
 
 fn Mat2_Init(m: ptr<function, Mat2>, v00: f32, v10: f32, v01: f32, v11: f32) {
   (*m).a00 = v00;
@@ -25071,8 +28297,10 @@ if ((${p[7]} == 1)) {
   "dc_butterflies": {
     params: [{ name: "seed", def: 1000 }, { name: "time", def: 0 }, { name: "zoom", def: 1 }, { name: "red", def: 1 }, { name: "green", def: 1 }, { name: "blue", def: 1 }, { name: "ColorOnly", def: 0 }, { name: "Gradient", def: 0 }, { name: "scale_z", def: 0 }, { name: "offset_z", def: 0 }, { name: "reset_z", def: 1 }],
     verified: true, priority: 0, flags: ["dc","rgb","z"], types: ["SIMULATION","DC","BASE_SHAPE"],
-    funcNames: ["read_imageStepMode","powc","dc_butterflies_cpow","dc_butterflies_csin","dc_butterflies_func","dc_butterflies_getRGBColor","dbl2int","greyscale","distance_color"],
+    funcNames: ["read_imageStepMode","atan2j","powc","dc_butterflies_cpow","dc_butterflies_csin","dc_butterflies_func","dc_butterflies_getRGBColor","dbl2int","greyscale","distance_color"],
     funcs: `fn read_imageStepMode(base: u32, n: i32, t: f32) -> vec4f { return pal[base + u32(clamp(t, 0.0, 0.99999) * f32(max(n, 1)))]; }
+
+fn atan2j(y: f32, x: f32) -> f32 { if (x == 0.0 && y == 0.0) { return select(0.0, PI, (bitcast<u32>(x) >> 31u) == 1u) * select(1.0, -1.0, (bitcast<u32>(y) >> 31u) == 1u); } return atan2(y, x); }
 
 fn powc(x: f32, y: f32) -> f32 {
   if (x >= 0.0) { return pow(x, y); }
@@ -25084,7 +28312,7 @@ fn powc(x: f32, y: f32) -> f32 {
 
 fn dc_butterflies_cpow(z: vec2f, n: f32) -> vec2f {
   var r_: f32 = length(z);
-  var a: f32 = atan2(z.y, z.x);
+  var a: f32 = atan2j(z.y, z.x);
   return (vec2f(cos((a * n)), sin((a * n))) * vec2f(powc(r_, n)));
 }
 
@@ -25213,8 +28441,10 @@ if ((min(max(${p[10]}, 0.0), 1.0) == 1)) {
   "cut_tileillusion": {
     params: [{ name: "time", def: 0 }, { name: "mode", def: 1 }, { name: "zoom", def: 15 }, { name: "invert", def: 0 }],
     verified: true, priority: 0, flags: ["hide"], types: ["2D","BASE_SHAPE","SIMULATION"],
-    funcNames: ["cut_tileillusion_f","cut_tileillusion_solve"],
-    funcs: `fn cut_tileillusion_f(x: f32) -> f32 {
+    funcNames: ["atan2j","cut_tileillusion_f","cut_tileillusion_solve"],
+    funcs: `fn atan2j(y: f32, x: f32) -> f32 { if (x == 0.0 && y == 0.0) { return select(0.0, PI, (bitcast<u32>(x) >> 31u) == 1u) * select(1.0, -1.0, (bitcast<u32>(y) >> 31u) == 1u); } return atan2(y, x); }
+
+fn cut_tileillusion_f(x: f32) -> f32 {
   return (x + (0.1 * sin((1.6 * x))));
 }
 
@@ -25289,8 +28519,10 @@ v.y = (${w} * y);
   "dc_fractcolor": {
     params: [{ name: "randomize", def: 0 }, { name: "time", def: 0 }, { name: "xpar", def: 0.5 }, { name: "ypar", def: 0.5 }, { name: "iters", def: 88 }, { name: "zoom", def: 1 }, { name: "ColorOnly", def: 0 }, { name: "Gradient", def: 0 }, { name: "scale_z", def: 0 }, { name: "offset_z", def: 0 }, { name: "reset_z", def: 1 }],
     verified: true, priority: 0, flags: ["dc","rgb","z"], types: ["SIMULATION","DC","BASE_SHAPE"],
-    funcNames: ["read_imageStepMode","dc_fractcolor_getRGBColor","dbl2int","greyscale","distance_color"],
+    funcNames: ["read_imageStepMode","atan2j","dc_fractcolor_getRGBColor","dbl2int","greyscale","distance_color"],
     funcs: `fn read_imageStepMode(base: u32, n: i32, t: f32) -> vec4f { return pal[base + u32(clamp(t, 0.0, 0.99999) * f32(max(n, 1)))]; }
+
+fn atan2j(y: f32, x: f32) -> f32 { if (x == 0.0 && y == 0.0) { return select(0.0, PI, (bitcast<u32>(x) >> 31u) == 1u) * select(1.0, -1.0, (bitcast<u32>(y) >> 31u) == 1u); } return atan2(y, x); }
 
 fn dc_fractcolor_getRGBColor(uv: vec2f, xpar: f32, ypar: f32, time: f32, iters_: f32) -> vec3f {
   var m: vec2f = vec2f(xpar, ypar);
@@ -25392,6 +28624,8 @@ if ((${p[10]} == 1)) {
   "cut_fractal": {
     params: [{ name: "seed", def: 0 }, { name: "mode", def: 1 }, { name: "time", def: 0 }, { name: "iters", def: 30 }, { name: "zoom", def: 1 }, { name: "invert", def: 0 }],
     verified: true, priority: 0, flags: ["hide"], types: ["2D","BASE_SHAPE","SIMULATION"],
+    funcNames: ["atan2j"],
+    funcs: `fn atan2j(y: f32, x: f32) -> f32 { if (x == 0.0 && y == 0.0) { return select(0.0, PI, (bitcast<u32>(x) >> 31u) == 1u) * select(1.0, -1.0, (bitcast<u32>(y) >> 31u) == 1u); } return atan2(y, x); }`,
     code: (w, p) => `{
 var x: f32;
 var y: f32;
@@ -25430,8 +28664,10 @@ v.y = (${w} * y);
   "cut_zigzag": {
     params: [{ name: "mode", def: 1 }, { name: "xpar", def: 1 }, { name: "ypar", def: 2 }, { name: "zoom", def: 2 }, { name: "invert", def: 0 }],
     verified: true, priority: 0, flags: ["hide"], types: ["2D","BASE_SHAPE"],
-    funcNames: ["smoothstepc","cut_zigzag_mirrorTile","cut_zigzag_fillY"],
-    funcs: `fn smoothstepc(a: f32, b: f32, x: f32) -> f32 { if (a == b) { return step(a, x); } let t = clamp((x - a) / (b - a), 0.0, 1.0); return t * t * (3.0 - 2.0 * t); }
+    funcNames: ["atan2j","smoothstepc","cut_zigzag_mirrorTile","cut_zigzag_fillY"],
+    funcs: `fn atan2j(y: f32, x: f32) -> f32 { if (x == 0.0 && y == 0.0) { return select(0.0, PI, (bitcast<u32>(x) >> 31u) == 1u) * select(1.0, -1.0, (bitcast<u32>(y) >> 31u) == 1u); } return atan2(y, x); }
+
+fn smoothstepc(a: f32, b: f32, x: f32) -> f32 { if (a == b) { return step(a, x); } let t = clamp((x - a) / (b - a), 0.0, 1.0); return t * t * (3.0 - 2.0 * t); }
 
 fn cut_zigzag_mirrorTile(st_in: vec2f) -> vec2f {
   var st: vec2f = st_in;
@@ -25485,7 +28721,7 @@ v.y = (${w} * yp);
   "cut_x": {
     params: [{ name: "mode", def: 1 }, { name: "zoom", def: 1 }, { name: "invert", def: 0 }, { name: "size", def: 0.1 }],
     verified: true, priority: 0, flags: ["hide"], types: ["2D","BASE_SHAPE","SIMULATION"],
-    funcNames: ["Mat2","smoothstepc","Mat2_Init","cut_x_rot","times"],
+    funcNames: ["Mat2","smoothstepc","atan2j","Mat2_Init","cut_x_rot","times"],
     funcs: `struct Mat2 {
   a00: f32,
   a01: f32,
@@ -25494,6 +28730,8 @@ v.y = (${w} * yp);
 }
 
 fn smoothstepc(a: f32, b: f32, x: f32) -> f32 { if (a == b) { return step(a, x); } let t = clamp((x - a) / (b - a), 0.0, 1.0); return t * t * (3.0 - 2.0 * t); }
+
+fn atan2j(y: f32, x: f32) -> f32 { if (x == 0.0 && y == 0.0) { return select(0.0, PI, (bitcast<u32>(x) >> 31u) == 1u) * select(1.0, -1.0, (bitcast<u32>(y) >> 31u) == 1u); } return atan2(y, x); }
 
 fn Mat2_Init(m: ptr<function, Mat2>, v00: f32, v10: f32, v01: f32, v11: f32) {
   (*m).a00 = v00;
@@ -25556,13 +28794,15 @@ v.y = (${w} * y);
   "cut_spiral": {
     params: [{ name: "time", def: 0 }, { name: "mode", def: 1 }, { name: "zoom", def: 2.5 }, { name: "invert", def: 0 }],
     verified: true, priority: 0, flags: ["hide"], types: ["2D","BASE_SHAPE","SIMULATION"],
-    funcNames: ["Mat2","Mat2_Init","cut_spiral_rot2","times"],
+    funcNames: ["Mat2","atan2j","Mat2_Init","cut_spiral_rot2","times"],
     funcs: `struct Mat2 {
   a00: f32,
   a01: f32,
   a10: f32,
   a11: f32,
 }
+
+fn atan2j(y: f32, x: f32) -> f32 { if (x == 0.0 && y == 0.0) { return select(0.0, PI, (bitcast<u32>(x) >> 31u) == 1u) * select(1.0, -1.0, (bitcast<u32>(y) >> 31u) == 1u); } return atan2(y, x); }
 
 fn Mat2_Init(m: ptr<function, Mat2>, v00: f32, v10: f32, v01: f32, v11: f32) {
   (*m).a00 = v00;
@@ -25622,13 +28862,15 @@ v.y = (${w} * y);
   "cut_spiralcb": {
     params: [{ name: "time", def: 0 }, { name: "mode", def: 1 }, { name: "zoom", def: 1 }, { name: "invert", def: 0 }],
     verified: true, priority: 0, flags: ["hide"], types: ["2D","BASE_SHAPE","SIMULATION"],
-    funcNames: ["Mat2","Mat2_Init","cut_spiralcb_rotate","times","cut_spiralcb_hill","cut_spiralcb_compute_spiral"],
+    funcNames: ["Mat2","atan2j","Mat2_Init","cut_spiralcb_rotate","times","cut_spiralcb_hill","cut_spiralcb_compute_spiral"],
     funcs: `struct Mat2 {
   a00: f32,
   a01: f32,
   a10: f32,
   a11: f32,
 }
+
+fn atan2j(y: f32, x: f32) -> f32 { if (x == 0.0 && y == 0.0) { return select(0.0, PI, (bitcast<u32>(x) >> 31u) == 1u) * select(1.0, -1.0, (bitcast<u32>(y) >> 31u) == 1u); } return atan2(y, x); }
 
 fn Mat2_Init(m: ptr<function, Mat2>, v00: f32, v10: f32, v01: f32, v11: f32) {
   (*m).a00 = v00;
@@ -25654,7 +28896,7 @@ fn cut_spiralcb_hill(t_: f32, w_: f32, p_: f32) -> f32 {
 fn cut_spiralcb_compute_spiral(uv_in: vec2f, time: f32) -> f32 {
   var uv: vec2f = uv_in;
   var fi: f32 = (length(uv) * 50.0);
-  var g: f32 = atan2(uv.y, uv.x);
+  var g: f32 = atan2j(uv.y, uv.x);
   var m: Mat2;
   m = cut_spiralcb_rotate((time * 7.0));
   uv = times(&(m), uv);
@@ -25698,8 +28940,10 @@ v.y = (${w} * y);
   "joukowski": {
     params: [{ name: "P1", def: 2.5 }, { name: "P2", def: 0 }, { name: "inverse", def: 0 }],
     verified: true, priority: 0, flags: [], types: ["2D"],
-    funcNames: ["joukowski_cexp","joukowski_cdiv","joukowski_cmul","joukowski_Jouk","joukowski_csqrt","joukowski_cnorm","joukowski_invJouk"],
-    funcs: `fn joukowski_cexp(b: f32) -> vec2f {
+    funcNames: ["atan2j","joukowski_cexp","joukowski_cdiv","joukowski_cmul","joukowski_Jouk","joukowski_csqrt","joukowski_cnorm","joukowski_invJouk"],
+    funcs: `fn atan2j(y: f32, x: f32) -> f32 { if (x == 0.0 && y == 0.0) { return select(0.0, PI, (bitcast<u32>(x) >> 31u) == 1u) * select(1.0, -1.0, (bitcast<u32>(y) >> 31u) == 1u); } return atan2(y, x); }
+
+fn joukowski_cexp(b: f32) -> vec2f {
   return vec2f(cos(b), sin(b));
 }
 
@@ -25755,8 +28999,10 @@ v.y += (${w} * Z.y);
   "jac_elk": {
     params: [{ name: "k", def: 0.5 }],
     verified: true, priority: 0, flags: [], types: ["2D"],
-    funcNames: ["jac_elk_nonz","jac_elk_safe_cot","sqrf","jac_elk_safe_sqrt2","jac_elk_intpow","jac_elk_RF"],
-    funcs: `fn jac_elk_nonz(nz: f32) -> f32 {
+    funcNames: ["atan2j","jac_elk_nonz","jac_elk_safe_cot","sqrf","jac_elk_safe_sqrt2","jac_elk_intpow","jac_elk_RF"],
+    funcs: `fn atan2j(y: f32, x: f32) -> f32 { if (x == 0.0 && y == 0.0) { return select(0.0, PI, (bitcast<u32>(x) >> 31u) == 1u) * select(1.0, -1.0, (bitcast<u32>(y) >> 31u) == 1u); } return atan2(y, x); }
+
+fn jac_elk_nonz(nz: f32) -> f32 {
   if ((abs(nz) <= 1.0e-9)) {
     return (1.0e-9 * sign(nz));
   }
@@ -25862,8 +29108,10 @@ v.y += (${w} * e_psi);
   "c_symmetry": {
     params: [{ name: "p1", def: 3 }, { name: "p2", def: 3 }],
     verified: true, priority: 0, flags: [], types: ["2D"],
-    funcNames: ["powc"],
-    funcs: `fn powc(x: f32, y: f32) -> f32 {
+    funcNames: ["atan2j","powc"],
+    funcs: `fn atan2j(y: f32, x: f32) -> f32 { if (x == 0.0 && y == 0.0) { return select(0.0, PI, (bitcast<u32>(x) >> 31u) == 1u) * select(1.0, -1.0, (bitcast<u32>(y) >> 31u) == 1u); } return atan2(y, x); }
+
+fn powc(x: f32, y: f32) -> f32 {
   if (x >= 0.0) { return pow(x, y); }
   let yi = round(y);
   if (abs(y - yi) > 1e-6) { return pow(x, y); }
@@ -25872,7 +29120,7 @@ v.y += (${w} * e_psi);
 }`,
     code: (w, p) => `{
 var uv: vec2f = vec2f(t.x, t.y);
-var t_: f32 = (${p[0]} * atan2(uv.y, uv.x));
+var t_: f32 = (${p[0]} * atan2j(uv.y, uv.x));
 uv = (vec2f(cos(t_), sin(t_)) * vec2f(powc(length(uv), ${p[1]})));
 v.x = (${w} * uv.x);
 v.y = (${w} * uv.y);
@@ -25881,8 +29129,10 @@ v.y = (${w} * uv.y);
   "cut_celtic": {
     params: [{ name: "mode", def: 1 }, { name: "zoom", def: 5 }, { name: "invert", def: 0 }],
     verified: true, priority: 0, flags: ["hide"], types: ["2D","BASE_SHAPE","SIMULATION"],
-    funcNames: ["smoothstepc","cut_celtic_circ","cut_celtic_celticShit"],
-    funcs: `fn smoothstepc(a: f32, b: f32, x: f32) -> f32 { if (a == b) { return step(a, x); } let t = clamp((x - a) / (b - a), 0.0, 1.0); return t * t * (3.0 - 2.0 * t); }
+    funcNames: ["atan2j","smoothstepc","cut_celtic_circ","cut_celtic_celticShit"],
+    funcs: `fn atan2j(y: f32, x: f32) -> f32 { if (x == 0.0 && y == 0.0) { return select(0.0, PI, (bitcast<u32>(x) >> 31u) == 1u) * select(1.0, -1.0, (bitcast<u32>(y) >> 31u) == 1u); } return atan2(y, x); }
+
+fn smoothstepc(a: f32, b: f32, x: f32) -> f32 { if (a == b) { return step(a, x); } let t = clamp((x - a) / (b - a), 0.0, 1.0); return t * t * (3.0 - 2.0 * t); }
 
 fn cut_celtic_circ(uv: vec2f, r_: f32) -> f32 {
   var d: f32 = length(uv);
@@ -25973,6 +29223,8 @@ v.y = (${w} * (y - py_center));
   "cut_vasarely": {
     params: [{ name: "mode", def: 1 }, { name: "zoom", def: 1 }, { name: "invert", def: 0 }, { name: "size", def: 0.5 }],
     verified: true, priority: 0, flags: ["hide"], types: ["2D","BASE_SHAPE","SIMULATION"],
+    funcNames: ["atan2j"],
+    funcs: `fn atan2j(y: f32, x: f32) -> f32 { if (x == 0.0 && y == 0.0) { return select(0.0, PI, (bitcast<u32>(x) >> 31u) == 1u) * select(1.0, -1.0, (bitcast<u32>(y) >> 31u) == 1u); } return atan2(y, x); }`,
     code: (w, p) => `{
 var x: f32;
 var y: f32;
@@ -25988,8 +29240,8 @@ uv = (uv * vec2f(${p[1]}));
 var l: f32 = length(uv);
 var b: f32 = max(0.0, (2.0 - (l / ${p[3]})));
 var color: f32 = 0.0;
-color = select(color, ((color - 0.5) - sin(((l * sin(((atan2(uv.y, uv.x) + 1.57) + ((4.0 * b) * b)))) * 150.0))), (abs(uv.x) < 1.0));
-color -= select(color, ((color - 0.5) - sin(((l * sin(((atan2(uv.y, uv.x) + 1.57) + ((4.0 * b) * b)))) * 150.0))), (abs(uv.x) < 1.0));
+color = select(color, ((color - 0.5) - sin(((l * sin(((atan2j(uv.y, uv.x) + 1.57) + ((4.0 * b) * b)))) * 150.0))), (abs(uv.x) < 1.0));
+color -= select(color, ((color - 0.5) - sin(((l * sin(((atan2j(uv.y, uv.x) + 1.57) + ((4.0 * b) * b)))) * 150.0))), (abs(uv.x) < 1.0));
 (*hd) = false;
 if ((min(max(${p[2]}, 0.0), 1.0) == 0)) {
   if ((color < 0.1)) {
@@ -26011,14 +29263,16 @@ v.y = (${w} * y);
   "cut_web": {
     params: [{ name: "seed", def: 1000 }, { name: "time", def: 0 }, { name: "mode", def: 1 }, { name: "thick", def: 0.05 }, { name: "invert", def: 1 }],
     verified: true, priority: 0, flags: ["hide"], types: ["2D","BASE_SHAPE","SIMULATION"],
-    funcNames: ["mmod2","cut_web_eval","cut_web_getColour"],
-    funcs: `fn mmod2(a: vec2f, b: vec2f) -> vec2f { return a - b * floor(a / b); }
+    funcNames: ["atan2j","mmod2","cut_web_eval","cut_web_getColour"],
+    funcs: `fn atan2j(y: f32, x: f32) -> f32 { if (x == 0.0 && y == 0.0) { return select(0.0, PI, (bitcast<u32>(x) >> 31u) == 1u) * select(1.0, -1.0, (bitcast<u32>(y) >> 31u) == 1u); } return atan2(y, x); }
+
+fn mmod2(a: vec2f, b: vec2f) -> vec2f { return a - b * floor(a / b); }
 
 fn cut_web_eval(p__in: vec2f, c: vec2f, strength: f32) -> vec2f {
   var p_: vec2f = p__in;
   p_ = (p_ - c);
   var l: f32 = log(length(p_));
-  var ang: f32 = atan2(p_.y, p_.x);
+  var ang: f32 = atan2j(p_.y, p_.x);
   return (vec2f(l, ang) * vec2f(strength));
 }
 
@@ -26063,8 +29317,10 @@ v.y = (${w} * y);
   "cut_spots": {
     params: [{ name: "mode", def: 1 }, { name: "seed", def: 0 }, { name: "zoom", def: 0.3 }, { name: "invert", def: 0 }],
     verified: true, priority: 0, flags: ["hide"], types: ["2D","BASE_SHAPE","SIMULATION"],
-    funcNames: ["cut_spots_random","cut_spots_noise","cut_spots_fbm","cut_spots_remap"],
-    funcs: `fn cut_spots_random(st: vec2f) -> f32 {
+    funcNames: ["atan2j","cut_spots_random","cut_spots_noise","cut_spots_fbm","cut_spots_remap"],
+    funcs: `fn atan2j(y: f32, x: f32) -> f32 { if (x == 0.0 && y == 0.0) { return select(0.0, PI, (bitcast<u32>(x) >> 31u) == 1u) * select(1.0, -1.0, (bitcast<u32>(y) >> 31u) == 1u); } return atan2(y, x); }
+
+fn cut_spots_random(st: vec2f) -> f32 {
   return fract((sin(dot(vec2f(st.x, st.y), vec2f(12.9898, 78.233))) * 43758.5453123));
 }
 
@@ -26140,8 +29396,10 @@ v.y = (${w} * y);
   "cut_magfield": {
     params: [{ name: "randomize", def: 0 }, { name: "time", def: 0 }, { name: "density", def: 3 }, { name: "zoom", def: 3 }, { name: "mode", def: 1 }, { name: "invert", def: 0 }],
     verified: true, priority: 0, flags: ["hide"], types: ["2D","BASE_SHAPE","SIMULATION"],
-    funcNames: ["powc","cut_magfield_rand","cut_magfield_force","cut_magfield_calcVelocity","cut_magfield_calcDerivative","cut_magfield_saturate"],
-    funcs: `fn powc(x: f32, y: f32) -> f32 {
+    funcNames: ["atan2j","powc","cut_magfield_rand","cut_magfield_force","cut_magfield_calcVelocity","cut_magfield_calcDerivative","cut_magfield_saturate"],
+    funcs: `fn atan2j(y: f32, x: f32) -> f32 { if (x == 0.0 && y == 0.0) { return select(0.0, PI, (bitcast<u32>(x) >> 31u) == 1u) * select(1.0, -1.0, (bitcast<u32>(y) >> 31u) == 1u); } return atan2(y, x); }
+
+fn powc(x: f32, y: f32) -> f32 {
   if (x >= 0.0) { return pow(x, y); }
   let yi = round(y);
   if (abs(y - yi) > 1e-6) { return pow(x, y); }
@@ -26202,7 +29460,7 @@ if ((min(max(${p[4]}, 0.0), 1.0) == 0)) {
 var p_: vec2f = vec2f((x * ${p[3]}), (y * ${p[3]}));
 spacing = (1.0 / (10.0 * min(max(${p[2]}, 1.0), 10.0)));
 var v_: vec2f = cut_magfield_calcVelocity(p_, ${p[1]});
-var a: f32 = ((atan2(v_.x, v_.y) / PI) / 2.0);
+var a: f32 = ((atan2j(v_.x, v_.y) / PI) / 2.0);
 var lines: f32 = fract((a / spacing));
 lines = (min(lines, (1.0 - lines)) * 2.0);
 lines /= (cut_magfield_calcDerivative(v_, p_, ${p[1]}) / spacing);
@@ -26235,6 +29493,8 @@ v.y = (${w} * y);
   "cut_btree": {
     params: [{ name: "randomize", def: 0 }, { name: "time", def: 1 }, { name: "thickness", def: 5 }, { name: "zoom", def: 1 }, { name: "mode", def: 1 }, { name: "invert", def: 1 }],
     verified: true, priority: 0, flags: ["hide"], types: ["2D","BASE_SHAPE","SIMULATION"],
+    funcNames: ["atan2j"],
+    funcs: `fn atan2j(y: f32, x: f32) -> f32 { if (x == 0.0 && y == 0.0) { return select(0.0, PI, (bitcast<u32>(x) >> 31u) == 1u) * select(1.0, -1.0, (bitcast<u32>(y) >> 31u) == 1u); } return atan2(y, x); }`,
     code: (w, p) => `{
 var x: f32;
 var y: f32;
@@ -26273,10 +29533,54 @@ v.x = (${w} * x);
 v.y = (${w} * y);
 }`,
   },
+  "post_crosscrop": {
+    params: [{ name: "x", def: 1 }, { name: "y", def: 1 }, { name: "z", def: 1 }, { name: "rotation", def: 0 }, { name: "reverse", def: 0 }],
+    verified: true, priority: 1, flags: ["3d","hide","z"], types: ["3D","CROP","POST"],
+    funcNames: ["atan2j"],
+    funcs: `fn atan2j(y: f32, x: f32) -> f32 { if (x == 0.0 && y == 0.0) { return select(0.0, PI, (bitcast<u32>(x) >> 31u) == 1u) * select(1.0, -1.0, (bitcast<u32>(y) >> 31u) == 1u); } return atan2(y, x); }`,
+    code: (w, p) => `{
+loop {
+var rotation_r: f32 = ((${p[3]} * PI) / 180);
+var rx: f32 = ((v.x * cos(rotation_r)) - (v.y * sin(rotation_r)));
+var ry: f32 = ((v.y * cos(rotation_r)) + (v.x * sin(rotation_r)));
+if ((min(max(${p[4]}, 0.0), 1.0) == 0)) {
+  if ((((((rx <= ${p[0]}) && (rx >= -(${p[0]}))) || ((ry <= ${p[1]}) && (ry >= -(${p[1]})))) && (pz_ <= ${p[2]})) && (pz_ >= -(${p[2]})))) {
+    (*hd) = false;
+    v.x = (${w} * v.x);
+    v.y = (${w} * v.y);
+    pz_ = (${w} * pz_);
+  } else {
+    pz_ = 0;
+    v.y = pz_;
+    v.x = v.y;
+    (*hd) = true;
+    break;
+  }
+} else if ((min(max(${p[4]}, 0.0), 1.0) == 1)) {
+  if ((((((rx <= ${p[0]}) && (rx >= -(${p[0]}))) || ((ry <= ${p[1]}) && (ry >= -(${p[1]})))) && (pz_ <= ${p[2]})) && (pz_ >= -(${p[2]})))) {
+    pz_ = 0;
+    v.y = pz_;
+    v.x = v.y;
+    (*hd) = true;
+    break;
+  } else {
+    (*hd) = false;
+    v.x = (${w} * v.x);
+    v.y = (${w} * v.y);
+    pz_ = (${w} * pz_);
+  }
+}
+if (false) {
+  pz_ += (${w} * z_);
+}
+break;
+}
+}`,
+  },
   "csin": {
     params: [{ name: "stretch", def: 1.5 }],
     verified: true, priority: 0, flags: [], types: ["2D"],
-    funcNames: ["Complex","Complex_Init","Complex_Flip","Complex_SinH","Complex_Sin"],
+    funcNames: ["Complex","atan2j","Complex_Init","Complex_Flip","Complex_SinH","Complex_Sin"],
     funcs: `struct Complex {
   per_fix: f32,
   re: f32,
@@ -26284,6 +29588,8 @@ v.y = (${w} * y);
   save_re: f32,
   save_im: f32,
 }
+
+fn atan2j(y: f32, x: f32) -> f32 { if (x == 0.0 && y == 0.0) { return select(0.0, PI, (bitcast<u32>(x) >> 31u) == 1u) * select(1.0, -1.0, (bitcast<u32>(y) >> 31u) == 1u); } return atan2(y, x); }
 
 fn Complex_Init(c: ptr<function, Complex>, Rp: f32, Ip: f32) {
   (*c).re = Rp;
@@ -26328,6 +29634,8 @@ v.y += (${w} * c.im);
   "sinusgrid": {
     params: [{ name: "ampx", def: 0.5 }, { name: "ampy", def: 0.6 }, { name: "freqx", def: 1.2 }, { name: "freqy", def: 1 }],
     verified: true, priority: 0, flags: ["3d","z"], types: ["3D"],
+    funcNames: ["atan2j"],
+    funcs: `fn atan2j(y: f32, x: f32) -> f32 { if (x == 0.0 && y == 0.0) { return select(0.0, PI, (bitcast<u32>(x) >> 31u) == 1u) * select(1.0, -1.0, (bitcast<u32>(y) >> 31u) == 1u); } return atan2(y, x); }`,
     code: (w, p) => `{
 var ax: f32 = ${p[0]};
 var ay: f32 = ${p[1]};
@@ -26347,7 +29655,7 @@ pz_ += (${w} * z_);
   "combimirror": {
     params: [{ name: "vmirror", def: 1 }, { name: "vmove", def: 0.05 }, { name: "hmirror", def: 0.5 }, { name: "hmove", def: 0.35 }, { name: "zmirror", def: 0 }, { name: "zmove", def: 0 }, { name: "pmirror", def: 0 }, { name: "pmovex", def: 0.05 }, { name: "pmovey", def: 0 }, { name: "vcolorshift", def: 0 }, { name: "hcolorshift", def: 0 }, { name: "zcolorshift", def: 0 }, { name: "pcolorshift", def: 0 }],
     verified: true, priority: 0, flags: ["3d","dc","z"], types: ["3D","DC"],
-    funcNames: ["Complex","Complex_Init","Complex_Scale"],
+    funcNames: ["Complex","atan2j","Complex_Init","Complex_Scale"],
     funcs: `struct Complex {
   per_fix: f32,
   re: f32,
@@ -26355,6 +29663,8 @@ pz_ += (${w} * z_);
   save_re: f32,
   save_im: f32,
 }
+
+fn atan2j(y: f32, x: f32) -> f32 { if (x == 0.0 && y == 0.0) { return select(0.0, PI, (bitcast<u32>(x) >> 31u) == 1u) * select(1.0, -1.0, (bitcast<u32>(y) >> 31u) == 1u); } return atan2(y, x); }
 
 fn Complex_Init(c: ptr<function, Complex>, Rp: f32, Ip: f32) {
   (*c).re = Rp;
@@ -26397,9 +29707,149 @@ if ((rnd(rs) < (${p[4]} / 2))) {
 }
 }`,
   },
+  "gumowski_mira": {
+    params: [{ name: "random", def: 1 }, { name: "step", def: 0.001 }, { name: "a", def: 0.000001 }, { name: "b", def: 0.05 }],
+    verified: true, priority: 0, flags: ["state","z"], types: ["2D"],
+    funcNames: ["jwx_gumowski_mira_inited_","jwx_gumowski_mira_x0","jwx_gumowski_mira_y0","jwx_gumowski_mira_m","atan2j","gumowski_mira_mira"],
+    funcs: `fn atan2j(y: f32, x: f32) -> f32 { if (x == 0.0 && y == 0.0) { return select(0.0, PI, (bitcast<u32>(x) >> 31u) == 1u) * select(1.0, -1.0, (bitcast<u32>(y) >> 31u) == 1u); } return atan2(y, x); }
+
+fn gumowski_mira_mira(x: f32) -> f32 {
+  var xx: f32 = (x * x);
+  return ((jwx_gumowski_mira_m * x) + (((2.0 * (1.0 - jwx_gumowski_mira_m)) * xx) / (1.0 + xx)));
+}
+
+var<private> jwx_gumowski_mira_inited_: f32 = 0.0;
+
+var<private> jwx_gumowski_mira_x0: f32 = 0.0;
+
+var<private> jwx_gumowski_mira_y0: f32 = 0.0;
+
+var<private> jwx_gumowski_mira_m: f32 = 0.0;`,
+    code: (w, p) => `{
+var p0_: f32 = ${p[0]};
+var p1_: f32 = ${p[1]};
+var currseed: i32 = i32(min(max(p0_, 0.0), 10000000.0));
+var a: f32 = 0.000001;
+if ((jwx_gumowski_mira_inited_ == 0.0)) {
+  jwx_gumowski_mira_inited_ = 1.0;
+  jwx_gumowski_mira_x0 = 5.0;
+  jwx_gumowski_mira_y0 = 5.0;
+  jwx_gumowski_mira_m = -0.08;
+}
+jwx_gumowski_mira_m = -0.08;
+{
+  p0_ = f32(i32(clamp(min(max(p0_, 0.0), 10000000.0), 0, 10000000)));
+  if ((min(max(p0_, 0.0), 10000000.0) > f32(currseed))) {
+    p1_ *= 2.0;
+  } else {
+    p1_ /= 2.0;
+  }
+  if ((min(max(p1_, 0.0), 1.0) > 1.0)) {
+    p1_ -= 1.0;
+  }
+  jwx_gumowski_mira_m += min(max(p1_, 0.0), 1.0);
+  currseed = i32(min(max(p0_, 0.0), 10000000.0));
+}
+{
+}
+var xn: f32 = ((jwx_gumowski_mira_y0 + ((a * (1.0 - ((${p[3]} * jwx_gumowski_mira_y0) * jwx_gumowski_mira_y0))) * jwx_gumowski_mira_y0)) + gumowski_mira_mira(jwx_gumowski_mira_x0));
+var yn: f32 = (-jwx_gumowski_mira_x0 + gumowski_mira_mira(xn));
+v.x = (xn * ${w});
+v.y = (yn * ${w});
+if (false) {
+  pz_ += (${w} * z_);
+}
+jwx_gumowski_mira_x0 = xn;
+jwx_gumowski_mira_y0 = yn;
+}`,
+  },
+  "hopalong": {
+    params: [{ name: "random", def: 1 }, { name: "a", def: 0.75 }, { name: "b", def: 0.5 }, { name: "c", def: 0.25 }, { name: "startx", def: 0 }, { name: "starty", def: 0 }],
+    verified: true, priority: 0, flags: ["state"], types: ["2D","SIMULATION","BASE_SHAPE"],
+    funcNames: ["jwx_hopalong_inited_","jwx_hopalong_x0","jwx_hopalong_y0","atan2j"],
+    funcs: `fn atan2j(y: f32, x: f32) -> f32 { if (x == 0.0 && y == 0.0) { return select(0.0, PI, (bitcast<u32>(x) >> 31u) == 1u) * select(1.0, -1.0, (bitcast<u32>(y) >> 31u) == 1u); } return atan2(y, x); }
+
+var<private> jwx_hopalong_inited_: f32 = 0.0;
+
+var<private> jwx_hopalong_x0: f32 = 0.0;
+
+var<private> jwx_hopalong_y0: f32 = 0.0;`,
+    code: (w, p) => `{
+if ((jwx_hopalong_inited_ == 0.0)) {
+  jwx_hopalong_inited_ = 1.0;
+  jwx_hopalong_x0 = ${p[4]};
+  jwx_hopalong_y0 = ${p[5]};
+}
+var x1: f32 = (jwx_hopalong_y0 - (sign(jwx_hopalong_x0) * sqrt(abs(((min(max(${p[2]}, -1.0), 1.0) * jwx_hopalong_x0) - min(max(${p[3]}, -1.0), 1.0))))));
+var y1: f32 = (min(max(${p[1]}, -1.0), 1.0) - jwx_hopalong_x0);
+v.x += (${w} * x1);
+v.y += (${w} * y1);
+jwx_hopalong_x0 = x1;
+jwx_hopalong_y0 = y1;
+}`,
+  },
+  "gingerbread_man": {
+    params: [],
+    verified: true, priority: 0, flags: ["state","z"], types: ["2D","BASE_SHAPE"],
+    funcNames: ["jwx_gingerbread_man_inited_","jwx_gingerbread_man_x0","jwx_gingerbread_man_y0","atan2j"],
+    funcs: `fn atan2j(y: f32, x: f32) -> f32 { if (x == 0.0 && y == 0.0) { return select(0.0, PI, (bitcast<u32>(x) >> 31u) == 1u) * select(1.0, -1.0, (bitcast<u32>(y) >> 31u) == 1u); } return atan2(y, x); }
+
+var<private> jwx_gingerbread_man_inited_: f32 = 0.0;
+
+var<private> jwx_gingerbread_man_x0: f32 = 0.0;
+
+var<private> jwx_gingerbread_man_y0: f32 = 0.0;`,
+    code: (w, _p) => `{
+if ((jwx_gingerbread_man_inited_ == 0.0)) {
+  jwx_gingerbread_man_inited_ = 1.0;
+  jwx_gingerbread_man_x0 = -0.1;
+  jwx_gingerbread_man_y0 = 0.0;
+}
+var xn: f32 = ((1 - jwx_gingerbread_man_y0) + abs(jwx_gingerbread_man_x0));
+var yn: f32 = jwx_gingerbread_man_x0;
+v.x = (xn * ${w});
+v.y = (yn * ${w});
+if (false) {
+  pz_ += (${w} * z_);
+}
+jwx_gingerbread_man_x0 = xn;
+jwx_gingerbread_man_y0 = yn;
+}`,
+  },
+  "threeply": {
+    params: [{ name: "a", def: -55 }, { name: "b", def: -1 }, { name: "c", def: -42 }],
+    verified: true, priority: 0, flags: ["state","z"], types: ["BASE_SHAPE"],
+    funcNames: ["jwx_threeply_inited_","jwx_threeply_x0","jwx_threeply_y0","atan2j"],
+    funcs: `fn atan2j(y: f32, x: f32) -> f32 { if (x == 0.0 && y == 0.0) { return select(0.0, PI, (bitcast<u32>(x) >> 31u) == 1u) * select(1.0, -1.0, (bitcast<u32>(y) >> 31u) == 1u); } return atan2(y, x); }
+
+var<private> jwx_threeply_inited_: f32 = 0.0;
+
+var<private> jwx_threeply_x0: f32 = 0.0;
+
+var<private> jwx_threeply_y0: f32 = 0.0;`,
+    code: (w, p) => `{
+if ((jwx_threeply_inited_ == 0.0)) {
+  jwx_threeply_inited_ = 1.0;
+  jwx_threeply_x0 = 0.0;
+  jwx_threeply_y0 = 0.0;
+}
+var sgn: i32 = select(select(0, -1, (jwx_threeply_x0 < 0)), 1, (jwx_threeply_x0 > 0));
+var xn: f32 = (jwx_threeply_y0 - (f32(sgn) * abs((((sin(jwx_threeply_x0) * cos(${p[1]})) + ${p[2]}) - (jwx_threeply_x0 * sin(((${p[0]} + ${p[1]}) + ${p[2]})))))));
+var yn: f32 = (${p[0]} - jwx_threeply_x0);
+v.x = ((0.001 * xn) * ${w});
+v.y = ((0.001 * yn) * ${w});
+jwx_threeply_x0 = xn;
+jwx_threeply_y0 = yn;
+if (false) {
+  pz_ += (${w} * z_);
+}
+}`,
+  },
   "triangle": {
     params: [{ name: "x1", def: -0.2 }, { name: "y1", def: -0.1 }, { name: "z1", def: 0 }, { name: "x2", def: 0.2 }, { name: "y2", def: -0.1 }, { name: "z2", def: 0 }, { name: "x3", def: 0.2 }, { name: "y3", def: 0.1 }, { name: "z3", def: 0 }],
     verified: true, priority: 0, flags: ["3d","z"], types: ["3D","BASE_SHAPE"],
+    funcNames: ["atan2j"],
+    funcs: `fn atan2j(y: f32, x: f32) -> f32 { if (x == 0.0 && y == 0.0) { return select(0.0, PI, (bitcast<u32>(x) >> 31u) == 1u) * select(1.0, -1.0, (bitcast<u32>(y) >> 31u) == 1u); } return atan2(y, x); }`,
     code: (w, p) => `{
 var sqrt_r1: f32 = sqrt(rnd(rs));
 var r2_: f32 = rnd(rs);
@@ -26414,11 +29864,41 @@ v.y = (${w} * dy);
 pz_ = (${w} * dz);
 }`,
   },
+  "crop_triangle": {
+    params: [{ name: "x1", def: 0 }, { name: "y1", def: 0.5 }, { name: "x2", def: 0.5 }, { name: "y2", def: 0.5 }, { name: "x3", def: 0 }, { name: "y3", def: -0.5 }],
+    verified: true, priority: 0, flags: ["hide"], types: ["CROP"],
+    funcNames: ["atan2j","crop_triangle_TriangleArea","crop_triangle_isInsideTriangle"],
+    funcs: `fn atan2j(y: f32, x: f32) -> f32 { if (x == 0.0 && y == 0.0) { return select(0.0, PI, (bitcast<u32>(x) >> 31u) == 1u) * select(1.0, -1.0, (bitcast<u32>(y) >> 31u) == 1u); } return atan2(y, x); }
+
+fn crop_triangle_TriangleArea(x1: f32, y1: f32, x2: f32, y2: f32, x3: f32, y3: f32) -> f32 {
+  return abs(((((x1 * (y2 - y3)) + (x2 * (y3 - y1))) + (x3 * (y1 - y2))) / 2.0));
+}
+
+fn crop_triangle_isInsideTriangle(x1: f32, y1: f32, x2: f32, y2: f32, x3: f32, y3: f32, x: f32, y: f32) -> bool {
+  var a: f32 = crop_triangle_TriangleArea(x1, y1, x2, y2, x3, y3);
+  var a1: f32 = crop_triangle_TriangleArea(x, y, x2, y2, x3, y3);
+  var a2: f32 = crop_triangle_TriangleArea(x1, y1, x, y, x3, y3);
+  var a3: f32 = crop_triangle_TriangleArea(x1, y1, x2, y2, x, y);
+  return (a == ((a1 + a2) + a3));
+}`,
+    code: (w, p) => `{
+var x: f32 = t.x;
+var y: f32 = t.y;
+(*hd) = true;
+if (crop_triangle_isInsideTriangle(${p[0]}, ${p[1]}, ${p[2]}, ${p[3]}, ${p[4]}, ${p[5]}, x, y)) {
+  (*hd) = false;
+}
+v.x += (${w} * x);
+v.y += (${w} * y);
+}`,
+  },
   "post_crop_triangle": {
     params: [{ name: "x1", def: 0 }, { name: "y1", def: 0.5 }, { name: "x2", def: 0.5 }, { name: "y2", def: 0.5 }, { name: "x3", def: 0 }, { name: "y3", def: -0.5 }],
     verified: true, priority: 1, flags: ["hide"], types: ["CROP","POST"],
-    funcNames: ["post_crop_triangle_TriangleArea","post_crop_triangle_isInsideTriangle"],
-    funcs: `fn post_crop_triangle_TriangleArea(x1: f32, y1: f32, x2: f32, y2: f32, x3: f32, y3: f32) -> f32 {
+    funcNames: ["atan2j","post_crop_triangle_TriangleArea","post_crop_triangle_isInsideTriangle"],
+    funcs: `fn atan2j(y: f32, x: f32) -> f32 { if (x == 0.0 && y == 0.0) { return select(0.0, PI, (bitcast<u32>(x) >> 31u) == 1u) * select(1.0, -1.0, (bitcast<u32>(y) >> 31u) == 1u); } return atan2(y, x); }
+
+fn post_crop_triangle_TriangleArea(x1: f32, y1: f32, x2: f32, y2: f32, x3: f32, y3: f32) -> f32 {
   return abs(((((x1 * (y2 - y3)) + (x2 * (y3 - y1))) + (x3 * (y1 - y2))) / 2.0));
 }
 
@@ -26447,8 +29927,10 @@ v.y = (${w} * y);
   "post_crop_polygon": {
     params: [{ name: "type", def: 4 }, { name: "radius", def: 0.35 }, { name: "invert", def: 0 }],
     verified: true, priority: 1, flags: ["hide"], types: ["CROP","POST"],
-    funcNames: ["post_crop_polygon_sdHexagram","post_crop_polygon_sdOctogon","post_crop_polygon_sdHexagon","post_crop_polygon_sdPentagon","post_crop_polygon_sdCircle"],
-    funcs: `fn post_crop_polygon_sdHexagram(p__in: vec2f, r_: f32) -> f32 {
+    funcNames: ["atan2j","post_crop_polygon_sdHexagram","post_crop_polygon_sdOctogon","post_crop_polygon_sdHexagon","post_crop_polygon_sdPentagon","post_crop_polygon_sdCircle"],
+    funcs: `fn atan2j(y: f32, x: f32) -> f32 { if (x == 0.0 && y == 0.0) { return select(0.0, PI, (bitcast<u32>(x) >> 31u) == 1u) * select(1.0, -1.0, (bitcast<u32>(y) >> 31u) == 1u); } return atan2(y, x); }
+
+fn post_crop_polygon_sdHexagram(p__in: vec2f, r_: f32) -> f32 {
   var p_: vec2f = p__in;
   var k: vec4f = vec4f(-0.5, 0.86602540378, 0.57735026919, 1.73205080757);
   p_ = abs(p_);
@@ -26534,8 +30016,10 @@ v.y = (${w} * y);
   "post_crop_rhombus": {
     params: [{ name: "width", def: 0.5 }, { name: "height", def: 0.5 }, { name: "invert", def: 0 }],
     verified: true, priority: 1, flags: ["hide"], types: ["CROP","POST"],
-    funcNames: ["post_crop_rhombus_ndot","post_crop_rhombus_sdRhombus"],
-    funcs: `fn post_crop_rhombus_ndot(a: vec2f, b: vec2f) -> f32 {
+    funcNames: ["atan2j","post_crop_rhombus_ndot","post_crop_rhombus_sdRhombus"],
+    funcs: `fn atan2j(y: f32, x: f32) -> f32 { if (x == 0.0 && y == 0.0) { return select(0.0, PI, (bitcast<u32>(x) >> 31u) == 1u) * select(1.0, -1.0, (bitcast<u32>(y) >> 31u) == 1u); } return atan2(y, x); }
+
+fn post_crop_rhombus_ndot(a: vec2f, b: vec2f) -> f32 {
   return ((a.x * b.x) - (a.y * b.y));
 }
 
@@ -26576,14 +30060,16 @@ v.y = (${w} * y);
   "post_crop_stars": {
     params: [{ name: "radius", def: 0.35 }, { name: "n", def: 3 }, { name: "r2", def: 0.333 }, { name: "invert", def: 0 }],
     verified: true, priority: 1, flags: ["hide"], types: ["CROP","POST"],
-    funcNames: ["post_crop_stars_sdStar"],
-    funcs: `fn post_crop_stars_sdStar(p__in: vec2f, r_: f32, n: i32, m: f32) -> f32 {
+    funcNames: ["atan2j","post_crop_stars_sdStar"],
+    funcs: `fn atan2j(y: f32, x: f32) -> f32 { if (x == 0.0 && y == 0.0) { return select(0.0, PI, (bitcast<u32>(x) >> 31u) == 1u) * select(1.0, -1.0, (bitcast<u32>(y) >> 31u) == 1u); } return atan2(y, x); }
+
+fn post_crop_stars_sdStar(p__in: vec2f, r_: f32, n: i32, m: f32) -> f32 {
   var p_: vec2f = p__in;
   var an: f32 = (3.141593 / f32(n));
   var en: f32 = (6.283185 / m);
   var acs: vec2f = vec2f(cos(an), sin(an));
   var ecs: vec2f = vec2f(cos(en), sin(en));
-  var bn: f32 = (mmod(atan2(p_.x, p_.y), (2.0 * an)) - an);
+  var bn: f32 = (mmod(atan2j(p_.x, p_.y), (2.0 * an)) - an);
   p_ = (vec2f(cos(bn), abs(sin(bn))) * vec2f(length(p_)));
   p_ = (p_ - (acs * vec2f(r_)));
   p_ = (p_ + (ecs * vec2f(clamp(-(dot(p_, ecs)), 0.0, ((r_ * acs.y) / ecs.y)))));
@@ -26622,8 +30108,10 @@ v.y = (${w} * y);
   "post_crop_trapezoid": {
     params: [{ name: "LMay", def: 0.5 }, { name: "LMin", def: 0.2 }, { name: "height", def: 0.5 }, { name: "invert", def: 0 }],
     verified: true, priority: 1, flags: ["hide"], types: ["CROP","POST"],
-    funcNames: ["post_crop_trapezoid_dot2","post_crop_trapezoid_sdTrapezoid"],
-    funcs: `fn post_crop_trapezoid_dot2(v_: vec2f) -> f32 {
+    funcNames: ["atan2j","post_crop_trapezoid_dot2","post_crop_trapezoid_sdTrapezoid"],
+    funcs: `fn atan2j(y: f32, x: f32) -> f32 { if (x == 0.0 && y == 0.0) { return select(0.0, PI, (bitcast<u32>(x) >> 31u) == 1u) * select(1.0, -1.0, (bitcast<u32>(y) >> 31u) == 1u); } return atan2(y, x); }
+
+fn post_crop_trapezoid_dot2(v_: vec2f) -> f32 {
   return dot(v_, v_);
 }
 
@@ -26668,8 +30156,10 @@ v.y = (${w} * y);
   "post_crop_cross": {
     params: [{ name: "width", def: 0.5 }, { name: "Size", def: 0.5 }, { name: "round", def: 0.001 }, { name: "invert", def: 0 }],
     verified: true, priority: 1, flags: ["hide"], types: ["CROP","POST"],
-    funcNames: ["post_crop_cross_sdCross"],
-    funcs: `fn post_crop_cross_sdCross(p__in: vec2f, b: vec2f, r_: f32) -> f32 {
+    funcNames: ["atan2j","post_crop_cross_sdCross"],
+    funcs: `fn atan2j(y: f32, x: f32) -> f32 { if (x == 0.0 && y == 0.0) { return select(0.0, PI, (bitcast<u32>(x) >> 31u) == 1u) * select(1.0, -1.0, (bitcast<u32>(y) >> 31u) == 1u); } return atan2(y, x); }
+
+fn post_crop_cross_sdCross(p__in: vec2f, b: vec2f, r_: f32) -> f32 {
   var p_: vec2f = p__in;
   p_ = abs(p_);
   p_ = select(vec2f(p_.x, p_.y), vec2f(p_.y, p_.x), (p_.y > p_.x));
@@ -26714,8 +30204,10 @@ v.y = (${w} * y);
   "post_crop_box": {
     params: [{ name: "width", def: 0.5 }, { name: "height", def: 0.5 }, { name: "invert", def: 0 }],
     verified: true, priority: 1, flags: ["hide"], types: ["CROP","POST"],
-    funcNames: ["post_crop_box_sdBox"],
-    funcs: `fn post_crop_box_sdBox(p_: vec2f, b: vec2f) -> f32 {
+    funcNames: ["atan2j","post_crop_box_sdBox"],
+    funcs: `fn atan2j(y: f32, x: f32) -> f32 { if (x == 0.0 && y == 0.0) { return select(0.0, PI, (bitcast<u32>(x) >> 31u) == 1u) * select(1.0, -1.0, (bitcast<u32>(y) >> 31u) == 1u); } return atan2(y, x); }
+
+fn post_crop_box_sdBox(p_: vec2f, b: vec2f) -> f32 {
   var d: vec2f = (abs(p_) - b);
   return (length(max(d, vec2f(0.0, 0.0))) + min(max(d.x, d.y), 0.0));
 }`,
@@ -26749,8 +30241,10 @@ v.y = (${w} * y);
   "post_crop_vesica": {
     params: [{ name: "width", def: 0.2 }, { name: "height", def: 0.1 }, { name: "invert", def: 0 }],
     verified: true, priority: 1, flags: ["hide"], types: ["CROP","POST"],
-    funcNames: ["post_crop_vesica_sdVesica"],
-    funcs: `fn post_crop_vesica_sdVesica(p__in: vec2f, r_: f32, d: f32) -> f32 {
+    funcNames: ["atan2j","post_crop_vesica_sdVesica"],
+    funcs: `fn atan2j(y: f32, x: f32) -> f32 { if (x == 0.0 && y == 0.0) { return select(0.0, PI, (bitcast<u32>(x) >> 31u) == 1u) * select(1.0, -1.0, (bitcast<u32>(y) >> 31u) == 1u); } return atan2(y, x); }
+
+fn post_crop_vesica_sdVesica(p__in: vec2f, r_: f32, d: f32) -> f32 {
   var p_: vec2f = p__in;
   p_ = abs(p_);
   var b: f32 = sqrt(((r_ * r_) - (d * d)));
@@ -26785,8 +30279,10 @@ v.y = (${w} * y);
   "post_crop_x": {
     params: [{ name: "radius", def: 0.1 }, { name: "width", def: 0.5 }, { name: "invert", def: 0 }],
     verified: true, priority: 1, flags: ["hide"], types: ["CROP","POST"],
-    funcNames: ["post_crop_x_sdRoundedX"],
-    funcs: `fn post_crop_x_sdRoundedX(p__in: vec2f, w_: f32, r_: f32) -> f32 {
+    funcNames: ["atan2j","post_crop_x_sdRoundedX"],
+    funcs: `fn atan2j(y: f32, x: f32) -> f32 { if (x == 0.0 && y == 0.0) { return select(0.0, PI, (bitcast<u32>(x) >> 31u) == 1u) * select(1.0, -1.0, (bitcast<u32>(y) >> 31u) == 1u); } return atan2(y, x); }
+
+fn post_crop_x_sdRoundedX(p__in: vec2f, w_: f32, r_: f32) -> f32 {
   var p_: vec2f = p__in;
   p_ = abs(p_);
   var t_: f32 = (min((p_.x + p_.y), w_) * 0.5);
@@ -26821,8 +30317,10 @@ v.y = (${w} * y);
   "pixel_flow": {
     params: [{ name: "angle", def: 90 }, { name: "len", def: 0.1 }, { name: "width", def: 200 }, { name: "seed", def: 42 }, { name: "enable_dc", def: 0 }],
     verified: true, priority: 0, flags: ["dc"], types: ["2D","DC"],
-    funcNames: ["pixel_flow_hash"],
-    funcs: `fn pixel_flow_hash(a_in: i32) -> f32 {
+    funcNames: ["atan2j","pixel_flow_hash"],
+    funcs: `fn atan2j(y: f32, x: f32) -> f32 { if (x == 0.0 && y == 0.0) { return select(0.0, PI, (bitcast<u32>(x) >> 31u) == 1u) * select(1.0, -1.0, (bitcast<u32>(y) >> 31u) == 1u); } return atan2(y, x); }
+
+fn pixel_flow_hash(a_in: i32) -> f32 {
   var a: i32 = a_in;
   a = ((a ^ 61) ^ (a >> 16));
   a = (a + (a << 3));
@@ -26852,8 +30350,10 @@ if ((min(max(${p[4]}, 0.0), 1.0) == 1)) {
   "glitchy1": {
     params: [{ name: "scale_x", def: 1 }, { name: "shift_x", def: 0 }, { name: "n_x", def: 2 }, { name: "scale_y", def: 1 }, { name: "shift_y", def: 0 }, { name: "n_y", def: 2 }, { name: "scale_z", def: 0 }, { name: "shift_z", def: 0 }, { name: "n_z", def: 2 }, { name: "width", def: 1 }, { name: "seed", def: 42 }, { name: "angle", def: 30 }, { name: "u", def: 1 }, { name: "v", def: 1 }, { name: "w", def: 1 }],
     verified: true, priority: 0, flags: ["3d","z"], types: ["3D"],
-    funcNames: ["roundc","glitchy1_hash"],
+    funcNames: ["roundc","atan2j","glitchy1_hash"],
     funcs: `fn roundc(x: f32) -> f32 { return sign(x) * floor(abs(x) + 0.5); }
+
+fn atan2j(y: f32, x: f32) -> f32 { if (x == 0.0 && y == 0.0) { return select(0.0, PI, (bitcast<u32>(x) >> 31u) == 1u) * select(1.0, -1.0, (bitcast<u32>(y) >> 31u) == 1u); } return atan2(y, x); }
 
 fn glitchy1_hash(a_in: i32) -> f32 {
   var a: i32 = a_in;
@@ -26928,7 +30428,7 @@ pz_ += ((${w} * z) * fLen);
   "dc_warping": {
     params: [{ name: "randomize", def: 0 }, { name: "zoom", def: 1 }, { name: "x0", def: 0 }, { name: "ColorOnly", def: 0 }, { name: "Gradient", def: 0 }, { name: "scale_z", def: 0 }, { name: "offset_z", def: 0 }, { name: "reset_z", def: 1 }],
     verified: true, priority: 0, flags: ["dc","rgb","z"], types: ["SIMULATION","DC","BASE_SHAPE"],
-    funcNames: ["Mat2","read_imageStepMode","smoothstepc","powc","Mat2_Init","dc_warping_hash","dc_warping_noise","times","dc_warping_fbm","dc_warping_fbm2","dc_warping_map","dc_warping_getRGBColor","dbl2int","greyscale","distance_color"],
+    funcNames: ["Mat2","read_imageStepMode","atan2j","smoothstepc","powc","Mat2_Init","dc_warping_hash","dc_warping_noise","times","dc_warping_fbm","dc_warping_fbm2","dc_warping_map","dc_warping_getRGBColor","dbl2int","greyscale","distance_color"],
     funcs: `struct Mat2 {
   a00: f32,
   a01: f32,
@@ -26937,6 +30437,8 @@ pz_ += ((${w} * z) * fLen);
 }
 
 fn read_imageStepMode(base: u32, n: i32, t: f32) -> vec4f { return pal[base + u32(clamp(t, 0.0, 0.99999) * f32(max(n, 1)))]; }
+
+fn atan2j(y: f32, x: f32) -> f32 { if (x == 0.0 && y == 0.0) { return select(0.0, PI, (bitcast<u32>(x) >> 31u) == 1u) * select(1.0, -1.0, (bitcast<u32>(y) >> 31u) == 1u); } return atan2(y, x); }
 
 fn smoothstepc(a: f32, b: f32, x: f32) -> f32 { if (a == b) { return step(a, x); } let t = clamp((x - a) / (b - a), 0.0, 1.0); return t * t * (3.0 - 2.0 * t); }
 
@@ -27112,8 +30614,10 @@ if ((${p[7]} == 1)) {
   "dc_vortex": {
     params: [{ name: "randomize", def: 0 }, { name: "time", def: 0 }, { name: "flowStrength", def: 10 }, { name: "Blending", def: 5 }, { name: "zoom", def: 1 }, { name: "ColorOnly", def: 0 }, { name: "Gradient", def: 0 }, { name: "scale_z", def: 0 }, { name: "offset_z", def: 0 }, { name: "reset_z", def: 1 }],
     verified: true, priority: 0, flags: ["dc","rgb","z"], types: ["SIMULATION","DC","BASE_SHAPE"],
-    funcNames: ["read_imageStepMode","dc_vortex_VortF","dc_vortex_FlowField","dc_vortex_Hashv4f","dc_vortex_Noisefv2","dc_vortex_Fbm2","dc_vortex_getRGBColor","dbl2int","greyscale","distance_color"],
+    funcNames: ["read_imageStepMode","atan2j","dc_vortex_VortF","dc_vortex_FlowField","dc_vortex_Hashv4f","dc_vortex_Noisefv2","dc_vortex_Fbm2","dc_vortex_getRGBColor","dbl2int","greyscale","distance_color"],
     funcs: `fn read_imageStepMode(base: u32, n: i32, t: f32) -> vec4f { return pal[base + u32(clamp(t, 0.0, 0.99999) * f32(max(n, 1)))]; }
+
+fn atan2j(y: f32, x: f32) -> f32 { if (x == 0.0 && y == 0.0) { return select(0.0, PI, (bitcast<u32>(x) >> 31u) == 1u) * select(1.0, -1.0, (bitcast<u32>(y) >> 31u) == 1u); } return atan2(y, x); }
 
 fn dc_vortex_VortF(q: vec2f, c: vec2f) -> vec2f {
   var d: vec2f = (q - c);
@@ -27258,8 +30762,10 @@ if ((${p[9]} == 1)) {
   "vortex": {
     params: [{ name: "randomize", def: 0 }, { name: "time", def: 0 }, { name: "flowVel", def: 20 }, { name: "zoom", def: 4 }, { name: "UpDown", def: 0 }, { name: "vSep", def: 0.6 }, { name: "v_viDistance", def: 4 }, { name: "vDiameter", def: 1 }],
     verified: true, priority: 0, flags: [], types: ["2D"],
-    funcNames: ["vortex_VortF","vortex_FlowField"],
-    funcs: `fn vortex_VortF(q: vec2f, c: vec2f, p3: f32) -> vec2f {
+    funcNames: ["atan2j","vortex_VortF","vortex_FlowField"],
+    funcs: `fn atan2j(y: f32, x: f32) -> f32 { if (x == 0.0 && y == 0.0) { return select(0.0, PI, (bitcast<u32>(x) >> 31u) == 1u) * select(1.0, -1.0, (bitcast<u32>(y) >> 31u) == 1u); } return atan2(y, x); }
+
+fn vortex_VortF(q: vec2f, c: vec2f, p3: f32) -> vec2f {
   var d: vec2f = (q - c);
   return ((vec2f(d.y, -d.x) / vec2f((dot(d, d) + 0.05))) * vec2f(p3));
 }
@@ -27290,8 +30796,10 @@ v.y += (${w} * p_.y);
   "box3D": {
     params: [{ name: "dx", def: 0.5 }, { name: "dy", def: 0.5 }, { name: "dz", def: 0.5 }],
     verified: true, priority: 0, flags: ["3d","hide","z"], types: ["3D","BASE_SHAPE"],
-    funcNames: ["box3D_sdBox"],
-    funcs: `fn box3D_sdBox(p_: vec3f, b: vec3f) -> f32 {
+    funcNames: ["atan2j","box3D_sdBox"],
+    funcs: `fn atan2j(y: f32, x: f32) -> f32 { if (x == 0.0 && y == 0.0) { return select(0.0, PI, (bitcast<u32>(x) >> 31u) == 1u) * select(1.0, -1.0, (bitcast<u32>(y) >> 31u) == 1u); } return atan2(y, x); }
+
+fn box3D_sdBox(p_: vec3f, b: vec3f) -> f32 {
   var q: vec3f = (abs(p_) - b);
   return (length(max(q, vec3f(0.0))) + min(max(q.x, max(q.y, q.z)), 0.0));
   return 1.0;
@@ -27315,8 +30823,10 @@ if ((distance_ < 0.0)) {
   "rbox3D": {
     params: [{ name: "dx", def: 0.5 }, { name: "dy", def: 0.5 }, { name: "dz", def: 0.5 }, { name: "r", def: 0.05 }],
     verified: true, priority: 0, flags: ["hide","z"], types: ["BASE_SHAPE"],
-    funcNames: ["rbox3D_sdRoundBox"],
-    funcs: `fn rbox3D_sdRoundBox(p_: vec3f, b: vec3f, r_: f32) -> f32 {
+    funcNames: ["atan2j","rbox3D_sdRoundBox"],
+    funcs: `fn atan2j(y: f32, x: f32) -> f32 { if (x == 0.0 && y == 0.0) { return select(0.0, PI, (bitcast<u32>(x) >> 31u) == 1u) * select(1.0, -1.0, (bitcast<u32>(y) >> 31u) == 1u); } return atan2(y, x); }
+
+fn rbox3D_sdRoundBox(p_: vec3f, b: vec3f, r_: f32) -> f32 {
   var q: vec3f = (abs(p_) - b);
   return ((length(max(q, vec3f(0.0))) + min(max(q.x, max(q.y, q.z)), 0.0)) - r_);
 }`,
@@ -27339,8 +30849,10 @@ if ((distance_ < 0.0)) {
   "bbox3D": {
     params: [{ name: "dx", def: 0.3 }, { name: "dy", def: 0.25 }, { name: "dz", def: 0.2 }, { name: "r", def: 0.05 }],
     verified: true, priority: 0, flags: ["3d","hide","z"], types: ["3D","BASE_SHAPE"],
-    funcNames: ["bbox3D_sdBoundingBox"],
-    funcs: `fn bbox3D_sdBoundingBox(p__in: vec3f, b: vec3f, e: f32) -> f32 {
+    funcNames: ["atan2j","bbox3D_sdBoundingBox"],
+    funcs: `fn atan2j(y: f32, x: f32) -> f32 { if (x == 0.0 && y == 0.0) { return select(0.0, PI, (bitcast<u32>(x) >> 31u) == 1u) * select(1.0, -1.0, (bitcast<u32>(y) >> 31u) == 1u); } return atan2(y, x); }
+
+fn bbox3D_sdBoundingBox(p__in: vec3f, b: vec3f, e: f32) -> f32 {
   var p_: vec3f = p__in;
   p_ = (abs(p_) - b);
   var q: vec3f = (abs((p_ + vec3f(e))) - vec3f(e));
@@ -27368,8 +30880,10 @@ for (var _try: i32 = 0; (_try < 50); _try++) {
   "rhombus3D": {
     params: [{ name: "la", def: 0.5 }, { name: "lb", def: 0.5 }, { name: "h", def: 0.5 }, { name: "r", def: 0.05 }],
     verified: true, priority: 0, flags: ["hide","z"], types: ["BASE_SHAPE"],
-    funcNames: ["rhombus3D_ndot","rhombus3D_sdRhombus"],
-    funcs: `fn rhombus3D_ndot(a: vec2f, b: vec2f) -> f32 {
+    funcNames: ["atan2j","rhombus3D_ndot","rhombus3D_sdRhombus"],
+    funcs: `fn atan2j(y: f32, x: f32) -> f32 { if (x == 0.0 && y == 0.0) { return select(0.0, PI, (bitcast<u32>(x) >> 31u) == 1u) * select(1.0, -1.0, (bitcast<u32>(y) >> 31u) == 1u); } return atan2(y, x); }
+
+fn rhombus3D_ndot(a: vec2f, b: vec2f) -> f32 {
   return ((a.x * b.x) - (a.y * b.y));
 }
 
@@ -27402,8 +30916,10 @@ for (var _try: i32 = 0; (_try < 50); _try++) {
   "ellipsoid3D": {
     params: [{ name: "dx", def: 0.5 }, { name: "dy", def: 0.5 }, { name: "dz", def: 0.5 }],
     verified: true, priority: 0, flags: ["3d","hide","z"], types: ["3D","BASE_SHAPE"],
-    funcNames: ["ellipsoid3D_sdEllipsoid"],
-    funcs: `fn ellipsoid3D_sdEllipsoid(p_: vec3f, r_: vec3f) -> f32 {
+    funcNames: ["atan2j","ellipsoid3D_sdEllipsoid"],
+    funcs: `fn atan2j(y: f32, x: f32) -> f32 { if (x == 0.0 && y == 0.0) { return select(0.0, PI, (bitcast<u32>(x) >> 31u) == 1u) * select(1.0, -1.0, (bitcast<u32>(y) >> 31u) == 1u); } return atan2(y, x); }
+
+fn ellipsoid3D_sdEllipsoid(p_: vec3f, r_: vec3f) -> f32 {
   var k0: f32 = length((p_ / r_));
   var k1: f32 = length((p_ / (r_ * r_)));
   return ((k0 * (k0 - 1.0)) / k1);
@@ -27430,8 +30946,10 @@ for (var _try: i32 = 0; (_try < 50); _try++) {
   "torus3D": {
     params: [{ name: "r1", def: 0.5 }, { name: "r2", def: 0.5 }],
     verified: true, priority: 0, flags: ["hide","z"], types: ["BASE_SHAPE"],
-    funcNames: ["torus3D_sdTorus"],
-    funcs: `fn torus3D_sdTorus(p_: vec3f, t_: vec2f) -> f32 {
+    funcNames: ["atan2j","torus3D_sdTorus"],
+    funcs: `fn atan2j(y: f32, x: f32) -> f32 { if (x == 0.0 && y == 0.0) { return select(0.0, PI, (bitcast<u32>(x) >> 31u) == 1u) * select(1.0, -1.0, (bitcast<u32>(y) >> 31u) == 1u); } return atan2(y, x); }
+
+fn torus3D_sdTorus(p_: vec3f, t_: vec2f) -> f32 {
   return (length(vec2f((length(vec2f(p_.x, p_.z)) - t_.x), p_.y)) - t_.y);
 }`,
     code: (w, p) => `{
@@ -27452,8 +30970,10 @@ if ((distance_ < 0.0)) {
   "hexprism3D": {
     params: [{ name: "d", def: 0.3 }, { name: "H", def: 0.25 }],
     verified: true, priority: 0, flags: ["3d","hide","z"], types: ["3D","BASE_SHAPE"],
-    funcNames: ["hexprism3D_sdHexPrism"],
-    funcs: `fn hexprism3D_sdHexPrism(p__in: vec3f, h: vec2f) -> f32 {
+    funcNames: ["atan2j","hexprism3D_sdHexPrism"],
+    funcs: `fn atan2j(y: f32, x: f32) -> f32 { if (x == 0.0 && y == 0.0) { return select(0.0, PI, (bitcast<u32>(x) >> 31u) == 1u) * select(1.0, -1.0, (bitcast<u32>(y) >> 31u) == 1u); } return atan2(y, x); }
+
+fn hexprism3D_sdHexPrism(p__in: vec3f, h: vec2f) -> f32 {
   var p_: vec3f = p__in;
   var q: vec3f = abs(p_);
   var k: vec3f = vec3f(-0.8660254, 0.5, 0.57735);
@@ -27486,8 +31006,10 @@ for (var _try: i32 = 0; (_try < 50); _try++) {
   "cylinder3D": {
     params: [{ name: "d", def: 0.3 }, { name: "H", def: 0.25 }],
     verified: true, priority: 0, flags: ["3d","hide","z"], types: ["3D"],
-    funcNames: ["cylinder3D_sdCylinder"],
-    funcs: `fn cylinder3D_sdCylinder(p_: vec3f, h: vec2f) -> f32 {
+    funcNames: ["atan2j","cylinder3D_sdCylinder"],
+    funcs: `fn atan2j(y: f32, x: f32) -> f32 { if (x == 0.0 && y == 0.0) { return select(0.0, PI, (bitcast<u32>(x) >> 31u) == 1u) * select(1.0, -1.0, (bitcast<u32>(y) >> 31u) == 1u); } return atan2(y, x); }
+
+fn cylinder3D_sdCylinder(p_: vec3f, h: vec2f) -> f32 {
   var d: vec2f = (abs(vec2f(length(vec2f(p_.x, p_.z)), p_.y)) - h);
   return (min(max(d.x, d.y), 0.0) + length(max(d, vec2f(0.0))));
 }`,
@@ -27512,8 +31034,10 @@ for (var _try: i32 = 0; (_try < 50); _try++) {
   "ocylinder3D": {
     params: [{ name: "dx", def: 1 }, { name: "dy", def: 0 }, { name: "dz", def: 0 }, { name: "tx", def: 0 }, { name: "ty", def: 0 }, { name: "tz", def: 0 }, { name: "r", def: 0.5 }],
     verified: true, priority: 0, flags: ["3d","hide","z"], types: ["3D","BASE_SHAPE"],
-    funcNames: ["ocylinder3D_sdCylinder"],
-    funcs: `fn ocylinder3D_sdCylinder(p_: vec3f, a: vec3f, b: vec3f, r_: f32) -> f32 {
+    funcNames: ["atan2j","ocylinder3D_sdCylinder"],
+    funcs: `fn atan2j(y: f32, x: f32) -> f32 { if (x == 0.0 && y == 0.0) { return select(0.0, PI, (bitcast<u32>(x) >> 31u) == 1u) * select(1.0, -1.0, (bitcast<u32>(y) >> 31u) == 1u); } return atan2(y, x); }
+
+fn ocylinder3D_sdCylinder(p_: vec3f, a: vec3f, b: vec3f, r_: f32) -> f32 {
   var pa: vec3f = (p_ - a);
   var ba: vec3f = (b - a);
   var baba: f32 = dot(ba, ba);
@@ -27546,8 +31070,10 @@ for (var _try: i32 = 0; (_try < 50); _try++) {
   "octogonprism3D": {
     params: [{ name: "R", def: 0.25 }, { name: "H", def: 0.5 }],
     verified: true, priority: 0, flags: ["3d","hide","z"], types: ["3D","BASE_SHAPE"],
-    funcNames: ["octogonprism3D_sdOctogonPrism"],
-    funcs: `fn octogonprism3D_sdOctogonPrism(p__in: vec3f, r_: f32, h: f32) -> f32 {
+    funcNames: ["atan2j","octogonprism3D_sdOctogonPrism"],
+    funcs: `fn atan2j(y: f32, x: f32) -> f32 { if (x == 0.0 && y == 0.0) { return select(0.0, PI, (bitcast<u32>(x) >> 31u) == 1u) * select(1.0, -1.0, (bitcast<u32>(y) >> 31u) == 1u); } return atan2(y, x); }
+
+fn octogonprism3D_sdOctogonPrism(p__in: vec3f, r_: f32, h: f32) -> f32 {
   var p_: vec3f = p__in;
   var k: vec3f = vec3f(-0.9238795325, 0.3826834323, 0.4142135623);
   p_ = abs(p_);
@@ -27584,8 +31110,10 @@ for (var _try: i32 = 0; (_try < 50); _try++) {
   "pyramid3D": {
     params: [{ name: "h", def: 0.25 }],
     verified: true, priority: 0, flags: ["hide","z"], types: ["BASE_SHAPE"],
-    funcNames: ["pyramid3D_sdPyramid"],
-    funcs: `fn pyramid3D_sdPyramid(p__in: vec3f, h: f32) -> f32 {
+    funcNames: ["atan2j","pyramid3D_sdPyramid"],
+    funcs: `fn atan2j(y: f32, x: f32) -> f32 { if (x == 0.0 && y == 0.0) { return select(0.0, PI, (bitcast<u32>(x) >> 31u) == 1u) * select(1.0, -1.0, (bitcast<u32>(y) >> 31u) == 1u); } return atan2(y, x); }
+
+fn pyramid3D_sdPyramid(p__in: vec3f, h: f32) -> f32 {
   var p_: vec3f = p__in;
   var m2: f32 = ((h * h) + 0.25);
   p_.x = abs(p_.x);
@@ -27628,8 +31156,10 @@ for (var _try: i32 = 0; (_try < 50); _try++) {
   "octahedron3D": {
     params: [{ name: "h", def: 0.25 }],
     verified: true, priority: 0, flags: ["hide","z"], types: ["BASE_SHAPE"],
-    funcNames: ["octahedron3D_sdOctahedron"],
-    funcs: `fn octahedron3D_sdOctahedron(p__in: vec3f, s: f32) -> f32 {
+    funcNames: ["atan2j","octahedron3D_sdOctahedron"],
+    funcs: `fn atan2j(y: f32, x: f32) -> f32 { if (x == 0.0 && y == 0.0) { return select(0.0, PI, (bitcast<u32>(x) >> 31u) == 1u) * select(1.0, -1.0, (bitcast<u32>(y) >> 31u) == 1u); } return atan2(y, x); }
+
+fn octahedron3D_sdOctahedron(p__in: vec3f, s: f32) -> f32 {
   var p_: vec3f = p__in;
   p_ = abs(p_);
   var m: f32 = (((p_.x + p_.y) + p_.z) - s);
@@ -27667,8 +31197,10 @@ for (var _try: i32 = 0; (_try < 50); _try++) {
   "solidangle3D": {
     params: [{ name: "p1", def: 0.25 }, { name: "p2", def: 0.5 }, { name: "p3", def: 0.5 }],
     verified: true, priority: 0, flags: ["3d","hide","z"], types: ["3D","BASE_SHAPE"],
-    funcNames: ["solidangle3D_sdSolidAngle"],
-    funcs: `fn solidangle3D_sdSolidAngle(pos: vec3f, c: vec2f, ra: f32) -> f32 {
+    funcNames: ["atan2j","solidangle3D_sdSolidAngle"],
+    funcs: `fn atan2j(y: f32, x: f32) -> f32 { if (x == 0.0 && y == 0.0) { return select(0.0, PI, (bitcast<u32>(x) >> 31u) == 1u) * select(1.0, -1.0, (bitcast<u32>(y) >> 31u) == 1u); } return atan2(y, x); }
+
+fn solidangle3D_sdSolidAngle(pos: vec3f, c: vec2f, ra: f32) -> f32 {
   var p_: vec2f = vec2f(length(vec2f(pos.x, pos.z)), pos.y);
   var l: f32 = (length(p_) - ra);
   var m: f32 = length((p_ - (c * vec2f(clamp(dot(p_, c), 0.0, ra)))));
@@ -27695,8 +31227,10 @@ for (var _try: i32 = 0; (_try < 50); _try++) {
   "triprism3D": {
     params: [{ name: "d", def: 0.25 }, { name: "h", def: 0.5 }],
     verified: true, priority: 0, flags: ["hide","z"], types: ["BASE_SHAPE"],
-    funcNames: ["triprism3D_sdTriPrism"],
-    funcs: `fn triprism3D_sdTriPrism(p__in: vec3f, h_in: vec2f) -> f32 {
+    funcNames: ["atan2j","triprism3D_sdTriPrism"],
+    funcs: `fn atan2j(y: f32, x: f32) -> f32 { if (x == 0.0 && y == 0.0) { return select(0.0, PI, (bitcast<u32>(x) >> 31u) == 1u) * select(1.0, -1.0, (bitcast<u32>(y) >> 31u) == 1u); } return atan2(y, x); }
+
+fn triprism3D_sdTriPrism(p__in: vec3f, h_in: vec2f) -> f32 {
   var p_: vec3f = p__in;
   var h: vec2f = h_in;
   var k: f32 = sqrt(3.0);
@@ -27736,8 +31270,10 @@ for (var _try: i32 = 0; (_try < 50); _try++) {
   "cappedtorus3D": {
     params: [{ name: "dx", def: 0.866025 }, { name: "dy", def: -0.5 }, { name: "R1", def: 0.25 }, { name: "R2", def: 0.15 }],
     verified: true, priority: 0, flags: ["3d","hide","z"], types: ["3D","BASE_SHAPE"],
-    funcNames: ["cappedtorus3D_sdCappedTorus"],
-    funcs: `fn cappedtorus3D_sdCappedTorus(p__in: vec3f, sc: vec2f, ra: f32, rb: f32) -> f32 {
+    funcNames: ["atan2j","cappedtorus3D_sdCappedTorus"],
+    funcs: `fn atan2j(y: f32, x: f32) -> f32 { if (x == 0.0 && y == 0.0) { return select(0.0, PI, (bitcast<u32>(x) >> 31u) == 1u) * select(1.0, -1.0, (bitcast<u32>(y) >> 31u) == 1u); } return atan2(y, x); }
+
+fn cappedtorus3D_sdCappedTorus(p__in: vec3f, sc: vec2f, ra: f32, rb: f32) -> f32 {
   var p_: vec3f = p__in;
   p_.x = abs(p_.x);
   var k: f32 = select(length(vec2f(p_.x, p_.y)), dot(vec2f(p_.x, p_.y), sc), ((sc.y * p_.x) > (sc.x * p_.y)));
@@ -27764,8 +31300,10 @@ for (var _try: i32 = 0; (_try < 50); _try++) {
   "cappedcone3D": {
     params: [{ name: "h", def: 0.5 }, { name: "r1", def: 0.1 }, { name: "r2", def: 0.3 }],
     verified: true, priority: 0, flags: ["3d","hide","z"], types: ["3D","BASE_SHAPE"],
-    funcNames: ["cappedcone3D_dot2","cappedcone3D_sdCappedCone"],
-    funcs: `fn cappedcone3D_dot2(v_: vec2f) -> f32 {
+    funcNames: ["atan2j","cappedcone3D_dot2","cappedcone3D_sdCappedCone"],
+    funcs: `fn atan2j(y: f32, x: f32) -> f32 { if (x == 0.0 && y == 0.0) { return select(0.0, PI, (bitcast<u32>(x) >> 31u) == 1u) * select(1.0, -1.0, (bitcast<u32>(y) >> 31u) == 1u); } return atan2(y, x); }
+
+fn cappedcone3D_dot2(v_: vec2f) -> f32 {
   return dot(v_, v_);
 }
 
@@ -27799,8 +31337,10 @@ for (var _try: i32 = 0; (_try < 50); _try++) {
   "ocappedcone3D": {
     params: [{ name: "dx", def: 0 }, { name: "dy", def: 0 }, { name: "dz", def: 0.1 }, { name: "tx", def: 0 }, { name: "ty", def: 0 }, { name: "tz", def: 0.5 }, { name: "r1", def: 0.25 }, { name: "r2", def: 0.05 }],
     verified: true, priority: 0, flags: ["hide","z"], types: ["BASE_SHAPE"],
-    funcNames: ["ocappedcone3D_sdCappedCone"],
-    funcs: `fn ocappedcone3D_sdCappedCone(p_: vec3f, a: vec3f, b: vec3f, ra: f32, rb: f32) -> f32 {
+    funcNames: ["atan2j","ocappedcone3D_sdCappedCone"],
+    funcs: `fn atan2j(y: f32, x: f32) -> f32 { if (x == 0.0 && y == 0.0) { return select(0.0, PI, (bitcast<u32>(x) >> 31u) == 1u) * select(1.0, -1.0, (bitcast<u32>(y) >> 31u) == 1u); } return atan2(y, x); }
+
+fn ocappedcone3D_sdCappedCone(p_: vec3f, a: vec3f, b: vec3f, ra: f32, rb: f32) -> f32 {
   var rba: f32 = (rb - ra);
   var baba: f32 = dot((b - a), (b - a));
   var papa: f32 = dot((p_ - a), (p_ - a));
@@ -27836,8 +31376,10 @@ for (var _try: i32 = 0; (_try < 50); _try++) {
   "cone3D": {
     params: [{ name: "w", def: 0.25 }, { name: "h", def: 0.25 }, { name: "Ty", def: 0.1 }],
     verified: true, priority: 0, flags: ["3d","hide","z"], types: ["3D","BASE_SHAPE"],
-    funcNames: ["cone3D_sdCone"],
-    funcs: `fn cone3D_sdCone(p_: vec3f, c: vec2f, h: f32) -> f32 {
+    funcNames: ["atan2j","cone3D_sdCone"],
+    funcs: `fn atan2j(y: f32, x: f32) -> f32 { if (x == 0.0 && y == 0.0) { return select(0.0, PI, (bitcast<u32>(x) >> 31u) == 1u) * select(1.0, -1.0, (bitcast<u32>(y) >> 31u) == 1u); } return atan2(y, x); }
+
+fn cone3D_sdCone(p_: vec3f, c: vec2f, h: f32) -> f32 {
   var q: vec2f = (vec2f(c.x, -c.y) * vec2f((h / c.y)));
   var w_: vec2f = vec2f(length(vec2f(p_.x, p_.z)), p_.y);
   var a: vec2f = (w_ - (q * vec2f(clamp((dot(w_, q) / dot(q, q)), 0.0, 1.0))));
@@ -27868,8 +31410,10 @@ for (var _try: i32 = 0; (_try < 50); _try++) {
   "oroundcone3D": {
     params: [{ name: "dx", def: 0.1 }, { name: "dy", def: 0 }, { name: "dz", def: 0 }, { name: "tx", def: -0.1 }, { name: "ty", def: 0.35 }, { name: "tz", def: 0.1 }, { name: "r1", def: 0.15 }, { name: "r2", def: 0.05 }],
     verified: true, priority: 0, flags: ["hide","z"], types: ["2D","BASE_SHAPE"],
-    funcNames: ["oroundcone3D_dot2","oroundcone3D_sdRoundCone"],
-    funcs: `fn oroundcone3D_dot2(v_: vec3f) -> f32 {
+    funcNames: ["atan2j","oroundcone3D_dot2","oroundcone3D_sdRoundCone"],
+    funcs: `fn atan2j(y: f32, x: f32) -> f32 { if (x == 0.0 && y == 0.0) { return select(0.0, PI, (bitcast<u32>(x) >> 31u) == 1u) * select(1.0, -1.0, (bitcast<u32>(y) >> 31u) == 1u); } return atan2(y, x); }
+
+fn oroundcone3D_dot2(v_: vec3f) -> f32 {
   return dot(v_, v_);
 }
 
@@ -27915,8 +31459,10 @@ for (var _try: i32 = 0; (_try < 50); _try++) {
   "capsule3D": {
     params: [{ name: "dx", def: 0.1 }, { name: "dy", def: 0 }, { name: "dz", def: 0 }, { name: "tx", def: 0 }, { name: "ty", def: 0 }, { name: "tz", def: 0 }, { name: "R", def: 0.05 }],
     verified: true, priority: 0, flags: ["hide","z"], types: ["BASE_SHAPE"],
-    funcNames: ["capsule3D_sdCapsule"],
-    funcs: `fn capsule3D_sdCapsule(p_: vec3f, a: vec3f, b: vec3f, r_: f32) -> f32 {
+    funcNames: ["atan2j","capsule3D_sdCapsule"],
+    funcs: `fn atan2j(y: f32, x: f32) -> f32 { if (x == 0.0 && y == 0.0) { return select(0.0, PI, (bitcast<u32>(x) >> 31u) == 1u) * select(1.0, -1.0, (bitcast<u32>(y) >> 31u) == 1u); } return atan2(y, x); }
+
+fn capsule3D_sdCapsule(p_: vec3f, a: vec3f, b: vec3f, r_: f32) -> f32 {
   var pa: vec3f = (p_ - a);
   var ba: vec3f = (b - a);
   var h: f32 = clamp((dot(pa, ba) / dot(ba, ba)), 0.0, 1.0);
@@ -27943,7 +31489,7 @@ for (var _try: i32 = 0; (_try < 50); _try++) {
   "post_trig": {
     params: [{ name: "reciprocalpow", def: 1 }, { name: "log_dividepow", def: 0 }, { name: "sqrtpow", def: 0 }, { name: "exppow", def: 0 }, { name: "logpow", def: 0 }, { name: "asinhpow", def: 0 }, { name: "acoshpow", def: 0 }, { name: "atanhpow", def: 0 }, { name: "asinpow", def: 0 }, { name: "acospow", def: 0 }, { name: "atanpow", def: 0 }, { name: "sinpow", def: 0 }, { name: "cospow", def: 0 }, { name: "tanpow", def: 0 }, { name: "sinhpow", def: 0 }, { name: "coshpow", def: 0 }, { name: "tanhpow", def: 0 }],
     verified: true, priority: 1, flags: [], types: ["2D","POST"],
-    funcNames: ["Complex","powc","Complex_Init","Complex_Mag2","Complex_MagInv","Complex_Recip","Complex_Scale","Complex_Dec","Complex_Inc","Complex_Div","Complex_Mag2eps","Complex_Arg","Complex_Copy","Complex_Log","Complex_Radius","Complex_Neg","Complex_Sqrt","Complex_UnP","Complex_Exp","Complex_Sqr","Complex_One","Complex_ToP","Complex_Pow","Complex_Add","Complex_AsinH","Complex_AcosH","Complex_AtanH","Complex_Flip","Complex_Asin","Complex_Acos","Complex_Atan","Complex_SinH","Complex_Sin","Complex_CosH","Complex_Cos"],
+    funcNames: ["Complex","atan2j","powc","Complex_Init","Complex_Mag2","Complex_MagInv","Complex_Recip","Complex_Scale","Complex_Dec","Complex_Inc","Complex_Div","Complex_Mag2eps","Complex_Arg","Complex_Copy","Complex_Log","Complex_Radius","Complex_Neg","Complex_Sqrt","Complex_UnP","Complex_Exp","Complex_Sqr","Complex_One","Complex_ToP","Complex_Pow","Complex_Add","Complex_AsinH","Complex_AcosH","Complex_AtanH","Complex_Flip","Complex_Asin","Complex_Acos","Complex_Atan","Complex_SinH","Complex_Sin","Complex_CosH","Complex_Cos"],
     funcs: `struct Complex {
   per_fix: f32,
   re: f32,
@@ -27951,6 +31497,8 @@ for (var _try: i32 = 0; (_try < 50); _try++) {
   save_re: f32,
   save_im: f32,
 }
+
+fn atan2j(y: f32, x: f32) -> f32 { if (x == 0.0 && y == 0.0) { return select(0.0, PI, (bitcast<u32>(x) >> 31u) == 1u) * select(1.0, -1.0, (bitcast<u32>(y) >> 31u) == 1u); } return atan2(y, x); }
 
 fn powc(x: f32, y: f32) -> f32 {
   if (x >= 0.0) { return pow(x, y); }
@@ -28009,7 +31557,7 @@ fn Complex_Mag2eps(c: ptr<function, Complex>) -> f32 {
 }
 
 fn Complex_Arg(c: ptr<function, Complex>) -> f32 {
-  return ((*c).per_fix + atan2((*c).im, (*c).re));
+  return ((*c).per_fix + atan2j((*c).im, (*c).re));
 }
 
 fn Complex_Copy(c: ptr<function, Complex>, zz: ptr<function, Complex>) {
@@ -28372,8 +31920,10 @@ if (((((((((((((${p[5]} + ${p[6]}) + ${p[7]}) + ${p[11]}) + ${p[12]}) + ${p[13]}
   "post_log_tile2": {
     params: [{ name: "spreadx", def: 2 }, { name: "spready", def: 2 }, { name: "spreadz", def: 0 }],
     verified: true, priority: 1, flags: ["3d","z"], types: ["3D","POST"],
-    funcNames: ["roundc"],
-    funcs: `fn roundc(x: f32) -> f32 { return sign(x) * floor(abs(x) + 0.5); }`,
+    funcNames: ["roundc","atan2j"],
+    funcs: `fn roundc(x: f32) -> f32 { return sign(x) * floor(abs(x) + 0.5); }
+
+fn atan2j(y: f32, x: f32) -> f32 { if (x == 0.0 && y == 0.0) { return select(0.0, PI, (bitcast<u32>(x) >> 31u) == 1u) * select(1.0, -1.0, (bitcast<u32>(y) >> 31u) == 1u); } return atan2(y, x); }`,
     code: (w, p) => `{
 var spreadx: f32 = -(${p[0]});
 if ((rnd(rs) < 0.5)) {
@@ -28392,11 +31942,117 @@ v.y = (${w} * (v.y + (spready * roundc(log(rnd(rs))))));
 pz_ = (${w} * (pz_ + (spreadz * roundc(log(rnd(rs))))));
 }`,
   },
+  "glitchy2": {
+    params: [{ name: "mode", def: 0 }, { name: "lr_spin", def: 1 }, { name: "lr_x", def: 0 }, { name: "lr_shiftx", def: 0 }, { name: "lr_y", def: 0 }, { name: "lr_shifty", def: 0 }, { name: "lr_re_a", def: 0 }, { name: "lr_re_b", def: 0 }, { name: "lr_re_c", def: 0 }, { name: "lr_re_d", def: 1 }, { name: "lr_im_a", def: 0 }, { name: "lr_im_b", def: 0 }, { name: "lr_im_c", def: 0 }, { name: "lr_im_d", def: 0 }, { name: "ur_spin", def: -1 }, { name: "ur_x", def: 0 }, { name: "ur_shiftx", def: 0 }, { name: "ur_y", def: 0 }, { name: "ur_shifty", def: 0 }, { name: "ur_re_a", def: 0 }, { name: "ur_re_b", def: 0 }, { name: "ur_re_c", def: 0 }, { name: "ur_re_d", def: 1 }, { name: "ur_im_a", def: 0 }, { name: "ur_im_b", def: 0 }, { name: "ur_im_c", def: 0 }, { name: "ur_im_d", def: 0 }, { name: "ll_spin", def: -1 }, { name: "ll_x", def: 0 }, { name: "ll_shiftx", def: 0 }, { name: "ll_y", def: 0 }, { name: "ll_shifty", def: 0 }, { name: "ll_re_a", def: 0 }, { name: "ll_re_b", def: 0 }, { name: "ll_re_c", def: 0 }, { name: "ll_re_d", def: 1 }, { name: "ll_im_a", def: 0 }, { name: "ll_im_b", def: 0 }, { name: "ll_im_c", def: 0 }, { name: "ll_im_d", def: 0 }, { name: "ul_spin", def: 1 }, { name: "ul_x", def: 0 }, { name: "ul_shiftx", def: 0 }, { name: "ul_y", def: 0 }, { name: "ul_shifty", def: 0 }, { name: "ul_re_a", def: 0 }, { name: "ul_re_b", def: 0 }, { name: "ul_re_c", def: 0 }, { name: "ul_re_d", def: 1 }, { name: "ul_im_a", def: 0 }, { name: "ul_im_b", def: 0 }, { name: "ul_im_c", def: 0 }, { name: "ul_im_d", def: 0 }],
+    verified: true, priority: 0, flags: ["z"], types: ["2D"],
+    funcNames: ["atan2j"],
+    funcs: `fn atan2j(y: f32, x: f32) -> f32 { if (x == 0.0 && y == 0.0) { return select(0.0, PI, (bitcast<u32>(x) >> 31u) == 1u) * select(1.0, -1.0, (bitcast<u32>(y) >> 31u) == 1u); } return atan2(y, x); }`,
+    code: (w, p) => `{
+loop {
+var lr_pz_sin: f32 = 0;
+var lr_pz_cos: f32 = 0;
+var ur_pz_sin: f32 = 0;
+var ur_pz_cos: f32 = 0;
+var ll_pz_sin: f32 = 0;
+var ll_pz_cos: f32 = 0;
+var ul_pz_sin: f32 = 0;
+var ul_pz_cos: f32 = 0;
+{
+  lr_pz_sin = sin((${p[1]} * (PI * 0.5)));
+  lr_pz_cos = cos((${p[1]} * (PI * 0.5)));
+  ur_pz_sin = sin((${p[14]} * (PI * 0.5)));
+  ur_pz_cos = cos((${p[14]} * (PI * 0.5)));
+  ll_pz_sin = sin((${p[27]} * (PI * 0.5)));
+  ll_pz_cos = cos((${p[27]} * (PI * 0.5)));
+  ul_pz_sin = sin((${p[40]} * (PI * 0.5)));
+  ul_pz_cos = cos((${p[40]} * (PI * 0.5)));
+}
+var count: i32 = 0;
+var x: f32 = 0.0;
+var y: f32 = 0.0;
+if (((t.x > ${p[3]}) && (t.y > ${p[5]}))) {
+  var lr_re_u: f32 = (((${p[6]} * t.x) - (${p[10]} * t.y)) + ${p[7]});
+  var lr_im_u: f32 = (((${p[6]} * t.y) + (${p[10]} * t.x)) + ${p[11]});
+  var lr_re_v: f32 = (((${p[8]} * t.x) - (${p[12]} * t.y)) + ${p[9]});
+  var lr_im_v: f32 = (((${p[8]} * t.y) + (${p[12]} * t.x)) + ${p[13]});
+  var d: f32 = ((lr_re_v * lr_re_v) + (lr_im_v * lr_im_v));
+  if ((d == 0)) {
+    break;
+  }
+  x += (((${w} * ((lr_pz_sin * t.y) + (lr_pz_cos * t.x))) + ${p[2]}) + (d * ((lr_re_u * lr_re_v) + (lr_im_u * lr_im_v))));
+  y += (((${w} * ((lr_pz_cos * t.y) - (lr_pz_sin * t.x))) + ${p[4]}) + (d * ((lr_im_u * lr_re_v) - (lr_re_u * lr_im_v))));
+  count += 1;
+}
+if (((t.x > ${p[16]}) && (t.y < ${p[18]}))) {
+  var ur_re_u: f32 = (((${p[19]} * t.x) - (${p[23]} * t.y)) + ${p[20]});
+  var ur_im_u: f32 = (((${p[19]} * t.y) + (${p[23]} * t.x)) + ${p[24]});
+  var ur_re_v: f32 = (((${p[21]} * t.x) - (${p[25]} * t.y)) + ${p[22]});
+  var ur_im_v: f32 = (((${p[21]} * t.y) + (${p[25]} * t.x)) + ${p[26]});
+  var d: f32 = ((ur_re_v * ur_re_v) + (ur_im_v * ur_im_v));
+  if ((d == 0)) {
+    break;
+  }
+  x += (((${w} * ((ur_pz_sin * t.y) + (ur_pz_cos * t.x))) + ${p[15]}) + (d * ((ur_re_u * ur_re_v) + (ur_im_u * ur_im_v))));
+  y += (((${w} * ((ur_pz_cos * t.y) - (ur_pz_sin * t.x))) + ${p[17]}) + (d * ((ur_im_u * ur_re_v) - (ur_re_u * ur_im_v))));
+  count += 1;
+}
+if (((t.x < ${p[29]}) && (t.y > ${p[31]}))) {
+  var ll_re_u: f32 = (((${p[32]} * t.x) - (${p[36]} * t.y)) + ${p[33]});
+  var ll_im_u: f32 = (((${p[32]} * t.y) + (${p[36]} * t.x)) + ${p[37]});
+  var ll_re_v: f32 = (((${p[34]} * t.x) - (${p[38]} * t.y)) + ${p[35]});
+  var ll_im_v: f32 = (((${p[34]} * t.y) + (${p[38]} * t.x)) + ${p[39]});
+  var d: f32 = ((ll_re_v * ll_re_v) + (ll_im_v * ll_im_v));
+  if ((d == 0)) {
+    break;
+  }
+  x += (((${w} * ((ll_pz_sin * t.y) + (ll_pz_cos * t.x))) + ${p[28]}) + (d * ((ll_re_u * ll_re_v) + (ll_im_u * ll_im_v))));
+  y += (((${w} * ((ll_pz_cos * t.y) - (ll_pz_sin * t.x))) + ${p[30]}) + (d * ((ll_im_u * ll_re_v) - (ll_re_u * ll_im_v))));
+  count += 1;
+}
+if (((t.x < ${p[42]}) && (t.y < ${p[44]}))) {
+  var ul_re_u: f32 = (((${p[45]} * t.x) - (${p[49]} * t.y)) + ${p[46]});
+  var ul_im_u: f32 = (((${p[45]} * t.y) + (${p[49]} * t.x)) + ${p[50]});
+  var ul_re_v: f32 = (((${p[47]} * t.x) - (${p[51]} * t.y)) + ${p[48]});
+  var ul_im_v: f32 = (((${p[47]} * t.y) + (${p[51]} * t.x)) + ${p[52]});
+  var d: f32 = ((ul_re_v * ul_re_v) + (ul_im_v * ul_im_v));
+  if ((d == 0)) {
+    break;
+  }
+  x += (((${w} * ((ul_pz_sin * t.y) + (ul_pz_cos * t.x))) + ${p[41]}) + (d * ((ul_re_u * ul_re_v) + (ul_im_u * ul_im_v))));
+  y += (((${w} * ((ul_pz_cos * t.y) - (ul_pz_sin * t.x))) + ${p[43]}) + (d * ((ul_im_u * ul_re_v) - (ul_re_u * ul_im_v))));
+  count += 1;
+}
+if ((min(max(${p[0]}, 0.0), 1.0) != 0)) {
+  if ((count == 0)) {
+    v.x += (${w} / t.y);
+    v.y += (${w} / t.x);
+  } else {
+    v.x += ((${w} / y) / f32(count));
+    v.y += ((${w} / x) / f32(count));
+  }
+} else {
+  if ((count == 0)) {
+    v.x += (${w} * t.x);
+    v.y += (${w} * t.y);
+  } else {
+    v.x += ((${w} * x) / f32(count));
+    v.y += ((${w} * y) / f32(count));
+  }
+}
+if (false) {
+  pz_ += (${w} * z_);
+}
+break;
+}
+}`,
+  },
   "hypertile3Db": {
     params: [{ name: "p", def: 3 }, { name: "q", def: 7 }, { name: "n", def: 0 }, { name: "b", def: 2 }, { name: "c", def: 2 }, { name: "d", def: 1 }, { name: "e", def: 1 }, { name: "f", def: 1 }, { name: "g", def: 2 }, { name: "h", def: 2 }, { name: "i", def: 1 }, { name: "j", def: 1 }, { name: "k", def: 1 }],
     verified: true, priority: 0, flags: ["3d","z"], types: ["3D"],
-    funcNames: ["roundc"],
-    funcs: `fn roundc(x: f32) -> f32 { return sign(x) * floor(abs(x) + 0.5); }`,
+    funcNames: ["roundc","atan2j"],
+    funcs: `fn roundc(x: f32) -> f32 { return sign(x) * floor(abs(x) + 0.5); }
+
+fn atan2j(y: f32, x: f32) -> f32 { if (x == 0.0 && y == 0.0) { return select(0.0, PI, (bitcast<u32>(x) >> 31u) == 1u) * select(1.0, -1.0, (bitcast<u32>(y) >> 31u) == 1u); } return atan2(y, x); }`,
     code: (w, p) => `{
 var c2x: f32;
 var c2y: f32;
@@ -28435,8 +32091,10 @@ pz_ += (d * (z_ * s2z));
   "hypertile3D2b": {
     params: [{ name: "p", def: 3 }, { name: "q", def: 7 }, { name: "b", def: 2 }, { name: "c", def: 2 }, { name: "d", def: 1 }, { name: "e", def: 1 }, { name: "f", def: 1 }, { name: "g", def: 2 }, { name: "h", def: 1 }, { name: "i", def: 1 }, { name: "j", def: 1 }, { name: "k", def: 1 }],
     verified: true, priority: 0, flags: ["3d","z"], types: ["3D"],
-    funcNames: ["roundc"],
-    funcs: `fn roundc(x: f32) -> f32 { return sign(x) * floor(abs(x) + 0.5); }`,
+    funcNames: ["roundc","atan2j"],
+    funcs: `fn roundc(x: f32) -> f32 { return sign(x) * floor(abs(x) + 0.5); }
+
+fn atan2j(y: f32, x: f32) -> f32 { if (x == 0.0 && y == 0.0) { return select(0.0, PI, (bitcast<u32>(x) >> 31u) == 1u) * select(1.0, -1.0, (bitcast<u32>(y) >> 31u) == 1u); } return atan2(y, x); }`,
     code: (w, p) => `{
 var pa: f32;
 var qa: f32;
@@ -28476,6 +32134,8 @@ pz_ += (vr * (z_ * s2z));
   "pdj3D": {
     params: [{ name: "a", def: 1 }, { name: "b", def: 2 }, { name: "c", def: 3 }, { name: "d", def: 4 }, { name: "e", def: 2 }, { name: "f", def: 0 }, { name: "g", def: 2 }, { name: "h", def: 0 }],
     verified: true, priority: 0, flags: ["3d","z"], types: ["3D"],
+    funcNames: ["atan2j"],
+    funcs: `fn atan2j(y: f32, x: f32) -> f32 { if (x == 0.0 && y == 0.0) { return select(0.0, PI, (bitcast<u32>(x) >> 31u) == 1u) * select(1.0, -1.0, (bitcast<u32>(y) >> 31u) == 1u); } return atan2(y, x); }`,
     code: (w, p) => `{
 v.x += (${w} * (sin((${p[0]} * t.y)) - cos((${p[1]} * t.x))));
 v.y += (${w} * (sin((${p[2]} * t.x)) - cos((${p[3]} * t.y))));
@@ -28485,8 +32145,10 @@ pz_ += (((${w} * (sin((${p[4]} * t.y)) - cos((${p[5]} * z_)))) * cos((${p[6]} * 
   "petal3D": {
     params: [{ name: "mode", def: 1 }, { name: "x1", def: 0 }, { name: "x2", def: 0 }, { name: "x3", def: 0 }, { name: "x4", def: 0 }, { name: "x5", def: 0 }, { name: "x6", def: 0 }, { name: "y1", def: 0 }, { name: "y2", def: 0 }, { name: "y3", def: 0 }, { name: "y4", def: 0 }, { name: "y5", def: 0 }, { name: "y6", def: 0 }, { name: "z1", def: 0 }, { name: "z2", def: 0 }, { name: "z3", def: 0 }, { name: "z4", def: 0 }, { name: "z5", def: 0 }, { name: "z6", def: 0 }, { name: "warp", def: 1 }],
     verified: true, priority: 0, flags: ["3d","z"], types: ["3D"],
-    funcNames: ["roundc"],
-    funcs: `fn roundc(x: f32) -> f32 { return sign(x) * floor(abs(x) + 0.5); }`,
+    funcNames: ["roundc","atan2j"],
+    funcs: `fn roundc(x: f32) -> f32 { return sign(x) * floor(abs(x) + 0.5); }
+
+fn atan2j(y: f32, x: f32) -> f32 { if (x == 0.0 && y == 0.0) { return select(0.0, PI, (bitcast<u32>(x) >> 31u) == 1u) * select(1.0, -1.0, (bitcast<u32>(y) >> 31u) == 1u); } return atan2(y, x); }`,
     code: (w, p) => `{
 var ax: f32 = cos((t.x * ${p[19]}));
 var bx: f32 = (((cos((t.x + ${p[1]})) * cos((t.y + ${p[2]}))) * (cos((t.x + ${p[3]})) * cos((t.y + ${p[4]})))) * (cos((t.x + ${p[5]})) * cos((t.y + ${p[6]}))));
@@ -28514,8 +32176,10 @@ if ((mode <= 0)) {
   "cut_kleinian": {
     params: [{ name: "mode", def: 1 }, { name: "zoom", def: 2 }, { name: "boxSize", def: 1 }, { name: "time", def: 0 }, { name: "NIters", def: 150 }, { name: "Dx", def: 0 }, { name: "Dy", def: -0.955 }, { name: "invert", def: 0 }],
     verified: true, priority: 0, flags: ["hide"], types: ["2D","BASE_SHAPE","SIMULATION"],
-    funcNames: ["cut_kleinian_wrap","cut_kleinian_TransA","cut_kleinian_JosKleinian"],
-    funcs: `fn cut_kleinian_wrap(x_in: f32, a: f32, s: f32) -> f32 {
+    funcNames: ["atan2j","cut_kleinian_wrap","cut_kleinian_TransA","cut_kleinian_JosKleinian"],
+    funcs: `fn atan2j(y: f32, x: f32) -> f32 { if (x == 0.0 && y == 0.0) { return select(0.0, PI, (bitcast<u32>(x) >> 31u) == 1u) * select(1.0, -1.0, (bitcast<u32>(y) >> 31u) == 1u); } return atan2(y, x); }
+
+fn cut_kleinian_wrap(x_in: f32, a: f32, s: f32) -> f32 {
   var x: f32 = x_in;
   x -= s;
   return ((x - (a * floor((x / a)))) + s);
@@ -28593,8 +32257,10 @@ v.y = (${w} * y);
   "cut_mandala": {
     params: [{ name: "seed", def: 1000 }, { name: "mode", def: 1 }, { name: "time", def: 0 }, { name: "zoom", def: 2 }, { name: "invert", def: 1 }],
     verified: true, priority: 0, flags: ["hide"], types: ["2D","BASE_SHAPE","SIMULATION"],
-    funcNames: ["mmod2","smoothstepc","cut_mandala_spiral","cut_mandala_rose","rose2","cut_mandala_circle"],
-    funcs: `fn mmod2(a: vec2f, b: vec2f) -> vec2f { return a - b * floor(a / b); }
+    funcNames: ["atan2j","mmod2","smoothstepc","cut_mandala_spiral","cut_mandala_rose","rose2","cut_mandala_circle"],
+    funcs: `fn atan2j(y: f32, x: f32) -> f32 { if (x == 0.0 && y == 0.0) { return select(0.0, PI, (bitcast<u32>(x) >> 31u) == 1u) * select(1.0, -1.0, (bitcast<u32>(y) >> 31u) == 1u); } return atan2(y, x); }
+
+fn mmod2(a: vec2f, b: vec2f) -> vec2f { return a - b * floor(a / b); }
 
 fn smoothstepc(a: f32, b: f32, x: f32) -> f32 { if (a == b) { return step(a, x); } let t = clamp((x - a) / (b - a), 0.0, 1.0); return t * t * (3.0 - 2.0 * t); }
 
@@ -28647,7 +32313,7 @@ if ((min(max(${p[1]}, 0.0), 1.0) == 0)) {
   y = (rnd(rs) - 0.5);
 }
 var p_: vec2f = vec2f((x * ${p[3]}), (y * ${p[3]}));
-var f: vec2f = vec2f(sqrt(((p_.x * p_.x) + (p_.y * p_.y))), atan2(p_.y, p_.x));
+var f: vec2f = vec2f(sqrt(((p_.x * p_.x) + (p_.y * p_.y))), atan2j(p_.y, p_.x));
 var T0: f32 = cos((0.3 * ${p[2]}));
 var T1: f32 = (0.5 + (0.5 * cos((0.3 * ${p[2]}))));
 var T2: f32 = 1.0;
@@ -28724,8 +32390,10 @@ v.y = (${w} * y);
   "dc_portal": {
     params: [{ name: "seed", def: 1000 }, { name: "time", def: 0 }, { name: "waves", def: 5 }, { name: "zoom", def: 15 }, { name: "ColorOnly", def: 0 }, { name: "Gradient", def: 0 }, { name: "scale_z", def: 0 }, { name: "offset_z", def: 0 }, { name: "reset_z", def: 1 }],
     verified: true, priority: 0, flags: ["dc","rgb","z"], types: ["SIMULATION","DC","BASE_SHAPE"],
-    funcNames: ["read_imageStepMode","dc_portal_getRGBColor","dbl2int","greyscale","distance_color"],
+    funcNames: ["read_imageStepMode","atan2j","dc_portal_getRGBColor","dbl2int","greyscale","distance_color"],
     funcs: `fn read_imageStepMode(base: u32, n: i32, t: f32) -> vec4f { return pal[base + u32(clamp(t, 0.0, 0.99999) * f32(max(n, 1)))]; }
+
+fn atan2j(y: f32, x: f32) -> f32 { if (x == 0.0 && y == 0.0) { return select(0.0, PI, (bitcast<u32>(x) >> 31u) == 1u) * select(1.0, -1.0, (bitcast<u32>(y) >> 31u) == 1u); } return atan2(y, x); }
 
 fn dc_portal_getRGBColor(uv: vec2f, time: f32, waves: f32) -> vec3f {
   var d: f32 = 1.0;
@@ -28836,13 +32504,15 @@ if ((${p[8]} == 1)) {
   "kaplan": {
     params: [{ name: "seed", def: 1000 }, { name: "N", def: 800 }, { name: "time", def: 10 }, { name: "invert", def: 0 }],
     verified: true, priority: 0, flags: ["hide"], types: ["2D","SIMULATION","BASE_SHAPE"],
-    funcNames: ["Mat2","powc","Mat2_Init","times"],
+    funcNames: ["Mat2","atan2j","powc","Mat2_Init","times"],
     funcs: `struct Mat2 {
   a00: f32,
   a01: f32,
   a10: f32,
   a11: f32,
 }
+
+fn atan2j(y: f32, x: f32) -> f32 { if (x == 0.0 && y == 0.0) { return select(0.0, PI, (bitcast<u32>(x) >> 31u) == 1u) * select(1.0, -1.0, (bitcast<u32>(y) >> 31u) == 1u); } return atan2(y, x); }
 
 fn powc(x: f32, y: f32) -> f32 {
   if (x >= 0.0) { return pow(x, y); }
@@ -28868,7 +32538,7 @@ var y: i32 = i32((min(max(${p[1]}, 50.0), 1500.0) * rnd(rs)));
 var zoom: f32 = floor(${p[2]});
 var xv: f32 = (zoom * (f32(x) - (f32(i32(min(max(${p[1]}, 50.0), 1500.0))) / 2.0)));
 var yv: f32 = (zoom * (f32(y) - (f32(i32(min(max(${p[1]}, 50.0), 1500.0))) / 2.0)));
-var r0: f32 = atan2(xv, yv);
+var r0: f32 = atan2j(xv, yv);
 var rot: Mat2;
 Mat2_Init(&(rot), cos(r0), -(sin(r0)), sin(r0), cos(r0));
 var uv: vec2f = times(&(rot), vec2f(xv, yv));
@@ -28895,11 +32565,146 @@ v.x = (${w} * ((f32(x) / min(max(${p[1]}, 50.0), 1500.0)) - 0.5));
 v.y = (${w} * ((f32(y) / min(max(${p[1]}, 50.0), 1500.0)) - 0.5));
 }`,
   },
+  "post_mandelbulb3d_crop": {
+    params: [{ name: "power", def: 9 }, { name: "xz", def: 0 }, { name: "iterations", def: 12 }, { name: "bailout", def: 2 }, { name: "filled", def: 0 }],
+    verified: true, priority: 1, flags: ["3d","dc","hide","z"], types: ["3D","CROP","ESCAPE_TIME_FRACTAL"],
+    funcNames: ["powc","atan2j"],
+    funcs: `fn powc(x: f32, y: f32) -> f32 {
+  if (x >= 0.0) { return pow(x, y); }
+  let yi = round(y);
+  if (abs(y - yi) > 1e-6) { return pow(x, y); }
+  let m = pow(-x, y);
+  return select(m, -m, (i32(yi) & 1) != 0);
+}
+
+fn atan2j(y: f32, x: f32) -> f32 { if (x == 0.0 && y == 0.0) { return select(0.0, PI, (bitcast<u32>(x) >> 31u) == 1u) * select(1.0, -1.0, (bitcast<u32>(y) >> 31u) == 1u); } return atan2(y, x); }`,
+    code: (w, p) => `{
+var x: f32;
+var y: f32;
+var z: f32;
+if ((min(max(${p[4]}, 0.0), 1.0) == 1)) {
+  var fillAmount: f32 = ((${w} + 1) * 2);
+  v.x = ((rnd(rs) * fillAmount) - (fillAmount / 2));
+  v.y = ((rnd(rs) * fillAmount) - (fillAmount / 2));
+  pz_ = ((rnd(rs) * fillAmount) - (fillAmount / 2));
+  x = v.x;
+  y = v.y;
+  z = pz_;
+} else {
+  x = v.x;
+  y = v.y;
+  z = pz_;
+}
+var xf: f32;
+var yf: f32;
+var zf: f32;
+var Power_: f32 = ${p[0]};
+var sq_r: f32;
+var sq_xz: f32;
+var r_: f32;
+var theta: f32;
+var zangle: f32;
+var colorIterations: i32 = 8;
+for (var i: i32 = 0; (f32(i) < min(max(${p[2]}, 0.0), 250.0)); i++) {
+  sq_r = sqrt((((x * x) + (y * y)) + (z * z)));
+  sq_xz = sqrt(((x * x) + (z * z)));
+  r_ = powc(sq_r, Power_);
+  theta = (atan2j((sq_xz + ${p[1]}), y) * Power_);
+  zangle = (atan2j(x, z) * Power_);
+  xf = ((sin(zangle) * sin(theta)) * r_);
+  yf = (cos(theta) * r_);
+  zf = ((sin(theta) * cos(zangle)) * r_);
+  xf += x;
+  yf += y;
+  zf += z;
+  x = xf;
+  y = yf;
+  z = zf;
+  (*cp) = min(1.0, (f32(colorIterations) / f32((i + 1))));
+  if ((sqrt((((xf * xf) + (yf * yf)) + (zf * zf))) < ${p[3]})) {
+    (*hd) = false;
+    v.x = (${w} * v.x);
+    v.y = (${w} * v.y);
+    pz_ = (${w} * pz_);
+  } else {
+    (*hd) = true;
+    pz_ = 0;
+    v.y = pz_;
+    v.x = v.y;
+  }
+}
+}`,
+  },
+  "post_mandelbox3d_crop": {
+    params: [{ name: "scale", def: 2 }, { name: "radius", def: 0.5 }, { name: "f", def: 1 }, { name: "iterations", def: 12 }, { name: "bailout", def: 16 }],
+    verified: true, priority: 1, flags: ["3d","hide","z"], types: ["3D","CROP","ESCAPE_TIME_FRACTAL"],
+    funcNames: ["atan2j"],
+    funcs: `fn atan2j(y: f32, x: f32) -> f32 { if (x == 0.0 && y == 0.0) { return select(0.0, PI, (bitcast<u32>(x) >> 31u) == 1u) * select(1.0, -1.0, (bitcast<u32>(y) >> 31u) == 1u); } return atan2(y, x); }`,
+    code: (w, p) => `{
+var x: f32 = (v.x * 6);
+var y: f32 = (v.y * 6);
+var z: f32 = (pz_ * 6);
+var x1: f32 = x;
+var y1: f32 = y;
+var z1: f32 = z;
+var mag: f32;
+var r_: f32 = ${p[1]};
+for (var i: i32 = 0; (f32(i) < min(max(${p[3]}, 0.0), 250.0)); i++) {
+  if ((x > 1)) {
+    x = (2 - x);
+  } else if ((x < -1)) {
+    x = (-2 - x);
+  }
+  if ((y > 1)) {
+    y = (2 - y);
+  } else if ((y < -1)) {
+    y = (-2 - y);
+  }
+  if ((z > 1)) {
+    z = (2 - z);
+  } else if ((z < -1)) {
+    z = (-2 - z);
+  }
+  x *= ${p[2]};
+  y *= ${p[2]};
+  z *= ${p[2]};
+  mag = sqrt((((x * x) + (y * y)) + (z * z)));
+  if ((mag < r_)) {
+    x = (x / (r_ * r_));
+    y = (y / (r_ * r_));
+    z = (z / (r_ * r_));
+  } else if ((mag < 1)) {
+    x = (x / (mag * mag));
+    y = (y / (mag * mag));
+    z = (z / (mag * mag));
+  }
+  x *= ${p[0]};
+  y *= ${p[0]};
+  z *= ${p[0]};
+  x += x1;
+  y += y1;
+  z += z1;
+  if ((mag < ${p[4]})) {
+    (*hd) = false;
+    v.x = (${w} * v.x);
+    v.y = (${w} * v.y);
+    pz_ = (${w} * pz_);
+  } else {
+    (*hd) = true;
+    pz_ = 0;
+    v.y = pz_;
+    v.x = v.y;
+  }
+}
+}`,
+  },
   "fresnel": {
     params: [{ name: "x0", def: 0 }, { name: "y0", def: 0 }, { name: "ring", def: -2 }],
     verified: true, priority: 0, flags: ["dc"], types: ["2D","DC","BASE_SHAPE"],
-    funcNames: ["fresnel_distance"],
-    funcs: `fn fresnel_distance(p0: vec2f, p1: vec2f) -> f32 {
+    funcNames: ["atan2j","fresnel_distance"],
+    funcs: `fn atan2j(y: f32, x: f32) -> f32 { if (x == 0.0 && y == 0.0) { return select(0.0, PI, (bitcast<u32>(x) >> 31u) == 1u) * select(1.0, -1.0, (bitcast<u32>(y) >> 31u) == 1u); } return atan2(y, x); }
+
+fn fresnel_distance(p0: vec2f, p1: vec2f) -> f32 {
   return length((p0 - p1));
 }`,
     code: (w, p) => `{
@@ -28914,14 +32719,16 @@ v.y = (${w} * p_.y);
   "tunnel": {
     params: [{ name: "Sx", def: 200 }, { name: "Sy", def: 50 }],
     verified: true, priority: 0, flags: ["dc"], types: ["2D","DC","BASE_SHAPE"],
-    funcNames: ["powc"],
+    funcNames: ["powc","atan2j"],
     funcs: `fn powc(x: f32, y: f32) -> f32 {
   if (x >= 0.0) { return pow(x, y); }
   let yi = round(y);
   if (abs(y - yi) > 1e-6) { return pow(x, y); }
   let m = pow(-x, y);
   return select(m, -m, (i32(yi) & 1) != 0);
-}`,
+}
+
+fn atan2j(y: f32, x: f32) -> f32 { if (x == 0.0 && y == 0.0) { return select(0.0, PI, (bitcast<u32>(x) >> 31u) == 1u) * select(1.0, -1.0, (bitcast<u32>(y) >> 31u) == 1u); } return atan2(y, x); }`,
     code: (w, p) => `{
 var uv: vec2f = (vec2f(t.x, t.y) + vec2f(0.5, 0.5));
 var deform: vec4f = vec4f(0.1, 0.1, 0.1, 0.1);
@@ -28940,14 +32747,16 @@ v.y = (${w} * (v.y + sample_shift.y));
   "bulge": {
     params: [{ name: "N", def: 2 }],
     verified: true, priority: 0, flags: [], types: ["2D"],
-    funcNames: ["powc"],
+    funcNames: ["powc","atan2j"],
     funcs: `fn powc(x: f32, y: f32) -> f32 {
   if (x >= 0.0) { return pow(x, y); }
   let yi = round(y);
   if (abs(y - yi) > 1e-6) { return pow(x, y); }
   let m = pow(-x, y);
   return select(m, -m, (i32(yi) & 1) != 0);
-}`,
+}
+
+fn atan2j(y: f32, x: f32) -> f32 { if (x == 0.0 && y == 0.0) { return select(0.0, PI, (bitcast<u32>(x) >> 31u) == 1u) * select(1.0, -1.0, (bitcast<u32>(y) >> 31u) == 1u); } return atan2(y, x); }`,
     code: (w, p) => `{
 var r_: f32 = length(vec2f(t.x, t.y));
 var rn: f32 = powc(r_, ${p[0]});
@@ -28955,11 +32764,145 @@ v.x += (${w} * ((rn * t.x) / r_));
 v.y += (${w} * ((rn * t.y) / r_));
 }`,
   },
+  "post_bulbtorus_crop": {
+    params: [{ name: "power1", def: 9 }, { name: "power2", def: 9 }, { name: "iterations", def: 12 }, { name: "bailout", def: 16 }, { name: "scaleX", def: 1 }, { name: "scaleY", def: 1 }, { name: "ScaleZ", def: 1 }, { name: "color", def: 1 }],
+    verified: true, priority: 0, flags: ["3d","dc","z"], types: ["3D","CROP","ESCAPE_TIME_FRACTAL","DC"],
+    funcNames: ["atan2j","powc"],
+    funcs: `fn atan2j(y: f32, x: f32) -> f32 { if (x == 0.0 && y == 0.0) { return select(0.0, PI, (bitcast<u32>(x) >> 31u) == 1u) * select(1.0, -1.0, (bitcast<u32>(y) >> 31u) == 1u); } return atan2(y, x); }
+
+fn powc(x: f32, y: f32) -> f32 {
+  if (x >= 0.0) { return pow(x, y); }
+  let yi = round(y);
+  if (abs(y - yi) > 1e-6) { return pow(x, y); }
+  let m = pow(-x, y);
+  return select(m, -m, (i32(yi) & 1) != 0);
+}`,
+    code: (w, p) => `{
+var x: f32 = (v.x * ${p[4]});
+var y: f32 = (v.y * ${p[5]});
+var z: f32 = (pz_ * ${p[6]});
+var x1: f32 = x;
+var y1: f32 = y;
+var z1: f32 = z;
+var r_: f32 = sqrt((((x * x) + (y * y)) + (z * z)));
+for (var i: i32 = 0; (f32(i) < min(max(${p[2]}, 0.0), 250.0)); i++) {
+  var rh: f32 = sqrt(((x * x) + (y * y)));
+  var phi: f32 = atan2j(y, x);
+  var phipow: f32 = (phi * ${p[0]});
+  var theta: f32 = atan2j(rh, z);
+  var px: f32 = (x - (cos(phi) * 1.5));
+  var py: f32 = (y - (sin(phi) * 1.5));
+  var rhrad: f32 = sqrt((((px * px) + (py * py)) + (z * z)));
+  var rh1: f32 = powc(rhrad, ${p[1]});
+  var rh2: f32 = powc(rhrad, ${p[0]});
+  var thetapow: f32 = (theta * ${p[1]});
+  var sintheta: f32 = (sin(thetapow) * rh2);
+  x = (sintheta * cos(phipow));
+  y = (sintheta * sin(phipow));
+  z = (cos(thetapow) * rh1);
+  x += x1;
+  y += y1;
+  z += z1;
+  r_ = sqrt((((x * x) + (y * y)) + (z * z)));
+  if ((r_ < ${p[3]})) {
+    v.x = (${w} * v.x);
+    v.y = (${w} * v.y);
+    pz_ = (${w} * pz_);
+    (*cp) = (sin(r_) * ${p[7]});
+  } else {
+    pz_ = 0;
+    v.y = pz_;
+    v.x = v.y;
+  }
+}
+}`,
+  },
+  "post_bristorbrot_crop": {
+    params: [{ name: "iterations", def: 12 }, { name: "bailout", def: 16 }, { name: "scaleX", def: 1 }, { name: "scaleY", def: 1 }, { name: "ScaleZ", def: 1 }, { name: "color", def: 1 }],
+    verified: true, priority: 1, flags: ["3d","dc","z"], types: ["3D","CROP","POST","ESCAPE_TIME_FRACTAL","DC"],
+    funcNames: ["atan2j"],
+    funcs: `fn atan2j(y: f32, x: f32) -> f32 { if (x == 0.0 && y == 0.0) { return select(0.0, PI, (bitcast<u32>(x) >> 31u) == 1u) * select(1.0, -1.0, (bitcast<u32>(y) >> 31u) == 1u); } return atan2(y, x); }`,
+    code: (w, p) => `{
+var x: f32 = (v.x * ${p[2]});
+var y: f32 = (v.y * ${p[3]});
+var z: f32 = (pz_ * ${p[4]});
+var x1: f32 = x;
+var y1: f32 = y;
+var z1: f32 = z;
+for (var i: i32 = 0; (f32(i) < min(max(${p[0]}, 0.0), 250.0)); i++) {
+  var newx: f32 = (((x * x) - (y * y)) - (z * z));
+  var newy: f32 = (y * ((2.0 * x) - z));
+  var newz: f32 = (z * ((2.0 * x) + y));
+  x = newx;
+  y = newy;
+  z = newz;
+  x += x1;
+  y += y1;
+  z += z1;
+  var r_: f32 = sqrt((((x * x) + (y * y)) + (z * z)));
+  if ((r_ < ${p[1]})) {
+    v.x = (${w} * v.x);
+    v.y = (${w} * v.y);
+    pz_ = (${w} * pz_);
+    (*cp) = (sin(r_) * min(max(${p[5]}, 0.0), 1.0));
+  } else {
+    pz_ = 0;
+    v.y = pz_;
+    v.x = v.y;
+  }
+}
+}`,
+  },
+  "post_benesi_crop": {
+    params: [{ name: "iterations", def: 12 }, { name: "bailout", def: 16 }, { name: "scaleX", def: 1 }, { name: "scaleY", def: 1 }, { name: "ScaleZ", def: 1 }, { name: "color", def: 1 }],
+    verified: true, priority: 1, flags: ["3d","dc","z"], types: ["3D","CROP","POST","ESCAPE_TIME_FRACTAL","DC"],
+    funcNames: ["atan2j"],
+    funcs: `fn atan2j(y: f32, x: f32) -> f32 { if (x == 0.0 && y == 0.0) { return select(0.0, PI, (bitcast<u32>(x) >> 31u) == 1u) * select(1.0, -1.0, (bitcast<u32>(y) >> 31u) == 1u); } return atan2(y, x); }`,
+    code: (w, p) => `{
+var x: f32 = (v.x * ${p[2]});
+var y: f32 = (v.y * ${p[3]});
+var z: f32 = (pz_ * ${p[4]});
+var x1: f32 = x;
+var y1: f32 = y;
+var z1: f32 = z;
+for (var i: i32 = 0; (f32(i) < min(max(${p[0]}, 0.0), 250.0)); i++) {
+  var r1: f32 = ((y * y) + (z * z));
+  var newx: f32;
+  if (((x1 < 0.0) || (x < sqrt(r1)))) {
+    newx = ((x * x) - r1);
+  } else {
+    newx = ((-x * x) + r1);
+  }
+  r1 = (((-1.0 / sqrt(r1)) * 2.0) * abs(x));
+  var newy: f32 = (r1 * ((y * y) - (z * z)));
+  var newz: f32 = (((r1 * 2.0) * y) * z);
+  x = newx;
+  y = newy;
+  z = newz;
+  x += x1;
+  y += y1;
+  z += z1;
+  var r_: f32 = sqrt((((x * x) + (y * y)) + (z * z)));
+  if ((r_ < ${p[1]})) {
+    v.x = (${w} * v.x);
+    v.y = (${w} * v.y);
+    pz_ = (${w} * pz_);
+    (*cp) = (sin(r_) * min(max(${p[5]}, 0.0), 1.0));
+  } else {
+    pz_ = 0;
+    v.y = pz_;
+    v.x = v.y;
+  }
+}
+}`,
+  },
   "dc_gmandelbroot": {
     params: [{ name: "randomize", def: 10000 }, { name: "colormode", def: 0 }, { name: "iters", def: 128 }, { name: "exp_re", def: 2 }, { name: "exp_im", def: 0 }, { name: "n", def: 0 }, { name: "m", def: 0 }, { name: "burnigship", def: 0 }, { name: "conjugate", def: 0 }, { name: "julia", def: 0 }, { name: "jre", def: 0 }, { name: "jim", def: 0 }, { name: "panX", def: 0.5 }, { name: "panY", def: 0 }, { name: "zoom", def: 4 }, { name: "ColorOnly", def: 0 }, { name: "Gradient", def: 0 }, { name: "scale_z", def: 0 }, { name: "offset_z", def: 0 }, { name: "reset_z", def: 1 }],
     verified: true, priority: 0, flags: ["dc","hide","rgb","z"], types: ["SIMULATION","DC","BASE_SHAPE","ESCAPE_TIME_FRACTAL"],
-    funcNames: ["read_imageStepMode","powc","roundc","dc_gmandelbroot_hsv","dc_gmandelbroot_gen_mandelbroot","dc_gmandelbroot_getRGBColor","dbl2int","greyscale","distance_color"],
+    funcNames: ["read_imageStepMode","atan2j","powc","roundc","dc_gmandelbroot_hsv","dc_gmandelbroot_gen_mandelbroot","dc_gmandelbroot_getRGBColor","dbl2int","greyscale","distance_color"],
     funcs: `fn read_imageStepMode(base: u32, n: i32, t: f32) -> vec4f { return pal[base + u32(clamp(t, 0.0, 0.99999) * f32(max(n, 1)))]; }
+
+fn atan2j(y: f32, x: f32) -> f32 { if (x == 0.0 && y == 0.0) { return select(0.0, PI, (bitcast<u32>(x) >> 31u) == 1u) * select(1.0, -1.0, (bitcast<u32>(y) >> 31u) == 1u); } return atan2(y, x); }
 
 fn powc(x: f32, y: f32) -> f32 {
   if (x >= 0.0) { return pow(x, y); }
@@ -28994,7 +32937,7 @@ fn dc_gmandelbroot_gen_mandelbroot(p_: vec2f, exp_: vec2f, colmode: f32, iters_:
     if ((conjugate == 1.0)) {
       z.y = -z.y;
     }
-    var q1: f32 = atan2(z.y, z.x);
+    var q1: f32 = atan2j(z.y, z.x);
     r_ = ((z.x * z.x) + (z.y * z.y));
     var q2: f32 = (((q1 * d) + ((k / 2.0) * log((r_ + m)))) + ((2 * PI) * n));
     var q3: f32 = (powc(r_, (d / 2.0)) / exp((k * q1)));
@@ -29153,7 +33096,7 @@ if ((((color.x == 0.0) && (color.y == 0.0)) && (color.z == 0.0))) {
   "sym_ng1": {
     params: [{ name: "stepx", def: 0.5 }, { name: "stepy", def: 0.5 }],
     verified: true, priority: 0, flags: [], types: ["2D"],
-    funcNames: ["Mathc","transfhcf"],
+    funcNames: ["Mathc","atan2j","transfhcf"],
     funcs: `struct Mathc {
   a: f32,
   b: f32,
@@ -29162,6 +33105,8 @@ if ((((color.x == 0.0) && (color.y == 0.0)) && (color.z == 0.0))) {
   e: f32,
   f: f32,
 }
+
+fn atan2j(y: f32, x: f32) -> f32 { if (x == 0.0 && y == 0.0) { return select(0.0, PI, (bitcast<u32>(x) >> 31u) == 1u) * select(1.0, -1.0, (bitcast<u32>(y) >> 31u) == 1u); } return atan2(y, x); }
 
 fn transfhcf(xy: vec2f, a: f32, b: f32, c: f32, d: f32, e: f32, f: f32) -> vec2f {
   var xt: f32 = (((a * xy.x) + (b * xy.y)) + c);
@@ -29188,7 +33133,7 @@ v.y += (${w} * f.y);
   "sym_ng2": {
     params: [{ name: "stepx", def: 2 }, { name: "stepy", def: 2 }],
     verified: true, priority: 0, flags: [], types: ["2D"],
-    funcNames: ["Mathc","transfhcf"],
+    funcNames: ["Mathc","atan2j","transfhcf"],
     funcs: `struct Mathc {
   a: f32,
   b: f32,
@@ -29197,6 +33142,8 @@ v.y += (${w} * f.y);
   e: f32,
   f: f32,
 }
+
+fn atan2j(y: f32, x: f32) -> f32 { if (x == 0.0 && y == 0.0) { return select(0.0, PI, (bitcast<u32>(x) >> 31u) == 1u) * select(1.0, -1.0, (bitcast<u32>(y) >> 31u) == 1u); } return atan2(y, x); }
 
 fn transfhcf(xy: vec2f, a: f32, b: f32, c: f32, d: f32, e: f32, f: f32) -> vec2f {
   var xt: f32 = (((a * xy.x) + (b * xy.y)) + c);
@@ -29223,7 +33170,7 @@ v.y += (${w} * f.y);
   "sym_ng3": {
     params: [{ name: "sepx", def: 0.5 }, { name: "sepy", def: 0 }, { name: "step", def: 2 }],
     verified: true, priority: 0, flags: [], types: ["2D"],
-    funcNames: ["Mathc","transfhcf"],
+    funcNames: ["Mathc","atan2j","transfhcf"],
     funcs: `struct Mathc {
   a: f32,
   b: f32,
@@ -29232,6 +33179,8 @@ v.y += (${w} * f.y);
   e: f32,
   f: f32,
 }
+
+fn atan2j(y: f32, x: f32) -> f32 { if (x == 0.0 && y == 0.0) { return select(0.0, PI, (bitcast<u32>(x) >> 31u) == 1u) * select(1.0, -1.0, (bitcast<u32>(y) >> 31u) == 1u); } return atan2(y, x); }
 
 fn transfhcf(xy: vec2f, a: f32, b: f32, c: f32, d: f32, e: f32, f: f32) -> vec2f {
   var xt: f32 = (((a * xy.x) + (b * xy.y)) + c);
@@ -29258,7 +33207,7 @@ v.y += (${w} * f.y);
   "sym_ng4": {
     params: [{ name: "sepx", def: 0 }, { name: "sepy", def: 0 }, { name: "stepx", def: 0 }, { name: "stepy", def: 0 }],
     verified: true, priority: 0, flags: [], types: ["2D"],
-    funcNames: ["Mathc","transfhcf"],
+    funcNames: ["Mathc","atan2j","transfhcf"],
     funcs: `struct Mathc {
   a: f32,
   b: f32,
@@ -29267,6 +33216,8 @@ v.y += (${w} * f.y);
   e: f32,
   f: f32,
 }
+
+fn atan2j(y: f32, x: f32) -> f32 { if (x == 0.0 && y == 0.0) { return select(0.0, PI, (bitcast<u32>(x) >> 31u) == 1u) * select(1.0, -1.0, (bitcast<u32>(y) >> 31u) == 1u); } return atan2(y, x); }
 
 fn transfhcf(xy: vec2f, a: f32, b: f32, c: f32, d: f32, e: f32, f: f32) -> vec2f {
   var xt: f32 = (((a * xy.x) + (b * xy.y)) + c);
@@ -29301,7 +33252,7 @@ v.y += (${w} * f.y);
   "sym_ng5": {
     params: [{ name: "sepx", def: 0 }, { name: "sepy", def: 0 }, { name: "stepx", def: 0 }],
     verified: true, priority: 0, flags: [], types: ["2D"],
-    funcNames: ["Mathc","transfhcf"],
+    funcNames: ["Mathc","atan2j","transfhcf"],
     funcs: `struct Mathc {
   a: f32,
   b: f32,
@@ -29310,6 +33261,8 @@ v.y += (${w} * f.y);
   e: f32,
   f: f32,
 }
+
+fn atan2j(y: f32, x: f32) -> f32 { if (x == 0.0 && y == 0.0) { return select(0.0, PI, (bitcast<u32>(x) >> 31u) == 1u) * select(1.0, -1.0, (bitcast<u32>(y) >> 31u) == 1u); } return atan2(y, x); }
 
 fn transfhcf(xy: vec2f, a: f32, b: f32, c: f32, d: f32, e: f32, f: f32) -> vec2f {
   var xt: f32 = (((a * xy.x) + (b * xy.y)) + c);
@@ -29340,7 +33293,7 @@ v.y += (${w} * f.y);
   "sym_ng6": {
     params: [{ name: "sepy", def: 0.1 }, { name: "stepx", def: 1 }, { name: "stepy", def: 1 }],
     verified: true, priority: 0, flags: [], types: ["2D"],
-    funcNames: ["Mathc","transfhcf"],
+    funcNames: ["Mathc","atan2j","transfhcf"],
     funcs: `struct Mathc {
   a: f32,
   b: f32,
@@ -29349,6 +33302,8 @@ v.y += (${w} * f.y);
   e: f32,
   f: f32,
 }
+
+fn atan2j(y: f32, x: f32) -> f32 { if (x == 0.0 && y == 0.0) { return select(0.0, PI, (bitcast<u32>(x) >> 31u) == 1u) * select(1.0, -1.0, (bitcast<u32>(y) >> 31u) == 1u); } return atan2(y, x); }
 
 fn transfhcf(xy: vec2f, a: f32, b: f32, c: f32, d: f32, e: f32, f: f32) -> vec2f {
   var xt: f32 = (((a * xy.x) + (b * xy.y)) + c);
@@ -29379,7 +33334,7 @@ v.y += (${w} * f.y);
   "sym_ng7": {
     params: [{ name: "sepx", def: 0 }, { name: "sepy", def: 0 }],
     verified: true, priority: 0, flags: [], types: ["2D"],
-    funcNames: ["Mathc","transfhcf"],
+    funcNames: ["Mathc","atan2j","transfhcf"],
     funcs: `struct Mathc {
   a: f32,
   b: f32,
@@ -29388,6 +33343,8 @@ v.y += (${w} * f.y);
   e: f32,
   f: f32,
 }
+
+fn atan2j(y: f32, x: f32) -> f32 { if (x == 0.0 && y == 0.0) { return select(0.0, PI, (bitcast<u32>(x) >> 31u) == 1u) * select(1.0, -1.0, (bitcast<u32>(y) >> 31u) == 1u); } return atan2(y, x); }
 
 fn transfhcf(xy: vec2f, a: f32, b: f32, c: f32, d: f32, e: f32, f: f32) -> vec2f {
   var xt: f32 = (((a * xy.x) + (b * xy.y)) + c);
@@ -29414,7 +33371,7 @@ v.y += (${w} * f.y);
   "sym_ng8": {
     params: [{ name: "sepx", def: 0 }, { name: "sepy", def: 0 }, { name: "skewx", def: 0 }, { name: "skewy", def: 0 }],
     verified: true, priority: 0, flags: [], types: ["2D"],
-    funcNames: ["Mathc","transfhcf"],
+    funcNames: ["Mathc","atan2j","transfhcf"],
     funcs: `struct Mathc {
   a: f32,
   b: f32,
@@ -29423,6 +33380,8 @@ v.y += (${w} * f.y);
   e: f32,
   f: f32,
 }
+
+fn atan2j(y: f32, x: f32) -> f32 { if (x == 0.0 && y == 0.0) { return select(0.0, PI, (bitcast<u32>(x) >> 31u) == 1u) * select(1.0, -1.0, (bitcast<u32>(y) >> 31u) == 1u); } return atan2(y, x); }
 
 fn transfhcf(xy: vec2f, a: f32, b: f32, c: f32, d: f32, e: f32, f: f32) -> vec2f {
   var xt: f32 = (((a * xy.x) + (b * xy.y)) + c);
@@ -29461,7 +33420,7 @@ v.y += (${w} * f.y);
   "sym_ng9": {
     params: [{ name: "sepx", def: 0 }, { name: "sepy", def: 0 }],
     verified: true, priority: 0, flags: [], types: ["2D"],
-    funcNames: ["Mathc","transfhcf"],
+    funcNames: ["Mathc","atan2j","transfhcf"],
     funcs: `struct Mathc {
   a: f32,
   b: f32,
@@ -29470,6 +33429,8 @@ v.y += (${w} * f.y);
   e: f32,
   f: f32,
 }
+
+fn atan2j(y: f32, x: f32) -> f32 { if (x == 0.0 && y == 0.0) { return select(0.0, PI, (bitcast<u32>(x) >> 31u) == 1u) * select(1.0, -1.0, (bitcast<u32>(y) >> 31u) == 1u); } return atan2(y, x); }
 
 fn transfhcf(xy: vec2f, a: f32, b: f32, c: f32, d: f32, e: f32, f: f32) -> vec2f {
   var xt: f32 = (((a * xy.x) + (b * xy.y)) + c);
@@ -29500,7 +33461,7 @@ v.y += (${w} * f.y);
   "sym_ng10": {
     params: [{ name: "space", def: 0 }, { name: "spacex", def: 0 }, { name: "spacey", def: 0 }],
     verified: true, priority: 0, flags: [], types: ["2D"],
-    funcNames: ["Mathc","transfhcf"],
+    funcNames: ["Mathc","atan2j","transfhcf"],
     funcs: `struct Mathc {
   a: f32,
   b: f32,
@@ -29509,6 +33470,8 @@ v.y += (${w} * f.y);
   e: f32,
   f: f32,
 }
+
+fn atan2j(y: f32, x: f32) -> f32 { if (x == 0.0 && y == 0.0) { return select(0.0, PI, (bitcast<u32>(x) >> 31u) == 1u) * select(1.0, -1.0, (bitcast<u32>(y) >> 31u) == 1u); } return atan2(y, x); }
 
 fn transfhcf(xy: vec2f, a: f32, b: f32, c: f32, d: f32, e: f32, f: f32) -> vec2f {
   var xt: f32 = (((a * xy.x) + (b * xy.y)) + c);
@@ -29540,7 +33503,7 @@ v.y += (${w} * f.y);
   "sym_ng11": {
     params: [{ name: "space", def: 0 }, { name: "spacex", def: 0 }, { name: "spacey", def: 0 }, { name: "stepx", def: 1.5 }, { name: "stepy", def: 1.5 }],
     verified: true, priority: 0, flags: [], types: ["2D"],
-    funcNames: ["Mathc","transfhcf"],
+    funcNames: ["Mathc","atan2j","transfhcf"],
     funcs: `struct Mathc {
   a: f32,
   b: f32,
@@ -29549,6 +33512,8 @@ v.y += (${w} * f.y);
   e: f32,
   f: f32,
 }
+
+fn atan2j(y: f32, x: f32) -> f32 { if (x == 0.0 && y == 0.0) { return select(0.0, PI, (bitcast<u32>(x) >> 31u) == 1u) * select(1.0, -1.0, (bitcast<u32>(y) >> 31u) == 1u); } return atan2(y, x); }
 
 fn transfhcf(xy: vec2f, a: f32, b: f32, c: f32, d: f32, e: f32, f: f32) -> vec2f {
   var xt: f32 = (((a * xy.x) + (b * xy.y)) + c);
@@ -29592,7 +33557,7 @@ v.y += (${w} * f.y);
   "sym_ng12": {
     params: [{ name: "space", def: 0 }, { name: "spacex", def: 0 }, { name: "spacey", def: 0 }],
     verified: true, priority: 0, flags: [], types: ["2D"],
-    funcNames: ["Mathc","transfhcf"],
+    funcNames: ["Mathc","atan2j","transfhcf"],
     funcs: `struct Mathc {
   a: f32,
   b: f32,
@@ -29601,6 +33566,8 @@ v.y += (${w} * f.y);
   e: f32,
   f: f32,
 }
+
+fn atan2j(y: f32, x: f32) -> f32 { if (x == 0.0 && y == 0.0) { return select(0.0, PI, (bitcast<u32>(x) >> 31u) == 1u) * select(1.0, -1.0, (bitcast<u32>(y) >> 31u) == 1u); } return atan2(y, x); }
 
 fn transfhcf(xy: vec2f, a: f32, b: f32, c: f32, d: f32, e: f32, f: f32) -> vec2f {
   var xt: f32 = (((a * xy.x) + (b * xy.y)) + c);
@@ -29642,7 +33609,7 @@ v.y += (${w} * f.y);
   "sym_ng13": {
     params: [{ name: "radius", def: 0 }, { name: "stepx", def: 0 }, { name: "stepy", def: 0 }],
     verified: true, priority: 0, flags: [], types: ["2D"],
-    funcNames: ["Mathc","transfhcf"],
+    funcNames: ["Mathc","atan2j","transfhcf"],
     funcs: `struct Mathc {
   a: f32,
   b: f32,
@@ -29651,6 +33618,8 @@ v.y += (${w} * f.y);
   e: f32,
   f: f32,
 }
+
+fn atan2j(y: f32, x: f32) -> f32 { if (x == 0.0 && y == 0.0) { return select(0.0, PI, (bitcast<u32>(x) >> 31u) == 1u) * select(1.0, -1.0, (bitcast<u32>(y) >> 31u) == 1u); } return atan2(y, x); }
 
 fn transfhcf(xy: vec2f, a: f32, b: f32, c: f32, d: f32, e: f32, f: f32) -> vec2f {
   var xt: f32 = (((a * xy.x) + (b * xy.y)) + c);
@@ -29694,7 +33663,7 @@ v.y += (${w} * f.y);
   "sym_ng14": {
     params: [{ name: "radius", def: 0 }, { name: "stepx", def: 0 }, { name: "stepy", def: 0 }],
     verified: true, priority: 0, flags: [], types: ["2D"],
-    funcNames: ["Mathc","transfhcf"],
+    funcNames: ["Mathc","atan2j","transfhcf"],
     funcs: `struct Mathc {
   a: f32,
   b: f32,
@@ -29703,6 +33672,8 @@ v.y += (${w} * f.y);
   e: f32,
   f: f32,
 }
+
+fn atan2j(y: f32, x: f32) -> f32 { if (x == 0.0 && y == 0.0) { return select(0.0, PI, (bitcast<u32>(x) >> 31u) == 1u) * select(1.0, -1.0, (bitcast<u32>(y) >> 31u) == 1u); } return atan2(y, x); }
 
 fn transfhcf(xy: vec2f, a: f32, b: f32, c: f32, d: f32, e: f32, f: f32) -> vec2f {
   var xt: f32 = (((a * xy.x) + (b * xy.y)) + c);
@@ -29754,7 +33725,7 @@ v.y += (${w} * f.y);
   "sym_ng15": {
     params: [{ name: "radius", def: 0 }, { name: "stepx", def: 0 }, { name: "stepy", def: 0 }],
     verified: true, priority: 0, flags: [], types: ["2D"],
-    funcNames: ["Mathc","transfhcf"],
+    funcNames: ["Mathc","atan2j","transfhcf"],
     funcs: `struct Mathc {
   a: f32,
   b: f32,
@@ -29763,6 +33734,8 @@ v.y += (${w} * f.y);
   e: f32,
   f: f32,
 }
+
+fn atan2j(y: f32, x: f32) -> f32 { if (x == 0.0 && y == 0.0) { return select(0.0, PI, (bitcast<u32>(x) >> 31u) == 1u) * select(1.0, -1.0, (bitcast<u32>(y) >> 31u) == 1u); } return atan2(y, x); }
 
 fn transfhcf(xy: vec2f, a: f32, b: f32, c: f32, d: f32, e: f32, f: f32) -> vec2f {
   var xt: f32 = (((a * xy.x) + (b * xy.y)) + c);
@@ -29814,7 +33787,7 @@ v.y += (${w} * f.y);
   "sym_ng16": {
     params: [{ name: "radius", def: 0 }, { name: "stepx", def: 0 }, { name: "stepy", def: 0 }],
     verified: true, priority: 0, flags: [], types: ["2D"],
-    funcNames: ["Mathc","transfhcf"],
+    funcNames: ["Mathc","atan2j","transfhcf"],
     funcs: `struct Mathc {
   a: f32,
   b: f32,
@@ -29823,6 +33796,8 @@ v.y += (${w} * f.y);
   e: f32,
   f: f32,
 }
+
+fn atan2j(y: f32, x: f32) -> f32 { if (x == 0.0 && y == 0.0) { return select(0.0, PI, (bitcast<u32>(x) >> 31u) == 1u) * select(1.0, -1.0, (bitcast<u32>(y) >> 31u) == 1u); } return atan2(y, x); }
 
 fn transfhcf(xy: vec2f, a: f32, b: f32, c: f32, d: f32, e: f32, f: f32) -> vec2f {
   var xt: f32 = (((a * xy.x) + (b * xy.y)) + c);
@@ -29874,7 +33849,7 @@ v.y += (${w} * f.y);
   "sym_ng17": {
     params: [{ name: "radius", def: 0 }, { name: "stepx", def: 0 }, { name: "stepy", def: 0 }],
     verified: true, priority: 0, flags: [], types: ["2D"],
-    funcNames: ["Mathc","transfhcf"],
+    funcNames: ["Mathc","atan2j","transfhcf"],
     funcs: `struct Mathc {
   a: f32,
   b: f32,
@@ -29883,6 +33858,8 @@ v.y += (${w} * f.y);
   e: f32,
   f: f32,
 }
+
+fn atan2j(y: f32, x: f32) -> f32 { if (x == 0.0 && y == 0.0) { return select(0.0, PI, (bitcast<u32>(x) >> 31u) == 1u) * select(1.0, -1.0, (bitcast<u32>(y) >> 31u) == 1u); } return atan2(y, x); }
 
 fn transfhcf(xy: vec2f, a: f32, b: f32, c: f32, d: f32, e: f32, f: f32) -> vec2f {
   var xt: f32 = (((a * xy.x) + (b * xy.y)) + c);
@@ -29958,7 +33935,7 @@ v.y += (${w} * f.y);
   "sym_bg1": {
     params: [{ name: "stepx", def: 0 }, { name: "stepy", def: 0 }],
     verified: true, priority: 0, flags: [], types: ["2D"],
-    funcNames: ["Mathc","transfhcf"],
+    funcNames: ["Mathc","atan2j","transfhcf"],
     funcs: `struct Mathc {
   a: f32,
   b: f32,
@@ -29967,6 +33944,8 @@ v.y += (${w} * f.y);
   e: f32,
   f: f32,
 }
+
+fn atan2j(y: f32, x: f32) -> f32 { if (x == 0.0 && y == 0.0) { return select(0.0, PI, (bitcast<u32>(x) >> 31u) == 1u) * select(1.0, -1.0, (bitcast<u32>(y) >> 31u) == 1u); } return atan2(y, x); }
 
 fn transfhcf(xy: vec2f, a: f32, b: f32, c: f32, d: f32, e: f32, f: f32) -> vec2f {
   var xt: f32 = (((a * xy.x) + (b * xy.y)) + c);
@@ -29993,7 +33972,7 @@ v.y += (${w} * f.y);
   "sym_bg2": {
     params: [{ name: "stepx", def: 0 }, { name: "stepy", def: 0 }],
     verified: true, priority: 0, flags: [], types: ["2D"],
-    funcNames: ["Mathc","transfhcf"],
+    funcNames: ["Mathc","atan2j","transfhcf"],
     funcs: `struct Mathc {
   a: f32,
   b: f32,
@@ -30002,6 +33981,8 @@ v.y += (${w} * f.y);
   e: f32,
   f: f32,
 }
+
+fn atan2j(y: f32, x: f32) -> f32 { if (x == 0.0 && y == 0.0) { return select(0.0, PI, (bitcast<u32>(x) >> 31u) == 1u) * select(1.0, -1.0, (bitcast<u32>(y) >> 31u) == 1u); } return atan2(y, x); }
 
 fn transfhcf(xy: vec2f, a: f32, b: f32, c: f32, d: f32, e: f32, f: f32) -> vec2f {
   var xt: f32 = (((a * xy.x) + (b * xy.y)) + c);
@@ -30028,7 +34009,7 @@ v.y += (${w} * f.y);
   "sym_bg3": {
     params: [{ name: "stepx", def: 0 }, { name: "stepy", def: 0 }],
     verified: true, priority: 0, flags: [], types: ["2D"],
-    funcNames: ["Mathc","transfhcf"],
+    funcNames: ["Mathc","atan2j","transfhcf"],
     funcs: `struct Mathc {
   a: f32,
   b: f32,
@@ -30037,6 +34018,8 @@ v.y += (${w} * f.y);
   e: f32,
   f: f32,
 }
+
+fn atan2j(y: f32, x: f32) -> f32 { if (x == 0.0 && y == 0.0) { return select(0.0, PI, (bitcast<u32>(x) >> 31u) == 1u) * select(1.0, -1.0, (bitcast<u32>(y) >> 31u) == 1u); } return atan2(y, x); }
 
 fn transfhcf(xy: vec2f, a: f32, b: f32, c: f32, d: f32, e: f32, f: f32) -> vec2f {
   var xt: f32 = (((a * xy.x) + (b * xy.y)) + c);
@@ -30063,7 +34046,7 @@ v.y += (${w} * f.y);
   "sym_bg4": {
     params: [{ name: "stepx", def: 0 }, { name: "stepy", def: 0 }],
     verified: true, priority: 0, flags: [], types: ["2D"],
-    funcNames: ["Mathc","transfhcf"],
+    funcNames: ["Mathc","atan2j","transfhcf"],
     funcs: `struct Mathc {
   a: f32,
   b: f32,
@@ -30072,6 +34055,8 @@ v.y += (${w} * f.y);
   e: f32,
   f: f32,
 }
+
+fn atan2j(y: f32, x: f32) -> f32 { if (x == 0.0 && y == 0.0) { return select(0.0, PI, (bitcast<u32>(x) >> 31u) == 1u) * select(1.0, -1.0, (bitcast<u32>(y) >> 31u) == 1u); } return atan2(y, x); }
 
 fn transfhcf(xy: vec2f, a: f32, b: f32, c: f32, d: f32, e: f32, f: f32) -> vec2f {
   var xt: f32 = (((a * xy.x) + (b * xy.y)) + c);
@@ -30098,7 +34083,7 @@ v.y += (${w} * f.y);
   "sym_bg5": {
     params: [{ name: "stepx", def: 0 }, { name: "stepy", def: 0 }],
     verified: true, priority: 0, flags: [], types: ["2D"],
-    funcNames: ["Mathc","transfhcf"],
+    funcNames: ["Mathc","atan2j","transfhcf"],
     funcs: `struct Mathc {
   a: f32,
   b: f32,
@@ -30107,6 +34092,8 @@ v.y += (${w} * f.y);
   e: f32,
   f: f32,
 }
+
+fn atan2j(y: f32, x: f32) -> f32 { if (x == 0.0 && y == 0.0) { return select(0.0, PI, (bitcast<u32>(x) >> 31u) == 1u) * select(1.0, -1.0, (bitcast<u32>(y) >> 31u) == 1u); } return atan2(y, x); }
 
 fn transfhcf(xy: vec2f, a: f32, b: f32, c: f32, d: f32, e: f32, f: f32) -> vec2f {
   var xt: f32 = (((a * xy.x) + (b * xy.y)) + c);
@@ -30133,7 +34120,7 @@ v.y += (${w} * f.y);
   "sym_bg6": {
     params: [{ name: "stepx", def: 0 }, { name: "stepy", def: 0 }],
     verified: true, priority: 0, flags: [], types: ["2D"],
-    funcNames: ["Mathc","transfhcf"],
+    funcNames: ["Mathc","atan2j","transfhcf"],
     funcs: `struct Mathc {
   a: f32,
   b: f32,
@@ -30142,6 +34129,8 @@ v.y += (${w} * f.y);
   e: f32,
   f: f32,
 }
+
+fn atan2j(y: f32, x: f32) -> f32 { if (x == 0.0 && y == 0.0) { return select(0.0, PI, (bitcast<u32>(x) >> 31u) == 1u) * select(1.0, -1.0, (bitcast<u32>(y) >> 31u) == 1u); } return atan2(y, x); }
 
 fn transfhcf(xy: vec2f, a: f32, b: f32, c: f32, d: f32, e: f32, f: f32) -> vec2f {
   var xt: f32 = (((a * xy.x) + (b * xy.y)) + c);
@@ -30172,7 +34161,7 @@ v.y += (${w} * f.y);
   "sym_bg7": {
     params: [{ name: "stepx", def: 0 }, { name: "stepy", def: 0 }],
     verified: true, priority: 0, flags: [], types: ["2D"],
-    funcNames: ["Mathc","transfhcf"],
+    funcNames: ["Mathc","atan2j","transfhcf"],
     funcs: `struct Mathc {
   a: f32,
   b: f32,
@@ -30181,6 +34170,8 @@ v.y += (${w} * f.y);
   e: f32,
   f: f32,
 }
+
+fn atan2j(y: f32, x: f32) -> f32 { if (x == 0.0 && y == 0.0) { return select(0.0, PI, (bitcast<u32>(x) >> 31u) == 1u) * select(1.0, -1.0, (bitcast<u32>(y) >> 31u) == 1u); } return atan2(y, x); }
 
 fn transfhcf(xy: vec2f, a: f32, b: f32, c: f32, d: f32, e: f32, f: f32) -> vec2f {
   var xt: f32 = (((a * xy.x) + (b * xy.y)) + c);
@@ -30211,6 +34202,8 @@ v.y += (${w} * f.y);
   "ovoid": {
     params: [{ name: "x", def: 0.94 }, { name: "y", def: 0.94 }],
     verified: true, priority: 0, flags: [], types: ["2D"],
+    funcNames: ["atan2j"],
+    funcs: `fn atan2j(y: f32, x: f32) -> f32 { if (x == 0.0 && y == 0.0) { return select(0.0, PI, (bitcast<u32>(x) >> 31u) == 1u) * select(1.0, -1.0, (bitcast<u32>(y) >> 31u) == 1u); } return atan2(y, x); }`,
     code: (w, p) => `{
 var T: f32 = (r2 + 1.0e-8);
 var r_: f32 = (${w} / T);
@@ -30221,8 +34214,10 @@ v.y += ((t.y * r_) * ${p[1]});
   "post_point_crop": {
     params: [{ name: "x_offset", def: 0 }, { name: "y_offset", def: 0 }, { name: "z_offset", def: 0 }, { name: "point_hide_enable", def: 1 }, { name: "point_crop_enable", def: 1 }, { name: "x_width", def: 0 }, { name: "y_width", def: 0 }, { name: "z_width", def: 0 }],
     verified: true, priority: 1, flags: ["dc","hide","stateful","z"], types: ["2D","CROP","POST"],
-    funcNames: ["jw_jwf0_post_scrop_x","jw_jwf0_post_scrop_y","jw_jwf0_post_scrop_z","jw_jwf0_post_scrop_c"],
-    funcs: `var<private> jw_jwf0_post_scrop_x: f32;
+    funcNames: ["atan2j","jw_jwf0_post_scrop_x","jw_jwf0_post_scrop_y","jw_jwf0_post_scrop_z","jw_jwf0_post_scrop_c"],
+    funcs: `fn atan2j(y: f32, x: f32) -> f32 { if (x == 0.0 && y == 0.0) { return select(0.0, PI, (bitcast<u32>(x) >> 31u) == 1u) * select(1.0, -1.0, (bitcast<u32>(y) >> 31u) == 1u); } return atan2(y, x); }
+
+var<private> jw_jwf0_post_scrop_x: f32;
 
 var<private> jw_jwf0_post_scrop_y: f32;
 
@@ -30266,8 +34261,10 @@ if ((boundaries != 0)) {
   "hole": {
     params: [{ name: "a", def: 1 }, { name: "inside", def: 0 }],
     verified: true, priority: 0, flags: [], types: ["2D"],
-    funcNames: ["powc"],
-    funcs: `fn powc(x: f32, y: f32) -> f32 {
+    funcNames: ["atan2j","powc"],
+    funcs: `fn atan2j(y: f32, x: f32) -> f32 { if (x == 0.0 && y == 0.0) { return select(0.0, PI, (bitcast<u32>(x) >> 31u) == 1u) * select(1.0, -1.0, (bitcast<u32>(y) >> 31u) == 1u); } return atan2(y, x); }
+
+fn powc(x: f32, y: f32) -> f32 {
   if (x >= 0.0) { return pow(x, y); }
   let yi = round(y);
   if (abs(y - yi) > 1e-6) { return pow(x, y); }
@@ -30276,7 +34273,7 @@ if ((boundaries != 0)) {
 }`,
     code: (w, p) => `{
 var hole_inside: i32 = i32(min(max(${p[1]}, 0.0), 1.0));
-var alpha: f32 = atan2(t.y, t.x);
+var alpha: f32 = atan2j(t.y, t.x);
 var delta: f32 = powc(((alpha / PI) + 1.0), ${p[0]});
 var r_: f32;
 if ((hole_inside != 0)) {
@@ -30295,6 +34292,8 @@ v.y += (r_ * s);
   "pre_flatten": {
     params: [],
     verified: true, priority: -1, flags: ["z"], types: ["ZTRANSFORM","POST"],
+    funcNames: ["atan2j"],
+    funcs: `fn atan2j(y: f32, x: f32) -> f32 { if (x == 0.0 && y == 0.0) { return select(0.0, PI, (bitcast<u32>(x) >> 31u) == 1u) * select(1.0, -1.0, (bitcast<u32>(y) >> 31u) == 1u); } return atan2(y, x); }`,
     code: (w, _p) => `{
 var pre_flatten: f32 = min(abs(${w}), 1.0);
 z_ = (z_ * (1.0 - pre_flatten));
@@ -30303,6 +34302,8 @@ z_ = (z_ * (1.0 - pre_flatten));
   "post_flatten": {
     params: [],
     verified: true, priority: 1, flags: ["z"], types: ["ZTRANSFORM","POST"],
+    funcNames: ["atan2j"],
+    funcs: `fn atan2j(y: f32, x: f32) -> f32 { if (x == 0.0 && y == 0.0) { return select(0.0, PI, (bitcast<u32>(x) >> 31u) == 1u) * select(1.0, -1.0, (bitcast<u32>(y) >> 31u) == 1u); } return atan2(y, x); }`,
     code: (w, _p) => `{
 var post_flatten: f32 = min(abs(${w}), 1.0);
 pz_ = (pz_ * (1.0 - post_flatten));
@@ -30311,6 +34312,8 @@ pz_ = (pz_ * (1.0 - post_flatten));
   "pre_disc": {
     params: [],
     verified: true, priority: -1, flags: [], types: ["2D","PRE"],
+    funcNames: ["atan2j"],
+    funcs: `fn atan2j(y: f32, x: f32) -> f32 { if (x == 0.0 && y == 0.0) { return select(0.0, PI, (bitcast<u32>(x) >> 31u) == 1u) * select(1.0, -1.0, (bitcast<u32>(y) >> 31u) == 1u); } return atan2(y, x); }`,
     code: (w, _p) => `{
 var rinv_: f32 = 1.0 / r;
 t.x = ((${w} * (th / PI)) * sin((PI * r)));
@@ -30318,7 +34321,7 @@ t.y = ((${w} * (th / PI)) * cos((PI * r)));
 r2 = ((t.x * t.x) + (t.y * t.y));
 r = sqrt(r2);
 rinv_ = (1.0 / r);
-th = atan2(t.x, t.y);
+th = atan2j(t.x, t.y);
 ph = ((0.5 * PI) - th);
 if ((ph > PI)) {
   ph -= (2.0 * PI);
@@ -30328,6 +34331,8 @@ if ((ph > PI)) {
   "post_rotate_z": {
     params: [],
     verified: true, priority: 1, flags: ["3d"], types: ["3D","POST"],
+    funcNames: ["atan2j"],
+    funcs: `fn atan2j(y: f32, x: f32) -> f32 { if (x == 0.0 && y == 0.0) { return select(0.0, PI, (bitcast<u32>(x) >> 31u) == 1u) * select(1.0, -1.0, (bitcast<u32>(y) >> 31u) == 1u); } return atan2(y, x); }`,
     code: (w, _p) => `{
 var cosa: f32;
 var sina: f32;
@@ -30341,8 +34346,10 @@ v.y = y;
   "maple_leaf": {
     params: [{ name: "filled", def: 0.5 }],
     verified: true, priority: 0, flags: [], types: ["2D","BASE_SHAPE"],
-    funcNames: ["maple_leaf_ipow2f","maple_leaf_ipow10f","maple_leaf_ipow12f","maple_leaf_ipow4f"],
-    funcs: `fn maple_leaf_ipow2f(a: f32) -> f32 {
+    funcNames: ["atan2j","maple_leaf_ipow2f","maple_leaf_ipow10f","maple_leaf_ipow12f","maple_leaf_ipow4f"],
+    funcs: `fn atan2j(y: f32, x: f32) -> f32 { if (x == 0.0 && y == 0.0) { return select(0.0, PI, (bitcast<u32>(x) >> 31u) == 1u) * select(1.0, -1.0, (bitcast<u32>(y) >> 31u) == 1u); } return atan2(y, x); }
+
+fn maple_leaf_ipow2f(a: f32) -> f32 {
   return (a * a);
 }
 
@@ -30372,8 +34379,10 @@ v.y += (r_ * ly);
   "oak_leaf": {
     params: [{ name: "filled", def: 0.25 }],
     verified: true, priority: 0, flags: [], types: ["2D","BASE_SHAPE"],
-    funcNames: ["oak_leaf_ipow9f","oak_leaf_ipow10f","oak_leaf_ipow2f","oak_leaf_ipow8f"],
-    funcs: `fn oak_leaf_ipow9f(a: f32) -> f32 {
+    funcNames: ["atan2j","oak_leaf_ipow9f","oak_leaf_ipow10f","oak_leaf_ipow2f","oak_leaf_ipow8f"],
+    funcs: `fn atan2j(y: f32, x: f32) -> f32 { if (x == 0.0 && y == 0.0) { return select(0.0, PI, (bitcast<u32>(x) >> 31u) == 1u) * select(1.0, -1.0, (bitcast<u32>(y) >> 31u) == 1u); } return atan2(y, x); }
+
+fn oak_leaf_ipow9f(a: f32) -> f32 {
   var b: f32 = ((a * a) * a);
   return ((b * b) * b);
 }
@@ -30403,8 +34412,10 @@ v.y += (r_ * ly);
   "japanese_maple_leaf": {
     params: [{ name: "filled", def: 0.15 }],
     verified: true, priority: 0, flags: [], types: ["BASE_SHAPE"],
-    funcNames: ["jmaple_leaf_ipow2f","jmaple_leaf_ipow10f","jmaple_leaf_ipow9f"],
-    funcs: `fn jmaple_leaf_ipow2f(a: f32) -> f32 {
+    funcNames: ["atan2j","jmaple_leaf_ipow2f","jmaple_leaf_ipow10f","jmaple_leaf_ipow9f"],
+    funcs: `fn atan2j(y: f32, x: f32) -> f32 { if (x == 0.0 && y == 0.0) { return select(0.0, PI, (bitcast<u32>(x) >> 31u) == 1u) * select(1.0, -1.0, (bitcast<u32>(y) >> 31u) == 1u); } return atan2(y, x); }
+
+fn jmaple_leaf_ipow2f(a: f32) -> f32 {
   return (a * a);
 }
 
@@ -30427,10 +34438,51 @@ v.x += (r_ * lx);
 v.y += (r_ * ly);
 }`,
   },
+  "cell2": {
+    params: [{ name: "size", def: 0.6 }, { name: "mirror_x", def: 0 }, { name: "mirror_y", def: 0 }, { name: "a", def: 1 }, { name: "space_ya", def: 2 }, { name: "space_xa", def: 2 }, { name: "space_yb", def: 2 }, { name: "space_xb", def: 2 }, { name: "move_xa", def: 1 }, { name: "space_yc", def: 2 }, { name: "move_ya", def: 1 }, { name: "space_xc", def: 2 }, { name: "space_yd", def: 2 }, { name: "move_yb", def: 1 }, { name: "space_xd", def: 2 }, { name: "move_xb", def: 1 }],
+    verified: true, priority: 0, flags: ["z"], types: ["2D"],
+    funcNames: ["atan2j"],
+    funcs: `fn atan2j(y: f32, x: f32) -> f32 { if (x == 0.0 && y == 0.0) { return select(0.0, PI, (bitcast<u32>(x) >> 31u) == 1u) * select(1.0, -1.0, (bitcast<u32>(y) >> 31u) == 1u); } return atan2(y, x); }`,
+    code: (w, p) => `{
+var inv_cell_size: f32 = (${p[3]} / ${p[0]});
+var x: f32 = f32(i32(floor((t.x * inv_cell_size))));
+var y: f32 = f32(i32(floor((t.y * inv_cell_size))));
+var dx: f32 = (t.x - (x * ${p[0]}));
+var dy: f32 = (t.y - (y * ${p[0]}));
+if ((y >= 0)) {
+  if ((x >= 0)) {
+    y *= ${p[4]};
+    x *= ${p[5]};
+  } else {
+    y *= ${p[6]};
+    x = -((${p[7]} * x) + ${p[8]});
+  }
+} else {
+  if ((x >= 0)) {
+    y = -((${p[9]} * y) + ${p[10]});
+    x *= ${p[11]};
+  } else {
+    y = -((${p[12]} * y) + ${p[13]});
+    x = -((${p[14]} * x) + ${p[15]});
+  }
+}
+v.x += (${w} * (dx + (x * ${p[0]})));
+v.y -= (${w} * (dy + (y * ${p[0]})));
+if (((i32(${p[1]}) > 0) && (rnd(rs) < 0.5))) {
+  v.x = -v.x;
+}
+if (((i32(${p[2]}) > 0) && (rnd(rs) < 0.5))) {
+  v.y = -v.y;
+}
+if (false) {
+  pz_ += (${w} * z_);
+}
+}`,
+  },
   "mobius_dragon_3D": {
     params: [{ name: "re", def: 1 }, { name: "im", def: 0 }, { name: "x_spread", def: 1 }, { name: "y_spread", def: 0 }, { name: "z_spread", def: 0 }, { name: "x_add", def: 0 }, { name: "y_add", def: 0 }, { name: "log_spread", def: 2.71828 }, { name: "line_enable", def: 1 }, { name: "line_weight", def: 0.125 }, { name: "line_color_shift", def: 0.1 }, { name: "mag_color", def: 1 }, { name: "mag_color_scale", def: 0.5 }, { name: "iterations", def: 1 }],
     verified: true, priority: 0, flags: ["3d","dc","z"], types: ["3D","SIMULATION"],
-    funcNames: ["Complex","roundc","Complex_Init","Complex_Mag2","Complex_MagInv","Complex_Div","Complex_Scale"],
+    funcNames: ["Complex","roundc","atan2j","Complex_Init","Complex_Mag2","Complex_MagInv","Complex_Div","Complex_Scale"],
     funcs: `struct Complex {
   per_fix: f32,
   re: f32,
@@ -30440,6 +34492,8 @@ v.y += (r_ * ly);
 }
 
 fn roundc(x: f32) -> f32 { return sign(x) * floor(abs(x) + 0.5); }
+
+fn atan2j(y: f32, x: f32) -> f32 { if (x == 0.0 && y == 0.0) { return select(0.0, PI, (bitcast<u32>(x) >> 31u) == 1u) * select(1.0, -1.0, (bitcast<u32>(y) >> 31u) == 1u); } return atan2(y, x); }
 
 fn Complex_Init(c: ptr<function, Complex>, Rp: f32, Ip: f32) {
   (*c).re = Rp;
@@ -30530,9 +34584,2804 @@ v.y = z.im;
 (*cp) = zc;
 }`,
   },
+  "whirligig": {
+    params: [{ name: "Mode", def: 0 }],
+    verified: true, priority: 0, flags: ["3d","z"], types: ["3D"],
+    funcNames: ["atan2j"],
+    funcs: `fn atan2j(y: f32, x: f32) -> f32 { if (x == 0.0 && y == 0.0) { return select(0.0, PI, (bitcast<u32>(x) >> 31u) == 1u) * select(1.0, -1.0, (bitcast<u32>(y) >> 31u) == 1u); } return atan2(y, x); }`,
+    code: (w, p) => `{
+var csin: f32 = sin(t.x);
+var ccos: f32 = cos(t.x);
+var csinh: f32 = sinh(t.y);
+var ccosh: f32 = cosh(t.y);
+if (false) {
+  pz_ += (${w} * z_);
+}
+switch i32(min(max(${p[0]}, 0.0), 15.0)) {
+  case 0: {
+    v.x += ((${w} * ccos) / ccosh);
+    v.y -= ((${w} * csin) / csinh);
+  }
+  case 1: {
+    v.x -= ((${w} * ccos) / ccosh);
+    v.y += ((${w} * csin) / csinh);
+  }
+  case 2: {
+    v.x += ((${w} * ccos) / ccosh);
+    v.y += ((${w} * csin) / csinh);
+  }
+  case 3: {
+    v.x -= ((${w} * ccos) / ccosh);
+    v.y -= ((${w} * csin) / csinh);
+  }
+  case 4: {
+    v.x += ((${w} * csin) / ccosh);
+    v.y -= ((${w} * ccos) / csinh);
+  }
+  case 5: {
+    v.x -= ((${w} * csin) / ccosh);
+    v.y += ((${w} * ccos) / csinh);
+  }
+  case 6: {
+    v.x += ((${w} * csin) / ccosh);
+    v.y += ((${w} * ccos) / csinh);
+  }
+  case 7: {
+    v.x -= ((${w} * csin) / ccosh);
+    v.y -= ((${w} * ccos) / csinh);
+  }
+  case 8: {
+    v.x += ((${w} * csin) / csinh);
+    v.y -= ((${w} * ccos) / ccosh);
+  }
+  case 9: {
+    v.x -= ((${w} * csin) / csinh);
+    v.y += ((${w} * ccos) / ccosh);
+  }
+  case 10: {
+    v.x += ((${w} * csin) / csinh);
+    v.y += ((${w} * ccos) / ccosh);
+  }
+  case 11: {
+    v.x -= ((${w} * csin) / csinh);
+    v.y -= ((${w} * ccos) / ccosh);
+  }
+  case 12: {
+    v.x += ((${w} * ccos) / csinh);
+    v.y -= ((${w} * csin) / ccosh);
+  }
+  case 13: {
+    v.x -= ((${w} * ccos) / csinh);
+    v.y += ((${w} * csin) / ccosh);
+  }
+  case 14: {
+    v.x += ((${w} * ccos) / csinh);
+    v.y += ((${w} * csin) / ccosh);
+  }
+  case 15: {
+    v.x -= ((${w} * ccos) / csinh);
+    v.y -= ((${w} * csin) / ccosh);
+  }
+  case default: {
+  }
+}
+}`,
+  },
+  "tess_shape": {
+    params: [{ name: "strength", def: 1 }, { name: "shapeSize", def: 0.8 }, { name: "shapeType", def: 0 }, { name: "shapeAspectRatio", def: 1 }, { name: "lrRadialAmp", def: 0.2 }, { name: "lrRadialWidthFreq", def: 0.6 }, { name: "tbAmp", def: 0.2 }, { name: "tbWidthFreq", def: 0.6 }, { name: "lrRadialPosPhaseDuty", def: 0 }, { name: "tbPosPhaseDuty", def: 0 }, { name: "lrRadialProfileType", def: 0 }, { name: "tbProfileType", def: 0 }, { name: "operationMode", def: 0 }],
+    verified: true, priority: 0, flags: ["hide","state","z"], types: ["2D","BASE_SHAPE"],
+    funcNames: ["jwx_tess_shape_inited_","jwx_tess_shape_TWO_PI","atan2j","tess_shape_isPointInTriangle","tess_shape_calculate_profile_offset"],
+    funcs: `fn atan2j(y: f32, x: f32) -> f32 { if (x == 0.0 && y == 0.0) { return select(0.0, PI, (bitcast<u32>(x) >> 31u) == 1u) * select(1.0, -1.0, (bitcast<u32>(y) >> 31u) == 1u); } return atan2(y, x); }
+
+fn tess_shape_isPointInTriangle(px: f32, py: f32, v1x: f32, v1y: f32, v2x: f32, v2y: f32, v3x: f32, v3y: f32) -> bool {
+  var d1: f32 = (((px - v2x) * (v1y - v2y)) - ((v1x - v2x) * (py - v2y)));
+  var d2: f32 = (((px - v3x) * (v2y - v3y)) - ((v2x - v3x) * (py - v3y)));
+  var d3: f32 = (((px - v1x) * (v3y - v1y)) - ((v3x - v1x) * (py - v1y)));
+  return !((((d1 < 0) || (d2 < 0)) || (d3 < 0)) && (((d1 > 0) || (d2 > 0)) || (d3 > 0)));
+}
+
+fn tess_shape_calculate_profile_offset(v_input: f32, profile_type: i32, amplitude: f32, param_wf: f32, param_ppd: f32) -> f32 {
+  if ((amplitude == 0.0)) {
+    return 0.0;
+  }
+  if (((profile_type != 0) && (abs(param_wf) <= 0.000001))) {
+    return 0.0;
+  }
+  switch profile_type {
+    case 0: {
+      {
+        var profile_width_factor: f32 = param_wf;
+        var position_offset_norm: f32 = param_ppd;
+        if ((profile_width_factor <= 0.000001)) {
+          return 0.0;
+        }
+        var effective_v: f32 = (v_input - position_offset_norm);
+        var half_profile_width_norm: f32 = (profile_width_factor / 2.0);
+        if ((abs(effective_v) < half_profile_width_norm)) {
+          var angle_bump: f32 = ((effective_v / half_profile_width_norm) * PI);
+          return ((amplitude * (1.0 + cos(angle_bump))) / 2.0);
+        }
+        return 0.0;
+      }
+    }
+    case 1: {
+      {
+        var frequency: f32 = param_wf;
+        var phase_norm: f32 = param_ppd;
+        return (amplitude * sin((((v_input * frequency) * jwx_tess_shape_TWO_PI) + (phase_norm * jwx_tess_shape_TWO_PI))));
+      }
+    }
+    case 2: {
+      {
+        var frequency: f32 = param_wf;
+        var phase_norm: f32 = param_ppd;
+        var scaled_t: f32 = ((v_input * frequency) + phase_norm);
+        var period_t: f32 = (scaled_t - floor(scaled_t));
+        var y_tri_01: f32 = select((2.0 * (1.0 - period_t)), (2.0 * period_t), (period_t < 0.5));
+        return (amplitude * ((y_tri_01 * 2.0) - 1.0));
+      }
+    }
+    case 3: {
+      {
+        var frequency: f32 = param_wf;
+        var duty_cycle: f32 = max(0.01, min(0.99, abs(param_ppd)));
+        var scaled_t: f32 = (v_input * frequency);
+        var period_t: f32 = (scaled_t - floor(scaled_t));
+        return select(-amplitude, amplitude, (period_t < duty_cycle));
+      }
+    }
+    case 4: {
+      {
+        var frequency: f32 = param_wf;
+        var phase_norm: f32 = param_ppd;
+        var scaled_t: f32 = ((v_input * frequency) + phase_norm);
+        var period_t: f32 = (scaled_t - floor(scaled_t));
+        return (amplitude * ((2.0 * period_t) - 1.0));
+      }
+    }
+    case default: {
+      return 0.0;
+    }
+  }
+}
+
+var<private> jwx_tess_shape_inited_: f32 = 0.0;
+
+var<private> jwx_tess_shape_TWO_PI: f32 = 0.0;`,
+    code: (w, p) => `{
+var SQRT3: f32 = sqrt(3.0);
+var MAX_REJECTION_SAMPLES: i32 = 100;
+if ((jwx_tess_shape_inited_ == 0.0)) {
+  jwx_tess_shape_inited_ = 1.0;
+  jwx_tess_shape_TWO_PI = (2.0 * PI);
+}
+jwx_tess_shape_TWO_PI = (2.0 * PI);
+var x_aff: f32 = t.x;
+var y_aff: f32 = t.y;
+var z_aff: f32 = z_;
+var base_h: f32 = ${p[1]};
+var base_w: f32 = (${p[1]} * ${p[3]});
+var half_h: f32 = select((base_h / 2.0), 1.0e-9, (base_h == 0));
+var half_w: f32 = select((base_w / 2.0), 1.0e-9, (base_w == 0));
+if ((min(max(${p[12]}, 0.0), 1.0) == 1)) {
+  var is_inside: bool = false;
+  var px_test: f32 = x_aff;
+  var py_test: f32 = y_aff;
+  switch i32(min(max(${p[2]}, 0.0), 7.0)) {
+    case 0: {
+      {
+        var s_ext: f32 = (${p[1]} / 2.0);
+        is_inside = ((abs(px_test) <= s_ext) && (abs(py_test) <= s_ext));
+        break;
+      }
+    }
+    case 1: {
+      {
+        is_inside = ((abs(px_test) <= half_w) && (abs(py_test) <= half_h));
+        break;
+      }
+    }
+    case 2: {
+      {
+        var s: f32 = ${p[1]};
+        var h_tri: f32 = ((s * SQRT3) / 2.0);
+        var v1x: f32 = 0;
+        var v1y: f32 = ((2.0 / 3.0) * h_tri);
+        var v2x: f32 = (-s / 2.0);
+        var v2y: f32 = (-(1.0 / 3.0) * h_tri);
+        var v3x: f32 = (s / 2.0);
+        var v3y: f32 = (-(1.0 / 3.0) * h_tri);
+        is_inside = tess_shape_isPointInTriangle(px_test, py_test, v1x, v1y, v2x, v2y, v3x, v3y);
+        break;
+      }
+    }
+    case 3: {
+      {
+        var s: f32 = ${p[1]};
+        is_inside = false;
+        for (var i: i32 = 0; (i < 6); i++) {
+          var a1: f32 = ((f32(i) * PI) / 3.0);
+          var a2: f32 = ((f32((i + 1)) * PI) / 3.0);
+          if (tess_shape_isPointInTriangle(px_test, py_test, 0, 0, (s * cos(a1)), (s * sin(a1)), (s * cos(a2)), (s * sin(a2)))) {
+            is_inside = true;
+            break;
+          }
+        }
+        break;
+      }
+    }
+    case 4: {
+      {
+        var py_norm: f32 = select(min(1, max(-1, (py_test / half_h))), 0, (half_h == 0));
+        var px_norm: f32 = select(min(1, max(-1, (px_test / half_w))), 0, (half_w == 0));
+        var v_lr_in: f32 = select(((py_norm + 1) / 2.0), py_norm, (min(max(${p[10]}, 0.0), 4.0) == 0));
+        var v_tb_in: f32 = select(((px_norm + 1) / 2.0), px_norm, (min(max(${p[11]}, 0.0), 4.0) == 0));
+        var lr_off: f32 = tess_shape_calculate_profile_offset(v_lr_in, i32(min(max(${p[10]}, 0.0), 4.0)), ${p[4]}, ${p[5]}, ${p[8]});
+        var tb_off: f32 = tess_shape_calculate_profile_offset(v_tb_in, i32(min(max(${p[11]}, 0.0), 4.0)), ${p[6]}, ${p[7]}, ${p[9]});
+        var xl: f32 = (-half_w + lr_off);
+        var xr: f32 = (half_w - lr_off);
+        var yb: f32 = (-half_h + tb_off);
+        var yt: f32 = (half_h - tb_off);
+        is_inside = ((((px_test >= xl) && (px_test <= xr)) && (py_test >= yb)) && (py_test <= yt));
+        break;
+      }
+    }
+    case 5: {
+      {
+        var py_n_lr: f32 = select(min(1, max(-1, (py_test / half_h))), 0, (half_h == 0));
+        var px_n_tb: f32 = select(min(1, max(-1, (px_test / half_w))), 0, (half_w == 0));
+        var v_in_lr_disp: f32 = select(((py_n_lr + 1) / 2.0), py_n_lr, (min(max(${p[10]}, 0.0), 4.0) == 0));
+        var v_in_tb_disp: f32 = select(((px_n_tb + 1) / 2.0), px_n_tb, (min(max(${p[11]}, 0.0), 4.0) == 0));
+        var disp_x_at_py: f32 = tess_shape_calculate_profile_offset(v_in_lr_disp, i32(min(max(${p[10]}, 0.0), 4.0)), ${p[4]}, ${p[5]}, ${p[8]});
+        var disp_y_at_px: f32 = tess_shape_calculate_profile_offset(v_in_tb_disp, i32(min(max(${p[11]}, 0.0), 4.0)), ${p[6]}, ${p[7]}, ${p[9]});
+        var prxb: f32 = (px_test - disp_x_at_py);
+        var pryb: f32 = (py_test - disp_y_at_px);
+        var eps: f32 = 1.0e-7;
+        is_inside = ((abs(prxb) <= (half_w + eps)) && (abs(pryb) <= (half_h + eps)));
+        break;
+      }
+    }
+    case 6: {
+      {
+        var pynre: f32 = select(min(1, max(-1, (py_test / half_h))), 0, (half_h == 0));
+        var pxnte: f32 = select(min(1, max(-1, (px_test / half_w))), 0, (half_w == 0));
+        var vire: f32 = select(((pynre + 1) / 2.0), pynre, (min(max(${p[10]}, 0.0), 4.0) == 0));
+        var vite: f32 = select(((pxnte + 1) / 2.0), pxnte, (min(max(${p[11]}, 0.0), 4.0) == 0));
+        var reo: f32 = tess_shape_calculate_profile_offset(vire, i32(min(max(${p[10]}, 0.0), 4.0)), ${p[4]}, ${p[5]}, ${p[8]});
+        var teo: f32 = tess_shape_calculate_profile_offset(vite, i32(min(max(${p[11]}, 0.0), 4.0)), ${p[6]}, ${p[7]}, ${p[9]});
+        var rb: f32 = (half_w + reo);
+        var tb: f32 = (half_h + teo);
+        is_inside = ((((px_test >= -half_w) && (px_test <= rb)) && (py_test >= -half_h)) && (py_test <= tb));
+        break;
+      }
+    }
+    case 7: {
+      {
+        var br: f32 = ${p[1]};
+        var angle_aff: f32 = atan2j(py_test, px_test);
+        var radius_aff: f32 = sqrt(((px_test * px_test) + (py_test * py_test)));
+        var ang_n01: f32 = (((angle_aff / jwx_tess_shape_TWO_PI) + 1.0) % 1.0);
+        var vip: f32 = select(ang_n01, ((ang_n01 * 2) - 1), (min(max(${p[10]}, 0.0), 4.0) == 0));
+        var rad_off: f32 = tess_shape_calculate_profile_offset(vip, i32(min(max(${p[10]}, 0.0), 4.0)), ${p[4]}, ${p[5]}, ${p[8]});
+        var bound_r: f32 = max(0.0, (br + rad_off));
+        is_inside = (radius_aff <= bound_r);
+        break;
+      }
+    }
+    case default: {
+      is_inside = false;
+    }
+  }
+  if (is_inside) {
+    (*hd) = false;
+    v.x = x_aff;
+    v.y = y_aff;
+  } else {
+    (*hd) = true;
+  }
+  if (false) {
+    pz_ += (${w} * z_);
+  }
+} else {
+  var targetShapeX: f32 = 0.0;
+  var targetShapeY: f32 = 0.0;
+  switch i32(min(max(${p[2]}, 0.0), 7.0)) {
+    case 0: {
+      {
+        targetShapeX = (((rnd(rs) * 2) - 1) * (${p[1]} / 2.0));
+        targetShapeY = (((rnd(rs) * 2) - 1) * (${p[1]} / 2.0));
+        break;
+      }
+    }
+    case 1: {
+      {
+        targetShapeX = (((rnd(rs) * 2) - 1) * half_w);
+        targetShapeY = (((rnd(rs) * 2) - 1) * half_h);
+        break;
+      }
+    }
+    case 2: {
+      {
+        var s: f32 = ${p[1]};
+        var h_tri: f32 = ((s * SQRT3) / 2.0);
+        var v1x: f32 = 0;
+        var v1y: f32 = ((2.0 / 3.0) * h_tri);
+        var v2x: f32 = (-s / 2.0);
+        var v2y: f32 = (-(1.0 / 3.0) * h_tri);
+        var v3x: f32 = (s / 2.0);
+        var v3y: f32 = (-(1.0 / 3.0) * h_tri);
+        var r1: f32 = rnd(rs);
+        var r2_: f32 = rnd(rs);
+        if (((r1 + r2_) > 1.0)) {
+          r1 = (1.0 - r1);
+          r2_ = (1.0 - r2_);
+        }
+        var r3: f32 = ((1.0 - r1) - r2_);
+        targetShapeX = (((r1 * v1x) + (r2_ * v2x)) + (r3 * v3x));
+        targetShapeY = (((r1 * v1y) + (r2_ * v2y)) + (r3 * v3y));
+        break;
+      }
+    }
+    case 3: {
+      {
+        var s: f32 = ${p[1]};
+        var ti: i32 = i32(floor((rnd(rs) * 6.0)));
+        var ao: f32 = ((f32(ti) * PI) / 3.0);
+        var v1xh: f32 = (s * cos(ao));
+        var v1yh: f32 = (s * sin(ao));
+        var v2xh: f32 = (s * cos((ao + (PI / 3.0))));
+        var v2yh: f32 = (s * sin((ao + (PI / 3.0))));
+        var r1h: f32 = rnd(rs);
+        var r2h: f32 = rnd(rs);
+        if (((r1h + r2h) > 1.0)) {
+          r1h = (1.0 - r1h);
+          r2h = (1.0 - r2h);
+        }
+        targetShapeX = (((((1.0 - r1h) - r2h) * 0) + (r1h * v1xh)) + (r2h * v2xh));
+        targetShapeY = (((((1.0 - r1h) - r2h) * 0) + (r1h * v1yh)) + (r2h * v2yh));
+        break;
+      }
+    }
+    case 4: {
+      {
+        var max_lr_off: f32 = abs(${p[4]});
+        var max_tb_off: f32 = abs(${p[6]});
+        var sx: f32 = (half_w + max_lr_off);
+        var sy: f32 = (half_h + max_tb_off);
+        var pf: bool = false;
+        for (var i: i32 = 0; (i < MAX_REJECTION_SAMPLES); i++) {
+          var px: f32 = (((rnd(rs) * 2) - 1) * sx);
+          var py: f32 = (((rnd(rs) * 2) - 1) * sy);
+          var pyn: f32 = select(min(1, max(-1, (py / half_h))), 0, (half_h == 0));
+          var pxn: f32 = select(min(1, max(-1, (px / half_w))), 0, (half_w == 0));
+          var vilr: f32 = select(((pyn + 1) / 2.0), pyn, (min(max(${p[10]}, 0.0), 4.0) == 0));
+          var vitb: f32 = select(((pxn + 1) / 2.0), pxn, (min(max(${p[11]}, 0.0), 4.0) == 0));
+          var lro: f32 = tess_shape_calculate_profile_offset(vilr, i32(min(max(${p[10]}, 0.0), 4.0)), ${p[4]}, ${p[5]}, ${p[8]});
+          var tbo: f32 = tess_shape_calculate_profile_offset(vitb, i32(min(max(${p[11]}, 0.0), 4.0)), ${p[6]}, ${p[7]}, ${p[9]});
+          var xl: f32 = (-half_w + lro);
+          var xr: f32 = (half_w - lro);
+          var yb: f32 = (-half_h + tbo);
+          var yt: f32 = (half_h - tbo);
+          if (((((px >= xl) && (px <= xr)) && (py >= yb)) && (py <= yt))) {
+            targetShapeX = px;
+            targetShapeY = py;
+            pf = true;
+            break;
+          }
+        }
+        if (!pf) {
+          targetShapeX = 0;
+          targetShapeY = 0;
+        }
+        break;
+      }
+    }
+    case 5: {
+      {
+        var rxb: f32 = (((rnd(rs) * 2) - 1) * half_w);
+        var ryb: f32 = (((rnd(rs) * 2) - 1) * half_h);
+        var rynd: f32 = select((ryb / half_h), 0, (half_h == 0));
+        var rxnd: f32 = select((rxb / half_w), 0, (half_w == 0));
+        var vild: f32 = select(((rynd + 1) / 2.0), rynd, (min(max(${p[10]}, 0.0), 4.0) == 0));
+        var vitd: f32 = select(((rxnd + 1) / 2.0), rxnd, (min(max(${p[11]}, 0.0), 4.0) == 0));
+        var dx: f32 = tess_shape_calculate_profile_offset(vild, i32(min(max(${p[10]}, 0.0), 4.0)), ${p[4]}, ${p[5]}, ${p[8]});
+        var dy: f32 = tess_shape_calculate_profile_offset(vitd, i32(min(max(${p[11]}, 0.0), 4.0)), ${p[6]}, ${p[7]}, ${p[9]});
+        targetShapeX = (rxb + dx);
+        targetShapeY = (ryb + dy);
+        break;
+      }
+    }
+    case 6: {
+      {
+        var r_amp: f32 = ${p[4]};
+        var r_wf: f32 = ${p[5]};
+        var r_ppd: f32 = ${p[8]};
+        var r_pt: i32 = i32(min(max(${p[10]}, 0.0), 4.0));
+        var t_amp: f32 = ${p[6]};
+        var t_wf: f32 = ${p[7]};
+        var t_ppd: f32 = ${p[9]};
+        var t_pt: i32 = i32(min(max(${p[11]}, 0.0), 4.0));
+        var xmb: f32 = -half_w;
+        var xab: f32 = (half_w + abs(r_amp));
+        var ymb: f32 = -half_h;
+        var yab: f32 = (half_h + abs(t_amp));
+        var pf6: bool = false;
+        for (var i: i32 = 0; (i < MAX_REJECTION_SAMPLES); i++) {
+          var px: f32 = (xmb + (rnd(rs) * (xab - xmb)));
+          var py: f32 = (ymb + (rnd(rs) * (yab - ymb)));
+          if (((px < -half_w) || (py < -half_h))) {
+            continue;
+          }
+          var pynre: f32 = select(min(1, max(-1, (py / half_h))), 0, (half_h == 0));
+          var pxnte: f32 = select(min(1, max(-1, (px / half_w))), 0, (half_w == 0));
+          var vire: f32 = select(((pynre + 1) / 2.0), pynre, (r_pt == 0));
+          var vite: f32 = select(((pxnte + 1) / 2.0), pxnte, (t_pt == 0));
+          var reo: f32 = tess_shape_calculate_profile_offset(vire, r_pt, r_amp, r_wf, r_ppd);
+          if ((px > (half_w + reo))) {
+            continue;
+          }
+          var teo: f32 = tess_shape_calculate_profile_offset(vite, t_pt, t_amp, t_wf, t_ppd);
+          if ((py > (half_h + teo))) {
+            continue;
+          }
+          targetShapeX = px;
+          targetShapeY = py;
+          pf6 = true;
+          break;
+        }
+        if (!pf6) {
+          targetShapeX = 0;
+          targetShapeY = 0;
+        }
+        break;
+      }
+    }
+    case 7: {
+      {
+        var base_radius: f32 = ${p[1]};
+        var current_radial_profile_type: i32 = i32(min(max(${p[10]}, 0.0), 4.0));
+        var current_radial_amp: f32 = ${p[4]};
+        var current_radial_param_wf: f32 = ${p[5]};
+        var current_radial_param_ppd: f32 = ${p[8]};
+        var random_angle_rad: f32 = (rnd(rs) * jwx_tess_shape_TWO_PI);
+        var angle_norm_01: f32 = (random_angle_rad / jwx_tess_shape_TWO_PI);
+        var v_input_for_profile: f32;
+        if ((current_radial_profile_type == 0)) {
+          v_input_for_profile = ((angle_norm_01 * 2.0) - 1.0);
+        } else {
+          v_input_for_profile = angle_norm_01;
+        }
+        var radial_offset: f32 = tess_shape_calculate_profile_offset(v_input_for_profile, current_radial_profile_type, current_radial_amp, current_radial_param_wf, current_radial_param_ppd);
+        var boundary_r: f32 = max(0.0, (base_radius + radial_offset));
+        var r_fill: f32 = (sqrt(rnd(rs)) * boundary_r);
+        targetShapeX = (r_fill * cos(random_angle_rad));
+        targetShapeY = (r_fill * sin(random_angle_rad));
+        break;
+      }
+    }
+    case default: {
+      targetShapeX = 0;
+      targetShapeY = 0;
+    }
+  }
+  var effectiveAmount: f32 = (${w} * ${p[0]});
+  var clampedEffectiveAmount: f32 = max(0.0, min(1.0, effectiveAmount));
+  v.x = (((1.0 - clampedEffectiveAmount) * x_aff) + (clampedEffectiveAmount * targetShapeX));
+  v.y = (((1.0 - clampedEffectiveAmount) * y_aff) + (clampedEffectiveAmount * targetShapeY));
+  if (false) {
+    pz_ += (${w} * z_);
+  }
+}
+}`,
+  },
+  "conicalSpiral": {
+    params: [{ name: "turns", def: 8 }, { name: "radius", def: 1.2 }, { name: "height", def: 1 }, { name: "mode", def: 0 }, { name: "z_wave_freq", def: 0 }, { name: "z_wave_amp", def: 0 }, { name: "twist", def: 0 }, { name: "thickness", def: 0 }, { name: "solid", def: 0 }, { name: "colorize", def: 0 }, { name: "colorMode", def: 0 }, { name: "colorSpeed", def: 1 }, { name: "colorOffset", def: 0 }],
+    verified: true, priority: 0, flags: ["3d","dc","z"], types: ["3D","BASE_SHAPE","DC"],
+    funcNames: ["atan2j"],
+    funcs: `fn atan2j(y: f32, x: f32) -> f32 { if (x == 0.0 && y == 0.0) { return select(0.0, PI, (bitcast<u32>(x) >> 31u) == 1u) * select(1.0, -1.0, (bitcast<u32>(y) >> 31u) == 1u); } return atan2(y, x); }`,
+    code: (w, p) => `{
+var t_: f32;
+if ((min(max(${p[3]}, 0.0), 3.0) == 1)) {
+  t_ = (abs(t.y) % 1.0);
+} else if ((min(max(${p[3]}, 0.0), 3.0) == 2)) {
+  t_ = (abs(z_) % 1.0);
+} else {
+  t_ = (abs(t.x) % 1.0);
+}
+var angle: f32 = ((t_ * (2.0 * PI)) * ${p[0]});
+var currentRadius: f32 = (t_ * ${p[1]});
+var z: f32 = (t_ * ${p[2]});
+if ((${p[5]} != 0.0)) {
+  z += (sin(((t_ * (2.0 * PI)) * ${p[4]})) * ${p[5]});
+}
+var final_angle: f32 = angle;
+if ((${p[6]} != 0.0)) {
+  final_angle += (z * ${p[6]});
+}
+var x: f32 = (currentRadius * cos(final_angle));
+var y: f32 = (currentRadius * sin(final_angle));
+if ((${p[7]} > 0.0)) {
+  if ((min(max(${p[8]}, 0.0), 1.0) > 0)) {
+    x += (rnd(rs) * ${p[7]});
+    y += (rnd(rs) * ${p[7]});
+    z += (rnd(rs) * ${p[7]});
+  } else {
+    x += (t.x * ${p[7]});
+    y += (t.y * ${p[7]});
+    z += (z_ * ${p[7]});
+  }
+}
+v.x += (x * ${w});
+v.y += (y * ${w});
+pz_ += (z * ${w});
+if ((min(max(${p[9]}, 0.0), 1.0) > 0)) {
+  var colorDriver: f32 = 0.0;
+  switch i32(min(max(${p[10]}, 0.0), 4.0)) {
+    case 0: {
+      colorDriver = t_;
+    }
+    case 1: {
+      colorDriver = currentRadius;
+    }
+    case 2: {
+      colorDriver = ((angle % (2.0 * PI)) / (2.0 * PI));
+    }
+    case 3, default: {
+      colorDriver = z;
+    }
+  }
+  (*cp) = (abs(((colorDriver * ${p[11]}) + ${p[12]})) % 1.0);
+}
+}`,
+  },
+  "flora": {
+    params: [{ name: "leafType", def: 0 }, { name: "filled", def: 1 }, { name: "scale", def: 1 }, { name: "distort", def: 0.1 }, { name: "shapeMod", def: 0.5 }],
+    verified: true, priority: 0, flags: ["z"], types: ["2D","BASE_SHAPE"],
+    funcNames: ["powc","atan2j"],
+    funcs: `fn powc(x: f32, y: f32) -> f32 {
+  if (x >= 0.0) { return pow(x, y); }
+  let yi = round(y);
+  if (abs(y - yi) > 1e-6) { return pow(x, y); }
+  let m = pow(-x, y);
+  return select(m, -m, (i32(yi) & 1) != 0);
+}
+
+fn atan2j(y: f32, x: f32) -> f32 { if (x == 0.0 && y == 0.0) { return select(0.0, PI, (bitcast<u32>(x) >> 31u) == 1u) * select(1.0, -1.0, (bitcast<u32>(y) >> 31u) == 1u); } return atan2(y, x); }`,
+    code: (w, p) => `{
+var t_: f32 = ph;
+var r_: f32 = select(${w}, (${w} * rnd(rs)), ((min(max(${p[1]}, 0.0), 1.0) > 0) && (min(max(${p[1]}, 0.0), 1.0) > rnd(rs))));
+var lx: f32 = 0;
+var ly: f32 = 0;
+switch i32(min(max(${p[0]}, 0.0), 24.0)) {
+  case 0: {
+    t_ += (PI * 0.5);
+    var ginkgo_r: f32 = 0;
+    if ((sin(t_) > 0)) {
+      ginkgo_r = 1.0;
+      ginkgo_r -= ((${p[4]} * 0.8) * powc(cos(t_), 50.0));
+      ginkgo_r *= (1.0 + (0.05 * cos((8.0 * t_))));
+    }
+    lx = (ginkgo_r * cos(t_));
+    ly = (ginkgo_r * sin(t_));
+  }
+  case 1: {
+    t_ += (PI * 0.5);
+    var cannabis_r: f32 = ((((1.0 + ((0.5 + (${p[4]} * 0.8)) * cos((8 * t_)))) * (1.0 + (0.1 * cos((24 * t_))))) * (0.9 + (0.05 * cos((200 * t_))))) * (1 + sin(t_)));
+    lx = (cannabis_r * sin(t_));
+    ly = (-cannabis_r * cos(t_));
+  }
+  case 2: {
+    var effectiveCloverMod: f32 = ((-6.0 * ${p[4]}) + 0.5);
+    var cleftTerm: f32 = (0.5 + (effectiveCloverMod * 0.5));
+    t_ += (PI / 4.0);
+    var clover_r: f32 = ((1 + (0.8 * cos((4.0 * t_)))) * (1 - (cleftTerm * powc(sin((4.0 * t_)), 2.0))));
+    lx = (clover_r * cos(t_));
+    ly = (clover_r * sin(t_));
+  }
+  case 3: {
+    t_ += (PI * 0.5);
+    var rose_r: f32 = sin(t_);
+    if ((rose_r < 0)) {
+      rose_r = 0;
+    }
+    rose_r *= (1.0 + ((${p[4]} * 0.1) * cos((40.0 * t_))));
+    lx = ((rose_r * cos(t_)) * 0.7);
+    ly = (rose_r * sin(t_));
+  }
+  case 4: {
+    t_ += (PI * 0.5);
+    var daisy_r: f32 = (0.6 * (1.2 + cos(((8.0 + (${p[4]} * 16.0)) * t_))));
+    lx = (daisy_r * cos(t_));
+    ly = (daisy_r * sin(t_));
+  }
+  case 5: {
+    t_ += (PI * 0.5);
+    var butterfly_r: f32 = ((exp(cos(t_)) - (2.0 * cos((4.0 * t_)))) + powc(sin((t_ / 12.0)), 5.0));
+    butterfly_r *= (0.7 + (${p[4]} * 0.6));
+    lx = (butterfly_r * sin(t_));
+    ly = (-butterfly_r * cos(t_));
+  }
+  case 6: {
+    t_ += (PI * 0.5);
+    var oak_r: f32 = ((1.0 + (0.8 * sin(t_))) * (1.0 + ((0.1 + (${p[4]} * 0.2)) * cos((14.0 * t_)))));
+    lx = (oak_r * sin(t_));
+    ly = (-oak_r * cos(t_));
+  }
+  case 7: {
+    t_ += (PI * 0.5);
+    var teardrop_r: f32 = (1.0 - (0.9 * sin(t_)));
+    teardrop_r *= (1.0 + (0.02 * cos((60.0 * t_))));
+    lx = ((teardrop_r * cos(t_)) * (0.6 + (${p[4]} * 0.4)));
+    ly = (teardrop_r * sin(t_));
+  }
+  case 8: {
+    var lotus_r: f32 = (1.0 + (0.05 * cos((12 * t_))));
+    var center_offset: f32 = (0.1 + (${p[4]} * 0.4));
+    lx = (lotus_r * cos(t_));
+    ly = ((lotus_r * sin(t_)) + (center_offset * (1 - lotus_r)));
+  }
+  case 9: {
+    t_ += (PI * 0.5);
+    var sycamore_r: f32 = (1.0 - (0.5 * sin(t_)));
+    sycamore_r *= (1.0 + ((0.1 + (${p[4]} * 0.4)) * cos((5.0 * t_))));
+    sycamore_r *= (1.0 + (0.05 * cos((25.0 * t_))));
+    lx = (sycamore_r * sin(t_));
+    ly = (-sycamore_r * cos(t_));
+  }
+  case 10: {
+    t_ += (PI * 0.5);
+    var ash_r: f32 = select(0, (sin(t_) * (1.0 + ((0.05 + (${p[4]} * 0.3)) * cos((30.0 * t_))))), (sin(t_) > 0));
+    lx = ((ash_r * cos(t_)) * 0.6);
+    ly = (ash_r * sin(t_));
+  }
+  case 11: {
+    t_ += (PI * 0.5);
+    var monstera_base_r: f32 = (1.0 - (0.9 * sin(t_)));
+    if ((monstera_base_r < 0)) {
+      monstera_base_r = 0;
+    }
+    var fenestrations: f32 = (1.0 - ((${p[4]} * 0.8) * powc(sin((t_ * 2.5)), 10.0)));
+    fenestrations *= (1.0 - ((${p[4]} * 0.7) * powc(cos((t_ * 3.5)), 10.0)));
+    var monstera_r: f32 = (monstera_base_r * fenestrations);
+    lx = (monstera_r * cos(t_));
+    ly = (monstera_r * sin(t_));
+  }
+  case 12: {
+    t_ += (PI * 0.5);
+    var anise_r: f32 = (1.0 + ((0.2 + (${p[4]} * 0.4)) * cos((8.0 * t_))));
+    lx = (anise_r * cos(t_));
+    ly = (anise_r * sin(t_));
+  }
+  case 13: {
+    t_ += (PI * 0.5);
+    var holly_base_r: f32 = 1.0;
+    var num_points: f32 = 10.0;
+    var spike_depth: f32 = (0.15 + (${p[4]} * 0.2));
+    var spikes: f32 = (1.0 - (spike_depth * abs(sin(((t_ * num_points) / 2.0)))));
+    var holly_r: f32 = (holly_base_r * spikes);
+    lx = ((holly_r * cos(t_)) * 0.7);
+    ly = (holly_r * sin(t_));
+  }
+  case 14: {
+    t_ += (PI * 0.5);
+    var sweetgum_base_r: f32 = 1.0;
+    var sweetgum_num_points: f32 = 5.0;
+    var sweetgum_point_depth: f32 = (0.3 + (${p[4]} * 0.4));
+    var sweetgum_sharp_valleys: f32 = (1.0 - (sweetgum_point_depth * abs(sin(((t_ * sweetgum_num_points) / 2.0)))));
+    var sweetgum_serrations: f32 = (1.0 + (0.04 * cos((40 * t_))));
+    var sweetgum_r: f32 = ((sweetgum_base_r * sweetgum_sharp_valleys) * sweetgum_serrations);
+    lx = (sweetgum_r * cos(t_));
+    ly = (sweetgum_r * sin(t_));
+  }
+  case 15: {
+    t_ += (PI * 0.5);
+    var lobe_depth: f32 = (0.1 + (${p[4]} * 0.2));
+    var base_shape: f32 = ((1.0 + (lobe_depth * cos((3.0 * t_)))) - ((lobe_depth * 0.5) * cos((5.0 * t_))));
+    var serrations: f32 = ((1.0 + (0.03 * cos((20.0 * t_)))) + (0.02 * cos((35.0 * t_))));
+    var grape_r: f32 = (base_shape * serrations);
+    lx = (grape_r * cos(t_));
+    ly = (grape_r * sin(t_));
+  }
+  case 16: {
+    t_ += (PI * 0.5);
+    var castor_lobe_depth: f32 = (0.3 + (${p[4]} * 0.5));
+    var castor_base_shape: f32 = (1.0 + (castor_lobe_depth * cos((7.0 * t_))));
+    var castor_serration_depth: f32 = 0.05;
+    var castor_serrations: f32 = (1.0 + (castor_serration_depth * cos((42.0 * t_))));
+    var castor_r: f32 = (castor_base_shape * castor_serrations);
+    lx = (castor_r * cos(t_));
+    ly = (castor_r * sin(t_));
+  }
+  case 17: {
+    t_ += (PI * 0.5);
+    var hosta_base_r: f32 = (1.0 - (0.9 * sin(t_)));
+    var waviness: f32 = (0.02 + (${p[4]} * 0.05));
+    var hosta_r: f32 = (hosta_base_r * (1.0 + (waviness * sin((10.0 * t_)))));
+    lx = ((hosta_r * cos(t_)) * 1.2);
+    ly = (hosta_r * sin(t_));
+  }
+  case 18: {
+    t_ = ph;
+    var alocasia_base_r: f32 = (1.0 - sin(t_));
+    var alocasia_lobe_definition: f32 = (1.0 - ((0.1 + (${p[4]} * 0.4)) * powc(cos(t_), 2.0)));
+    var alocasia_r: f32 = (alocasia_base_r * alocasia_lobe_definition);
+    alocasia_r *= (1.0 + (0.03 * sin((15.0 * t_))));
+    lx = ((alocasia_r * cos(t_)) * 0.7);
+    ly = (alocasia_r * sin(t_));
+  }
+  case 19: {
+    t_ += (PI * 0.5);
+    var dandelion_r: f32 = (0.8 * (1.1 + (cos(((20.0 + (${p[4]} * 40.0)) * t_)) * 0.3)));
+    lx = (dandelion_r * cos(t_));
+    ly = (dandelion_r * sin(t_));
+  }
+  case 20: {
+    t_ += (PI * 0.5);
+    var columbine_r: f32 = ((1.0 + sin(t_)) + ((0.2 + (${p[4]} * 0.6)) * sin(((5.0 * t_) - (PI * 0.5)))));
+    lx = (columbine_r * cos(t_));
+    ly = (columbine_r * sin(t_));
+  }
+  case 21: {
+    t_ = ph;
+    var birch_base_r: f32 = (1.0 - (0.9 * sin(t_)));
+    var primary_serrations: f32 = (1.0 + (0.05 * cos((20.0 * t_))));
+    var secondary_serrations: f32 = (1.0 + ((0.02 + (${p[4]} * 0.03)) * cos((40.0 * t_))));
+    var birch_r: f32 = ((birch_base_r * primary_serrations) * secondary_serrations);
+    lx = ((birch_r * cos(t_)) * 0.8);
+    ly = (birch_r * sin(t_));
+  }
+  case 22: {
+    t_ += (PI * 0.5);
+    var tulip_r: f32 = (powc(abs(cos(t_)), 0.3) + powc(abs(sin(t_)), (2.0 + (${p[4]} * 2.0))));
+    lx = (tulip_r * sin(t_));
+    ly = ((-tulip_r * cos(t_)) * 0.6);
+  }
+  case 23: {
+    t_ += (PI * 0.5);
+    var linden_r: f32 = (1.0 - (0.9 * sin((t_ + ((${p[4]} - 0.5) * 0.2)))));
+    lx = ((linden_r * sin(t_)) * 1.1);
+    ly = (-linden_r * cos(t_));
+  }
+  case 24: {
+    t_ = ((ph * (2.0 + (${p[4]} * 4.0))) * PI);
+    var fiddlehead_r: f32 = (0.05 * t_);
+    lx = (fiddlehead_r * cos(t_));
+    ly = (fiddlehead_r * sin(t_));
+  }
+  default: {}
+}
+if ((${p[3]} != 0)) {
+  var origX: f32 = t.x;
+  var origY: f32 = t.y;
+  lx += (${p[3]} * sin((origY * 5.0)));
+  ly += (${p[3]} * cos((origX * 5.0)));
+}
+v.x += ((r_ * lx) * ${p[2]});
+v.y += ((r_ * ly) * ${p[2]});
+if (false) {
+  pz_ += (${w} * z_);
+}
+}`,
+  },
+  "mandelbox2D": {
+    params: [{ name: "mandelboxMode", def: 0 }, { name: "iterations", def: 10 }, { name: "scale", def: -1.5 }, { name: "foldLimit", def: 1 }, { name: "minRadius", def: 0.5 }, { name: "fixedRadius", def: 1 }, { name: "rotation", def: 0 }, { name: "juliaMode", def: 0 }, { name: "juliaX", def: 0.4 }, { name: "juliaY", def: 0.6 }, { name: "coloringMode", def: 0 }, { name: "colorSpeed", def: 0.5 }],
+    verified: true, priority: 0, flags: ["dc","z"], types: ["2D"],
+    funcNames: ["atan2j"],
+    funcs: `fn atan2j(y: f32, x: f32) -> f32 { if (x == 0.0 && y == 0.0) { return select(0.0, PI, (bitcast<u32>(x) >> 31u) == 1u) * select(1.0, -1.0, (bitcast<u32>(y) >> 31u) == 1u); } return atan2(y, x); }`,
+    code: (w, p) => `{
+var x: f32 = t.x;
+var y: f32 = t.y;
+var cx: f32;
+var cy: f32;
+if ((min(max(${p[7]}, 0.0), 1.0) == 1)) {
+  cx = ${p[8]};
+  cy = ${p[9]};
+} else {
+  cx = x;
+  cy = y;
+}
+var minRadius2: f32 = (${p[4]} * ${p[4]});
+var fixedRadius2: f32 = (${p[5]} * ${p[5]});
+var rotRad: f32 = radians(${p[6]});
+var cos_r: f32 = cos(rotRad);
+var sin_r: f32 = sin(rotRad);
+var blendedColor: f32 = (*cp);
+for (var i: i32 = 0; (f32(i) < ${p[1]}); i++) {
+  if ((min(max(${p[10]}, 0.0), 2.0) == 2)) {
+    var targetColor: f32 = ((atan2j(y, x) / (2.0 * PI)) + 0.5);
+    blendedColor += ((targetColor - blendedColor) * ${p[11]});
+  }
+  if ((min(max(${p[0]}, 0.0), 2.0) == 0)) {
+    if ((x > ${p[3]})) {
+      x = ((2.0 * ${p[3]}) - x);
+    } else if ((x < -(${p[3]}))) {
+      x = ((-2.0 * ${p[3]}) - x);
+    }
+    if ((y > ${p[3]})) {
+      y = ((2.0 * ${p[3]}) - y);
+    } else if ((y < -(${p[3]}))) {
+      y = ((-2.0 * ${p[3]}) - y);
+    }
+    var r2_: f32 = ((x * x) + (y * y));
+    if ((r2_ < minRadius2)) {
+      var f: f32 = (fixedRadius2 / minRadius2);
+      x *= f;
+      y *= f;
+    }
+    x *= ${p[2]};
+    y *= ${p[2]};
+    if ((${p[6]} != 0.0)) {
+      var xn: f32 = ((x * cos_r) - (y * sin_r));
+      y = ((x * sin_r) + (y * cos_r));
+      x = xn;
+    }
+    x += cx;
+    y += cy;
+  } else if ((min(max(${p[0]}, 0.0), 2.0) == 1)) {
+    x *= ${p[2]};
+    y *= ${p[2]};
+    x += cx;
+    y += cy;
+    if ((${p[6]} != 0.0)) {
+      var xn: f32 = ((x * cos_r) - (y * sin_r));
+      y = ((x * sin_r) + (y * cos_r));
+      x = xn;
+    }
+    if ((x > ${p[3]})) {
+      x = ((2.0 * ${p[3]}) - x);
+    } else if ((x < -(${p[3]}))) {
+      x = ((-2.0 * ${p[3]}) - x);
+    }
+    if ((y > ${p[3]})) {
+      y = ((2.0 * ${p[3]}) - y);
+    } else if ((y < -(${p[3]}))) {
+      y = ((-2.0 * ${p[3]}) - y);
+    }
+    var r2_: f32 = ((x * x) + (y * y));
+    if ((r2_ < minRadius2)) {
+      var f: f32 = (fixedRadius2 / r2_);
+      x *= f;
+      y *= f;
+    }
+  } else {
+    if ((x > ${p[3]})) {
+      x = ((2.0 * ${p[3]}) - x);
+    } else if ((x < -(${p[3]}))) {
+      x = ((-2.0 * ${p[3]}) - x);
+    }
+    if ((y > ${p[3]})) {
+      y = ((2.0 * ${p[3]}) - y);
+    } else if ((y < -(${p[3]}))) {
+      y = ((-2.0 * ${p[3]}) - y);
+    }
+    x += cx;
+    y += cy;
+    x *= ${p[2]};
+    y *= ${p[2]};
+    if ((${p[6]} != 0.0)) {
+      var xn: f32 = ((x * cos_r) - (y * sin_r));
+      y = ((x * sin_r) + (y * cos_r));
+      x = xn;
+    }
+    var r2_: f32 = ((x * x) + (y * y));
+    if ((r2_ < minRadius2)) {
+      var f: f32 = (fixedRadius2 / r2_);
+      x *= f;
+      y *= f;
+    }
+  }
+}
+v.x += (x * ${w});
+v.y += (y * ${w});
+if ((min(max(${p[10]}, 0.0), 2.0) == 1)) {
+  (*cp) = ((atan2j(y, x) / (2.0 * PI)) + 0.5);
+} else if ((min(max(${p[10]}, 0.0), 2.0) == 2)) {
+  (*cp) = blendedColor;
+}
+if (false) {
+  pz_ += (z_ * ${w});
+}
+}`,
+  },
+  "multi_ifs": {
+    params: [{ name: "ifs_type", def: 0 }, { name: "coloring_mode", def: 0 }, { name: "color_speed", def: 0.5 }, { name: "color1", def: 0 }, { name: "color2", def: 0.25 }, { name: "color3", def: 0.5 }, { name: "color4", def: 0.75 }],
+    verified: true, priority: 0, flags: ["dc","z"], types: ["2D"],
+    funcNames: ["atan2j"],
+    funcs: `fn atan2j(y: f32, x: f32) -> f32 { if (x == 0.0 && y == 0.0) { return select(0.0, PI, (bitcast<u32>(x) >> 31u) == 1u) * select(1.0, -1.0, (bitcast<u32>(y) >> 31u) == 1u); } return atan2(y, x); }`,
+    code: (w, p) => `{
+var S3D2: f32 = 0.4330127018922193;
+var x: f32 = t.x;
+var y: f32 = t.y;
+var nx: f32 = 0.0;
+var ny: f32 = 0.0;
+var newColor: f32 = 0.0;
+var rand: f32 = rnd(rs);
+switch i32(min(max(${p[0]}, 0.0), 73.0)) {
+  case 1: {
+    if ((rand < 0.25)) {
+      nx = (0.5 * x);
+      ny = (0.5 * y);
+      newColor = ${p[3]};
+    } else if ((rand < 0.5)) {
+      nx = (((-0.25 * x) - (S3D2 * y)) + 0.25);
+      ny = (((S3D2 * x) - (0.25 * y)) + S3D2);
+      newColor = ${p[4]};
+    } else if ((rand < 0.75)) {
+      nx = (((-0.25 * x) + (S3D2 * y)) - 0.5);
+      ny = ((-S3D2 * x) - (0.25 * y));
+      newColor = ${p[5]};
+    } else {
+      nx = ((-0.5 * x) - 0.25);
+      ny = ((-0.5 * y) + S3D2);
+      newColor = ${p[6]};
+    }
+  }
+  case 2: {
+    if ((rand < 0.25)) {
+      nx = (0.5 * x);
+      ny = (0.5 * y);
+      newColor = ${p[3]};
+    } else if ((rand < 0.5)) {
+      nx = ((0.5 * x) - 0.5);
+      ny = ((0.5 * y) + 0.5);
+      newColor = ${p[4]};
+    } else if ((rand < 0.75)) {
+      nx = ((-0.5 * x) + 0.5);
+      ny = ((0.5 * y) + 0.5);
+      newColor = ${p[5]};
+    } else {
+      nx = ((0.5 * y) + 0.5);
+      ny = ((-0.5 * x) + 0.5);
+      newColor = ${p[6]};
+    }
+  }
+  case 3: {
+    if ((rand < 0.25)) {
+      nx = (0.5 * x);
+      ny = (0.5 * y);
+      newColor = ${p[3]};
+    } else if ((rand < 0.5)) {
+      nx = ((-0.5 * x) + 0.5);
+      ny = (0.5 * y);
+      newColor = ${p[4]};
+    } else if ((rand < 0.75)) {
+      nx = (((-0.25 * x) - (S3D2 * y)) + 0.25);
+      ny = (((-S3D2 * x) + (0.25 * y)) + S3D2);
+      newColor = ${p[5]};
+    } else {
+      nx = (((-0.25 * x) + (S3D2 * y)) + 0.25);
+      ny = (((-S3D2 * x) - (0.25 * y)) + S3D2);
+      newColor = ${p[6]};
+    }
+  }
+  case 4: {
+    if ((rand < 0.25)) {
+      nx = (0.5 * x);
+      ny = (0.5 * y);
+      newColor = ${p[3]};
+    } else if ((rand < 0.5)) {
+      nx = ((0.5 * x) + 0.5);
+      ny = (0.5 * y);
+      newColor = ${p[4]};
+    } else if ((rand < 0.75)) {
+      nx = (0.5 * x);
+      ny = ((0.5 * y) + 0.5);
+      newColor = ${p[5]};
+    } else {
+      nx = ((0.5 * y) + 0.5);
+      ny = ((-0.5 * x) + 1.0);
+      newColor = ${p[6]};
+    }
+  }
+  case 5: {
+    if ((rand < 0.25)) {
+      nx = (((0.25 * x) + (-0.4330127018922193 * y)) + 0);
+      ny = (((0.4330127018922193 * x) + (0.25 * y)) + 0);
+      newColor = ${p[3]};
+    } else if ((rand < 0.5)) {
+      nx = (((-0.25 * x) + (0.4330127018922193 * y)) - 0.5);
+      ny = (((-0.4330127018922193 * x) + (-0.25 * y)) + 0);
+      newColor = ${p[4]};
+    } else if ((rand < 0.75)) {
+      nx = (((-0.25 * x) + (0.4330127018922193 * y)) + 0.25);
+      ny = (((-0.4330127018922193 * x) + (-0.25 * y)) - 0.4330127018922193);
+      newColor = ${p[5]};
+    } else {
+      nx = (((-0.25 * x) + (0.4330127018922193 * y)) + 0.25);
+      ny = (((-0.4330127018922193 * x) + (-0.25 * y)) + 0.4330127018922193);
+      newColor = ${p[6]};
+    }
+  }
+  case 6: {
+    if ((rand < 0.25)) {
+      nx = (((-0.5 * x) + (0 * y)) + 0);
+      ny = (((0 * x) + (0.5 * y)) + 0);
+      newColor = ${p[3]};
+    } else if ((rand < 0.5)) {
+      nx = (((-0.25 * x) + (-0.4330127018922193 * y)) + 0.25);
+      ny = (((-0.4330127018922194 * x) + (0.25 * y)) - 0.4330127018922194);
+      newColor = ${p[4]};
+    } else if ((rand < 0.75)) {
+      nx = (((-0.25 * x) + (-0.4330127018922193 * y)) - 0.5);
+      ny = (((0.4330127018922194 * x) + (-0.25 * y)) - 0.8660254037844387);
+      newColor = ${p[5]};
+    } else {
+      nx = (((0.5 * x) + (0 * y)) + 1.0);
+      ny = (((0 * x) + (0.5 * y)) + 0);
+      newColor = ${p[6]};
+    }
+  }
+  case 7: {
+    if ((rand < 0.25)) {
+      nx = (((0.5 * x) + (0 * y)) + 0);
+      ny = (((0 * x) + (-0.5 * y)) + 0);
+      newColor = ${p[3]};
+    } else if ((rand < 0.5)) {
+      nx = (((0 * x) + (-0.5 * y)) + 0);
+      ny = (((0.5 * x) + (0 * y)) - 0.5);
+      newColor = ${p[4]};
+    } else if ((rand < 0.75)) {
+      nx = (((0 * x) + (0.5 * y)) + 0);
+      ny = (((0.5 * x) + (0 * y)) - 0.5);
+      newColor = ${p[5]};
+    } else {
+      nx = (((0.5 * x) + (0 * y)) - 0.5);
+      ny = (((0 * x) + (0.5 * y)) + 0);
+      newColor = ${p[6]};
+    }
+  }
+  case 8: {
+    if ((rand < 0.25)) {
+      nx = (((-0.5 * x) + (0 * y)) + 0);
+      ny = (((0 * x) + (-0.5 * y)) + 0);
+      newColor = ${p[3]};
+    } else if ((rand < 0.5)) {
+      nx = (((0.5 * x) + (0 * y)) - 0.25);
+      ny = (((0 * x) + (-0.5 * y)) + 0.4330127018922194);
+      newColor = ${p[4]};
+    } else if ((rand < 0.75)) {
+      nx = (((0.25 * x) + (-0.4330127018922193 * y)) + 0.25);
+      ny = (((0.4330127018922194 * x) + (0.25 * y)) + 0.4330127018922194);
+      newColor = ${p[5]};
+    } else {
+      nx = (((0.25 * x) + (-0.4330127018922193 * y)) + 0.25);
+      ny = (((0.4330127018922194 * x) + (0.25 * y)) - 0.4330127018922194);
+      newColor = ${p[6]};
+    }
+  }
+  case 9: {
+    if ((rand < 0.25)) {
+      nx = (((0.5 * x) + (0 * y)) + 0);
+      ny = (((0 * x) + (0.5 * y)) + 0);
+      newColor = ${p[3]};
+    } else if ((rand < 0.5)) {
+      nx = (((-0.25 * x) + (0.4330127018922193 * y)) - 0.5);
+      ny = (((-0.4330127018922194 * x) + (-0.25 * y)) + 0);
+      newColor = ${p[4]};
+    } else if ((rand < 0.75)) {
+      nx = (((-0.25 * x) + (0.4330127018922193 * y)) - 0.25);
+      ny = (((0.4330127018922194 * x) + (0.25 * y)) + 0.4330127018922194);
+      newColor = ${p[5]};
+    } else {
+      nx = (((-0.25 * x) + (-0.4330127018922193 * y)) - 0.25);
+      ny = (((-0.4330127018922194 * x) + (-0.25 * y)) + 0.4330127018922194);
+      newColor = ${p[6]};
+    }
+  }
+  case 10: {
+    if ((rand < 0.25)) {
+      nx = (((-0.5 * x) + (0 * y)) + 0);
+      ny = (((0 * x) + (0.5 * y)) + 0);
+      newColor = ${p[3]};
+    } else if ((rand < 0.5)) {
+      nx = (((0.5 * x) + (0 * y)) - 1);
+      ny = (((0 * x) + (-0.5 * y)) - 1.5);
+      newColor = ${p[4]};
+    } else if ((rand < 0.75)) {
+      nx = (((-0.5 * x) + (0 * y)) + 0);
+      ny = (((0 * x) + (-0.5 * y)) - 1);
+      newColor = ${p[5]};
+    } else {
+      nx = (((0.5 * x) + (0 * y)) - 1);
+      ny = (((0 * x) + (0.5 * y)) - 1.5);
+      newColor = ${p[6]};
+    }
+  }
+  case 11: {
+    if ((rand < 0.25)) {
+      nx = (((0.5 * x) + (0 * y)) + 0);
+      ny = (((0 * x) + (-0.5 * y)) + 0);
+      newColor = ${p[3]};
+    } else if ((rand < 0.5)) {
+      nx = (((-0.5 * x) + (0 * y)) + 0.5);
+      ny = (((0 * x) + (0.5 * y)) + 0);
+      newColor = ${p[4]};
+    } else if ((rand < 0.75)) {
+      nx = (((-0.25 * x) + (-0.4330127018922193 * y)) + 0.25);
+      ny = (((-0.4330127018922194 * x) + (0.25 * y)) + 0.4330127018922194);
+      newColor = ${p[5]};
+    } else {
+      nx = (((-0.25 * x) + (0.4330127018922193 * y)) + 0.25);
+      ny = (((-0.4330127018922194 * x) + (-0.25 * y)) + 0.4330127018922194);
+      newColor = ${p[6]};
+    }
+  }
+  case 12: {
+    if ((rand < 0.25)) {
+      nx = (((0 * x) + (0.5 * y)) + 0);
+      ny = (((0.5 * x) + (0 * y)) + 0);
+      newColor = ${p[3]};
+    } else if ((rand < 0.5)) {
+      nx = (((0 * x) + (0.5 * y)) + 0);
+      ny = (((0.5 * x) + (0 * y)) - 0.5);
+      newColor = ${p[4]};
+    } else if ((rand < 0.75)) {
+      nx = (((0 * x) + (0.5 * y)) + 0);
+      ny = (((-0.5 * x) + (0 * y)) - 0.5);
+      newColor = ${p[5]};
+    } else {
+      nx = (((0 * x) + (-0.5 * y)) - 1);
+      ny = (((-0.5 * x) + (0 * y)) - 1);
+      newColor = ${p[6]};
+    }
+  }
+  case 13: {
+    if ((rand < 0.25)) {
+      nx = (((-0.5 * x) + (0 * y)) + 0);
+      ny = (((0 * x) + (0.5 * y)) + 0);
+      newColor = ${p[3]};
+    } else if ((rand < 0.5)) {
+      nx = (((-0.25 * x) + (-0.4330127018922193 * y)) + 0.5);
+      ny = (((-0.4330127018922194 * x) + (0.25 * y)) + 0);
+      newColor = ${p[4]};
+    } else if ((rand < 0.75)) {
+      nx = (((0.5 * x) + (0 * y)) + 0.5);
+      ny = (((0 * x) + (-0.5 * y)) + 0);
+      newColor = ${p[5]};
+    } else {
+      nx = (((-0.25 * x) + (0.4330127018922193 * y)) + 0.5);
+      ny = (((0.4330127018922194 * x) + (0.25 * y)) + 0);
+      newColor = ${p[6]};
+    }
+  }
+  case 14: {
+    if ((rand < 0.25)) {
+      nx = (((0 * x) + (-0.5 * y)) + 0);
+      ny = (((-0.5 * x) + (0 * y)) + 0);
+      newColor = ${p[3]};
+    } else if ((rand < 0.5)) {
+      nx = (((0 * x) + (-0.5 * y)) + 0);
+      ny = (((0.5 * x) + (0 * y)) + 0.5);
+      newColor = ${p[4]};
+    } else if ((rand < 0.75)) {
+      nx = (((0 * x) + (-0.5 * y)) - 0.5);
+      ny = (((-0.5 * x) + (0 * y)) + 0);
+      newColor = ${p[5]};
+    } else {
+      nx = (((0 * x) + (0.5 * y)) - 0.5);
+      ny = (((0.5 * x) + (0 * y)) + 0.5);
+      newColor = ${p[6]};
+    }
+  }
+  case 15: {
+    if ((rand < 0.25)) {
+      nx = (((0 * x) + (-0.5 * y)) + 0);
+      ny = (((-0.5 * x) + (0 * y)) + 0);
+      newColor = ${p[3]};
+    } else if ((rand < 0.5)) {
+      nx = (((0.5 * x) + (0 * y)) - 1);
+      ny = (((0 * x) + (0.5 * y)) + 0);
+      newColor = ${p[4]};
+    } else if ((rand < 0.75)) {
+      nx = (((0 * x) + (0.5 * y)) - 1.5);
+      ny = (((0.5 * x) + (0 * y)) + 0.5);
+      newColor = ${p[5]};
+    } else {
+      nx = (((0 * x) + (-0.5 * y)) - 0.5);
+      ny = (((-0.5 * x) + (0 * y)) + 0.5);
+      newColor = ${p[6]};
+    }
+  }
+  case 16: {
+    if ((rand < 0.25)) {
+      nx = (((-0.5 * x) + (0 * y)) + 0);
+      ny = (((0 * x) + (0.5 * y)) + 0);
+      newColor = ${p[3]};
+    } else if ((rand < 0.5)) {
+      nx = (((0 * x) + (0.5 * y)) + 0.5);
+      ny = (((-0.5 * x) + (0 * y)) - 0.5);
+      newColor = ${p[4]};
+    } else if ((rand < 0.75)) {
+      nx = (((0 * x) + (0.5 * y)) + 2);
+      ny = (((-0.5 * x) + (0 * y)) - 0.5);
+      newColor = ${p[5]};
+    } else {
+      nx = (((0.5 * x) + (0 * y)) + 1);
+      ny = (((0 * x) + (-0.5 * y)) - 1.5);
+      newColor = ${p[6]};
+    }
+  }
+  case 17: {
+    if ((rand < 0.25)) {
+      nx = (((-0.25 * x) + (-0.4330127018922193 * y)) + 0);
+      ny = (((-0.4330127018922194 * x) + (0.25 * y)) + 0);
+      newColor = ${p[3]};
+    } else if ((rand < 0.5)) {
+      nx = (((-0.25 * x) + (-0.4330127018922193 * y)) + 0.5);
+      ny = (((-0.4330127018922194 * x) + (0.25 * y)) - 0.8660254037844387);
+      newColor = ${p[4]};
+    } else if ((rand < 0.75)) {
+      nx = (((0.25 * x) + (0.4330127018922193 * y)) + 0.25);
+      ny = (((0.4330127018922194 * x) + (-0.25 * y)) - 1.299038105676658);
+      newColor = ${p[5]};
+    } else {
+      nx = (((-0.25 * x) + (-0.4330127018922193 * y)) + 1.25);
+      ny = (((-0.4330127018922194 * x) + (0.25 * y)) + 0.4330127018922194);
+      newColor = ${p[6]};
+    }
+  }
+  case 18: {
+    if ((rand < 0.25)) {
+      nx = (((0 * x) + (-0.5 * y)) + 0);
+      ny = (((-0.5 * x) + (0 * y)) + 0);
+      newColor = ${p[3]};
+    } else if ((rand < 0.5)) {
+      nx = (((0.5 * x) + (0 * y)) + 0);
+      ny = (((0 * x) + (-0.5 * y)) - 0.5);
+      newColor = ${p[4]};
+    } else if ((rand < 0.75)) {
+      nx = (((-0.5 * x) + (0 * y)) + 0.5);
+      ny = (((0 * x) + (0.5 * y)) - 0.5);
+      newColor = ${p[5]};
+    } else {
+      nx = (((0 * x) + (-0.5 * y)) + 0);
+      ny = (((-0.5 * x) + (0 * y)) - 0.5);
+      newColor = ${p[6]};
+    }
+  }
+  case 19: {
+    if ((rand < 0.25)) {
+      nx = (((0 * x) + (0.5 * y)) + 0);
+      ny = (((0.5 * x) + (0 * y)) + 0);
+      newColor = ${p[3]};
+    } else if ((rand < 0.5)) {
+      nx = (((-0.5 * x) + (0 * y)) + 0.5);
+      ny = (((0 * x) + (0.5 * y)) + 0);
+      newColor = ${p[4]};
+    } else if ((rand < 0.75)) {
+      nx = (((0 * x) + (0.5 * y)) + 0.5);
+      ny = (((0.5 * x) + (0 * y)) + 0);
+      newColor = ${p[5]};
+    } else {
+      nx = (((0 * x) + (-0.5 * y)) + 0.5);
+      ny = (((-0.5 * x) + (0 * y)) + 0.5);
+      newColor = ${p[6]};
+    }
+  }
+  case 20: {
+    if ((rand < 0.25)) {
+      nx = (((0.5 * x) + (0 * y)) + 0);
+      ny = (((0 * x) + (-0.5 * y)) + 0);
+      newColor = ${p[3]};
+    } else if ((rand < 0.5)) {
+      nx = (((0 * x) + (0.5 * y)) + 0.5);
+      ny = (((0.5 * x) + (0 * y)) + 0);
+      newColor = ${p[4]};
+    } else if ((rand < 0.75)) {
+      nx = (((0 * x) + (-0.5 * y)) + 0.5);
+      ny = (((-0.5 * x) + (0 * y)) + 0.5);
+      newColor = ${p[5]};
+    } else {
+      nx = (((-0.5 * x) + (0 * y)) + 0.5);
+      ny = (((0 * x) + (-0.5 * y)) + 0);
+      newColor = ${p[6]};
+    }
+  }
+  case 21: {
+    if ((rand < 0.25)) {
+      nx = (((0.5 * x) + (0 * y)) + 0);
+      ny = (((0 * x) + (0.5 * y)) + 0);
+      newColor = ${p[3]};
+    } else if ((rand < 0.5)) {
+      nx = (((-0.5 * x) + (0 * y)) - 0.5);
+      ny = (((0 * x) + (-0.5 * y)) + 0.5);
+      newColor = ${p[4]};
+    } else if ((rand < 0.75)) {
+      nx = (((0 * x) + (0.5 * y)) - 0.5);
+      ny = (((0.5 * x) + (0 * y)) + 1);
+      newColor = ${p[5]};
+    } else {
+      nx = (((-0.5 * x) + (0 * y)) - 0.5);
+      ny = (((0 * x) + (-0.5 * y)) + 1);
+      newColor = ${p[6]};
+    }
+  }
+  case 22: {
+    if ((rand < 0.25)) {
+      nx = (((0 * x) + (0.5 * y)) + 0);
+      ny = (((0.5 * x) + (0 * y)) + 0);
+      newColor = ${p[3]};
+    } else if ((rand < 0.5)) {
+      nx = (((0.5 * x) + (0 * y)) - 0.5);
+      ny = (((0 * x) + (-0.5 * y)) - 0.5);
+      newColor = ${p[4]};
+    } else if ((rand < 0.75)) {
+      nx = (((0.5 * x) + (0 * y)) - 0.5);
+      ny = (((0 * x) + (-0.5 * y)) - 1);
+      newColor = ${p[5]};
+    } else {
+      nx = (((0 * x) + (0.5 * y)) - 1.5);
+      ny = (((0.5 * x) + (0 * y)) + 0);
+      newColor = ${p[6]};
+    }
+  }
+  case 23: {
+    if ((rand < 0.25)) {
+      nx = (((0 * x) + (0.5 * y)) + 0);
+      ny = (((0.5 * x) + (0 * y)) + 0);
+      newColor = ${p[3]};
+    } else if ((rand < 0.5)) {
+      nx = (((-0.5 * x) + (0 * y)) - 0.5);
+      ny = (((0 * x) + (-0.5 * y)) - 0.5);
+      newColor = ${p[4]};
+    } else if ((rand < 0.75)) {
+      nx = (((0.5 * x) + (0 * y)) + 0);
+      ny = (((0 * x) + (-0.5 * y)) - 1);
+      newColor = ${p[5]};
+    } else {
+      nx = (((0 * x) + (-0.5 * y)) - 0.5);
+      ny = (((0.5 * x) + (0 * y)) - 0.5);
+      newColor = ${p[6]};
+    }
+  }
+  case 24: {
+    if ((rand < 0.25)) {
+      nx = (((0.25 * x) + (0.4330127018922193 * y)) + 0);
+      ny = (((0.4330127018922194 * x) + (-0.25 * y)) + 0);
+      newColor = ${p[3]};
+    } else if ((rand < 0.5)) {
+      nx = (((0.25 * x) + (0.4330127018922193 * y)) + 0.5);
+      ny = (((0.4330127018922194 * x) + (-0.25 * y)) - 0.8660254037844387);
+      newColor = ${p[4]};
+    } else if ((rand < 0.75)) {
+      nx = (((-0.25 * x) + (-0.4330127018922193 * y)) + 1.5);
+      ny = (((-0.4330127018922194 * x) + (0.25 * y)) + 0);
+      newColor = ${p[5]};
+    } else {
+      nx = (((0.25 * x) + (0.4330127018922193 * y)) + 1.5);
+      ny = (((0.4330127018922194 * x) + (-0.25 * y)) + 0);
+      newColor = ${p[6]};
+    }
+  }
+  case 25: {
+    if ((rand < 0.25)) {
+      nx = (((0.5 * x) + (0 * y)) + 0);
+      ny = (((0 * x) + (0.5 * y)) + 0);
+      newColor = ${p[3]};
+    } else if ((rand < 0.5)) {
+      nx = (((0.25 * x) + (0.4330127018922193 * y)) - 0.25);
+      ny = (((-0.4330127018922194 * x) + (0.25 * y)) + 0.4330127018922194);
+      newColor = ${p[4]};
+    } else if ((rand < 0.75)) {
+      nx = (((-0.5 * x) + (0 * y)) + 0.5);
+      ny = (((0 * x) + (0.5 * y)) + 0);
+      newColor = ${p[5]};
+    } else {
+      nx = (((-0.25 * x) + (0.4330127018922193 * y)) + 0.25);
+      ny = (((-0.4330127018922194 * x) + (-0.25 * y)) + 0.4330127018922194);
+      newColor = ${p[6]};
+    }
+  }
+  case 26: {
+    if ((rand < 0.25)) {
+      nx = (((0.25 * x) + (-0.4330127018922193 * y)) + 0);
+      ny = (((0.4330127018922194 * x) + (0.25 * y)) + 0);
+      newColor = ${p[3]};
+    } else if ((rand < 0.5)) {
+      nx = (((-0.25 * x) + (-0.4330127018922193 * y)) + 0.25);
+      ny = (((0.4330127018922194 * x) + (-0.25 * y)) - 0.4330127018922194);
+      newColor = ${p[4]};
+    } else if ((rand < 0.75)) {
+      nx = (((0.5 * x) + (0 * y)) + 0.25);
+      ny = (((0 * x) + (-0.5 * y)) - 0.4330127018922194);
+      newColor = ${p[5]};
+    } else {
+      nx = (((0.5 * x) + (0 * y)) + 0.25);
+      ny = (((0 * x) + (0.5 * y)) - 0.4330127018922194);
+      newColor = ${p[6]};
+    }
+  }
+  case 27: {
+    if ((rand < 0.25)) {
+      nx = (((0.25 * x) + (0.4330127018922193 * y)) + 0);
+      ny = (((-0.4330127018922194 * x) + (0.25 * y)) + 0);
+      newColor = ${p[3]};
+    } else if ((rand < 0.5)) {
+      nx = (((0.25 * x) + (-0.4330127018922193 * y)) + 0.5);
+      ny = (((0.4330127018922194 * x) + (0.25 * y)) + 0);
+      newColor = ${p[4]};
+    } else if ((rand < 0.75)) {
+      nx = (((-0.5 * x) + (0 * y)) - 0.5);
+      ny = (((0 * x) + (-0.5 * y)) + 0);
+      newColor = ${p[5]};
+    } else {
+      nx = (((-0.5 * x) + (0 * y)) + 0.25);
+      ny = (((0 * x) + (-0.5 * y)) + 0.4330127018922194);
+      newColor = ${p[6]};
+    }
+  }
+  case 28: {
+    if ((rand < 0.25)) {
+      nx = (((0.25 * x) + (0.4330127018922193 * y)) + 0);
+      ny = (((-0.4330127018922194 * x) + (0.25 * y)) + 0);
+      newColor = ${p[3]};
+    } else if ((rand < 0.5)) {
+      nx = (((0.5 * x) + (0 * y)) + 0.25);
+      ny = (((0 * x) + (-0.5 * y)) + 0.4330127018922194);
+      newColor = ${p[4]};
+    } else if ((rand < 0.75)) {
+      nx = (((-0.25 * x) + (0.4330127018922193 * y)) + 0.25);
+      ny = (((0.4330127018922194 * x) + (0.25 * y)) - 0.4330127018922194);
+      newColor = ${p[5]};
+    } else {
+      nx = (((-0.5 * x) + (0 * y)) - 0.75);
+      ny = (((0 * x) + (-0.5 * y)) + 0.4330127018922194);
+      newColor = ${p[6]};
+    }
+  }
+  case 29: {
+    if ((rand < 0.25)) {
+      nx = (((-0.5 * x) + (0 * y)) + 0);
+      ny = (((0 * x) + (-0.5 * y)) + 0);
+      newColor = ${p[3]};
+    } else if ((rand < 0.5)) {
+      nx = (((0 * x) + (0.5 * y)) + 0.5);
+      ny = (((-0.5 * x) + (0 * y)) + 0.5);
+      newColor = ${p[4]};
+    } else if ((rand < 0.75)) {
+      nx = (((-0.5 * x) + (0 * y)) + 1.5);
+      ny = (((0 * x) + (-0.5 * y)) + 0);
+      newColor = ${p[5]};
+    } else {
+      nx = (((0.5 * x) + (0 * y)) + 0);
+      ny = (((0 * x) + (0.5 * y)) - 0.5);
+      newColor = ${p[6]};
+    }
+  }
+  case 30: {
+    if ((rand < 0.25)) {
+      nx = (((-0.5 * x) + (0 * y)) + 0);
+      ny = (((0 * x) + (-0.5 * y)) + 0);
+      newColor = ${p[3]};
+    } else if ((rand < 0.5)) {
+      nx = (((0.5 * x) + (0 * y)) - 0.25);
+      ny = (((0 * x) + (0.5 * y)) + 1.299038105676658);
+      newColor = ${p[4]};
+    } else if ((rand < 0.75)) {
+      nx = (((0.25 * x) + (0.4330127018922193 * y)) - 0.75);
+      ny = (((0.4330127018922194 * x) + (-0.25 * y)) - 0.4330127018922194);
+      newColor = ${p[5]};
+    } else {
+      nx = (((0.25 * x) + (0.4330127018922193 * y)) - 0.25);
+      ny = (((0.4330127018922194 * x) + (-0.25 * y)) + 1.299038105676658);
+      newColor = ${p[6]};
+    }
+  }
+  case 31: {
+    if ((rand < 0.25)) {
+      nx = (((0 * x) + (-0.5 * y)) + 0);
+      ny = (((0.5 * x) + (0 * y)) + 0);
+      newColor = ${p[3]};
+    } else if ((rand < 0.5)) {
+      nx = (((0 * x) + (0.5 * y)) - 0.5);
+      ny = (((-0.5 * x) + (0 * y)) + 2);
+      newColor = ${p[4]};
+    } else if ((rand < 0.75)) {
+      nx = (((0 * x) + (0.5 * y)) - 1);
+      ny = (((-0.5 * x) + (0 * y)) + 1);
+      newColor = ${p[5]};
+    } else {
+      nx = (((0 * x) + (0.5 * y)) - 1.5);
+      ny = (((-0.5 * x) + (0 * y)) + 0);
+      newColor = ${p[6]};
+    }
+  }
+  case 32: {
+    if ((rand < 0.25)) {
+      nx = (((-0.5 * x) + (0 * y)) + 0);
+      ny = (((0 * x) + (-0.5 * y)) + 0);
+      newColor = ${p[3]};
+    } else if ((rand < 0.5)) {
+      nx = (((0 * x) + (0.5 * y)) + 0.5);
+      ny = (((0.5 * x) + (0 * y)) - 1);
+      newColor = ${p[4]};
+    } else if ((rand < 0.75)) {
+      nx = (((-0.5 * x) + (0 * y)) + 1.5);
+      ny = (((0 * x) + (-0.5 * y)) + 0);
+      newColor = ${p[5]};
+    } else {
+      nx = (((0 * x) + (-0.5 * y)) + 0.5);
+      ny = (((-0.5 * x) + (0 * y)) - 0.5);
+      newColor = ${p[6]};
+    }
+  }
+  case 33: {
+    if ((rand < 0.25)) {
+      nx = (((0.5 * x) + (0 * y)) + 0);
+      ny = (((0 * x) + (-0.5 * y)) + 0);
+      newColor = ${p[3]};
+    } else if ((rand < 0.5)) {
+      nx = (((-0.25 * x) + (0.4330127018922193 * y)) + 0.5);
+      ny = (((0.4330127018922194 * x) + (0.25 * y)) + 0);
+      newColor = ${p[4]};
+    } else if ((rand < 0.75)) {
+      nx = (((-0.5 * x) + (0 * y)) + 0.5);
+      ny = (((0 * x) + (-0.5 * y)) + 0);
+      newColor = ${p[5]};
+    } else {
+      nx = (((-0.25 * x) + (-0.4330127018922193 * y)) + 0.5);
+      ny = (((0.4330127018922194 * x) + (-0.25 * y)) + 0);
+      newColor = ${p[6]};
+    }
+  }
+  case 34: {
+    if ((rand < 0.25)) {
+      nx = (((0.5 * x) + (0 * y)) + 0);
+      ny = (((0 * x) + (-0.5 * y)) + 0);
+      newColor = ${p[3]};
+    } else if ((rand < 0.5)) {
+      nx = (((0.5 * x) + (0 * y)) - 1.5);
+      ny = (((0 * x) + (-0.5 * y)) + 0);
+      newColor = ${p[4]};
+    } else if ((rand < 0.75)) {
+      nx = (((-0.5 * x) + (0 * y)) - 1.5);
+      ny = (((0 * x) + (0.5 * y)) - 0.5);
+      newColor = ${p[5]};
+    } else {
+      nx = (((0.5 * x) + (0 * y)) + 0);
+      ny = (((0 * x) + (-0.5 * y)) + 1.5);
+      newColor = ${p[6]};
+    }
+  }
+  case 35: {
+    if ((rand < 0.25)) {
+      nx = (((-0.5 * x) + (0 * y)) + 0);
+      ny = (((0 * x) + (0.5 * y)) + 0);
+      newColor = ${p[3]};
+    } else if ((rand < 0.5)) {
+      nx = (((0.5 * x) + (0 * y)) - 1);
+      ny = (((0 * x) + (-0.5 * y)) - 1.5);
+      newColor = ${p[4]};
+    } else if ((rand < 0.75)) {
+      nx = (((-0.5 * x) + (0 * y)) + 0);
+      ny = (((0 * x) + (-0.5 * y)) - 1);
+      newColor = ${p[5]};
+    } else {
+      nx = (((0.5 * x) + (0 * y)) - 1);
+      ny = (((0 * x) + (0.5 * y)) - 1.5);
+      newColor = ${p[6]};
+    }
+  }
+  case 36: {
+    if ((rand < 0.25)) {
+      nx = (((0.25 * x) + (-0.4330127018922193 * y)) + 0);
+      ny = (((0.4330127018922194 * x) + (0.25 * y)) + 0);
+      newColor = ${p[3]};
+    } else if ((rand < 0.5)) {
+      nx = (((-0.5 * x) + (0 * y)) + 0.5);
+      ny = (((0 * x) + (-0.5 * y)) + 0);
+      newColor = ${p[4]};
+    } else if ((rand < 0.75)) {
+      nx = (((-0.5 * x) + (0 * y)) + 1.25);
+      ny = (((0 * x) + (-0.5 * y)) - 1.299038105676658);
+      newColor = ${p[5]};
+    } else {
+      nx = (((0.25 * x) + (0.4330127018922193 * y)) + 0.25);
+      ny = (((-0.4330127018922194 * x) + (0.25 * y)) + 0.4330127018922194);
+      newColor = ${p[6]};
+    }
+  }
+  case 37: {
+    if ((rand < 0.25)) {
+      nx = (((0.5 * x) + (0 * y)) + 0);
+      ny = (((0 * x) + (-0.5 * y)) + 0);
+      newColor = ${p[3]};
+    } else if ((rand < 0.5)) {
+      nx = (((0.25 * x) + (0.4330127018922193 * y)) - 0.25);
+      ny = (((-0.4330127018922194 * x) + (0.25 * y)) + 0.4330127018922194);
+      newColor = ${p[4]};
+    } else if ((rand < 0.75)) {
+      nx = (((-0.5 * x) + (0 * y)) + 0.5);
+      ny = (((0 * x) + (0.5 * y)) + 0);
+      newColor = ${p[5]};
+    } else {
+      nx = (((-0.25 * x) + (0.4330127018922193 * y)) + 0.25);
+      ny = (((-0.4330127018922194 * x) + (-0.25 * y)) + 0.4330127018922194);
+      newColor = ${p[6]};
+    }
+  }
+  case 38: {
+    if ((rand < 0.25)) {
+      nx = (((-0.25 * x) + (0.4330127018922193 * y)) + 0);
+      ny = (((0.4330127018922194 * x) + (0.25 * y)) + 0);
+      newColor = ${p[3]};
+    } else if ((rand < 0.5)) {
+      nx = (((0.25 * x) + (-0.4330127018922193 * y)) + 0.5);
+      ny = (((0.4330127018922194 * x) + (0.25 * y)) + 0);
+      newColor = ${p[4]};
+    } else if ((rand < 0.75)) {
+      nx = (((-0.5 * x) + (0 * y)) - 0.5);
+      ny = (((0 * x) + (-0.5 * y)) + 0);
+      newColor = ${p[5]};
+    } else {
+      nx = (((-0.5 * x) + (0 * y)) + 0.25);
+      ny = (((0 * x) + (-0.5 * y)) + 0.4330127018922194);
+      newColor = ${p[6]};
+    }
+  }
+  case 39: {
+    if ((rand < 0.25)) {
+      nx = (((-0.5 * x) + (0 * y)) + 0);
+      ny = (((0 * x) + (-0.5 * y)) + 0);
+      newColor = ${p[3]};
+    } else if ((rand < 0.5)) {
+      nx = (((0 * x) + (-0.5 * y)) - 0.5);
+      ny = (((0.5 * x) + (0 * y)) - 1);
+      newColor = ${p[4]};
+    } else if ((rand < 0.75)) {
+      nx = (((0 * x) + (0.5 * y)) + 0.5);
+      ny = (((-0.5 * x) + (0 * y)) + 0.5);
+      newColor = ${p[5]};
+    } else {
+      nx = (((-0.5 * x) + (0 * y)) + 1.5);
+      ny = (((0 * x) + (-0.5 * y)) + 0);
+      newColor = ${p[6]};
+    }
+  }
+  case 40: {
+    if ((rand < 0.25)) {
+      nx = (((0 * x) + (-0.5 * y)) + 0);
+      ny = (((-0.5 * x) + (0 * y)) + 0);
+      newColor = ${p[3]};
+    } else if ((rand < 0.5)) {
+      nx = (((0.5 * x) + (0 * y)) - 1);
+      ny = (((0 * x) + (0.5 * y)) + 0);
+      newColor = ${p[4]};
+    } else if ((rand < 0.75)) {
+      nx = (((0 * x) + (0.5 * y)) - 1.5);
+      ny = (((0.5 * x) + (0 * y)) + 0.5);
+      newColor = ${p[5]};
+    } else {
+      nx = (((0 * x) + (-0.5 * y)) - 0.5);
+      ny = (((-0.5 * x) + (0 * y)) + 0.5);
+      newColor = ${p[6]};
+    }
+  }
+  case 41: {
+    if ((rand < 0.25)) {
+      nx = (((0 * x) + (-0.5 * y)) + 0);
+      ny = (((-0.5 * x) + (0 * y)) + 0);
+      newColor = ${p[3]};
+    } else if ((rand < 0.5)) {
+      nx = (((0 * x) + (-0.5 * y)) + 0);
+      ny = (((0.5 * x) + (0 * y)) + 0.5);
+      newColor = ${p[4]};
+    } else if ((rand < 0.75)) {
+      nx = (((0 * x) + (-0.5 * y)) - 0.5);
+      ny = (((-0.5 * x) + (0 * y)) + 0);
+      newColor = ${p[5]};
+    } else {
+      nx = (((0 * x) + (0.5 * y)) - 0.5);
+      ny = (((0.5 * x) + (0 * y)) + 0.5);
+      newColor = ${p[6]};
+    }
+  }
+  case 42: {
+    if ((rand < 0.25)) {
+      nx = (((0.25 * x) + (0.4330127018922193 * y)) + 0);
+      ny = (((-0.4330127018922194 * x) + (0.25 * y)) + 0);
+      newColor = ${p[3]};
+    } else if ((rand < 0.5)) {
+      nx = (((0.5 * x) + (0 * y)) + 0.25);
+      ny = (((0 * x) + (-0.5 * y)) + 0.4330127018922194);
+      newColor = ${p[4]};
+    } else if ((rand < 0.75)) {
+      nx = (((-0.25 * x) + (0.4330127018922193 * y)) + 0.25);
+      ny = (((0.4330127018922194 * x) + (0.25 * y)) - 0.4330127018922194);
+      newColor = ${p[5]};
+    } else {
+      nx = (((-0.5 * x) + (0 * y)) - 0.75);
+      ny = (((0 * x) + (-0.5 * y)) + 0.4330127018922194);
+      newColor = ${p[6]};
+    }
+  }
+  case 43: {
+    if ((rand < 0.25)) {
+      nx = (((0.25 * x) + (0.4330127018922193 * y)) + 0);
+      ny = (((-0.4330127018922194 * x) + (0.25 * y)) + 0);
+      newColor = ${p[3]};
+    } else if ((rand < 0.5)) {
+      nx = (((0.25 * x) + (-0.4330127018922193 * y)) + 0.5);
+      ny = (((0.4330127018922194 * x) + (0.25 * y)) + 0);
+      newColor = ${p[4]};
+    } else if ((rand < 0.75)) {
+      nx = (((-0.5 * x) + (0 * y)) - 0.5);
+      ny = (((0 * x) + (-0.5 * y)) + 0);
+      newColor = ${p[5]};
+    } else {
+      nx = (((-0.5 * x) + (0 * y)) + 0.25);
+      ny = (((0 * x) + (-0.5 * y)) + 0.4330127018922194);
+      newColor = ${p[6]};
+    }
+  }
+  case 44: {
+    if ((rand < 0.25)) {
+      nx = (((-0.5 * x) + (0 * y)) + 0);
+      ny = (((0 * x) + (-0.5 * y)) + 0);
+      newColor = ${p[3]};
+    } else if ((rand < 0.5)) {
+      nx = (((-0.25 * x) + (-0.4330127018922193 * y)) + 0.25);
+      ny = (((-0.4330127018922194 * x) + (0.25 * y)) - 0.4330127018922194);
+      newColor = ${p[4]};
+    } else if ((rand < 0.75)) {
+      nx = (((-0.25 * x) + (0.4330127018922193 * y)) + 0.25);
+      ny = (((-0.4330127018922194 * x) + (-0.25 * y)) - 0.4330127018922194);
+      newColor = ${p[5]};
+    } else {
+      nx = (((0.5 * x) + (0 * y)) - 0.5);
+      ny = (((0 * x) + (0.5 * y)) + 0);
+      newColor = ${p[6]};
+    }
+  }
+  case 45: {
+    if ((rand < 0.25)) {
+      nx = (((-0.5 * x) + (0 * y)) + 0);
+      ny = (((0 * x) + (0.5 * y)) + 0);
+      newColor = ${p[3]};
+    } else if ((rand < 0.5)) {
+      nx = (((0 * x) + (0.5 * y)) + 0.5);
+      ny = (((-0.5 * x) + (0 * y)) - 0.5);
+      newColor = ${p[4]};
+    } else if ((rand < 0.75)) {
+      nx = (((-0.5 * x) + (0 * y)) - 0.5);
+      ny = (((0 * x) + (0.5 * y)) - 0.5);
+      newColor = ${p[5]};
+    } else {
+      nx = (((-0.5 * x) + (0 * y)) + 0);
+      ny = (((0 * x) + (-0.5 * y)) - 1);
+      newColor = ${p[6]};
+    }
+  }
+  case 46: {
+    if ((rand < 0.25)) {
+      nx = (((0.5 * x) + (0 * y)) + 0);
+      ny = (((0 * x) + (0.5 * y)) + 0);
+      newColor = ${p[3]};
+    } else if ((rand < 0.5)) {
+      nx = (((0.5 * x) + (0 * y)) - 1.5);
+      ny = (((0 * x) + (0.5 * y)) - 0.5);
+      newColor = ${p[4]};
+    } else if ((rand < 0.75)) {
+      nx = (((0.5 * x) + (0 * y)) + 0);
+      ny = (((0 * x) + (0.5 * y)) - 2);
+      newColor = ${p[5]};
+    } else {
+      nx = (((0.5 * x) + (0 * y)) + 0.5);
+      ny = (((0 * x) + (0.5 * y)) - 0.5);
+      newColor = ${p[6]};
+    }
+  }
+  case 47: {
+    if ((rand < 0.25)) {
+      nx = (((0.5 * x) + (0 * y)) + 0);
+      ny = (((0 * x) + (0.5 * y)) + 0);
+      newColor = ${p[3]};
+    } else if ((rand < 0.5)) {
+      nx = (((-0.5 * x) + (0 * y)) - 1);
+      ny = (((0 * x) + (0.5 * y)) + 0);
+      newColor = ${p[4]};
+    } else if ((rand < 0.75)) {
+      nx = (((0 * x) + (0.5 * y)) - 0.5);
+      ny = (((-0.5 * x) + (0 * y)) - 0.5);
+      newColor = ${p[5]};
+    } else {
+      nx = (((-0.5 * x) + (0 * y)) - 0.5);
+      ny = (((0 * x) + (-0.5 * y)) - 0.5);
+      newColor = ${p[6]};
+    }
+  }
+  case 48: {
+    if ((rand < 0.25)) {
+      nx = (((-0.25 * x) + (0.4330127018922193 * y)) + 0);
+      ny = (((0.4330127018922194 * x) + (0.25 * y)) + 0);
+      newColor = ${p[3]};
+    } else if ((rand < 0.5)) {
+      nx = (((-0.25 * x) + (0.4330127018922193 * y)) - 0.75);
+      ny = (((0.4330127018922194 * x) + (0.25 * y)) + 0.4330127018922194);
+      newColor = ${p[4]};
+    } else if ((rand < 0.75)) {
+      nx = (((0.5 * x) + (0 * y)) - 0.5);
+      ny = (((0 * x) + (-0.5 * y)) + 0);
+      newColor = ${p[5]};
+    } else {
+      nx = (((0.25 * x) + (-0.4330127018922193 * y)) - 0.5);
+      ny = (((0.4330127018922194 * x) + (0.25 * y)) + 0);
+      newColor = ${p[6]};
+    }
+  }
+  case 49: {
+    if ((rand < 0.25)) {
+      nx = (((0.5 * x) + (0 * y)) + 0);
+      ny = (((0 * x) + (0.5 * y)) + 0);
+      newColor = ${p[3]};
+    } else if ((rand < 0.5)) {
+      nx = (((-0.5 * x) + (0 * y)) - 0.5);
+      ny = (((0 * x) + (-0.5 * y)) + 0.5);
+      newColor = ${p[4]};
+    } else if ((rand < 0.75)) {
+      nx = (((0 * x) + (0.5 * y)) - 0.5);
+      ny = (((0.5 * x) + (0 * y)) + 1);
+      newColor = ${p[5]};
+    } else {
+      nx = (((-0.5 * x) + (0 * y)) - 0.5);
+      ny = (((0 * x) + (-0.5 * y)) + 1);
+      newColor = ${p[6]};
+    }
+  }
+  case 50: {
+    if ((rand < 0.25)) {
+      nx = (((-0.25 * x) + (0.4330127018922193 * y)) + 0);
+      ny = (((0.4330127018922194 * x) + (0.25 * y)) + 0);
+      newColor = ${p[3]};
+    } else if ((rand < 0.5)) {
+      nx = (((-0.25 * x) + (-0.4330127018922193 * y)) - 0.25);
+      ny = (((-0.4330127018922194 * x) + (0.25 * y)) + 0.4330127018922194);
+      newColor = ${p[4]};
+    } else if ((rand < 0.75)) {
+      nx = (((0.25 * x) + (0.4330127018922193 * y)) - 0.25);
+      ny = (((-0.4330127018922194 * x) + (0.25 * y)) + 0.4330127018922194);
+      newColor = ${p[5]};
+    } else {
+      nx = (((-0.25 * x) + (-0.4330127018922193 * y)) + 0.5);
+      ny = (((-0.4330127018922194 * x) + (0.25 * y)) + 0);
+      newColor = ${p[6]};
+    }
+  }
+  case 51: {
+    if ((rand < 0.25)) {
+      nx = (((0.25 * x) + (0.4330127018922193 * y)) + 0);
+      ny = (((0.4330127018922194 * x) + (-0.25 * y)) + 0);
+      newColor = ${p[3]};
+    } else if ((rand < 0.5)) {
+      nx = (((0.5 * x) + (0 * y)) - 0.25);
+      ny = (((0 * x) + (-0.5 * y)) - 0.4330127018922194);
+      newColor = ${p[4]};
+    } else if ((rand < 0.75)) {
+      nx = (((0.25 * x) + (0.4330127018922193 * y)) - 0.25);
+      ny = (((0.4330127018922194 * x) + (-0.25 * y)) - 0.4330127018922194);
+      newColor = ${p[5]};
+    } else {
+      nx = (((0.25 * x) + (-0.4330127018922193 * y)) - 0.25);
+      ny = (((-0.4330127018922194 * x) + (-0.25 * y)) - 0.4330127018922194);
+      newColor = ${p[6]};
+    }
+  }
+  case 52: {
+    if ((rand < 0.25)) {
+      nx = (((0.5 * x) + (0 * y)) + 0);
+      ny = (((0 * x) + (-0.5 * y)) + 0);
+      newColor = ${p[3]};
+    } else if ((rand < 0.5)) {
+      nx = (((-0.25 * x) + (0.4330127018922193 * y)) - 0.25);
+      ny = (((0.4330127018922194 * x) + (0.25 * y)) - 0.4330127018922194);
+      newColor = ${p[4]};
+    } else if ((rand < 0.75)) {
+      nx = (((0.5 * x) + (0 * y)) + 0);
+      ny = (((0 * x) + (-0.5 * y)) - 0.8660254037844387);
+      newColor = ${p[5]};
+    } else {
+      nx = (((-0.25 * x) + (-0.4330127018922193 * y)) + 0.25);
+      ny = (((-0.4330127018922194 * x) + (0.25 * y)) - 0.4330127018922194);
+      newColor = ${p[6]};
+    }
+  }
+  case 53: {
+    if ((rand < 0.25)) {
+      nx = (((-0.25 * x) + (0.4330127018922193 * y)) + 0);
+      ny = (((0.4330127018922194 * x) + (0.25 * y)) + 0);
+      newColor = ${p[3]};
+    } else if ((rand < 0.5)) {
+      nx = (((-0.25 * x) + (0.4330127018922193 * y)) - 0.75);
+      ny = (((0.4330127018922194 * x) + (0.25 * y)) + 0.4330127018922194);
+      newColor = ${p[4]};
+    } else if ((rand < 0.75)) {
+      nx = (((0.5 * x) + (0 * y)) - 0.5);
+      ny = (((0 * x) + (-0.5 * y)) + 0);
+      newColor = ${p[5]};
+    } else {
+      nx = (((0.25 * x) + (-0.4330127018922193 * y)) - 0.5);
+      ny = (((0.4330127018922194 * x) + (0.25 * y)) + 0);
+      newColor = ${p[6]};
+    }
+  }
+  case 54: {
+    if ((rand < 0.25)) {
+      nx = (((0.5 * x) + (0 * y)) + 0);
+      ny = (((0 * x) + (-0.5 * y)) + 0);
+      newColor = ${p[3]};
+    } else if ((rand < 0.5)) {
+      nx = (((-0.25 * x) + (-0.4330127018922193 * y)) + 0.5);
+      ny = (((-0.4330127018922194 * x) + (0.25 * y)) + 0);
+      newColor = ${p[4]};
+    } else if ((rand < 0.75)) {
+      nx = (((0.5 * x) + (0 * y)) + 0.5);
+      ny = (((0 * x) + (-0.5 * y)) + 0);
+      newColor = ${p[5]};
+    } else {
+      nx = (((-0.25 * x) + (0.4330127018922193 * y)) + 0.5);
+      ny = (((0.4330127018922194 * x) + (0.25 * y)) + 0);
+      newColor = ${p[6]};
+    }
+  }
+  case 55: {
+    if ((rand < 0.25)) {
+      nx = (((-0.25 * x) + (-0.4330127018922193 * y)) + 0);
+      ny = (((-0.4330127018922194 * x) + (0.25 * y)) + 0);
+      newColor = ${p[3]};
+    } else if ((rand < 0.5)) {
+      nx = (((-0.25 * x) + (0.4330127018922193 * y)) - 0.5);
+      ny = (((0.4330127018922194 * x) + (0.25 * y)) + 0);
+      newColor = ${p[4]};
+    } else if ((rand < 0.75)) {
+      nx = (((-0.25 * x) + (0.4330127018922193 * y)) + 0.25);
+      ny = (((0.4330127018922194 * x) + (0.25 * y)) + 0.4330127018922194);
+      newColor = ${p[5]};
+    } else {
+      nx = (((-0.25 * x) + (-0.4330127018922193 * y)) + 0.25);
+      ny = (((-0.4330127018922194 * x) + (0.25 * y)) + 0.4330127018922194);
+      newColor = ${p[6]};
+    }
+  }
+  case 56: {
+    if ((rand < 0.25)) {
+      nx = (((-0.25 * x) + (0.4330127018922193 * y)) + 0);
+      ny = (((-0.4330127018922194 * x) + (-0.25 * y)) + 0);
+      newColor = ${p[3]};
+    } else if ((rand < 0.5)) {
+      nx = (((0.25 * x) + (0.4330127018922193 * y)) + 0.75);
+      ny = (((-0.4330127018922194 * x) + (0.25 * y)) + 0.4330127018922194);
+      newColor = ${p[4]};
+    } else if ((rand < 0.75)) {
+      nx = (((0.25 * x) + (0.4330127018922193 * y)) - 0.25);
+      ny = (((-0.4330127018922194 * x) + (0.25 * y)) - 0.4330127018922194);
+      newColor = ${p[5]};
+    } else {
+      nx = (((-0.25 * x) + (-0.4330127018922193 * y)) + 0.5);
+      ny = (((0.4330127018922194 * x) + (-0.25 * y)) + 0);
+      newColor = ${p[6]};
+    }
+  }
+  case 57: {
+    if ((rand < 0.25)) {
+      nx = (((0.5 * x) + (0 * y)) + 0);
+      ny = (((0 * x) + (-0.5 * y)) + 0);
+      newColor = ${p[3]};
+    } else if ((rand < 0.5)) {
+      nx = (((-0.25 * x) + (0.4330127018922193 * y)) - 0.5);
+      ny = (((0.4330127018922194 * x) + (0.25 * y)) + 0);
+      newColor = ${p[4]};
+    } else if ((rand < 0.75)) {
+      nx = (((-0.25 * x) + (-0.4330127018922193 * y)) - 0.25);
+      ny = (((-0.4330127018922194 * x) + (0.25 * y)) - 0.4330127018922194);
+      newColor = ${p[5]};
+    } else {
+      nx = (((-0.25 * x) + (-0.4330127018922193 * y)) - 0.5);
+      ny = (((0.4330127018922194 * x) + (-0.25 * y)) + 0);
+      newColor = ${p[6]};
+    }
+  }
+  case 58: {
+    if ((rand < 0.25)) {
+      nx = (((-0.5 * x) + (0 * y)) + 0);
+      ny = (((0 * x) + (0.5 * y)) + 0);
+      newColor = ${p[3]};
+    } else if ((rand < 0.5)) {
+      nx = (((0 * x) + (0.5 * y)) + 0.5);
+      ny = (((-0.5 * x) + (0 * y)) - 0.5);
+      newColor = ${p[4]};
+    } else if ((rand < 0.75)) {
+      nx = (((-0.5 * x) + (0 * y)) - 0.5);
+      ny = (((0 * x) + (0.5 * y)) - 0.5);
+      newColor = ${p[5]};
+    } else {
+      nx = (((-0.5 * x) + (0 * y)) + 0);
+      ny = (((0 * x) + (-0.5 * y)) - 1);
+      newColor = ${p[6]};
+    }
+  }
+  case 59: {
+    if ((rand < 0.25)) {
+      nx = (((0.5 * x) + (0 * y)) + 0);
+      ny = (((0 * x) + (0.5 * y)) + 0);
+      newColor = ${p[3]};
+    } else if ((rand < 0.5)) {
+      nx = (((0.5 * x) + (0 * y)) - 1.5);
+      ny = (((0 * x) + (0.5 * y)) - 0.5);
+      newColor = ${p[4]};
+    } else if ((rand < 0.75)) {
+      nx = (((0.5 * x) + (0 * y)) + 0);
+      ny = (((0 * x) + (0.5 * y)) - 2);
+      newColor = ${p[5]};
+    } else {
+      nx = (((0.5 * x) + (0 * y)) + 0.5);
+      ny = (((0 * x) + (0.5 * y)) - 0.5);
+      newColor = ${p[6]};
+    }
+  }
+  case 60: {
+    if ((rand < 0.25)) {
+      nx = (((0.5 * x) + (0 * y)) + 0);
+      ny = (((0 * x) + (0.5 * y)) + 0);
+      newColor = ${p[3]};
+    } else if ((rand < 0.5)) {
+      nx = (((-0.5 * x) + (0 * y)) - 1);
+      ny = (((0 * x) + (0.5 * y)) + 0);
+      newColor = ${p[4]};
+    } else if ((rand < 0.75)) {
+      nx = (((0 * x) + (0.5 * y)) - 0.5);
+      ny = (((-0.5 * x) + (0 * y)) - 0.5);
+      newColor = ${p[5]};
+    } else {
+      nx = (((-0.5 * x) + (0 * y)) - 0.5);
+      ny = (((0 * x) + (-0.5 * y)) - 0.5);
+      newColor = ${p[6]};
+    }
+  }
+  case 61: {
+    if ((rand < 0.25)) {
+      nx = (((0.5 * x) + (0 * y)) + 0);
+      ny = (((0 * x) + (0.5 * y)) + 0);
+      newColor = ${p[3]};
+    } else if ((rand < 0.5)) {
+      nx = (((-0.25 * x) + (-0.4330127018922193 * y)) - 0.5);
+      ny = (((0.4330127018922194 * x) + (-0.25 * y)) + 0);
+      newColor = ${p[4]};
+    } else if ((rand < 0.75)) {
+      nx = (((-0.5 * x) + (0 * y)) - 0.25);
+      ny = (((0 * x) + (0.5 * y)) - 0.4330127018922194);
+      newColor = ${p[5]};
+    } else {
+      nx = (((-0.25 * x) + (0.4330127018922193 * y)) - 0.25);
+      ny = (((-0.4330127018922194 * x) + (-0.25 * y)) - 0.4330127018922194);
+      newColor = ${p[6]};
+    }
+  }
+  case 62: {
+    if ((rand < 0.25)) {
+      nx = (((0 * x) + (0.5 * y)) + 0);
+      ny = (((0.5 * x) + (0 * y)) + 0);
+      newColor = ${p[3]};
+    } else if ((rand < 0.5)) {
+      nx = (((0 * x) + (-0.5 * y)) - 1);
+      ny = (((-0.5 * x) + (0 * y)) - 1.5);
+      newColor = ${p[4]};
+    } else if ((rand < 0.75)) {
+      nx = (((0 * x) + (0.5 * y)) + 0);
+      ny = (((-0.5 * x) + (0 * y)) - 0.5);
+      newColor = ${p[5]};
+    } else {
+      nx = (((0 * x) + (0.5 * y)) + 0);
+      ny = (((-0.5 * x) + (0 * y)) - 1);
+      newColor = ${p[6]};
+    }
+  }
+  case 63: {
+    if ((rand < 0.25)) {
+      nx = (((0 * x) + (0.5 * y)) + 0);
+      ny = (((0.5 * x) + (0 * y)) + 0);
+      newColor = ${p[3]};
+    } else if ((rand < 0.5)) {
+      nx = (((0 * x) + (0.5 * y)) + 0);
+      ny = (((0.5 * x) + (0 * y)) - 1);
+      newColor = ${p[4]};
+    } else if ((rand < 0.75)) {
+      nx = (((0 * x) + (0.5 * y)) + 0);
+      ny = (((-0.5 * x) + (0 * y)) - 0.5);
+      newColor = ${p[5]};
+    } else {
+      nx = (((0 * x) + (-0.5 * y)) - 1);
+      ny = (((0.5 * x) + (0 * y)) - 0.5);
+      newColor = ${p[6]};
+    }
+  }
+  case 64: {
+    if ((rand < 0.25)) {
+      nx = (((0 * x) + (-0.5 * y)) + 0);
+      ny = (((-0.5 * x) + (0 * y)) + 0);
+      newColor = ${p[3]};
+    } else if ((rand < 0.5)) {
+      nx = (((0 * x) + (0.5 * y)) + 1.5);
+      ny = (((-0.5 * x) + (0 * y)) + 0);
+      newColor = ${p[4]};
+    } else if ((rand < 0.75)) {
+      nx = (((0 * x) + (0.5 * y)) + 0.5);
+      ny = (((-0.5 * x) + (0 * y)) + 0);
+      newColor = ${p[5]};
+    } else {
+      nx = (((0 * x) + (0.5 * y)) + 1);
+      ny = (((0.5 * x) + (0 * y)) - 1);
+      newColor = ${p[6]};
+    }
+  }
+  case 65: {
+    if ((rand < 0.25)) {
+      nx = (((0.5 * x) + (0 * y)) + 0);
+      ny = (((0 * x) + (0.5 * y)) + 0);
+      newColor = ${p[3]};
+    } else if ((rand < 0.5)) {
+      nx = (((-0.25 * x) + (0.4330127018922193 * y)) - 0.5);
+      ny = (((-0.4330127018922194 * x) + (-0.25 * y)) + 0);
+      newColor = ${p[4]};
+    } else if ((rand < 0.75)) {
+      nx = (((-0.25 * x) + (0.4330127018922193 * y)) - 0.25);
+      ny = (((0.4330127018922194 * x) + (0.25 * y)) + 0.4330127018922194);
+      newColor = ${p[5]};
+    } else {
+      nx = (((-0.25 * x) + (-0.4330127018922193 * y)) - 0.25);
+      ny = (((-0.4330127018922194 * x) + (-0.25 * y)) + 0.4330127018922194);
+      newColor = ${p[6]};
+    }
+  }
+  case 66: {
+    if ((rand < 0.25)) {
+      nx = (((-0.5 * x) + (0 * y)) + 0);
+      ny = (((0 * x) + (-0.5 * y)) + 0);
+      newColor = ${p[3]};
+    } else if ((rand < 0.5)) {
+      nx = (((0.5 * x) + (0 * y)) + 0.25);
+      ny = (((0 * x) + (-0.5 * y)) + 0.4330127018922194);
+      newColor = ${p[4]};
+    } else if ((rand < 0.75)) {
+      nx = (((0.25 * x) + (-0.4330127018922193 * y)) + 0.25);
+      ny = (((0.4330127018922194 * x) + (0.25 * y)) + 0.4330127018922194);
+      newColor = ${p[5]};
+    } else {
+      nx = (((0.25 * x) + (-0.4330127018922193 * y)) + 0.25);
+      ny = (((0.4330127018922194 * x) + (0.25 * y)) - 0.4330127018922194);
+      newColor = ${p[6]};
+    }
+  }
+  case 67: {
+    if ((rand < 0.25)) {
+      nx = (((0.25 * x) + (-0.4330127018922193 * y)) + 0);
+      ny = (((0.4330127018922194 * x) + (0.25 * y)) + 0);
+      newColor = ${p[3]};
+    } else if ((rand < 0.5)) {
+      nx = (((-0.25 * x) + (0.4330127018922193 * y)) + 0.5);
+      ny = (((-0.4330127018922194 * x) + (-0.25 * y)) + 0);
+      newColor = ${p[4]};
+    } else if ((rand < 0.75)) {
+      nx = (((-0.5 * x) + (0 * y)) + 0.5);
+      ny = (((0 * x) + (0.5 * y)) + 0);
+      newColor = ${p[5]};
+    } else {
+      nx = (((-0.25 * x) + (-0.4330127018922193 * y)) + 0.5);
+      ny = (((-0.4330127018922194 * x) + (0.25 * y)) + 0);
+      newColor = ${p[6]};
+    }
+  }
+  case 68: {
+    if ((rand < 0.25)) {
+      nx = (((0.25 * x) + (0.4330127018922193 * y)) + 0);
+      ny = (((-0.4330127018922194 * x) + (0.25 * y)) + 0);
+      newColor = ${p[3]};
+    } else if ((rand < 0.5)) {
+      nx = (((-0.25 * x) + (-0.4330127018922193 * y)) + 0.25);
+      ny = (((0.4330127018922194 * x) + (-0.25 * y)) + 0.4330127018922194);
+      newColor = ${p[4]};
+    } else if ((rand < 0.75)) {
+      nx = (((-0.25 * x) + (-0.4330127018922193 * y)) + 0.25);
+      ny = (((-0.4330127018922194 * x) + (0.25 * y)) + 0.4330127018922194);
+      newColor = ${p[5]};
+    } else {
+      nx = (((-0.5 * x) + (0 * y)) + 0.25);
+      ny = (((0 * x) + (-0.5 * y)) + 0.4330127018922194);
+      newColor = ${p[6]};
+    }
+  }
+  case 69: {
+    if ((rand < 0.25)) {
+      nx = (((0.5 * x) + (0 * y)) + 0);
+      ny = (((0 * x) + (-0.5 * y)) + 0);
+      newColor = ${p[3]};
+    } else if ((rand < 0.5)) {
+      nx = (((-0.25 * x) + (0.4330127018922193 * y)) - 0.5);
+      ny = (((0.4330127018922194 * x) + (0.25 * y)) + 0);
+      newColor = ${p[4]};
+    } else if ((rand < 0.75)) {
+      nx = (((-0.25 * x) + (-0.4330127018922193 * y)) - 0.25);
+      ny = (((-0.4330127018922194 * x) + (0.25 * y)) - 0.4330127018922194);
+      newColor = ${p[5]};
+    } else {
+      nx = (((-0.25 * x) + (-0.4330127018922193 * y)) - 0.5);
+      ny = (((0.4330127018922194 * x) + (-0.25 * y)) + 0);
+      newColor = ${p[6]};
+    }
+  }
+  case 70: {
+    if ((rand < 0.25)) {
+      nx = (((-0.5 * x) + (0 * y)) + 0);
+      ny = (((0 * x) + (0.5 * y)) + 0);
+      newColor = ${p[3]};
+    } else if ((rand < 0.5)) {
+      nx = (((0 * x) + (0.5 * y)) + 0.5);
+      ny = (((-0.5 * x) + (0 * y)) - 0.5);
+      newColor = ${p[4]};
+    } else if ((rand < 0.75)) {
+      nx = (((-0.5 * x) + (0 * y)) - 0.5);
+      ny = (((0 * x) + (0.5 * y)) - 0.5);
+      newColor = ${p[5]};
+    } else {
+      nx = (((-0.5 * x) + (0 * y)) + 0);
+      ny = (((0 * x) + (-0.5 * y)) - 1);
+      newColor = ${p[6]};
+    }
+  }
+  case 71: {
+    if ((rand < 0.25)) {
+      nx = (((0.5 * x) + (0 * y)) + 0);
+      ny = (((0 * x) + (0.5 * y)) + 0);
+      newColor = ${p[3]};
+    } else if ((rand < 0.5)) {
+      nx = (((0.5 * x) + (0 * y)) - 1.5);
+      ny = (((0 * x) + (0.5 * y)) - 0.5);
+      newColor = ${p[4]};
+    } else if ((rand < 0.75)) {
+      nx = (((0.5 * x) + (0 * y)) + 0);
+      ny = (((0 * x) + (0.5 * y)) - 2);
+      newColor = ${p[5]};
+    } else {
+      nx = (((0.5 * x) + (0 * y)) + 0.5);
+      ny = (((0 * x) + (0.5 * y)) - 0.5);
+      newColor = ${p[6]};
+    }
+  }
+  case 72: {
+    if ((rand < 0.25)) {
+      nx = (((0.5 * x) + (0 * y)) + 0);
+      ny = (((0 * x) + (0.5 * y)) + 0);
+      newColor = ${p[3]};
+    } else if ((rand < 0.5)) {
+      nx = (((-0.5 * x) + (0 * y)) - 1);
+      ny = (((0 * x) + (0.5 * y)) + 0);
+      newColor = ${p[4]};
+    } else if ((rand < 0.75)) {
+      nx = (((0 * x) + (0.5 * y)) - 0.5);
+      ny = (((-0.5 * x) + (0 * y)) - 0.5);
+      newColor = ${p[5]};
+    } else {
+      nx = (((-0.5 * x) + (0 * y)) - 0.5);
+      ny = (((0 * x) + (-0.5 * y)) - 0.5);
+      newColor = ${p[6]};
+    }
+  }
+  case 73: {
+    if ((rand < 0.25)) {
+      nx = (((0.5 * x) + (0 * y)) + 0);
+      ny = (((0 * x) + (0.5 * y)) + 0);
+      newColor = ${p[3]};
+    } else if ((rand < 0.5)) {
+      nx = (((-0.25 * x) + (-0.4330127018922193 * y)) - 0.5);
+      ny = (((0.4330127018922194 * x) + (-0.25 * y)) + 0);
+      newColor = ${p[4]};
+    } else if ((rand < 0.75)) {
+      nx = (((-0.5 * x) + (0 * y)) - 0.25);
+      ny = (((0 * x) + (0.5 * y)) - 0.4330127018922194);
+      newColor = ${p[5]};
+    } else {
+      nx = (((-0.25 * x) + (0.4330127018922193 * y)) - 0.25);
+      ny = (((-0.4330127018922194 * x) + (-0.25 * y)) - 0.4330127018922194);
+      newColor = ${p[6]};
+    }
+  }
+  case 0, default: {
+    if ((rand < 0.25)) {
+      nx = (0.5 * x);
+      ny = (0.5 * y);
+      newColor = ${p[3]};
+    } else if ((rand < 0.5)) {
+      nx = ((0.5 * x) - 0.5);
+      ny = ((0.5 * y) - 0.5);
+      newColor = ${p[4]};
+    } else if ((rand < 0.75)) {
+      nx = ((0.5 * x) - 0.5);
+      ny = (0.5 * y);
+      newColor = ${p[5]};
+    } else {
+      nx = (0.5 * x);
+      ny = ((0.5 * y) - 0.5);
+      newColor = ${p[6]};
+    }
+  }
+}
+var oldColor: f32 = (*cp);
+switch i32(min(max(${p[1]}, 0.0), 1.0)) {
+  case 1: {
+    (*cp) = (oldColor + ((newColor - oldColor) * ${p[2]}));
+  }
+  case 0, default: {
+    (*cp) = newColor;
+  }
+}
+v.x += (nx * ${w});
+v.y += (ny * ${w});
+if (!false) {
+  pz_ += (z_ * ${w});
+}
+}`,
+  },
+  "polySurf": {
+    params: [{ name: "c", def: 0.3 }, { name: "mirrorX", def: 1 }, { name: "mirrorY", def: 1 }, { name: "mirrorZ", def: 0 }, { name: "julia", def: 0 }, { name: "juliaX", def: 0 }, { name: "juliaY", def: 0 }, { name: "juliaZ", def: 0 }, { name: "enableFold", def: 0 }, { name: "foldX", def: 1 }, { name: "foldY", def: 1 }, { name: "rotX", def: 0 }, { name: "rotY", def: 0 }, { name: "rotZ", def: 0 }, { name: "enableOffset", def: 1 }, { name: "offsetX", def: 1 }, { name: "offsetY", def: 1 }, { name: "offsetZ", def: 0 }, { name: "enableInvert", def: 0 }, { name: "invertRadius", def: 1 }, { name: "colorMode", def: 0 }, { name: "colorSpeed", def: 1 }],
+    verified: true, priority: 0, flags: ["3d","dc","z"], types: ["3D"],
+    funcNames: ["atan2j","polySurf_sqr"],
+    funcs: `fn atan2j(y: f32, x: f32) -> f32 { if (x == 0.0 && y == 0.0) { return select(0.0, PI, (bitcast<u32>(x) >> 31u) == 1u) * select(1.0, -1.0, (bitcast<u32>(y) >> 31u) == 1u); } return atan2(y, x); }
+
+fn polySurf_sqr(pVal: f32) -> f32 {
+  return (pVal * pVal);
+}`,
+    code: (w, p) => `{
+var c2z: f32 = 0;
+var c2: f32 = 0;
+{
+  c2z = (2 * ${p[0]});
+  c2 = polySurf_sqr(${p[0]});
+}
+var sign_x: f32 = select(-1.0, 1.0, (t.x >= 0));
+var sign_y: f32 = select(-1.0, 1.0, (t.y >= 0));
+var x_calc: f32 = t.x;
+var y_calc: f32 = t.y;
+var z_calc: f32 = z_;
+if ((min(max(${p[4]}, 0.0), 1.0) > 0)) {
+  x_calc += ${p[5]};
+  y_calc += ${p[6]};
+  z_calc += ${p[7]};
+}
+if ((min(max(${p[8]}, 0.0), 1.0) > 0)) {
+  x_calc = ((abs((x_calc + ${p[9]})) - abs((x_calc - ${p[9]}))) - x_calc);
+  y_calc = ((abs((y_calc + ${p[10]})) - abs((y_calc - ${p[10]}))) - y_calc);
+}
+if ((min(max(${p[14]}, 0.0), 1.0) > 0)) {
+  x_calc += ${p[15]};
+  y_calc += ${p[16]};
+  z_calc += ${p[17]};
+}
+var x_abs: f32 = abs(x_calc);
+var y_abs: f32 = abs(y_calc);
+var r2_: f32 = ((polySurf_sqr(x_abs) + polySurf_sqr(y_abs)) + polySurf_sqr(z_calc));
+var r_: f32 = (${w} / (((r2_ * c2) + (c2z * z_calc)) + 1));
+var delta_x: f32 = (r_ * x_abs);
+var delta_y: f32 = (r_ * y_abs);
+var delta_z: f32 = (r_ * (z_calc + (${p[0]} * r2_)));
+if ((((${p[11]} != 0.0) || (${p[12]} != 0.0)) || (${p[13]} != 0.0))) {
+  var radX: f32 = radians(${p[11]});
+  var radY: f32 = radians(${p[12]});
+  var radZ: f32 = radians(${p[13]});
+  var cosX: f32 = cos(radX);
+  var sinX: f32 = sin(radX);
+  var cosY: f32 = cos(radY);
+  var sinY: f32 = sin(radY);
+  var cosZ: f32 = cos(radZ);
+  var sinZ: f32 = sin(radZ);
+  var temp_x: f32;
+  var temp_y: f32;
+  var temp_z: f32;
+  temp_y = ((delta_y * cosX) - (delta_z * sinX));
+  temp_z = ((delta_y * sinX) + (delta_z * cosX));
+  delta_y = temp_y;
+  delta_z = temp_z;
+  temp_x = ((delta_x * cosY) + (delta_z * sinY));
+  temp_z = ((-delta_x * sinY) + (delta_z * cosY));
+  delta_x = temp_x;
+  delta_z = temp_z;
+  temp_x = ((delta_x * cosZ) - (delta_y * sinZ));
+  temp_y = ((delta_x * sinZ) + (delta_y * cosZ));
+  delta_x = temp_x;
+  delta_y = temp_y;
+}
+if ((min(max(${p[18]}, 0.0), 1.0) > 0)) {
+  var r2_inv: f32 = ((polySurf_sqr(delta_x) + polySurf_sqr(delta_y)) + polySurf_sqr(delta_z));
+  if ((r2_inv > 1.0e-9)) {
+    var factor: f32 = (polySurf_sqr(${p[19]}) / r2_inv);
+    delta_x *= factor;
+    delta_y *= factor;
+    delta_z *= factor;
+  }
+}
+v.x += ((select(1.0, -1.0, ((min(max(${p[1]}, 0.0), 1.0) > 0) && (rnd(rs) < 0.5))) * sign_x) * delta_x);
+v.y += ((select(1.0, -1.0, ((min(max(${p[2]}, 0.0), 1.0) > 0) && (rnd(rs) < 0.5))) * sign_y) * delta_y);
+pz_ += (select(1.0, -1.0, ((min(max(${p[3]}, 0.0), 1.0) > 0) && (rnd(rs) < 0.5))) * delta_z);
+if ((min(max(${p[20]}, 0.0), 2.0) > 0)) {
+  var calculatedColor: f32 = 0.0;
+  switch i32(min(max(${p[20]}, 0.0), 2.0)) {
+    case 1: {
+      calculatedColor = sqrt(((polySurf_sqr(delta_x) + polySurf_sqr(delta_y)) + polySurf_sqr(delta_z)));
+    }
+    case 2: {
+      calculatedColor = ((atan2j(delta_y, delta_x) / (2.0 * PI)) + 0.5);
+    }
+    case 3: {
+      calculatedColor = delta_z;
+    }
+    default: {}
+  }
+  calculatedColor *= ${p[21]};
+  calculatedColor = (((calculatedColor % 1.0) + 1.0) % 1.0);
+  (*cp) += ((calculatedColor - (*cp)) * ${w});
+}
+}`,
+  },
+  "mobiqN": {
+    params: [{ name: "qat", def: 1 }, { name: "qax", def: 0 }, { name: "qay", def: 0 }, { name: "qaz", def: 0 }, { name: "qbt", def: 0 }, { name: "qbx", def: 0 }, { name: "qby", def: 0 }, { name: "qbz", def: 0 }, { name: "qct", def: 0 }, { name: "qcx", def: 0 }, { name: "qcy", def: 0 }, { name: "qcz", def: 1 }, { name: "qdt", def: 1 }, { name: "qdx", def: 0 }, { name: "qdy", def: 0 }, { name: "qdz", def: 0 }, { name: "power", def: 2 }, { name: "dist", def: 1 }, { name: "colorMode", def: 0 }, { name: "iterations", def: 1 }, { name: "spaceType", def: 0 }],
+    verified: true, priority: 0, flags: ["3d","dc","z"], types: ["3D"],
+    funcNames: ["sqr","atan2j","powc","mobiqN_sinh","mobiqN_asinh"],
+    funcs: `fn sqr(x: f32) -> f32 { return x * x; }
+
+fn atan2j(y: f32, x: f32) -> f32 { if (x == 0.0 && y == 0.0) { return select(0.0, PI, (bitcast<u32>(x) >> 31u) == 1u) * select(1.0, -1.0, (bitcast<u32>(y) >> 31u) == 1u); } return atan2(y, x); }
+
+fn powc(x: f32, y: f32) -> f32 {
+  if (x >= 0.0) { return pow(x, y); }
+  let yi = round(y);
+  if (abs(y - yi) > 1e-6) { return pow(x, y); }
+  let m = pow(-x, y);
+  return select(m, -m, (i32(yi) & 1) != 0);
+}
+
+fn mobiqN_sinh(x: f32) -> f32 {
+  return ((exp(x) - exp(-x)) * 0.5);
+}
+
+fn mobiqN_asinh(x: f32) -> f32 {
+  return log((x + sqrt(((x * x) + 1.0))));
+}`,
+    code: (w, p) => `{
+var p16_: f32 = ${p[16]};
+{
+  if ((abs(p16_) < 1.0)) {
+    p16_ = 1.0;
+  }
+}
+var z_scale: f32 = select(0.0, ((4.0 * ${p[17]}) / p16_), (p16_ != 0.0));
+var rho: f32 = sqrt(((sqr(t.x) + sqr(t.y)) + sqr(z_)));
+var theta: f32 = atan2j(t.y, t.x);
+var phi: f32 = select(acos((z_ / rho)), 0.0, (rho == 0.0));
+var new_rho: f32 = powc(rho, z_scale);
+var new_theta: f32 = (theta * p16_);
+var new_phi: f32 = (phi * p16_);
+var sin_phi: f32 = sin(new_phi);
+var x_prime: f32 = ((new_rho * sin_phi) * cos(new_theta));
+var y_prime: f32 = ((new_rho * sin_phi) * sin(new_theta));
+var z_prime: f32 = (new_rho * cos(new_phi));
+var x_mapped: f32 = x_prime;
+var y_mapped: f32 = y_prime;
+var z_mapped: f32 = z_prime;
+switch i32(${p[20]}) {
+  case 1: {
+    x_mapped = mobiqN_sinh(x_prime);
+    y_mapped = mobiqN_sinh(y_prime);
+    z_mapped = mobiqN_sinh(z_prime);
+  }
+  case 2: {
+    x_mapped = sin(x_prime);
+    y_mapped = sin(y_prime);
+    z_mapped = sin(z_prime);
+  }
+  default: {}
+}
+var x_res: f32 = x_mapped;
+var y_res: f32 = y_mapped;
+var z_res: f32 = z_mapped;
+var t_res_quat: f32 = 0.0;
+var denom_sqr: f32 = 0.0;
+var iter: i32 = max(1, i32(${p[19]}));
+for (var i: i32 = 0; (i < iter); i++) {
+  var t2: f32 = x_res;
+  var x2: f32 = y_res;
+  var y2: f32 = z_res;
+  var nt_num: f32 = ((((${p[0]} * t2) - (${p[1]} * x2)) - (${p[2]} * y2)) + ${p[4]});
+  var nx_num: f32 = ((((${p[0]} * x2) + (${p[1]} * t2)) - (${p[3]} * y2)) + ${p[5]});
+  var ny_num: f32 = ((((${p[0]} * y2) + (${p[2]} * t2)) + (${p[3]} * x2)) + ${p[6]});
+  var nz_num: f32 = ((((${p[3]} * t2) + (${p[1]} * y2)) - (${p[2]} * x2)) + ${p[7]});
+  var dt_den: f32 = ((((${p[8]} * t2) - (${p[9]} * x2)) - (${p[10]} * y2)) + ${p[12]});
+  var dx_den: f32 = ((((${p[8]} * x2) + (${p[9]} * t2)) - (${p[11]} * y2)) + ${p[13]});
+  var dy_den: f32 = ((((${p[8]} * y2) + (${p[10]} * t2)) + (${p[11]} * x2)) + ${p[14]});
+  var dz_den: f32 = ((((${p[11]} * t2) + (${p[9]} * y2)) - (${p[10]} * x2)) + ${p[15]});
+  denom_sqr = (((sqr(dt_den) + sqr(dx_den)) + sqr(dy_den)) + sqr(dz_den));
+  if ((denom_sqr != 0.0)) {
+    var inv_denom: f32 = (1.0 / denom_sqr);
+    t_res_quat = (((((nt_num * dt_den) + (nx_num * dx_den)) + (ny_num * dy_den)) + (nz_num * dz_den)) * inv_denom);
+    x_res = (((((nx_num * dt_den) - (nt_num * dx_den)) - (ny_num * dz_den)) + (nz_num * dy_den)) * inv_denom);
+    y_res = (((((ny_num * dt_den) - (nt_num * dy_den)) - (nz_num * dx_den)) + (nx_num * dz_den)) * inv_denom);
+    z_res = (((((nz_num * dt_den) - (nx_num * dy_den)) + (ny_num * dx_den)) - (nt_num * dz_den)) * inv_denom);
+  } else {
+    z_res = 0.0;
+    y_res = z_res;
+    x_res = y_res;
+    t_res_quat = x_res;
+  }
+}
+var x_unmapped: f32 = x_res;
+var y_unmapped: f32 = y_res;
+var z_unmapped: f32 = z_res;
+switch i32(${p[20]}) {
+  case 1: {
+    x_unmapped = mobiqN_asinh(x_res);
+    y_unmapped = mobiqN_asinh(y_res);
+    z_unmapped = mobiqN_asinh(z_res);
+  }
+  case 2: {
+    x_unmapped = asin(x_res);
+    y_unmapped = asin(y_res);
+    z_unmapped = asin(z_res);
+  }
+  default: {}
+}
+var z_inv_scale: f32 = select(0.0, (1.0 / z_scale), (z_scale != 0.0));
+var rho_res: f32 = sqrt(((sqr(x_unmapped) + sqr(y_unmapped)) + sqr(z_unmapped)));
+var theta_res: f32 = atan2j(y_unmapped, x_unmapped);
+var phi_res: f32 = select(acos((z_unmapped / rho_res)), 0.0, (rho_res == 0.0));
+var final_rho: f32 = powc(rho_res, z_inv_scale);
+var floored_power: f32 = floor(p16_);
+var n_theta: f32 = floor((p16_ * rnd(rs)));
+var n_phi: f32 = floor((p16_ * rnd(rs)));
+var final_theta: f32 = select(theta_res, ((theta_res + (n_theta * (2.0 * PI))) / floored_power), (floored_power != 0.0));
+var final_phi: f32 = select(phi_res, ((phi_res + (n_phi * (2.0 * PI))) / floored_power), (floored_power != 0.0));
+var final_sin_phi: f32 = sin(final_phi);
+var final_x: f32 = ((final_rho * final_sin_phi) * cos(final_theta));
+var final_y: f32 = ((final_rho * final_sin_phi) * sin(final_theta));
+var final_z: f32 = (final_rho * cos(final_phi));
+switch i32(${p[18]}) {
+  case 1: {
+    (*cp) = ((new_rho * z_inv_scale) * 0.1);
+  }
+  case 2: {
+    (*cp) = ((t_res_quat + 1.0) * 0.5);
+  }
+  case 3: {
+    (*cp) = (atan(sqrt(denom_sqr)) / (PI * 0.5));
+  }
+  case 4: {
+    var len: f32 = sqrt(((sqr(final_x) + sqr(final_y)) + sqr(final_z)));
+    (*cp) = select(0.5, (((final_z / len) + 1.0) * 0.5), (len > 1.0e-9));
+  }
+  case 5: {
+    if ((rho > 1.0e-9)) {
+      var ratio: f32 = (final_rho / rho);
+      (*cp) = (atan(ratio) / (PI * 0.5));
+    } else {
+      (*cp) = 0.5;
+    }
+  }
+  case 6: {
+    var twist: f32 = (final_theta - theta);
+    var normalized_twist: f32 = (twist / (2.0 * PI));
+    (*cp) = (normalized_twist - floor(normalized_twist));
+  }
+  default: {}
+}
+v.x += (${w} * final_x);
+v.y += (${w} * final_y);
+pz_ += (${w} * final_z);
+}`,
+  },
+  "attractor_flow": {
+    params: [{ name: "preset", def: 0 }, { name: "attractorMode", def: 0 }, { name: "waveMode", def: 0 }, { name: "zMode", def: 0 }, { name: "yScale", def: -1.7 }, { name: "xScale", def: 1.8 }, { name: "zScale", def: 1.5 }, { name: "xAmplitude", def: -0.5 }, { name: "yAmplitude", def: -1.9 }, { name: "zAmplitude", def: 1.2 }, { name: "freqX", def: 1 }, { name: "freqY", def: 1 }, { name: "phaseX", def: 0 }, { name: "phaseY", def: 0 }],
+    verified: true, priority: 0, flags: ["3d","state","z"], types: ["3D"],
+    funcNames: ["jwx_attractor_flow_preset_c","jwx_attractor_flow_attractorMode_c","jwx_attractor_flow_waveMode_c","jwx_attractor_flow_zMode_c","jwx_attractor_flow_yScale_c","jwx_attractor_flow_xScale_c","jwx_attractor_flow_xAmplitude_c","jwx_attractor_flow_yAmplitude_c","jwx_attractor_flow_freqX_c","jwx_attractor_flow_freqY_c","jwx_attractor_flow_phaseX_c","jwx_attractor_flow_phaseY_c","jwx_attractor_flow_zScale_c","jwx_attractor_flow_zAmplitude_c","atan2j","attractor_flow_selectWave","attractor_flow_selectCosWave"],
+    funcs: `fn atan2j(y: f32, x: f32) -> f32 { if (x == 0.0 && y == 0.0) { return select(0.0, PI, (bitcast<u32>(x) >> 31u) == 1u) * select(1.0, -1.0, (bitcast<u32>(y) >> 31u) == 1u); } return atan2(y, x); }
+
+fn attractor_flow_selectWave(value: f32) -> f32 {
+  switch i32(jwx_attractor_flow_waveMode_c) {
+    case 1: {
+      return sign(sin(value));
+    }
+    case 2: {
+      return (asin(sin(value)) * (2.0 / PI));
+    }
+    case 3: {
+      return (2.0 * ((value / (2.0 * PI)) - floor((0.5 + (value / (2.0 * PI))))));
+    }
+    case default: {
+      return sin(value);
+    }
+  }
+}
+
+fn attractor_flow_selectCosWave(value: f32) -> f32 {
+  return attractor_flow_selectWave((value + (PI * 0.5)));
+}
+
+var<private> jwx_attractor_flow_preset_c: f32 = 0.0;
+
+var<private> jwx_attractor_flow_attractorMode_c: f32 = 0.0;
+
+var<private> jwx_attractor_flow_waveMode_c: f32 = 0.0;
+
+var<private> jwx_attractor_flow_zMode_c: f32 = 0.0;
+
+var<private> jwx_attractor_flow_yScale_c: f32 = 0.0;
+
+var<private> jwx_attractor_flow_xScale_c: f32 = 0.0;
+
+var<private> jwx_attractor_flow_xAmplitude_c: f32 = 0.0;
+
+var<private> jwx_attractor_flow_yAmplitude_c: f32 = 0.0;
+
+var<private> jwx_attractor_flow_freqX_c: f32 = 0.0;
+
+var<private> jwx_attractor_flow_freqY_c: f32 = 0.0;
+
+var<private> jwx_attractor_flow_phaseX_c: f32 = 0.0;
+
+var<private> jwx_attractor_flow_phaseY_c: f32 = 0.0;
+
+var<private> jwx_attractor_flow_zScale_c: f32 = 0.0;
+
+var<private> jwx_attractor_flow_zAmplitude_c: f32 = 0.0;`,
+    code: (w, p) => `{
+jwx_attractor_flow_preset_c = ${p[0]};
+jwx_attractor_flow_attractorMode_c = f32(i32(${p[1]}));
+jwx_attractor_flow_waveMode_c = f32(i32(${p[2]}));
+jwx_attractor_flow_zMode_c = f32(i32(${p[3]}));
+jwx_attractor_flow_yScale_c = ${p[4]};
+jwx_attractor_flow_xScale_c = ${p[5]};
+jwx_attractor_flow_xAmplitude_c = ${p[7]};
+jwx_attractor_flow_yAmplitude_c = ${p[8]};
+jwx_attractor_flow_freqX_c = ${p[10]};
+jwx_attractor_flow_freqY_c = ${p[11]};
+jwx_attractor_flow_phaseX_c = ${p[12]};
+jwx_attractor_flow_phaseY_c = ${p[13]};
+jwx_attractor_flow_zScale_c = ${p[6]};
+jwx_attractor_flow_zAmplitude_c = ${p[9]};
+var x: f32 = t.x;
+var y: f32 = t.y;
+var z: f32 = z_;
+var newX: f32 = 0.0;
+var newY: f32 = 0.0;
+var newZ: f32 = 0.0;
+switch i32(${p[1]}) {
+  case 1: {
+    newX = (attractor_flow_selectWave((${p[4]} * y)) - attractor_flow_selectCosWave((${p[5]} * x)));
+    newY = (attractor_flow_selectWave((${p[7]} * select(x, z, (i32(${p[3]}) == 1)))) - attractor_flow_selectCosWave((${p[8]} * y)));
+  }
+  case 2: {
+    newX = ((${p[8]} * attractor_flow_selectWave((${p[4]} * x))) - attractor_flow_selectWave((${p[5]} * y)));
+    newY = ((${p[7]} * attractor_flow_selectCosWave((${p[4]} * select(x, z, (i32(${p[3]}) == 1))))) + attractor_flow_selectCosWave((${p[5]} * y)));
+  }
+  case 3: {
+    var g_x: f32 = ((${p[7]} * x) + ((((2.0 * (1.0 - ${p[7]})) * x) * x) / (1.0 + (x * x))));
+    newY = ((${p[4]} * y) + g_x);
+    newX = (-x + g_x);
+  }
+  case default: {
+    newX = (attractor_flow_selectWave((((${p[4]} * y) * ${p[11]}) + ${p[13]})) + (${p[7]} * attractor_flow_selectCosWave((((${p[4]} * x) * ${p[10]}) + ${p[12]}))));
+    newY = (attractor_flow_selectWave((((${p[5]} * select(x, z, (i32(${p[3]}) == 1))) * ${p[10]}) + ${p[12]})) + (${p[8]} * attractor_flow_selectCosWave((((${p[5]} * y) * ${p[11]}) + ${p[13]}))));
+  }
+}
+v.x += ((newX - x) * ${w});
+v.y += ((newY - y) * ${w});
+if (false) {
+  if ((i32(${p[3]}) == 1)) {
+    newZ = (attractor_flow_selectWave((${p[6]} * x)) + (${p[9]} * attractor_flow_selectCosWave((${p[6]} * z))));
+    pz_ += ((newZ - z) * ${w});
+  } else {
+    newZ = (attractor_flow_selectWave((${p[5]} * z)) + (${p[7]} * attractor_flow_selectCosWave((${p[8]} * z))));
+    pz_ += (newZ * ${w});
+  }
+}
+}`,
+  },
+  "busybrad": {
+    params: [{ name: "mode", def: 2 }, { name: "gridSize", def: 1 }, { name: "xOffset", def: 0 }, { name: "yOffset", def: 0 }, { name: "spin", def: 0.1 }, { name: "twist", def: 0.2 }, { name: "space", def: 0.4 }, { name: "n", def: 4 }, { name: "corner", def: 1 }, { name: "mod_spin_strength", def: 0 }, { name: "mod_twist_strength", def: 0 }, { name: "sensen_post_effect", def: 0 }, { name: "sensen_fold", def: 1 }],
+    verified: true, priority: 0, flags: ["z"], types: ["2D"],
+    funcNames: ["roundc","atan2j"],
+    funcs: `fn roundc(x: f32) -> f32 { return sign(x) * floor(abs(x) + 0.5); }
+
+fn atan2j(y: f32, x: f32) -> f32 { if (x == 0.0 && y == 0.0) { return select(0.0, PI, (bitcast<u32>(x) >> 31u) == 1u) * select(1.0, -1.0, (bitcast<u32>(y) >> 31u) == 1u); } return atan2(y, x); }`,
+    code: (w, p) => `{
+var p7_: f32 = ${p[7]};
+var vertex: f32 = 0;
+var sin_vertex: f32 = 0;
+var pie_slice: f32 = 0;
+var half_slice: f32 = 0;
+var corner_rotation: f32 = 0;
+{
+  if (((i32(${p[0]}) == 1) || (i32(${p[0]}) == 2))) {
+    if ((i32(p7_) < 2)) {
+      p7_ = 2;
+    }
+    vertex = ((PI * f32((i32(p7_) - 2))) / (2.0 * f32(i32(p7_))));
+    sin_vertex = sin(vertex);
+    pie_slice = ((2.0 * PI) / f32(i32(p7_)));
+    half_slice = (pie_slice / 2.0);
+    corner_rotation = ((f32(i32(${p[8]})) - 1.0) * pie_slice);
+  }
+}
+var cellCenterX: f32 = select((${p[1]} * roundc((t.x / ${p[1]}))), 0.0, (${p[1]} == 0.0));
+var cellCenterY: f32 = select((${p[1]} * roundc((t.y / ${p[1]}))), 0.0, (${p[1]} == 0.0));
+var x: f32 = (t.x - cellCenterX);
+var y: f32 = (t.y - cellCenterY);
+var local_x: f32 = (x - ${p[2]});
+var local_y: f32 = (y + ${p[3]});
+var transformedX: f32 = 0;
+var transformedY: f32 = 0;
+if ((i32(${p[0]}) == 0)) {
+  var rr: f32 = sqrt(((local_x * local_x) + (local_y * local_y)));
+  if ((rr < ${w})) {
+    var a: f32 = ((atan2j(local_y, local_x) + ${p[4]}) + (${p[5]} * (${w} - rr)));
+    var r2_: f32 = (${w} * rr);
+    transformedX = (r2_ * cos(a));
+    transformedY = (r2_ * sin(a));
+  } else {
+    var r2_: f32 = select(0, (${w} * (1.0 + (${p[6]} / rr))), (rr != 0));
+    transformedX = (r2_ * local_x);
+    transformedY = (r2_ * local_y);
+  }
+} else if ((i32(${p[0]}) == 1)) {
+  var modulus: f32 = sqrt(((local_x * local_x) + (local_y * local_y)));
+  var n_d: f32 = f32(select(i32(p7_), 1, (i32(p7_) == 0)));
+  var theta_check: f32 = atan2j(local_y, local_x);
+  var r_poly: f32 = ((${w} * cos((PI / n_d))) / cos((theta_check - (((2.0 * PI) / n_d) * floor((((n_d * theta_check) / (2.0 * PI)) + 0.5))))));
+  if ((modulus < r_poly)) {
+    var twist_effect: f32 = select(0.0, ((${p[5]} * (r_poly - modulus)) / r_poly), (r_poly > 1.0e-9));
+    var theta: f32 = ((atan2j(local_y, local_x) + ${p[4]}) + twist_effect);
+    transformedX = (modulus * cos(theta));
+    transformedY = (modulus * sin(theta));
+  } else {
+    var new_modulus: f32 = select(0, (${w} * (1.0 + (${p[6]} / modulus))), (modulus != 0));
+    transformedX = (new_modulus * local_x);
+    transformedY = (new_modulus * local_y);
+  }
+} else {
+  var rr: f32 = sqrt(((local_x * local_x) + (local_y * local_y)));
+  var modulation_value: f32 = select(0, (${w} * (1.0 + (${p[6]} / rr))), (rr != 0));
+  var dynamic_spin: f32 = (${p[4]} + (modulation_value * ${p[9]}));
+  var dynamic_twist: f32 = (${p[5]} + (modulation_value * ${p[10]}));
+  var modulus: f32 = rr;
+  var n_d: f32 = f32(select(i32(p7_), 1, (i32(p7_) == 0)));
+  var theta_check: f32 = atan2j(local_y, local_x);
+  var r_poly: f32 = ((${w} * cos((PI / n_d))) / cos((theta_check - (((2.0 * PI) / n_d) * floor((((n_d * theta_check) / (2.0 * PI)) + 0.5))))));
+  if ((modulus < r_poly)) {
+    var twist_effect: f32 = select(0.0, ((dynamic_twist * (r_poly - modulus)) / r_poly), (r_poly > 1.0e-9));
+    var theta: f32 = ((atan2j(local_y, local_x) + dynamic_spin) + twist_effect);
+    transformedX = (modulus * cos(theta));
+    transformedY = (modulus * sin(theta));
+  } else {
+    transformedX = (modulation_value * local_x);
+    transformedY = (modulation_value * local_y);
+  }
+}
+if (((i32(${p[11]}) == 1) && (${p[12]} != 0.0))) {
+  var nr_x: f32 = floor((transformedX * ${p[12]}));
+  if ((((nr_x >= 0) && ((nr_x % 2) == 1)) || ((nr_x < 0) && ((nr_x % 2) == 0)))) {
+    transformedX = -transformedX;
+  }
+  var nr_y: f32 = floor((transformedY * ${p[12]}));
+  if ((((nr_y >= 0) && ((nr_y % 2) == 1)) || ((nr_y < 0) && ((nr_y % 2) == 0)))) {
+    transformedY = -transformedY;
+  }
+}
+v.x += ((cellCenterX + transformedX) - ${p[2]});
+v.y += ((cellCenterY + transformedY) + ${p[3]});
+if (false) {
+  pz_ += (${w} * z_);
+}
+}`,
+  },
   "abs_fold": {
     params: [{ name: "fold", def: 1 }],
     verified: true, priority: 0, flags: [], types: ["2D"],
+    funcNames: ["atan2j"],
+    funcs: `fn atan2j(y: f32, x: f32) -> f32 { if (x == 0.0 && y == 0.0) { return select(0.0, PI, (bitcast<u32>(x) >> 31u) == 1u) * select(1.0, -1.0, (bitcast<u32>(y) >> 31u) == 1u); } return atan2(y, x); }`,
     code: (w, p) => `{
 var nx: f32 = t.x;
 var ny: f32 = t.y;
@@ -30553,9 +37402,11 @@ v.y += (${w} * ny);
   "azimuthal": {
     params: [{ name: "scale", def: 1 }],
     verified: true, priority: 0, flags: [], types: ["2D"],
+    funcNames: ["atan2j"],
+    funcs: `fn atan2j(y: f32, x: f32) -> f32 { if (x == 0.0 && y == 0.0) { return select(0.0, PI, (bitcast<u32>(x) >> 31u) == 1u) * select(1.0, -1.0, (bitcast<u32>(y) >> 31u) == 1u); } return atan2(y, x); }`,
     code: (w, p) => `{
 var az_r: f32 = sqrt(((t.x * t.x) + (t.y * t.y)));
-var az_theta: f32 = atan2(t.y, t.x);
+var az_theta: f32 = atan2j(t.y, t.x);
 var az_nr: f32 = select(az_r, (sin((az_r * ${p[0]})) / ${p[0]}), (az_r > 0.001));
 v.x += ((${w} * az_nr) * cos(az_theta));
 v.y += ((${w} * az_nr) * sin(az_theta));
@@ -30564,10 +37415,12 @@ v.y += ((${w} * az_nr) * sin(az_theta));
   "calcination": {
     params: [{ name: "freq", def: 4 }, { name: "intensity", def: 0.3 }, { name: "decay", def: 0.5 }],
     verified: true, priority: 0, flags: [], types: ["2D"],
+    funcNames: ["atan2j"],
+    funcs: `fn atan2j(y: f32, x: f32) -> f32 { if (x == 0.0 && y == 0.0) { return select(0.0, PI, (bitcast<u32>(x) >> 31u) == 1u) * select(1.0, -1.0, (bitcast<u32>(y) >> 31u) == 1u); } return atan2(y, x); }`,
     code: (w, p) => `{
 var cal_decay: f32 = max(abs(${p[2]}), 0.01);
 var cal_r: f32 = sqrt(((t.x * t.x) + (t.y * t.y)));
-var cal_theta: f32 = atan2(t.y, t.x);
+var cal_theta: f32 = atan2j(t.y, t.x);
 var cal_heat: f32 = ((${p[1]} * sin((${p[0]} * cal_r))) * exp((-cal_decay * cal_r)));
 var cal_new_r: f32 = max((cal_r - cal_heat), 0.0);
 v.x += ((${w} * cal_new_r) * cos(cal_theta));
@@ -30577,10 +37430,12 @@ v.y += ((${w} * cal_new_r) * sin(cal_theta));
   "klein": {
     params: [{ name: "inner_radius", def: 0.5 }, { name: "twist", def: 0.3 }],
     verified: true, priority: 0, flags: [], types: ["2D"],
+    funcNames: ["atan2j"],
+    funcs: `fn atan2j(y: f32, x: f32) -> f32 { if (x == 0.0 && y == 0.0) { return select(0.0, PI, (bitcast<u32>(x) >> 31u) == 1u) * select(1.0, -1.0, (bitcast<u32>(y) >> 31u) == 1u); } return atan2(y, x); }`,
     code: (w, p) => `{
 var kl_ri: f32 = max(abs(${p[0]}), 0.01);
 var kl_r: f32 = sqrt(((t.x * t.x) + (t.y * t.y)));
-var kl_theta: f32 = atan2(t.y, t.x);
+var kl_theta: f32 = atan2j(t.y, t.x);
 var kl_nr: f32;
 var kl_nt: f32;
 if ((kl_r < kl_ri)) {
@@ -30597,6 +37452,8 @@ v.y += ((${w} * kl_nr) * sin(kl_nt));
   "symmetric_icon": {
     params: [{ name: "lambda", def: 1.56 }, { name: "alpha", def: -1 }, { name: "beta", def: 0.1 }, { name: "omega", def: -0.82 }],
     verified: true, priority: 0, flags: [], types: ["2D"],
+    funcNames: ["atan2j"],
+    funcs: `fn atan2j(y: f32, x: f32) -> f32 { if (x == 0.0 && y == 0.0) { return select(0.0, PI, (bitcast<u32>(x) >> 31u) == 1u) * select(1.0, -1.0, (bitcast<u32>(y) >> 31u) == 1u); } return atan2(y, x); }`,
     code: (w, p) => `{
 var r2_: f32 = ((t.x * t.x) + (t.y * t.y));
 var nx: f32 = ((((${p[0]} * t.x) + (${p[1]} * ((t.x * t.x) - (t.y * t.y)))) + ((${p[2]} * r2_) * t.x)) + ((${p[3]} * t.x) * t.y));
@@ -30608,6 +37465,8 @@ v.y += (${w} * ny);
   "afterimage": {
     params: [{ name: "freq", def: 3 }, { name: "len", def: 0.4 }, { name: "decay", def: 0.5 }],
     verified: true, priority: 0, flags: [], types: ["2D"],
+    funcNames: ["atan2j"],
+    funcs: `fn atan2j(y: f32, x: f32) -> f32 { if (x == 0.0 && y == 0.0) { return select(0.0, PI, (bitcast<u32>(x) >> 31u) == 1u) * select(1.0, -1.0, (bitcast<u32>(y) >> 31u) == 1u); } return atan2(y, x); }`,
     code: (w, p) => `{
 var ai_decay: f32 = max(abs(${p[2]}), 0.01);
 var ai_smear: f32 = ((${p[1]} * sin((${p[0]} * t.y))) * exp(((-t.y * t.y) * ai_decay)));
@@ -30618,10 +37477,12 @@ v.y += (${w} * t.y);
   "aurora": {
     params: [{ name: "freq", def: 4 }, { name: "amp", def: 0.5 }, { name: "width", def: 0.3 }, { name: "lat", def: 0.3 }],
     verified: true, priority: 0, flags: [], types: ["2D"],
+    funcNames: ["atan2j"],
+    funcs: `fn atan2j(y: f32, x: f32) -> f32 { if (x == 0.0 && y == 0.0) { return select(0.0, PI, (bitcast<u32>(x) >> 31u) == 1u) * select(1.0, -1.0, (bitcast<u32>(y) >> 31u) == 1u); } return atan2(y, x); }`,
     code: (w, p) => `{
 var au_width: f32 = max(abs(${p[2]}), 0.01);
 var au_r: f32 = sqrt(((t.x * t.x) + (t.y * t.y)));
-var au_theta: f32 = atan2(t.y, t.x);
+var au_theta: f32 = atan2j(t.y, t.x);
 var au_ov: f32 = (1.0 + (${p[3]} * cos(au_theta)));
 var au_band: f32 = (au_r - au_ov);
 var au_env: f32 = exp(((-au_band * au_band) / (au_width * au_width)));
@@ -30633,6 +37494,8 @@ v.y += (${w} * (t.y + (au_wave * sin(au_theta))));
   "cam": {
     params: [{ name: "k1", def: 0.5 }, { name: "k2", def: 0 }],
     verified: true, priority: 0, flags: [], types: ["2D"],
+    funcNames: ["atan2j"],
+    funcs: `fn atan2j(y: f32, x: f32) -> f32 { if (x == 0.0 && y == 0.0) { return select(0.0, PI, (bitcast<u32>(x) >> 31u) == 1u) * select(1.0, -1.0, (bitcast<u32>(y) >> 31u) == 1u); } return atan2(y, x); }`,
     code: (w, p) => `{
 var cam_r2: f32 = ((t.x * t.x) + (t.y * t.y));
 var cam_d: f32 = ((1.0 + (${p[0]} * cam_r2)) + ((${p[1]} * cam_r2) * cam_r2));
@@ -30643,6 +37506,8 @@ v.y += ((${w} * t.y) * cam_d);
   "halo": {
     params: [{ name: "radius", def: 0.5 }, { name: "width", def: 0.2 }, { name: "strength", def: 0.5 }],
     verified: true, priority: 0, flags: [], types: ["2D"],
+    funcNames: ["atan2j"],
+    funcs: `fn atan2j(y: f32, x: f32) -> f32 { if (x == 0.0 && y == 0.0) { return select(0.0, PI, (bitcast<u32>(x) >> 31u) == 1u) * select(1.0, -1.0, (bitcast<u32>(y) >> 31u) == 1u); } return atan2(y, x); }`,
     code: (w, p) => `{
 var hl_rad: f32 = max(abs(${p[0]}), 0.01);
 var hl_w: f32 = max(abs(${p[1]}), 0.01);
@@ -30657,6 +37522,8 @@ v.y += ((${w} * t.y) * hl_scale);
   "satin": {
     params: [{ name: "freq", def: 4 }, { name: "sheen", def: 0.2 }],
     verified: true, priority: 0, flags: [], types: ["2D"],
+    funcNames: ["atan2j"],
+    funcs: `fn atan2j(y: f32, x: f32) -> f32 { if (x == 0.0 && y == 0.0) { return select(0.0, PI, (bitcast<u32>(x) >> 31u) == 1u) * select(1.0, -1.0, (bitcast<u32>(y) >> 31u) == 1u); } return atan2(y, x); }`,
     code: (w, p) => `{
 var sa_freq: f32 = max(abs(${p[0]}), 0.01);
 var sa_diag1: f32 = ((t.x + t.y) * 0.70710678);
@@ -30670,10 +37537,12 @@ v.y += (${w} * (t.y + sa_dy));
   "aftershock": {
     params: [{ name: "freq", def: 5 }, { name: "amp", def: 0.3 }, { name: "decay", def: 1 }],
     verified: true, priority: 0, flags: [], types: ["2D"],
+    funcNames: ["atan2j"],
+    funcs: `fn atan2j(y: f32, x: f32) -> f32 { if (x == 0.0 && y == 0.0) { return select(0.0, PI, (bitcast<u32>(x) >> 31u) == 1u) * select(1.0, -1.0, (bitcast<u32>(y) >> 31u) == 1u); } return atan2(y, x); }`,
     code: (w, p) => `{
 var as_decay: f32 = max(abs(${p[2]}), 0.01);
 var as_r: f32 = sqrt(((t.x * t.x) + (t.y * t.y)));
-var as_theta: f32 = atan2(t.y, t.x);
+var as_theta: f32 = atan2j(t.y, t.x);
 var as_ring: f32 = ((${p[1]} * sin((${p[0]} * as_r))) * exp((-as_decay * as_r)));
 var as_new_r: f32 = (as_r + as_ring);
 v.x += ((${w} * as_new_r) * cos(as_theta));
@@ -30683,6 +37552,8 @@ v.y += ((${w} * as_new_r) * sin(as_theta));
   "aurora_curtain": {
     params: [{ name: "freq", def: 2 }, { name: "amp", def: 0.3 }],
     verified: true, priority: 0, flags: [], types: ["2D"],
+    funcNames: ["atan2j"],
+    funcs: `fn atan2j(y: f32, x: f32) -> f32 { if (x == 0.0 && y == 0.0) { return select(0.0, PI, (bitcast<u32>(x) >> 31u) == 1u) * select(1.0, -1.0, (bitcast<u32>(y) >> 31u) == 1u); } return atan2(y, x); }`,
     code: (w, p) => `{
 var ac_dx: f32 = (${p[1]} * ((sin((${p[0]} * t.y)) + (0.5 * sin((((2.0 * ${p[0]}) * t.y) + 1.1)))) + (0.25 * sin((((3.0 * ${p[0]}) * t.y) + 2.3)))));
 v.x += (${w} * (t.x + ac_dx));
@@ -30692,6 +37563,8 @@ v.y += (${w} * t.y);
   "lace": {
     params: [{ name: "freq", def: 3 }, { name: "amp", def: 0.3 }],
     verified: true, priority: 0, flags: [], types: ["2D"],
+    funcNames: ["atan2j"],
+    funcs: `fn atan2j(y: f32, x: f32) -> f32 { if (x == 0.0 && y == 0.0) { return select(0.0, PI, (bitcast<u32>(x) >> 31u) == 1u) * select(1.0, -1.0, (bitcast<u32>(y) >> 31u) == 1u); } return atan2(y, x); }`,
     code: (w, p) => `{
 var lc_freq: f32 = max(abs(${p[0]}), 0.01);
 var lc_nx: f32 = (${p[1]} * sin((lc_freq * t.y)));
@@ -30703,6 +37576,8 @@ v.y += (${w} * (t.y + lc_ny));
   "mercator": {
     params: [{ name: "scale", def: 1 }],
     verified: true, priority: 0, flags: [], types: ["2D"],
+    funcNames: ["atan2j"],
+    funcs: `fn atan2j(y: f32, x: f32) -> f32 { if (x == 0.0 && y == 0.0) { return select(0.0, PI, (bitcast<u32>(x) >> 31u) == 1u) * select(1.0, -1.0, (bitcast<u32>(y) >> 31u) == 1u); } return atan2(y, x); }`,
     code: (w, p) => `{
 var mc_scale: f32 = max(abs(${p[0]}), 0.01);
 var mc_lat: f32 = clamp((t.y * mc_scale), -1.5, 1.5);
@@ -30714,8 +37589,10 @@ v.y += ((${w} * mc_y) / mc_scale);
   "bubble_col": {
     params: [{ name: "freq", def: 4 }, { name: "amp", def: 0.3 }, { name: "rise", def: 0.5 }],
     verified: true, priority: 0, flags: [], types: ["2D"],
-    funcNames: ["roundc"],
-    funcs: `fn roundc(x: f32) -> f32 { return sign(x) * floor(abs(x) + 0.5); }`,
+    funcNames: ["roundc","atan2j"],
+    funcs: `fn roundc(x: f32) -> f32 { return sign(x) * floor(abs(x) + 0.5); }
+
+fn atan2j(y: f32, x: f32) -> f32 { if (x == 0.0 && y == 0.0) { return select(0.0, PI, (bitcast<u32>(x) >> 31u) == 1u) * select(1.0, -1.0, (bitcast<u32>(y) >> 31u) == 1u); } return atan2(y, x); }`,
     code: (w, p) => `{
 var bc_freq: f32 = max(abs(${p[0]}), 0.01);
 var bc_col: f32 = (roundc((t.x * bc_freq)) / bc_freq);
@@ -30728,6 +37605,8 @@ v.y += (${w} * (t.y + (${p[2]} / (bc_freq + 0.0001))));
   "catenary": {
     params: [{ name: "a", def: 0.5 }],
     verified: true, priority: 0, flags: [], types: ["2D"],
+    funcNames: ["atan2j"],
+    funcs: `fn atan2j(y: f32, x: f32) -> f32 { if (x == 0.0 && y == 0.0) { return select(0.0, PI, (bitcast<u32>(x) >> 31u) == 1u) * select(1.0, -1.0, (bitcast<u32>(y) >> 31u) == 1u); } return atan2(y, x); }`,
     code: (w, p) => `{
 var cat_a: f32 = max(abs(${p[0]}), 0.001);
 v.x += (${w} * t.x);
@@ -30737,8 +37616,10 @@ v.y += ((${w} * cat_a) * cosh((t.x / cat_a)));
   "involute": {
     params: [{ name: "r", def: 0.3 }],
     verified: true, priority: 0, flags: [], types: ["2D"],
+    funcNames: ["atan2j"],
+    funcs: `fn atan2j(y: f32, x: f32) -> f32 { if (x == 0.0 && y == 0.0) { return select(0.0, PI, (bitcast<u32>(x) >> 31u) == 1u) * select(1.0, -1.0, (bitcast<u32>(y) >> 31u) == 1u); } return atan2(y, x); }`,
     code: (w, p) => `{
-var t_: f32 = atan2(t.y, t.x);
+var t_: f32 = atan2j(t.y, t.x);
 v.x += ((${w} * ${p[0]}) * (cos(t_) + (t_ * sin(t_))));
 v.y += ((${w} * ${p[0]}) * (sin(t_) - (t_ * cos(t_))));
 }`,
@@ -30746,6 +37627,8 @@ v.y += ((${w} * ${p[0]}) * (sin(t_) - (t_ * cos(t_))));
   "p_wave": {
     params: [{ name: "freq", def: 4 }, { name: "amp", def: 0.3 }],
     verified: true, priority: 0, flags: [], types: ["2D"],
+    funcNames: ["atan2j"],
+    funcs: `fn atan2j(y: f32, x: f32) -> f32 { if (x == 0.0 && y == 0.0) { return select(0.0, PI, (bitcast<u32>(x) >> 31u) == 1u) * select(1.0, -1.0, (bitcast<u32>(y) >> 31u) == 1u); } return atan2(y, x); }`,
     code: (w, p) => `{
 var pw_dist: f32 = sqrt(((t.x * t.x) + (t.y * t.y)));
 var pw_compress: f32 = (1.0 + (${p[1]} * sin((${p[0]} * pw_dist))));
@@ -30756,6 +37639,8 @@ v.y += ((${w} * t.y) * pw_compress);
   "zhukowski": {
     params: [{ name: "c", def: 0.5 }],
     verified: true, priority: 0, flags: [], types: ["2D"],
+    funcNames: ["atan2j"],
+    funcs: `fn atan2j(y: f32, x: f32) -> f32 { if (x == 0.0 && y == 0.0) { return select(0.0, PI, (bitcast<u32>(x) >> 31u) == 1u) * select(1.0, -1.0, (bitcast<u32>(y) >> 31u) == 1u); } return atan2(y, x); }`,
     code: (w, p) => `{
 var zk_r2: f32 = (((t.x * t.x) + (t.y * t.y)) + 0.000001);
 v.x += (${w} * (t.x + ((${p[0]} * t.x) / zk_r2)));
@@ -30765,6 +37650,8 @@ v.y += (${w} * (t.y - ((${p[0]} * t.y) / zk_r2)));
   "cantor": {
     params: [{ name: "freq", def: 1 }],
     verified: true, priority: 0, flags: [], types: ["2D"],
+    funcNames: ["atan2j"],
+    funcs: `fn atan2j(y: f32, x: f32) -> f32 { if (x == 0.0 && y == 0.0) { return select(0.0, PI, (bitcast<u32>(x) >> 31u) == 1u) * select(1.0, -1.0, (bitcast<u32>(y) >> 31u) == 1u); } return atan2(y, x); }`,
     code: (w, p) => `{
 var fx: f32 = ((t.x * ${p[0]}) % 3.0);
 if ((fx < 0.0)) {
@@ -30787,6 +37674,8 @@ v.y += ((${w} * fy) / ${p[0]});
   "chainmail": {
     params: [{ name: "scale", def: 3 }, { name: "ring_ratio", def: 0.35 }],
     verified: true, priority: 0, flags: [], types: ["2D"],
+    funcNames: ["atan2j"],
+    funcs: `fn atan2j(y: f32, x: f32) -> f32 { if (x == 0.0 && y == 0.0) { return select(0.0, PI, (bitcast<u32>(x) >> 31u) == 1u) * select(1.0, -1.0, (bitcast<u32>(y) >> 31u) == 1u); } return atan2(y, x); }`,
     code: (w, p) => `{
 var cm_cx: f32 = (t.x * ${p[0]});
 var cm_cy: f32 = (t.y * ${p[0]});
@@ -30803,9 +37692,11 @@ v.y += ((${w} * (cm_ly * cm_s)) / ${p[0]});
   "diatom": {
     params: [{ name: "spokes", def: 8 }, { name: "amplitude", def: 0.3 }],
     verified: true, priority: 0, flags: [], types: ["2D"],
+    funcNames: ["atan2j"],
+    funcs: `fn atan2j(y: f32, x: f32) -> f32 { if (x == 0.0 && y == 0.0) { return select(0.0, PI, (bitcast<u32>(x) >> 31u) == 1u) * select(1.0, -1.0, (bitcast<u32>(y) >> 31u) == 1u); } return atan2(y, x); }`,
     code: (w, p) => `{
 var dt_r: f32 = sqrt((((t.x * t.x) + (t.y * t.y)) + 1.0e-10));
-var dt_theta: f32 = atan2(t.y, t.x);
+var dt_theta: f32 = atan2j(t.y, t.x);
 var dt_radial: f32 = (1.0 + (${p[1]} * cos((f32(i32(${p[0]})) * dt_theta))));
 var dt_nr: f32 = (dt_r * dt_radial);
 v.x += ((${w} * dt_nr) * cos(dt_theta));
@@ -30815,6 +37706,8 @@ v.y += ((${w} * dt_nr) * sin(dt_theta));
   "lagrange": {
     params: [{ name: "separation", def: 0.5 }, { name: "strength", def: 0.2 }],
     verified: true, priority: 0, flags: [], types: ["2D"],
+    funcNames: ["atan2j"],
+    funcs: `fn atan2j(y: f32, x: f32) -> f32 { if (x == 0.0 && y == 0.0) { return select(0.0, PI, (bitcast<u32>(x) >> 31u) == 1u) * select(1.0, -1.0, (bitcast<u32>(y) >> 31u) == 1u); } return atan2(y, x); }`,
     code: (w, p) => `{
 var lg_sep: f32 = max(abs(${p[0]}), 0.01);
 var lg_m1x: f32 = (-lg_sep * 0.5);
@@ -30832,8 +37725,10 @@ v.y += (${w} * (t.y + lg_py));
   "sph_harmonic": {
     params: [{ name: "l", def: 2 }, { name: "m", def: 1 }, { name: "strength", def: 0.3 }],
     verified: true, priority: 0, flags: [], types: ["2D"],
+    funcNames: ["atan2j"],
+    funcs: `fn atan2j(y: f32, x: f32) -> f32 { if (x == 0.0 && y == 0.0) { return select(0.0, PI, (bitcast<u32>(x) >> 31u) == 1u) * select(1.0, -1.0, (bitcast<u32>(y) >> 31u) == 1u); } return atan2(y, x); }`,
     code: (w, p) => `{
-var sh_theta: f32 = atan2(t.y, t.x);
+var sh_theta: f32 = atan2j(t.y, t.x);
 var sh_r: f32 = sqrt(((t.x * t.x) + (t.y * t.y)));
 var sh_harm: f32 = (cos((f32(i32(${p[0]})) * sh_theta)) * cos((f32(i32(${p[1]})) * sh_theta)));
 var sh_nr: f32 = (sh_r * (1.0 + (${p[2]} * sh_harm)));
@@ -30844,10 +37739,12 @@ v.y += ((${w} * sh_nr) * sin(sh_theta));
   "amoeba": {
     params: [{ name: "lobes", def: 4 }, { name: "amp", def: 0.3 }],
     verified: true, priority: 0, flags: [], types: ["2D"],
+    funcNames: ["atan2j"],
+    funcs: `fn atan2j(y: f32, x: f32) -> f32 { if (x == 0.0 && y == 0.0) { return select(0.0, PI, (bitcast<u32>(x) >> 31u) == 1u) * select(1.0, -1.0, (bitcast<u32>(y) >> 31u) == 1u); } return atan2(y, x); }`,
     code: (w, p) => `{
 var am_n: f32 = max(abs(${p[0]}), 2.0);
 var am_r: f32 = sqrt(((t.x * t.x) + (t.y * t.y)));
-var am_theta: f32 = atan2(t.y, t.x);
+var am_theta: f32 = atan2j(t.y, t.x);
 var am_new_r: f32 = (am_r * ((1.0 + (${p[1]} * cos((am_n * am_theta)))) + ((0.4 * ${p[1]}) * sin((((am_n + 1.0) * am_theta) + 0.5)))));
 v.x += ((${w} * am_new_r) * cos(am_theta));
 v.y += ((${w} * am_new_r) * sin(am_theta));
@@ -30856,9 +37753,11 @@ v.y += ((${w} * am_new_r) * sin(am_theta));
   "caustic": {
     params: [{ name: "freq", def: 5 }, { name: "strength", def: 0.3 }],
     verified: true, priority: 0, flags: [], types: ["2D"],
+    funcNames: ["atan2j"],
+    funcs: `fn atan2j(y: f32, x: f32) -> f32 { if (x == 0.0 && y == 0.0) { return select(0.0, PI, (bitcast<u32>(x) >> 31u) == 1u) * select(1.0, -1.0, (bitcast<u32>(y) >> 31u) == 1u); } return atan2(y, x); }`,
     code: (w, p) => `{
 var ca_r: f32 = sqrt(((t.x * t.x) + (t.y * t.y)));
-var ca_theta: f32 = atan2(t.y, t.x);
+var ca_theta: f32 = atan2j(t.y, t.x);
 var ca_new_r: f32 = (ca_r + (${p[1]} * sin((ca_r * ${p[0]}))));
 v.x += ((${w} * ca_new_r) * cos(ca_theta));
 v.y += ((${w} * ca_new_r) * sin(ca_theta));
@@ -30867,8 +37766,10 @@ v.y += ((${w} * ca_new_r) * sin(ca_theta));
   "deltoid": {
     params: [{ name: "r", def: 0.33 }],
     verified: true, priority: 0, flags: [], types: ["2D"],
+    funcNames: ["atan2j"],
+    funcs: `fn atan2j(y: f32, x: f32) -> f32 { if (x == 0.0 && y == 0.0) { return select(0.0, PI, (bitcast<u32>(x) >> 31u) == 1u) * select(1.0, -1.0, (bitcast<u32>(y) >> 31u) == 1u); } return atan2(y, x); }`,
     code: (w, p) => `{
-var theta: f32 = atan2(t.y, t.x);
+var theta: f32 = atan2j(t.y, t.x);
 v.x += (${w} * (((2.0 * ${p[0]}) * cos(theta)) + (${p[0]} * cos((2.0 * theta)))));
 v.y += (${w} * (((2.0 * ${p[0]}) * sin(theta)) - (${p[0]} * sin((2.0 * theta)))));
 }`,
@@ -30876,6 +37777,8 @@ v.y += (${w} * (((2.0 * ${p[0]}) * sin(theta)) - (${p[0]} * sin((2.0 * theta))))
   "fog_bank": {
     params: [{ name: "haze", def: 0.5 }, { name: "wind", def: 0.3 }],
     verified: true, priority: 0, flags: [], types: ["2D"],
+    funcNames: ["atan2j"],
+    funcs: `fn atan2j(y: f32, x: f32) -> f32 { if (x == 0.0 && y == 0.0) { return select(0.0, PI, (bitcast<u32>(x) >> 31u) == 1u) * select(1.0, -1.0, (bitcast<u32>(y) >> 31u) == 1u); } return atan2(y, x); }`,
     code: (w, p) => `{
 var fg_haze: f32 = clamp(${p[0]}, 0.0, 1.0);
 var fg_r2: f32 = ((t.x * t.x) + (t.y * t.y));
@@ -30889,6 +37792,8 @@ v.y += (${w} * ((t.y * fg_fade) + fg_dy));
   "bedhead": {
     params: [{ name: "a", def: -0.81 }, { name: "b", def: -0.92 }],
     verified: true, priority: 0, flags: [], types: ["2D"],
+    funcNames: ["atan2j"],
+    funcs: `fn atan2j(y: f32, x: f32) -> f32 { if (x == 0.0 && y == 0.0) { return select(0.0, PI, (bitcast<u32>(x) >> 31u) == 1u) * select(1.0, -1.0, (bitcast<u32>(y) >> 31u) == 1u); } return atan2(y, x); }`,
     code: (w, p) => `{
 var b_safe: f32 = select(${p[1]}, (select(1.0, -1.0, ((${p[1]} + 0.00001) < 0.0)) * 0.001), (abs(${p[1]}) < 0.001));
 var nx: f32 = ((sin(((t.x * t.y) / b_safe)) * t.y) + cos(((${p[0]} * t.x) - t.y)));
@@ -30900,6 +37805,8 @@ v.y += (${w} * ny);
   "brick": {
     params: [{ name: "scale_x", def: 1 }, { name: "scale_y", def: 0.5 }],
     verified: true, priority: 0, flags: [], types: ["2D"],
+    funcNames: ["atan2j"],
+    funcs: `fn atan2j(y: f32, x: f32) -> f32 { if (x == 0.0 && y == 0.0) { return select(0.0, PI, (bitcast<u32>(x) >> 31u) == 1u) * select(1.0, -1.0, (bitcast<u32>(y) >> 31u) == 1u); } return atan2(y, x); }`,
     code: (w, p) => `{
 var br_sx: f32 = max(abs(${p[0]}), 0.0001);
 var br_sy: f32 = max(abs(${p[1]}), 0.0001);
@@ -30914,6 +37821,8 @@ v.y += (${w} * ny);
   "catapult": {
     params: [{ name: "height", def: 0.5 }, { name: "range", def: 1 }],
     verified: true, priority: 0, flags: [], types: ["2D"],
+    funcNames: ["atan2j"],
+    funcs: `fn atan2j(y: f32, x: f32) -> f32 { if (x == 0.0 && y == 0.0) { return select(0.0, PI, (bitcast<u32>(x) >> 31u) == 1u) * select(1.0, -1.0, (bitcast<u32>(y) >> 31u) == 1u); } return atan2(y, x); }`,
     code: (w, p) => `{
 var ca_range: f32 = max(abs(${p[1]}), 0.01);
 var ca_t: f32 = (t.x / ca_range);
@@ -30925,6 +37834,8 @@ v.y += (${w} * (t.y + ca_arc));
   "liquefaction": {
     params: [{ name: "freq", def: 3 }, { name: "amp", def: 0.3 }, { name: "phase", def: 0 }],
     verified: true, priority: 0, flags: [], types: ["2D"],
+    funcNames: ["atan2j"],
+    funcs: `fn atan2j(y: f32, x: f32) -> f32 { if (x == 0.0 && y == 0.0) { return select(0.0, PI, (bitcast<u32>(x) >> 31u) == 1u) * select(1.0, -1.0, (bitcast<u32>(y) >> 31u) == 1u); } return atan2(y, x); }`,
     code: (w, p) => `{
 var liq_dx: f32 = (${p[1]} * sin(((${p[0]} * t.y) + ${p[2]})));
 var liq_dy: f32 = (${p[1]} * sin(((${p[0]} * t.x) + ${p[2]})));
@@ -30935,6 +37846,8 @@ v.y += (${w} * (t.y + liq_dy));
   "membrane": {
     params: [{ name: "radius", def: 0.5 }, { name: "height", def: 0.3 }, { name: "stiff", def: 0.5 }],
     verified: true, priority: 0, flags: [], types: ["2D"],
+    funcNames: ["atan2j"],
+    funcs: `fn atan2j(y: f32, x: f32) -> f32 { if (x == 0.0 && y == 0.0) { return select(0.0, PI, (bitcast<u32>(x) >> 31u) == 1u) * select(1.0, -1.0, (bitcast<u32>(y) >> 31u) == 1u); } return atan2(y, x); }`,
     code: (w, p) => `{
 var mb_radius: f32 = max(abs(${p[0]}), 0.01);
 var mb_stiff: f32 = max(abs(${p[2]}), 0.01);
@@ -30950,8 +37863,10 @@ v.y = ((${w} * t.y) * il_scale);
   "astroid": {
     params: [{ name: "a", def: 1 }],
     verified: true, priority: 0, flags: [], types: ["2D"],
+    funcNames: ["atan2j"],
+    funcs: `fn atan2j(y: f32, x: f32) -> f32 { if (x == 0.0 && y == 0.0) { return select(0.0, PI, (bitcast<u32>(x) >> 31u) == 1u) * select(1.0, -1.0, (bitcast<u32>(y) >> 31u) == 1u); } return atan2(y, x); }`,
     code: (w, p) => `{
-var theta: f32 = atan2(t.y, t.x);
+var theta: f32 = atan2j(t.y, t.x);
 var ct: f32 = cos(theta);
 var st: f32 = sin(theta);
 v.x += ((((${w} * ${p[0]}) * ct) * ct) * ct);
@@ -30961,8 +37876,10 @@ v.y += ((((${w} * ${p[0]}) * st) * st) * st);
   "bravais": {
     params: [{ name: "scale", def: 3 }, { name: "pull", def: 0.5 }],
     verified: true, priority: 0, flags: [], types: ["2D"],
-    funcNames: ["roundc"],
-    funcs: `fn roundc(x: f32) -> f32 { return sign(x) * floor(abs(x) + 0.5); }`,
+    funcNames: ["roundc","atan2j"],
+    funcs: `fn roundc(x: f32) -> f32 { return sign(x) * floor(abs(x) + 0.5); }
+
+fn atan2j(y: f32, x: f32) -> f32 { if (x == 0.0 && y == 0.0) { return select(0.0, PI, (bitcast<u32>(x) >> 31u) == 1u) * select(1.0, -1.0, (bitcast<u32>(y) >> 31u) == 1u); } return atan2(y, x); }`,
     code: (w, p) => `{
 var bv_cx: f32 = (roundc((t.x * ${p[0]})) / ${p[0]});
 var bv_cy: f32 = (roundc((t.y * ${p[0]})) / ${p[0]});
@@ -30975,6 +37892,8 @@ v.y += (${w} * (t.y + (${p[1]} * bv_dy)));
   "collision": {
     params: [{ name: "radius", def: 0.3 }, { name: "force", def: 0.5 }],
     verified: true, priority: 0, flags: [], types: ["2D"],
+    funcNames: ["atan2j"],
+    funcs: `fn atan2j(y: f32, x: f32) -> f32 { if (x == 0.0 && y == 0.0) { return select(0.0, PI, (bitcast<u32>(x) >> 31u) == 1u) * select(1.0, -1.0, (bitcast<u32>(y) >> 31u) == 1u); } return atan2(y, x); }`,
     code: (w, p) => `{
 var cl_radius: f32 = max(abs(${p[0]}), 0.01);
 var cl_r: f32 = sqrt(((t.x * t.x) + (t.y * t.y)));
@@ -30987,6 +37906,8 @@ v.y += (${w} * (t.y + ((cl_force_val * t.y) / cl_safe)));
   "jet_stream": {
     params: [{ name: "speed", def: 1 }, { name: "width", def: 0.3 }, { name: "center", def: 0 }],
     verified: true, priority: 0, flags: [], types: ["2D"],
+    funcNames: ["atan2j"],
+    funcs: `fn atan2j(y: f32, x: f32) -> f32 { if (x == 0.0 && y == 0.0) { return select(0.0, PI, (bitcast<u32>(x) >> 31u) == 1u) * select(1.0, -1.0, (bitcast<u32>(y) >> 31u) == 1u); } return atan2(y, x); }`,
     code: (w, p) => `{
 var js_width: f32 = max(abs(${p[1]}), 0.01);
 var js_dy: f32 = (t.y - ${p[2]});
@@ -30998,8 +37919,10 @@ v.y += (${w} * t.y);
   "lituus_var": {
     params: [{ name: "a", def: 1 }],
     verified: true, priority: 0, flags: [], types: ["2D"],
+    funcNames: ["atan2j"],
+    funcs: `fn atan2j(y: f32, x: f32) -> f32 { if (x == 0.0 && y == 0.0) { return select(0.0, PI, (bitcast<u32>(x) >> 31u) == 1u) * select(1.0, -1.0, (bitcast<u32>(y) >> 31u) == 1u); } return atan2(y, x); }`,
     code: (w, p) => `{
-var theta: f32 = atan2(t.y, t.x);
+var theta: f32 = atan2j(t.y, t.x);
 var abs_theta: f32 = max(abs(theta), 0.0001);
 var new_r: f32 = ((${p[0]} * ${p[0]}) / abs_theta);
 new_r = sqrt(max(new_r, 0.0));
@@ -31010,6 +37933,8 @@ v.y += ((${w} * new_r) * sin(theta));
   "chladni": {
     params: [{ name: "m", def: 2 }, { name: "n", def: 3 }, { name: "amplitude", def: 0.25 }],
     verified: true, priority: 0, flags: [], types: ["2D"],
+    funcNames: ["atan2j"],
+    funcs: `fn atan2j(y: f32, x: f32) -> f32 { if (x == 0.0 && y == 0.0) { return select(0.0, PI, (bitcast<u32>(x) >> 31u) == 1u) * select(1.0, -1.0, (bitcast<u32>(y) >> 31u) == 1u); } return atan2(y, x); }`,
     code: (w, p) => `{
 var dx: f32 = ((${p[2]} * cos(((${p[0]} * PI) * t.x))) * sin(((${p[1]} * PI) * t.y)));
 var dy: f32 = ((${p[2]} * sin(((${p[0]} * PI) * t.x))) * cos(((${p[1]} * PI) * t.y)));
@@ -31020,6 +37945,8 @@ v.y += (${w} * (t.y + dy));
   "domain_fold": {
     params: [{ name: "fold_x", def: 1 }, { name: "fold_y", def: 1 }],
     verified: true, priority: 0, flags: [], types: ["2D"],
+    funcNames: ["atan2j"],
+    funcs: `fn atan2j(y: f32, x: f32) -> f32 { if (x == 0.0 && y == 0.0) { return select(0.0, PI, (bitcast<u32>(x) >> 31u) == 1u) * select(1.0, -1.0, (bitcast<u32>(y) >> 31u) == 1u); } return atan2(y, x); }`,
     code: (w, p) => `{
 var df_fx: f32 = max(abs(${p[0]}), 0.0001);
 var df_fy: f32 = max(abs(${p[1]}), 0.0001);
@@ -31042,6 +37969,8 @@ v.y += (${w} * ny);
   "embroidery": {
     params: [{ name: "scale", def: 3 }, { name: "depth", def: 0.2 }],
     verified: true, priority: 0, flags: [], types: ["2D"],
+    funcNames: ["atan2j"],
+    funcs: `fn atan2j(y: f32, x: f32) -> f32 { if (x == 0.0 && y == 0.0) { return select(0.0, PI, (bitcast<u32>(x) >> 31u) == 1u) * select(1.0, -1.0, (bitcast<u32>(y) >> 31u) == 1u); } return atan2(y, x); }`,
     code: (w, p) => `{
 var emb_cx: f32 = (t.x * ${p[0]});
 var emb_cy: f32 = (t.y * ${p[0]});
@@ -31060,6 +37989,8 @@ v.y += (${w} * (t.y + (emb_wy / ${p[0]})));
   "leather": {
     params: [{ name: "scale", def: 2 }, { name: "rough", def: 0.3 }],
     verified: true, priority: 0, flags: [], types: ["2D"],
+    funcNames: ["atan2j"],
+    funcs: `fn atan2j(y: f32, x: f32) -> f32 { if (x == 0.0 && y == 0.0) { return select(0.0, PI, (bitcast<u32>(x) >> 31u) == 1u) * select(1.0, -1.0, (bitcast<u32>(y) >> 31u) == 1u); } return atan2(y, x); }`,
     code: (w, p) => `{
 var lt_scale: f32 = max(abs(${p[0]}), 0.01);
 var lt_coarse: f32 = ((${p[1]} * sin((lt_scale * t.x))) * cos((lt_scale * t.y)));
@@ -31071,6 +38002,8 @@ v.y += (${w} * (t.y + lt_fine));
   "piston": {
     params: [{ name: "freq", def: 2 }, { name: "amp", def: 0.5 }, { name: "offset", def: 0 }],
     verified: true, priority: 0, flags: [], types: ["2D"],
+    funcNames: ["atan2j"],
+    funcs: `fn atan2j(y: f32, x: f32) -> f32 { if (x == 0.0 && y == 0.0) { return select(0.0, PI, (bitcast<u32>(x) >> 31u) == 1u) * select(1.0, -1.0, (bitcast<u32>(y) >> 31u) == 1u); } return atan2(y, x); }`,
     code: (w, p) => `{
 var ps_comp: f32 = (1.0 + (${p[1]} * sin(((${p[0]} * t.x) + ${p[2]}))));
 v.x += (${w} * t.x);
@@ -31080,8 +38013,10 @@ v.y += ((${w} * t.y) * ps_comp);
   "bwraps": {
     params: [{ name: "scale", def: 0.5 }, { name: "cellscale", def: 0.9 }],
     verified: true, priority: 0, flags: [], types: ["2D"],
-    funcNames: ["roundc"],
-    funcs: `fn roundc(x: f32) -> f32 { return sign(x) * floor(abs(x) + 0.5); }`,
+    funcNames: ["roundc","atan2j"],
+    funcs: `fn roundc(x: f32) -> f32 { return sign(x) * floor(abs(x) + 0.5); }
+
+fn atan2j(y: f32, x: f32) -> f32 { if (x == 0.0 && y == 0.0) { return select(0.0, PI, (bitcast<u32>(x) >> 31u) == 1u) * select(1.0, -1.0, (bitcast<u32>(y) >> 31u) == 1u); } return atan2(y, x); }`,
     code: (w, p) => `{
 var bw_scale: f32 = max(abs(${p[0]}), 0.01);
 var bw_cs: f32 = clamp(${p[1]}, 0.1, 1.0);
@@ -31099,8 +38034,10 @@ v.y += (${w} * (bw_cy + (bw_dy * bw_inv)));
   "coagulation": {
     params: [{ name: "freq", def: 3 }, { name: "pull", def: 0.5 }],
     verified: true, priority: 0, flags: [], types: ["2D"],
-    funcNames: ["roundc"],
-    funcs: `fn roundc(x: f32) -> f32 { return sign(x) * floor(abs(x) + 0.5); }`,
+    funcNames: ["roundc","atan2j"],
+    funcs: `fn roundc(x: f32) -> f32 { return sign(x) * floor(abs(x) + 0.5); }
+
+fn atan2j(y: f32, x: f32) -> f32 { if (x == 0.0 && y == 0.0) { return select(0.0, PI, (bitcast<u32>(x) >> 31u) == 1u) * select(1.0, -1.0, (bitcast<u32>(y) >> 31u) == 1u); } return atan2(y, x); }`,
     code: (w, p) => `{
 var cg_cx: f32 = (roundc((t.x * ${p[0]})) / ${p[0]});
 var cg_cy: f32 = (roundc((t.y * ${p[0]})) / ${p[0]});
@@ -31113,6 +38050,8 @@ v.y += (${w} * (t.y + (${p[1]} * cg_dy)));
   "copperplate": {
     params: [{ name: "angle", def: 0 }, { name: "freq", def: 5 }, { name: "width", def: 0.3 }, { name: "taper", def: 1 }],
     verified: true, priority: 0, flags: [], types: ["2D"],
+    funcNames: ["atan2j"],
+    funcs: `fn atan2j(y: f32, x: f32) -> f32 { if (x == 0.0 && y == 0.0) { return select(0.0, PI, (bitcast<u32>(x) >> 31u) == 1u) * select(1.0, -1.0, (bitcast<u32>(y) >> 31u) == 1u); } return atan2(y, x); }`,
     code: (w, p) => `{
 var cp_ca: f32 = cos(${p[0]});
 var cp_sa: f32 = sin(${p[0]});
@@ -31127,6 +38066,8 @@ v.y += (${w} * ((cp_u * cp_sa) + (cp_nv * cp_ca)));
   "cumulonimbus": {
     params: [{ name: "height", def: 1 }, { name: "spread", def: 0.5 }, { name: "turb", def: 0.15 }],
     verified: true, priority: 0, flags: [], types: ["2D"],
+    funcNames: ["atan2j"],
+    funcs: `fn atan2j(y: f32, x: f32) -> f32 { if (x == 0.0 && y == 0.0) { return select(0.0, PI, (bitcast<u32>(x) >> 31u) == 1u) * select(1.0, -1.0, (bitcast<u32>(y) >> 31u) == 1u); } return atan2(y, x); }`,
     code: (w, p) => `{
 var cb_h: f32 = max(abs(${p[0]}), 0.1);
 var cb_t: f32 = clamp((t.y / cb_h), -1.5, 1.5);
@@ -31139,6 +38080,8 @@ v.y += (${w} * (t.y * (1.0 + (0.5 * abs(cb_t)))));
   "duffing": {
     params: [{ name: "a", def: 2.75 }, { name: "b", def: 0.2 }],
     verified: true, priority: 0, flags: [], types: ["2D"],
+    funcNames: ["atan2j"],
+    funcs: `fn atan2j(y: f32, x: f32) -> f32 { if (x == 0.0 && y == 0.0) { return select(0.0, PI, (bitcast<u32>(x) >> 31u) == 1u) * select(1.0, -1.0, (bitcast<u32>(y) >> 31u) == 1u); } return atan2(y, x); }`,
     code: (w, p) => `{
 var nx: f32 = t.y;
 var ny: f32 = (((-(${p[1]}) * t.x) + (${p[0]} * t.y)) - ((t.y * t.y) * t.y));
@@ -31149,6 +38092,8 @@ v.y += (${w} * ny);
   "cirrus": {
     params: [{ name: "freq", def: 3 }, { name: "amp", def: 0.3 }, { name: "angle", def: 0 }],
     verified: true, priority: 0, flags: [], types: ["2D"],
+    funcNames: ["atan2j"],
+    funcs: `fn atan2j(y: f32, x: f32) -> f32 { if (x == 0.0 && y == 0.0) { return select(0.0, PI, (bitcast<u32>(x) >> 31u) == 1u) * select(1.0, -1.0, (bitcast<u32>(y) >> 31u) == 1u); } return atan2(y, x); }`,
     code: (w, p) => `{
 var ci_ca: f32 = cos(${p[2]});
 var ci_sa: f32 = sin(${p[2]});
@@ -31163,9 +38108,11 @@ v.y += (${w} * ((ci_u * ci_sa) + (ci_nv * ci_ca)));
   "color_wheel": {
     params: [{ name: "sectors", def: 6 }, { name: "speed", def: 0.3 }],
     verified: true, priority: 0, flags: [], types: ["2D"],
+    funcNames: ["atan2j"],
+    funcs: `fn atan2j(y: f32, x: f32) -> f32 { if (x == 0.0 && y == 0.0) { return select(0.0, PI, (bitcast<u32>(x) >> 31u) == 1u) * select(1.0, -1.0, (bitcast<u32>(y) >> 31u) == 1u); } return atan2(y, x); }`,
     code: (w, p) => `{
 var cw_r: f32 = sqrt((((t.x * t.x) + (t.y * t.y)) + 1.0e-10));
-var cw_theta: f32 = atan2(t.y, t.x);
+var cw_theta: f32 = atan2j(t.y, t.x);
 var cw_new_theta: f32 = (cw_theta + (${p[1]} * sin((${p[0]} * cw_theta))));
 v.x += ((${w} * cw_r) * cos(cw_new_theta));
 v.y += ((${w} * cw_r) * sin(cw_new_theta));
@@ -31174,10 +38121,12 @@ v.y += ((${w} * cw_r) * sin(cw_new_theta));
   "corona": {
     params: [{ name: "n", def: 8 }, { name: "amp", def: 0.5 }, { name: "decay", def: 1 }],
     verified: true, priority: 0, flags: [], types: ["2D"],
+    funcNames: ["atan2j"],
+    funcs: `fn atan2j(y: f32, x: f32) -> f32 { if (x == 0.0 && y == 0.0) { return select(0.0, PI, (bitcast<u32>(x) >> 31u) == 1u) * select(1.0, -1.0, (bitcast<u32>(y) >> 31u) == 1u); } return atan2(y, x); }`,
     code: (w, p) => `{
 var cr_decay: f32 = max(abs(${p[2]}), 0.01);
 var cr_r: f32 = sqrt(((t.x * t.x) + (t.y * t.y)));
-var cr_theta: f32 = atan2(t.y, t.x);
+var cr_theta: f32 = atan2j(t.y, t.x);
 var cr_jet: f32 = ((${p[1]} * exp((-cr_decay * cr_r))) * abs(cos(((${p[0]} * cr_theta) * 0.5))));
 var cr_new_r: f32 = (cr_r + cr_jet);
 v.x += ((${w} * cr_new_r) * cos(cr_theta));
@@ -31187,8 +38136,10 @@ v.y += ((${w} * cr_new_r) * sin(cr_theta));
   "karman_vortex": {
     params: [{ name: "freq", def: 2 }, { name: "strength", def: 0.3 }, { name: "sep", def: 0.5 }],
     verified: true, priority: 0, flags: [], types: ["2D"],
-    funcNames: ["roundc"],
-    funcs: `fn roundc(x: f32) -> f32 { return sign(x) * floor(abs(x) + 0.5); }`,
+    funcNames: ["roundc","atan2j"],
+    funcs: `fn roundc(x: f32) -> f32 { return sign(x) * floor(abs(x) + 0.5); }
+
+fn atan2j(y: f32, x: f32) -> f32 { if (x == 0.0 && y == 0.0) { return select(0.0, PI, (bitcast<u32>(x) >> 31u) == 1u) * select(1.0, -1.0, (bitcast<u32>(y) >> 31u) == 1u); } return atan2(y, x); }`,
     code: (w, p) => `{
 var kv_freq: f32 = max(abs(${p[0]}), 0.01);
 var kv_xi: f32 = roundc((t.x * kv_freq));
@@ -31209,10 +38160,12 @@ v.y += (${w} * (t.y + (kv_spin * kv_dx)));
   "ouroboros": {
     params: [{ name: "radius", def: 0.5 }, { name: "twist", def: 0.5 }],
     verified: true, priority: 0, flags: [], types: ["2D"],
+    funcNames: ["atan2j"],
+    funcs: `fn atan2j(y: f32, x: f32) -> f32 { if (x == 0.0 && y == 0.0) { return select(0.0, PI, (bitcast<u32>(x) >> 31u) == 1u) * select(1.0, -1.0, (bitcast<u32>(y) >> 31u) == 1u); } return atan2(y, x); }`,
     code: (w, p) => `{
 var or_radius: f32 = max(abs(${p[0]}), 0.01);
 var or_r: f32 = sqrt(((t.x * t.x) + (t.y * t.y)));
-var or_theta: f32 = atan2(t.y, t.x);
+var or_theta: f32 = atan2j(t.y, t.x);
 var or_wrapped_r: f32 = (or_radius * ((or_r / or_radius) - floor((or_r / or_radius))));
 var or_nt: f32 = (or_theta + (${p[1]} * or_r));
 v.x += ((${w} * or_wrapped_r) * cos(or_nt));
@@ -31222,6 +38175,8 @@ v.y += ((${w} * or_wrapped_r) * sin(or_nt));
   "curl_noise": {
     params: [{ name: "freq", def: 2 }, { name: "strength", def: 0.3 }],
     verified: true, priority: 0, flags: [], types: ["2D"],
+    funcNames: ["atan2j"],
+    funcs: `fn atan2j(y: f32, x: f32) -> f32 { if (x == 0.0 && y == 0.0) { return select(0.0, PI, (bitcast<u32>(x) >> 31u) == 1u) * select(1.0, -1.0, (bitcast<u32>(y) >> 31u) == 1u); } return atan2(y, x); }`,
     code: (w, p) => `{
 var dx: f32 = (((${p[1]} * ${p[0]}) * sin((${p[0]} * t.x))) * cos((${p[0]} * t.y)));
 var dy: f32 = (((-(${p[1]}) * ${p[0]}) * cos((${p[0]} * t.x))) * sin((${p[0]} * t.y)));
@@ -31232,10 +38187,12 @@ v.y += (${w} * (t.y + dy));
   "flourish": {
     params: [{ name: "n", def: 3 }, { name: "amp", def: 0.5 }, { name: "damp", def: 0.3 }],
     verified: true, priority: 0, flags: [], types: ["2D"],
+    funcNames: ["atan2j"],
+    funcs: `fn atan2j(y: f32, x: f32) -> f32 { if (x == 0.0 && y == 0.0) { return select(0.0, PI, (bitcast<u32>(x) >> 31u) == 1u) * select(1.0, -1.0, (bitcast<u32>(y) >> 31u) == 1u); } return atan2(y, x); }`,
     code: (w, p) => `{
 var fl_damp: f32 = max(abs(${p[2]}), 0.01);
 var fl_r: f32 = sqrt(((t.x * t.x) + (t.y * t.y)));
-var fl_theta: f32 = atan2(t.y, t.x);
+var fl_theta: f32 = atan2j(t.y, t.x);
 var fl_loop: f32 = ((${p[1]} * sin((${p[0]} * fl_theta))) * exp((-fl_damp * fl_r)));
 var fl_new_r: f32 = (fl_r + fl_loop);
 v.x += ((${w} * fl_new_r) * cos(fl_theta));
@@ -31245,9 +38202,11 @@ v.y += ((${w} * fl_new_r) * sin(fl_theta));
   "isobar": {
     params: [{ name: "freq", def: 3 }, { name: "amp", def: 0.3 }, { name: "spin", def: 0.5 }],
     verified: true, priority: 0, flags: [], types: ["2D"],
+    funcNames: ["atan2j"],
+    funcs: `fn atan2j(y: f32, x: f32) -> f32 { if (x == 0.0 && y == 0.0) { return select(0.0, PI, (bitcast<u32>(x) >> 31u) == 1u) * select(1.0, -1.0, (bitcast<u32>(y) >> 31u) == 1u); } return atan2(y, x); }`,
     code: (w, p) => `{
 var iso_r: f32 = sqrt((((t.x * t.x) + (t.y * t.y)) + 1.0e-10));
-var iso_theta: f32 = atan2(t.y, t.x);
+var iso_theta: f32 = atan2j(t.y, t.x);
 var iso_band: f32 = (sin((${p[0]} * iso_r)) * ${p[1]});
 var iso_nr: f32 = (iso_r + iso_band);
 var iso_nt: f32 = (iso_theta + (${p[2]} * iso_band));
@@ -31258,9 +38217,11 @@ v.y += ((${w} * iso_nr) * sin(iso_nt));
   "rewind": {
     params: [{ name: "speed", def: 1 }, { name: "radius", def: 0.5 }, { name: "decay", def: 0.3 }],
     verified: true, priority: 0, flags: [], types: ["2D"],
+    funcNames: ["atan2j"],
+    funcs: `fn atan2j(y: f32, x: f32) -> f32 { if (x == 0.0 && y == 0.0) { return select(0.0, PI, (bitcast<u32>(x) >> 31u) == 1u) * select(1.0, -1.0, (bitcast<u32>(y) >> 31u) == 1u); } return atan2(y, x); }`,
     code: (w, p) => `{
 var rew_r: f32 = sqrt((((t.x * t.x) + (t.y * t.y)) + 1.0e-10));
-var rew_theta: f32 = atan2(t.y, t.x);
+var rew_theta: f32 = atan2j(t.y, t.x);
 var rew_turn: f32 = (${p[0]} / (rew_r + ${p[1]}));
 var rew_nr: f32 = (rew_r * (1.0 - (${p[2]} * 0.05)));
 var rew_nt: f32 = (rew_theta + rew_turn);
@@ -31271,8 +38232,10 @@ v.y += ((${w} * rew_nr) * sin(rew_nt));
   "contour_map": {
     params: [{ name: "bands", def: 5 }, { name: "pull", def: 0.7 }],
     verified: true, priority: 0, flags: [], types: ["2D"],
-    funcNames: ["roundc"],
-    funcs: `fn roundc(x: f32) -> f32 { return sign(x) * floor(abs(x) + 0.5); }`,
+    funcNames: ["roundc","atan2j"],
+    funcs: `fn roundc(x: f32) -> f32 { return sign(x) * floor(abs(x) + 0.5); }
+
+fn atan2j(y: f32, x: f32) -> f32 { if (x == 0.0 && y == 0.0) { return select(0.0, PI, (bitcast<u32>(x) >> 31u) == 1u) * select(1.0, -1.0, (bitcast<u32>(y) >> 31u) == 1u); } return atan2(y, x); }`,
     code: (w, p) => `{
 var cm_r: f32 = sqrt(((t.x * t.x) + (t.y * t.y)));
 var cm_band_r: f32 = (roundc((cm_r * ${p[0]})) / ${p[0]});
@@ -31285,6 +38248,8 @@ v.y += ((${w} * t.y) * cm_scale);
   "gingerbread": {
     params: [],
     verified: true, priority: 0, flags: [], types: ["2D"],
+    funcNames: ["atan2j"],
+    funcs: `fn atan2j(y: f32, x: f32) -> f32 { if (x == 0.0 && y == 0.0) { return select(0.0, PI, (bitcast<u32>(x) >> 31u) == 1u) * select(1.0, -1.0, (bitcast<u32>(y) >> 31u) == 1u); } return atan2(y, x); }`,
     code: (w, _p) => `{
 var nx: f32 = ((1.0 - t.y) + abs(t.x));
 var ny: f32 = t.x;
@@ -31295,6 +38260,8 @@ v.y += (${w} * ny);
   "labyrinth": {
     params: [{ name: "scale", def: 0.5 }],
     verified: true, priority: 0, flags: [], types: ["2D"],
+    funcNames: ["atan2j"],
+    funcs: `fn atan2j(y: f32, x: f32) -> f32 { if (x == 0.0 && y == 0.0) { return select(0.0, PI, (bitcast<u32>(x) >> 31u) == 1u) * select(1.0, -1.0, (bitcast<u32>(y) >> 31u) == 1u); } return atan2(y, x); }`,
     code: (w, p) => `{
 var lb_scale: f32 = max(abs(${p[0]}), 0.01);
 var lb_ri: f32 = floor(((t.x / lb_scale) + 0.5));
@@ -31310,6 +38277,8 @@ v.y += (${w} * ((lb_ci * lb_scale) + lb_fy));
   "meander": {
     params: [{ name: "freq", def: 2 }, { name: "amplitude", def: 0.4 }],
     verified: true, priority: 0, flags: [], types: ["2D"],
+    funcNames: ["atan2j"],
+    funcs: `fn atan2j(y: f32, x: f32) -> f32 { if (x == 0.0 && y == 0.0) { return select(0.0, PI, (bitcast<u32>(x) >> 31u) == 1u) * select(1.0, -1.0, (bitcast<u32>(y) >> 31u) == 1u); } return atan2(y, x); }`,
     code: (w, p) => `{
 v.x += (${w} * (t.x + (${p[1]} * cos(((t.y * ${p[0]}) * 3.14159265)))));
 v.y += (${w} * (t.y + (${p[1]} * sin(((t.x * ${p[0]}) * 3.14159265)))));
@@ -31318,6 +38287,8 @@ v.y += (${w} * (t.y + (${p[1]} * sin(((t.x * ${p[0]}) * 3.14159265)))));
   "mitosis": {
     params: [{ name: "sep", def: 1 }, { name: "width", def: 0.5 }, { name: "phase", def: 0 }],
     verified: true, priority: 0, flags: [], types: ["2D"],
+    funcNames: ["atan2j"],
+    funcs: `fn atan2j(y: f32, x: f32) -> f32 { if (x == 0.0 && y == 0.0) { return select(0.0, PI, (bitcast<u32>(x) >> 31u) == 1u) * select(1.0, -1.0, (bitcast<u32>(y) >> 31u) == 1u); } return atan2(y, x); }`,
     code: (w, p) => `{
 var mi_sep: f32 = ${p[0]};
 var mi_w: f32 = max(abs(${p[1]}), 0.01);
@@ -31337,6 +38308,8 @@ v.y += (${w} * ((mi_new_u * mi_sa) + (mi_new_v * mi_ca)));
   "hexagonal": {
     params: [{ name: "scale", def: 1 }],
     verified: true, priority: 0, flags: [], types: ["2D"],
+    funcNames: ["atan2j"],
+    funcs: `fn atan2j(y: f32, x: f32) -> f32 { if (x == 0.0 && y == 0.0) { return select(0.0, PI, (bitcast<u32>(x) >> 31u) == 1u) * select(1.0, -1.0, (bitcast<u32>(y) >> 31u) == 1u); } return atan2(y, x); }`,
     code: (w, p) => `{
 var hx_scale: f32 = max(abs(${p[0]}), 0.0001);
 var q: f32 = (((2.0 / 3.0) * t.x) / hx_scale);
@@ -31362,8 +38335,10 @@ v.y += (${w} * (t.y - cy));
   "nephroid": {
     params: [{ name: "r", def: 0.5 }],
     verified: true, priority: 0, flags: [], types: ["2D"],
+    funcNames: ["atan2j"],
+    funcs: `fn atan2j(y: f32, x: f32) -> f32 { if (x == 0.0 && y == 0.0) { return select(0.0, PI, (bitcast<u32>(x) >> 31u) == 1u) * select(1.0, -1.0, (bitcast<u32>(y) >> 31u) == 1u); } return atan2(y, x); }`,
     code: (w, p) => `{
-var theta: f32 = atan2(t.y, t.x);
+var theta: f32 = atan2j(t.y, t.x);
 v.x += ((${w} * ${p[0]}) * ((2.0 * cos(theta)) - cos((2.0 * theta))));
 v.y += ((${w} * ${p[0]}) * ((2.0 * sin(theta)) - sin((2.0 * theta))));
 }`,
@@ -31371,6 +38346,8 @@ v.y += ((${w} * ${p[0]}) * ((2.0 * sin(theta)) - sin((2.0 * theta))));
   "robinson": {
     params: [{ name: "scale", def: 1 }],
     verified: true, priority: 0, flags: [], types: ["2D"],
+    funcNames: ["atan2j"],
+    funcs: `fn atan2j(y: f32, x: f32) -> f32 { if (x == 0.0 && y == 0.0) { return select(0.0, PI, (bitcast<u32>(x) >> 31u) == 1u) * select(1.0, -1.0, (bitcast<u32>(y) >> 31u) == 1u); } return atan2(y, x); }`,
     code: (w, p) => `{
 var rbn_lat: f32 = clamp((t.y * ${p[0]}), -1.570796, 1.570796);
 var rbn_t: f32 = (abs(rbn_lat) / 1.570796);
@@ -31383,9 +38360,11 @@ v.y += (((${w} * rbn_lat) * rbn_yscale) / ${p[0]});
   "tentacle": {
     params: [{ name: "freq", def: 2 }, { name: "amp", def: 0.5 }],
     verified: true, priority: 0, flags: [], types: ["2D"],
+    funcNames: ["atan2j"],
+    funcs: `fn atan2j(y: f32, x: f32) -> f32 { if (x == 0.0 && y == 0.0) { return select(0.0, PI, (bitcast<u32>(x) >> 31u) == 1u) * select(1.0, -1.0, (bitcast<u32>(y) >> 31u) == 1u); } return atan2(y, x); }`,
     code: (w, p) => `{
 var te_r: f32 = sqrt(((t.x * t.x) + (t.y * t.y)));
-var te_theta: f32 = atan2(t.y, t.x);
+var te_theta: f32 = atan2j(t.y, t.x);
 var te_wave: f32 = (${p[1]} * sin((${p[0]} * te_r)));
 var te_new_theta: f32 = (te_theta + te_wave);
 v.x += ((${w} * te_r) * cos(te_new_theta));
@@ -31395,6 +38374,8 @@ v.y += ((${w} * te_r) * sin(te_new_theta));
   "virus": {
     params: [{ name: "spread", def: 2 }, { name: "mut", def: 0.3 }],
     verified: true, priority: 0, flags: [], types: ["2D"],
+    funcNames: ["atan2j"],
+    funcs: `fn atan2j(y: f32, x: f32) -> f32 { if (x == 0.0 && y == 0.0) { return select(0.0, PI, (bitcast<u32>(x) >> 31u) == 1u) * select(1.0, -1.0, (bitcast<u32>(y) >> 31u) == 1u); } return atan2(y, x); }`,
     code: (w, p) => `{
 var vr_s: f32 = (sin((t.x * ${p[0]})) * cos((t.y * ${p[0]})));
 var sign_x: f32 = select(select(1.0, -1.0, (t.x < 0.0)), 0.0, (t.x == 0.0));
@@ -31411,9 +38392,11 @@ v.y += ((${w} * vr_ny) * vr_scale);
   "epitrochoid": {
     params: [{ name: "r_big", def: 3 }, { name: "r_small", def: 1 }, { name: "d", def: 0.5 }],
     verified: true, priority: 0, flags: [], types: ["2D"],
+    funcNames: ["atan2j"],
+    funcs: `fn atan2j(y: f32, x: f32) -> f32 { if (x == 0.0 && y == 0.0) { return select(0.0, PI, (bitcast<u32>(x) >> 31u) == 1u) * select(1.0, -1.0, (bitcast<u32>(y) >> 31u) == 1u); } return atan2(y, x); }`,
     code: (w, p) => `{
 var ep_r: f32 = max(abs(${p[1]}), 0.0001);
-var theta: f32 = atan2(t.y, t.x);
+var theta: f32 = atan2j(t.y, t.x);
 var ratio: f32 = ((${p[0]} + ep_r) / ep_r);
 v.x += (${w} * (((${p[0]} + ep_r) * cos(theta)) - (${p[2]} * cos((ratio * theta)))));
 v.y += (${w} * (((${p[0]} + ep_r) * sin(theta)) - (${p[2]} * sin((ratio * theta)))));
@@ -31422,8 +38405,10 @@ v.y += (${w} * (((${p[0]} + ep_r) * sin(theta)) - (${p[2]} * sin((ratio * theta)
   "gear_teeth": {
     params: [{ name: "teeth", def: 12 }, { name: "depth", def: 0.3 }],
     verified: true, priority: 0, flags: [], types: ["2D"],
+    funcNames: ["atan2j"],
+    funcs: `fn atan2j(y: f32, x: f32) -> f32 { if (x == 0.0 && y == 0.0) { return select(0.0, PI, (bitcast<u32>(x) >> 31u) == 1u) * select(1.0, -1.0, (bitcast<u32>(y) >> 31u) == 1u); } return atan2(y, x); }`,
     code: (w, p) => `{
-var gt_a: f32 = atan2(t.y, t.x);
+var gt_a: f32 = atan2j(t.y, t.x);
 var gt_r: f32 = sqrt(((t.x * t.x) + (t.y * t.y)));
 var gt_tooth: f32 = (0.5 * (1.0 + cos((${p[0]} * gt_a))));
 var gt_rmod: f32 = (gt_r + (${p[1]} * gt_tooth));
@@ -31434,6 +38419,8 @@ v.y += ((${w} * gt_rmod) * sin(gt_a));
   "mirror_rotate": {
     params: [{ name: "angle", def: 45 }],
     verified: true, priority: 0, flags: [], types: ["2D"],
+    funcNames: ["atan2j"],
+    funcs: `fn atan2j(y: f32, x: f32) -> f32 { if (x == 0.0 && y == 0.0) { return select(0.0, PI, (bitcast<u32>(x) >> 31u) == 1u) * select(1.0, -1.0, (bitcast<u32>(y) >> 31u) == 1u); } return atan2(y, x); }`,
     code: (w, p) => `{
 var mr_angle: f32 = (${p[0]} * 0.01745329);
 var c2: f32 = cos((2.0 * mr_angle));
@@ -31447,12 +38434,14 @@ v.y += (${w} * ny);
   "resonance": {
     params: [{ name: "freq", def: 3 }, { name: "decay", def: 0.5 }],
     verified: true, priority: 0, flags: [], types: ["2D"],
-    funcNames: ["roundc"],
-    funcs: `fn roundc(x: f32) -> f32 { return sign(x) * floor(abs(x) + 0.5); }`,
+    funcNames: ["atan2j","roundc"],
+    funcs: `fn atan2j(y: f32, x: f32) -> f32 { if (x == 0.0 && y == 0.0) { return select(0.0, PI, (bitcast<u32>(x) >> 31u) == 1u) * select(1.0, -1.0, (bitcast<u32>(y) >> 31u) == 1u); } return atan2(y, x); }
+
+fn roundc(x: f32) -> f32 { return sign(x) * floor(abs(x) + 0.5); }`,
     code: (w, p) => `{
 var rs_freq: f32 = max(abs(${p[0]}), 0.01);
 var rs_r: f32 = sqrt(((t.x * t.x) + (t.y * t.y)));
-var rs_theta: f32 = atan2(t.y, t.x);
+var rs_theta: f32 = atan2j(t.y, t.x);
 var rs_ring: f32 = (roundc((rs_r * rs_freq)) / rs_freq);
 var rs_dist: f32 = (rs_r - rs_ring);
 var rs_pull: f32 = (${p[1]} * exp(((((-rs_dist * rs_dist) * rs_freq) * rs_freq) * 4.0)));
@@ -31464,13 +38453,15 @@ v.y += ((${w} * rs_new_r) * sin(rs_theta));
   "ridged": {
     params: [{ name: "freq", def: 2 }, { name: "amp", def: 0.4 }],
     verified: true, priority: 0, flags: [], types: ["2D"],
+    funcNames: ["atan2j"],
+    funcs: `fn atan2j(y: f32, x: f32) -> f32 { if (x == 0.0 && y == 0.0) { return select(0.0, PI, (bitcast<u32>(x) >> 31u) == 1u) * select(1.0, -1.0, (bitcast<u32>(y) >> 31u) == 1u); } return atan2(y, x); }`,
     code: (w, p) => `{
 var rg_x: f32 = (${p[0]} * t.x);
 var rg_y: f32 = (${p[0]} * t.y);
 var rg_v1: f32 = (1.0 - abs(sin((rg_x + (rg_y * 0.3)))));
 var rg_v2: f32 = ((1.0 - abs(sin(((2.1 * rg_x) - (rg_y * 0.7))))) * 0.5);
 var rg_val: f32 = (${p[1]} * (rg_v1 + rg_v2));
-var rg_theta: f32 = atan2(t.y, t.x);
+var rg_theta: f32 = atan2j(t.y, t.x);
 v.x += ((${w} * rg_val) * cos(rg_theta));
 v.y += ((${w} * rg_val) * sin(rg_theta));
 }`,
@@ -31478,6 +38469,8 @@ v.y += ((${w} * rg_val) * sin(rg_theta));
   "marble": {
     params: [{ name: "freq", def: 2 }, { name: "amp", def: 0.3 }],
     verified: true, priority: 0, flags: [], types: ["2D"],
+    funcNames: ["atan2j"],
+    funcs: `fn atan2j(y: f32, x: f32) -> f32 { if (x == 0.0 && y == 0.0) { return select(0.0, PI, (bitcast<u32>(x) >> 31u) == 1u) * select(1.0, -1.0, (bitcast<u32>(y) >> 31u) == 1u); } return atan2(y, x); }`,
     code: (w, p) => `{
 var mb_t: f32 = ((${p[0]} * t.x) + (${p[1]} * (sin((${p[0]} * t.y)) + (0.5 * sin(((2.0 * ${p[0]}) * t.y))))));
 var mb_dx: f32 = (${p[1]} * sin(mb_t));
@@ -31489,6 +38482,8 @@ v.y += (${w} * (t.y + mb_dy));
   "mushroom": {
     params: [{ name: "cap_r", def: 0.5 }, { name: "cap_w", def: 2 }, { name: "stalk_w", def: 0.3 }],
     verified: true, priority: 0, flags: [], types: ["2D"],
+    funcNames: ["atan2j"],
+    funcs: `fn atan2j(y: f32, x: f32) -> f32 { if (x == 0.0 && y == 0.0) { return select(0.0, PI, (bitcast<u32>(x) >> 31u) == 1u) * select(1.0, -1.0, (bitcast<u32>(y) >> 31u) == 1u); } return atan2(y, x); }`,
     code: (w, p) => `{
 var mu_cr: f32 = max(abs(${p[0]}), 0.01);
 var mu_cw: f32 = max(abs(${p[1]}), 0.01);
@@ -31503,6 +38498,8 @@ v.y = (${w} * t.y);
   "pleat": {
     params: [{ name: "width", def: 0.5 }, { name: "depth", def: 0.3 }],
     verified: true, priority: 0, flags: [], types: ["2D"],
+    funcNames: ["atan2j"],
+    funcs: `fn atan2j(y: f32, x: f32) -> f32 { if (x == 0.0 && y == 0.0) { return select(0.0, PI, (bitcast<u32>(x) >> 31u) == 1u) * select(1.0, -1.0, (bitcast<u32>(y) >> 31u) == 1u); } return atan2(y, x); }`,
     code: (w, p) => `{
 var pl_width: f32 = max(abs(${p[0]}), 0.01);
 var pl_cell: f32 = floor((t.x / pl_width));
@@ -31520,9 +38517,11 @@ v.y += (${w} * (t.y + (pl_crease * pl_dir)));
   "quadrupole": {
     params: [{ name: "strength", def: 0.3 }, { name: "smooth", def: 0.1 }],
     verified: true, priority: 0, flags: [], types: ["2D"],
+    funcNames: ["atan2j"],
+    funcs: `fn atan2j(y: f32, x: f32) -> f32 { if (x == 0.0 && y == 0.0) { return select(0.0, PI, (bitcast<u32>(x) >> 31u) == 1u) * select(1.0, -1.0, (bitcast<u32>(y) >> 31u) == 1u); } return atan2(y, x); }`,
     code: (w, p) => `{
 var qp_r2: f32 = (((t.x * t.x) + (t.y * t.y)) + ${p[1]});
-var qp_theta: f32 = atan2(t.y, t.x);
+var qp_theta: f32 = atan2j(t.y, t.x);
 var qp_field_r: f32 = ((${p[0]} * cos((2.0 * qp_theta))) / qp_r2);
 var qp_field_t: f32 = ((${p[0]} * sin((2.0 * qp_theta))) / qp_r2);
 var qp_r: f32 = sqrt((((t.x * t.x) + (t.y * t.y)) + 1.0e-10));
@@ -31535,6 +38534,8 @@ v.y += ((${w} * qp_nr) * sin(qp_nt));
   "roche": {
     params: [{ name: "sep", def: 0.5 }, { name: "mass", def: 0.5 }],
     verified: true, priority: 0, flags: [], types: ["2D"],
+    funcNames: ["atan2j"],
+    funcs: `fn atan2j(y: f32, x: f32) -> f32 { if (x == 0.0 && y == 0.0) { return select(0.0, PI, (bitcast<u32>(x) >> 31u) == 1u) * select(1.0, -1.0, (bitcast<u32>(y) >> 31u) == 1u); } return atan2(y, x); }`,
     code: (w, p) => `{
 var ro_sep: f32 = max(abs(${p[0]}), 0.01);
 var ro_mass: f32 = clamp(${p[1]}, 0.01, 0.99);
@@ -31554,8 +38555,10 @@ v.y += (${w} * (t.y + (ro_px * 0.5)));
   "cyclone": {
     params: [{ name: "strength", def: 0.5 }],
     verified: true, priority: 0, flags: [], types: ["2D"],
+    funcNames: ["atan2j"],
+    funcs: `fn atan2j(y: f32, x: f32) -> f32 { if (x == 0.0 && y == 0.0) { return select(0.0, PI, (bitcast<u32>(x) >> 31u) == 1u) * select(1.0, -1.0, (bitcast<u32>(y) >> 31u) == 1u); } return atan2(y, x); }`,
     code: (w, p) => `{
-var theta: f32 = atan2(t.y, t.x);
+var theta: f32 = atan2j(t.y, t.x);
 var r_: f32 = sqrt(((t.x * t.x) + (t.y * t.y)));
 var new_theta: f32 = (theta + (${p[0]} / (r_ + 0.01)));
 v.x += ((${w} * r_) * cos(new_theta));
@@ -31565,8 +38568,10 @@ v.y += ((${w} * r_) * sin(new_theta));
   "penrose_fold": {
     params: [{ name: "scale", def: 2 }],
     verified: true, priority: 0, flags: [], types: ["2D"],
-    funcNames: ["roundc"],
-    funcs: `fn roundc(x: f32) -> f32 { return sign(x) * floor(abs(x) + 0.5); }`,
+    funcNames: ["roundc","atan2j"],
+    funcs: `fn roundc(x: f32) -> f32 { return sign(x) * floor(abs(x) + 0.5); }
+
+fn atan2j(y: f32, x: f32) -> f32 { if (x == 0.0 && y == 0.0) { return select(0.0, PI, (bitcast<u32>(x) >> 31u) == 1u) * select(1.0, -1.0, (bitcast<u32>(y) >> 31u) == 1u); } return atan2(y, x); }`,
     code: (w, p) => `{
 var pf_phi: f32 = 1.618034;
 var pf_x: f32 = (t.x * ${p[0]});
@@ -31584,6 +38589,8 @@ v.y += (${w} * pf_ny);
   "pickover": {
     params: [{ name: "a", def: 1 }, { name: "b", def: 2 }, { name: "c", def: 0.5 }, { name: "d", def: -0.5 }],
     verified: true, priority: 0, flags: [], types: ["2D"],
+    funcNames: ["atan2j"],
+    funcs: `fn atan2j(y: f32, x: f32) -> f32 { if (x == 0.0 && y == 0.0) { return select(0.0, PI, (bitcast<u32>(x) >> 31u) == 1u) * select(1.0, -1.0, (bitcast<u32>(y) >> 31u) == 1u); } return atan2(y, x); }`,
     code: (w, p) => `{
 var nx: f32 = (sin((${p[0]} * t.y)) + (${p[2]} * cos((${p[0]} * t.x))));
 var ny: f32 = (sin((${p[1]} * t.x)) + (${p[3]} * cos((${p[1]} * t.y))));
@@ -31594,6 +38601,8 @@ v.y += (${w} * ny);
   "stereographic": {
     params: [{ name: "scale", def: 1 }],
     verified: true, priority: 0, flags: [], types: ["2D"],
+    funcNames: ["atan2j"],
+    funcs: `fn atan2j(y: f32, x: f32) -> f32 { if (x == 0.0 && y == 0.0) { return select(0.0, PI, (bitcast<u32>(x) >> 31u) == 1u) * select(1.0, -1.0, (bitcast<u32>(y) >> 31u) == 1u); } return atan2(y, x); }`,
     code: (w, p) => `{
 var st_r2: f32 = ((t.x * t.x) + (t.y * t.y));
 var st_d: f32 = (1.0 + (st_r2 * ${p[0]}));
@@ -31604,7 +38613,7 @@ v.y += (((${w} * 2.0) * t.y) / st_d);
   "voronoi_fold": {
     params: [{ name: "scale", def: 1 }, { name: "fold", def: 0.5 }],
     verified: true, priority: 0, flags: [], types: ["2D"],
-    funcNames: ["df_add","op_","df_qts","df_ts","df_mulf","hsin_","df_mul","df_sin","df_cos"],
+    funcNames: ["df_add","op_","df_qts","df_ts","df_mulf","hsin_","df_mul","df_sin","df_cos","atan2j"],
     funcs: `fn df_add(x: vec2f, y: vec2f) -> vec2f { var s = df_ts(x.x, y.x); let t = df_ts(x.y, y.y); s.y = op_(s.y + t.x); s = df_qts(s.x, s.y); s.y = op_(s.y + t.y); return df_qts(s.x, s.y); }
 
 fn op_(v: f32) -> f32 { return bitcast<f32>(bitcast<u32>(v) + df_zero); }
@@ -31659,7 +38668,9 @@ fn df_cos(x: vec2f) -> vec2f {
   s = df_add(df_mul(s, x2), vec2f(-0.5, 0.0));
   s = df_add(df_mul(s, x2), vec2f(1.0, 0.0));
   return s;
-}`,
+}
+
+fn atan2j(y: f32, x: f32) -> f32 { if (x == 0.0 && y == 0.0) { return select(0.0, PI, (bitcast<u32>(x) >> 31u) == 1u) * select(1.0, -1.0, (bitcast<u32>(y) >> 31u) == 1u); } return atan2(y, x); }`,
     code: (w, p) => `{
 var vf_scale: f32 = max(abs(${p[0]}), 0.01);
 var vf_cx: f32 = floor((t.x / vf_scale));
@@ -31694,6 +38705,8 @@ v.y += (${w} * (nearest_y + ((t.y - nearest_y) * (1.0 - ${p[1]}))));
   "ikeda": {
     params: [{ name: "u", def: 0.9 }],
     verified: true, priority: 0, flags: [], types: ["2D"],
+    funcNames: ["atan2j"],
+    funcs: `fn atan2j(y: f32, x: f32) -> f32 { if (x == 0.0 && y == 0.0) { return select(0.0, PI, (bitcast<u32>(x) >> 31u) == 1u) * select(1.0, -1.0, (bitcast<u32>(y) >> 31u) == 1u); } return atan2(y, x); }`,
     code: (w, p) => `{
 var t_: f32 = (0.4 - (6.0 / ((1.0 + (t.x * t.x)) + (t.y * t.y))));
 var cos_t: f32 = cos(t_);
@@ -31707,25 +38720,47 @@ v.y += (${w} * ny);
   "quintessence": {
     params: [{ name: "scale", def: 1 }, { name: "power", def: 0.5 }],
     verified: true, priority: 0, flags: [], types: ["2D"],
-    funcNames: ["powc"],
+    funcNames: ["powc","atan2j"],
     funcs: `fn powc(x: f32, y: f32) -> f32 {
   if (x >= 0.0) { return pow(x, y); }
   let yi = round(y);
   if (abs(y - yi) > 1e-6) { return pow(x, y); }
   let m = pow(-x, y);
   return select(m, -m, (i32(yi) & 1) != 0);
-}`,
+}
+
+fn atan2j(y: f32, x: f32) -> f32 { if (x == 0.0 && y == 0.0) { return select(0.0, PI, (bitcast<u32>(x) >> 31u) == 1u) * select(1.0, -1.0, (bitcast<u32>(y) >> 31u) == 1u); } return atan2(y, x); }`,
     code: (w, p) => `{
 var qe_r2: f32 = ((t.x * t.x) + (t.y * t.y));
 var qe_r: f32 = powc((qe_r2 + 1.0e-10), (${p[1]} * 0.5));
-var qe_a: f32 = (atan2(t.y, t.x) * 5.0);
+var qe_a: f32 = (atan2j(t.y, t.x) * 5.0);
 v.x += (((${w} * qe_r) * cos(qe_a)) * ${p[0]});
 v.y += (((${w} * qe_r) * sin(qe_a)) * ${p[0]});
+}`,
+  },
+  "ruffle": {
+    params: [{ name: "freq", def: 3 }, { name: "amp", def: 0.3 }],
+    verified: true, priority: 0, flags: ["z"], types: ["2D"],
+    funcNames: ["atan2j"],
+    funcs: `fn atan2j(y: f32, x: f32) -> f32 { if (x == 0.0 && y == 0.0) { return select(0.0, PI, (bitcast<u32>(x) >> 31u) == 1u) * select(1.0, -1.0, (bitcast<u32>(y) >> 31u) == 1u); } return atan2(y, x); }`,
+    code: (w, p) => `{
+var freqa: f32 = max(abs(${p[0]}), 0.01);
+var cell: f32 = floor((t.x * freqa));
+var lx: f32 = ((t.x * freqa) - cell);
+var dir: f32 = select(-1.0, 1.0, ((cell - (2.0 * floor((cell / 2.0)))) > 0.5));
+var wave: f32 = ((${p[1]} * sin((PI * lx))) * dir);
+v.x = (${w} * t.x);
+v.y = (${w} * (t.y + wave));
+if (false) {
+  pz_ += (${w} * z_);
+}
 }`,
   },
   "secant": {
     params: [],
     verified: true, priority: 0, flags: [], types: ["2D"],
+    funcNames: ["atan2j"],
+    funcs: `fn atan2j(y: f32, x: f32) -> f32 { if (x == 0.0 && y == 0.0) { return select(0.0, PI, (bitcast<u32>(x) >> 31u) == 1u) * select(1.0, -1.0, (bitcast<u32>(y) >> 31u) == 1u); } return atan2(y, x); }`,
     code: (w, _p) => `{
 var sec_r: f32 = (${w} * sqrt(((t.x * t.x) + (t.y * t.y))));
 var sec_cr: f32 = cos(sec_r);
@@ -31738,6 +38773,8 @@ if ((abs(sec_cr) > 0.000001)) {
   "standing_wave": {
     params: [{ name: "freq_x", def: 3 }, { name: "freq_y", def: 3 }, { name: "amp", def: 0.3 }],
     verified: true, priority: 0, flags: [], types: ["2D"],
+    funcNames: ["atan2j"],
+    funcs: `fn atan2j(y: f32, x: f32) -> f32 { if (x == 0.0 && y == 0.0) { return select(0.0, PI, (bitcast<u32>(x) >> 31u) == 1u) * select(1.0, -1.0, (bitcast<u32>(y) >> 31u) == 1u); } return atan2(y, x); }`,
     code: (w, p) => `{
 var dx: f32 = ((${p[2]} * sin(((${p[0]} * 3.14159265) * t.x))) * cos(((${p[1]} * 3.14159265) * t.y)));
 var dy: f32 = ((${p[2]} * cos(((${p[0]} * 3.14159265) * t.x))) * sin(((${p[1]} * 3.14159265) * t.y)));
@@ -31748,6 +38785,8 @@ v.y += (${w} * (t.y + dy));
   "doppler": {
     params: [{ name: "dir", def: 0 }, { name: "speed", def: 0.5 }],
     verified: true, priority: 0, flags: [], types: ["2D"],
+    funcNames: ["atan2j"],
+    funcs: `fn atan2j(y: f32, x: f32) -> f32 { if (x == 0.0 && y == 0.0) { return select(0.0, PI, (bitcast<u32>(x) >> 31u) == 1u) * select(1.0, -1.0, (bitcast<u32>(y) >> 31u) == 1u); } return atan2(y, x); }`,
     code: (w, p) => `{
 var dp_spd: f32 = clamp(${p[1]}, -0.99, 0.99);
 var dp_ca: f32 = cos(${p[0]});
@@ -31763,10 +38802,12 @@ v.y += (${w} * ((dp_r * dp_sa) + (dp_perp * dp_ca)));
   "faraday": {
     params: [{ name: "freq", def: 4 }, { name: "modes", def: 4 }, { name: "amp", def: 0.2 }],
     verified: true, priority: 0, flags: [], types: ["2D"],
+    funcNames: ["atan2j"],
+    funcs: `fn atan2j(y: f32, x: f32) -> f32 { if (x == 0.0 && y == 0.0) { return select(0.0, PI, (bitcast<u32>(x) >> 31u) == 1u) * select(1.0, -1.0, (bitcast<u32>(y) >> 31u) == 1u); } return atan2(y, x); }`,
     code: (w, p) => `{
 var fa_modes: f32 = max(abs(f32(i32(${p[1]}))), 1.0);
 var fa_r: f32 = sqrt(((t.x * t.x) + (t.y * t.y)));
-var fa_theta: f32 = atan2(t.y, t.x);
+var fa_theta: f32 = atan2j(t.y, t.x);
 var fa_wave: f32 = ((${p[2]} * cos((${p[0]} * fa_r))) * cos((fa_modes * fa_theta)));
 var fa_new_r: f32 = (fa_r + fa_wave);
 v.x += ((${w} * fa_new_r) * cos(fa_theta));
@@ -31776,8 +38817,10 @@ v.y += ((${w} * fa_new_r) * sin(fa_theta));
   "lattice": {
     params: [{ name: "freq", def: 3 }, { name: "pull", def: 0.5 }, { name: "shear", def: 0 }],
     verified: true, priority: 0, flags: [], types: ["2D"],
-    funcNames: ["roundc"],
-    funcs: `fn roundc(x: f32) -> f32 { return sign(x) * floor(abs(x) + 0.5); }`,
+    funcNames: ["roundc","atan2j"],
+    funcs: `fn roundc(x: f32) -> f32 { return sign(x) * floor(abs(x) + 0.5); }
+
+fn atan2j(y: f32, x: f32) -> f32 { if (x == 0.0 && y == 0.0) { return select(0.0, PI, (bitcast<u32>(x) >> 31u) == 1u) * select(1.0, -1.0, (bitcast<u32>(y) >> 31u) == 1u); } return atan2(y, x); }`,
     code: (w, p) => `{
 var lt_freq: f32 = max(abs(${p[0]}), 0.01);
 var lt_pull: f32 = clamp(${p[1]}, 0.0, 1.0);
@@ -31792,6 +38835,8 @@ v.y += (${w} * ((t.y + (lt_pull * lt_dy)) + (${p[2]} * lt_dx)));
   "simplex_warp": {
     params: [{ name: "freq", def: 2 }, { name: "amp", def: 0.4 }],
     verified: true, priority: 0, flags: [], types: ["2D"],
+    funcNames: ["atan2j"],
+    funcs: `fn atan2j(y: f32, x: f32) -> f32 { if (x == 0.0 && y == 0.0) { return select(0.0, PI, (bitcast<u32>(x) >> 31u) == 1u) * select(1.0, -1.0, (bitcast<u32>(y) >> 31u) == 1u); } return atan2(y, x); }`,
     code: (w, p) => `{
 var sw_x: f32 = (${p[0]} * t.x);
 var sw_y: f32 = (${p[0]} * t.y);
@@ -31804,8 +38849,10 @@ v.y += ((${w} * ${p[1]}) * sw_v2);
   "diamond_lattice": {
     params: [{ name: "scale", def: 2 }, { name: "pull", def: 0.5 }],
     verified: true, priority: 0, flags: [], types: ["2D"],
-    funcNames: ["roundc"],
-    funcs: `fn roundc(x: f32) -> f32 { return sign(x) * floor(abs(x) + 0.5); }`,
+    funcNames: ["roundc","atan2j"],
+    funcs: `fn roundc(x: f32) -> f32 { return sign(x) * floor(abs(x) + 0.5); }
+
+fn atan2j(y: f32, x: f32) -> f32 { if (x == 0.0 && y == 0.0) { return select(0.0, PI, (bitcast<u32>(x) >> 31u) == 1u) * select(1.0, -1.0, (bitcast<u32>(y) >> 31u) == 1u); } return atan2(y, x); }`,
     code: (w, p) => `{
 var dl_ax: f32 = (t.x * ${p[0]});
 var dl_ay: f32 = (t.y * ${p[0]});
@@ -31824,6 +38871,8 @@ v.y += ((${w} * (dl_by + (dl_dv * (1.0 - ${p[1]})))) / ${p[0]});
   "erode": {
     params: [{ name: "strength", def: 0.3 }, { name: "scale", def: 2 }, { name: "rough", def: 0.5 }],
     verified: true, priority: 0, flags: [], types: ["2D"],
+    funcNames: ["atan2j"],
+    funcs: `fn atan2j(y: f32, x: f32) -> f32 { if (x == 0.0 && y == 0.0) { return select(0.0, PI, (bitcast<u32>(x) >> 31u) == 1u) * select(1.0, -1.0, (bitcast<u32>(y) >> 31u) == 1u); } return atan2(y, x); }`,
     code: (w, p) => `{
 var er_rough: f32 = clamp(${p[2]}, 0.0, 1.0);
 var er_dx0: f32 = (${p[0]} * sin(((${p[1]} * t.x) + (0.7 * sin((${p[1]} * t.y))))));
@@ -31837,14 +38886,16 @@ v.y += (${w} * ((t.y + er_dy0) + er_dy1));
   "gothic_arch": {
     params: [{ name: "height", def: 1 }, { name: "sharpness", def: 2 }],
     verified: true, priority: 0, flags: [], types: ["2D"],
-    funcNames: ["powc"],
+    funcNames: ["powc","atan2j"],
     funcs: `fn powc(x: f32, y: f32) -> f32 {
   if (x >= 0.0) { return pow(x, y); }
   let yi = round(y);
   if (abs(y - yi) > 1e-6) { return pow(x, y); }
   let m = pow(-x, y);
   return select(m, -m, (i32(yi) & 1) != 0);
-}`,
+}
+
+fn atan2j(y: f32, x: f32) -> f32 { if (x == 0.0 && y == 0.0) { return select(0.0, PI, (bitcast<u32>(x) >> 31u) == 1u) * select(1.0, -1.0, (bitcast<u32>(y) >> 31u) == 1u); } return atan2(y, x); }`,
     code: (w, p) => `{
 var ga_h: f32 = max(abs(${p[0]}), 0.1);
 var ga_sharp: f32 = max(abs(${p[1]}), 0.1);
@@ -31857,6 +38908,8 @@ v.y += (${w} * t.y);
   "laminar": {
     params: [{ name: "shear", def: 0.5 }, { name: "amp", def: 0.1 }, { name: "freq", def: 2 }],
     verified: true, priority: 0, flags: [], types: ["2D"],
+    funcNames: ["atan2j"],
+    funcs: `fn atan2j(y: f32, x: f32) -> f32 { if (x == 0.0 && y == 0.0) { return select(0.0, PI, (bitcast<u32>(x) >> 31u) == 1u) * select(1.0, -1.0, (bitcast<u32>(y) >> 31u) == 1u); } return atan2(y, x); }`,
     code: (w, p) => `{
 var lm_flow: f32 = (${p[0]} * (1.0 - (t.y * t.y)));
 v.x += (${w} * (lm_flow + (${p[1]} * sin((${p[2]} * t.y)))));
@@ -31866,9 +38919,11 @@ v.y += (${w} * t.y);
   "screw": {
     params: [{ name: "pitch", def: 2 }],
     verified: true, priority: 0, flags: [], types: ["2D"],
+    funcNames: ["atan2j"],
+    funcs: `fn atan2j(y: f32, x: f32) -> f32 { if (x == 0.0 && y == 0.0) { return select(0.0, PI, (bitcast<u32>(x) >> 31u) == 1u) * select(1.0, -1.0, (bitcast<u32>(y) >> 31u) == 1u); } return atan2(y, x); }`,
     code: (w, p) => `{
 var sc_r: f32 = sqrt(((t.x * t.x) + (t.y * t.y)));
-var sc_theta: f32 = atan2(t.y, t.x);
+var sc_theta: f32 = atan2j(t.y, t.x);
 var sc_nt: f32 = (sc_theta + (sc_r * ${p[0]}));
 v.x += ((${w} * sc_r) * cos(sc_nt));
 v.y += ((${w} * sc_r) * sin(sc_nt));
@@ -31877,6 +38932,8 @@ v.y += ((${w} * sc_r) * sin(sc_nt));
   "gradient_warp": {
     params: [{ name: "freq", def: 2 }, { name: "amp", def: 0.5 }, { name: "seed", def: 0 }],
     verified: true, priority: 0, flags: [], types: ["2D"],
+    funcNames: ["atan2j"],
+    funcs: `fn atan2j(y: f32, x: f32) -> f32 { if (x == 0.0 && y == 0.0) { return select(0.0, PI, (bitcast<u32>(x) >> 31u) == 1u) * select(1.0, -1.0, (bitcast<u32>(y) >> 31u) == 1u); } return atan2(y, x); }`,
     code: (w, p) => `{
 var gw_px: f32 = ((${p[0]} * t.x) + ${p[2]});
 var gw_py: f32 = ((${p[0]} * t.y) + (${p[2]} * 1.3));
@@ -31889,8 +38946,10 @@ v.y += (${w} * gw_dy);
   "quilt": {
     params: [{ name: "scale", def: 3 }, { name: "puff", def: 0.3 }],
     verified: true, priority: 0, flags: [], types: ["2D"],
-    funcNames: ["roundc"],
-    funcs: `fn roundc(x: f32) -> f32 { return sign(x) * floor(abs(x) + 0.5); }`,
+    funcNames: ["roundc","atan2j"],
+    funcs: `fn roundc(x: f32) -> f32 { return sign(x) * floor(abs(x) + 0.5); }
+
+fn atan2j(y: f32, x: f32) -> f32 { if (x == 0.0 && y == 0.0) { return select(0.0, PI, (bitcast<u32>(x) >> 31u) == 1u) * select(1.0, -1.0, (bitcast<u32>(y) >> 31u) == 1u); } return atan2(y, x); }`,
     code: (w, p) => `{
 var qt_cx: f32 = (t.x * ${p[0]});
 var qt_cy: f32 = (t.y * ${p[0]});
@@ -31907,14 +38966,16 @@ v.y += ((${w} * (qt_row + (qt_ly * (1.0 - qt_bulge)))) / ${p[0]});
   "rainbow_arc": {
     params: [{ name: "radius", def: 0.5 }, { name: "width", def: 0.2 }, { name: "arc", def: 3.14159 }],
     verified: true, priority: 0, flags: [], types: ["2D"],
-    funcNames: ["roundc"],
-    funcs: `fn roundc(x: f32) -> f32 { return sign(x) * floor(abs(x) + 0.5); }`,
+    funcNames: ["atan2j","roundc"],
+    funcs: `fn atan2j(y: f32, x: f32) -> f32 { if (x == 0.0 && y == 0.0) { return select(0.0, PI, (bitcast<u32>(x) >> 31u) == 1u) * select(1.0, -1.0, (bitcast<u32>(y) >> 31u) == 1u); } return atan2(y, x); }
+
+fn roundc(x: f32) -> f32 { return sign(x) * floor(abs(x) + 0.5); }`,
     code: (w, p) => `{
 var ra_radius: f32 = max(abs(${p[0]}), 0.01);
 var ra_width: f32 = max(abs(${p[1]}), 0.001);
 var ra_arc: f32 = max(abs(${p[2]}), 0.01);
 var ra_r: f32 = sqrt(((t.x * t.x) + (t.y * t.y)));
-var ra_theta: f32 = atan2(t.y, t.x);
+var ra_theta: f32 = atan2j(t.y, t.x);
 var ra_band_r: f32 = ((roundc(((ra_r - ra_radius) / ra_width)) * ra_width) + ra_radius);
 var ra_new_r: f32 = mix(ra_r, max(ra_band_r, 0.0001), 0.6);
 var ra_new_theta: f32 = clamp(ra_theta, -ra_arc, ra_arc);
@@ -31925,6 +38986,8 @@ v.y += ((${w} * ra_new_r) * sin(ra_new_theta));
   "schwarz_christoffel": {
     params: [{ name: "scale", def: 1 }],
     verified: true, priority: 0, flags: [], types: ["2D"],
+    funcNames: ["atan2j"],
+    funcs: `fn atan2j(y: f32, x: f32) -> f32 { if (x == 0.0 && y == 0.0) { return select(0.0, PI, (bitcast<u32>(x) >> 31u) == 1u) * select(1.0, -1.0, (bitcast<u32>(y) >> 31u) == 1u); } return atan2(y, x); }`,
     code: (w, p) => `{
 var sc_s: f32 = max(abs(${p[0]}), 0.01);
 var sc_ex: f32 = exp(((3.14159265 * t.x) / sc_s));
@@ -31935,6 +38998,8 @@ v.y += ((${w} * sc_ex) * sin(((3.14159265 * t.y) / sc_s)));
   "sinusoidal_proj": {
     params: [{ name: "scale", def: 1 }],
     verified: true, priority: 0, flags: [], types: ["2D"],
+    funcNames: ["atan2j"],
+    funcs: `fn atan2j(y: f32, x: f32) -> f32 { if (x == 0.0 && y == 0.0) { return select(0.0, PI, (bitcast<u32>(x) >> 31u) == 1u) * select(1.0, -1.0, (bitcast<u32>(y) >> 31u) == 1u); } return atan2(y, x); }`,
     code: (w, p) => `{
 var sip_lat: f32 = (t.y * ${p[0]});
 v.x += ((${w} * t.x) * cos(sip_lat));
@@ -31944,6 +39009,8 @@ v.y += (${w} * t.y);
   "dipole": {
     params: [{ name: "separation", def: 0.5 }, { name: "strength", def: 0.2 }],
     verified: true, priority: 0, flags: [], types: ["2D"],
+    funcNames: ["atan2j"],
+    funcs: `fn atan2j(y: f32, x: f32) -> f32 { if (x == 0.0 && y == 0.0) { return select(0.0, PI, (bitcast<u32>(x) >> 31u) == 1u) * select(1.0, -1.0, (bitcast<u32>(y) >> 31u) == 1u); } return atan2(y, x); }`,
     code: (w, p) => `{
 var dx1: f32 = (t.x + ${p[0]});
 var dx2: f32 = (t.x - ${p[0]});
@@ -31962,8 +39029,10 @@ v.y += (${w} * (t.y + (${p[1]} * ey)));
   "honeycomb": {
     params: [{ name: "scale", def: 1 }, { name: "pull", def: 0.7 }],
     verified: true, priority: 0, flags: [], types: ["2D"],
-    funcNames: ["roundc"],
-    funcs: `fn roundc(x: f32) -> f32 { return sign(x) * floor(abs(x) + 0.5); }`,
+    funcNames: ["roundc","atan2j"],
+    funcs: `fn roundc(x: f32) -> f32 { return sign(x) * floor(abs(x) + 0.5); }
+
+fn atan2j(y: f32, x: f32) -> f32 { if (x == 0.0 && y == 0.0) { return select(0.0, PI, (bitcast<u32>(x) >> 31u) == 1u) * select(1.0, -1.0, (bitcast<u32>(y) >> 31u) == 1u); } return atan2(y, x); }`,
     code: (w, p) => `{
 var hc_s: f32 = max(abs(${p[0]}), 0.01);
 var hc_p: f32 = clamp(${p[1]}, 0.0, 1.0);
@@ -31989,6 +39058,8 @@ v.y += (${w} * (hc_cy + ((t.y - hc_cy) * hc_p)));
   "mercator_cylinder": {
     params: [{ name: "scale", def: 1 }],
     verified: true, priority: 0, flags: [], types: ["2D"],
+    funcNames: ["atan2j"],
+    funcs: `fn atan2j(y: f32, x: f32) -> f32 { if (x == 0.0 && y == 0.0) { return select(0.0, PI, (bitcast<u32>(x) >> 31u) == 1u) * select(1.0, -1.0, (bitcast<u32>(y) >> 31u) == 1u); } return atan2(y, x); }`,
     code: (w, p) => `{
 var mc_ty: f32 = clamp((t.y * ${p[0]}), -1.5, 1.5);
 var mc_y: f32 = log((tan((0.78539816 + (mc_ty * 0.5))) + 0.001));
@@ -31999,6 +39070,8 @@ v.y += ((${w} * mc_y) / ${p[0]});
   "quasicrystal": {
     params: [{ name: "freq", def: 3 }, { name: "amp", def: 0.3 }],
     verified: true, priority: 0, flags: [], types: ["2D"],
+    funcNames: ["atan2j"],
+    funcs: `fn atan2j(y: f32, x: f32) -> f32 { if (x == 0.0 && y == 0.0) { return select(0.0, PI, (bitcast<u32>(x) >> 31u) == 1u) * select(1.0, -1.0, (bitcast<u32>(y) >> 31u) == 1u); } return atan2(y, x); }`,
     code: (w, p) => `{
 var qc_sum_x: f32 = 0.0;
 var qc_sum_y: f32 = 0.0;
@@ -32017,6 +39090,8 @@ v.y += (${w} * (t.y + ((${p[1]} * qc_sum_y) * 0.2)));
   "sublimation": {
     params: [{ name: "lift", def: 0.3 }, { name: "spread", def: 1 }, { name: "freq", def: 3 }, { name: "amp", def: 0.1 }],
     verified: true, priority: 0, flags: [], types: ["2D"],
+    funcNames: ["atan2j"],
+    funcs: `fn atan2j(y: f32, x: f32) -> f32 { if (x == 0.0 && y == 0.0) { return select(0.0, PI, (bitcast<u32>(x) >> 31u) == 1u) * select(1.0, -1.0, (bitcast<u32>(y) >> 31u) == 1u); } return atan2(y, x); }`,
     code: (w, p) => `{
 var sub_rise: f32 = (exp((-(abs(t.x)) * ${p[1]})) * ${p[0]});
 var sub_turb: f32 = (${p[3]} * sin((${p[2]} * t.y)));
@@ -32027,8 +39102,10 @@ v.y += (${w} * (t.y + sub_rise));
   "dragon_scale": {
     params: [{ name: "freq", def: 3 }, { name: "relief", def: 0.4 }],
     verified: true, priority: 0, flags: [], types: ["2D"],
-    funcNames: ["roundc"],
-    funcs: `fn roundc(x: f32) -> f32 { return sign(x) * floor(abs(x) + 0.5); }`,
+    funcNames: ["roundc","atan2j"],
+    funcs: `fn roundc(x: f32) -> f32 { return sign(x) * floor(abs(x) + 0.5); }
+
+fn atan2j(y: f32, x: f32) -> f32 { if (x == 0.0 && y == 0.0) { return select(0.0, PI, (bitcast<u32>(x) >> 31u) == 1u) * select(1.0, -1.0, (bitcast<u32>(y) >> 31u) == 1u); } return atan2(y, x); }`,
     code: (w, p) => `{
 var ds_freq: f32 = max(abs(${p[0]}), 0.01);
 var ds_cx: f32 = (roundc((t.x * ds_freq)) / ds_freq);
@@ -32045,6 +39122,8 @@ v.y += (${w} * (t.y + (ds_bump * ds_dy)));
   "fractal_zoom": {
     params: [{ name: "zoom", def: 2 }, { name: "angle", def: 0.5 }, { name: "iters", def: 3 }],
     verified: true, priority: 0, flags: [], types: ["2D"],
+    funcNames: ["atan2j"],
+    funcs: `fn atan2j(y: f32, x: f32) -> f32 { if (x == 0.0 && y == 0.0) { return select(0.0, PI, (bitcast<u32>(x) >> 31u) == 1u) * select(1.0, -1.0, (bitcast<u32>(y) >> 31u) == 1u); } return atan2(y, x); }`,
     code: (w, p) => `{
 var fz_x: f32 = t.x;
 var fz_y: f32 = t.y;
@@ -32063,9 +39142,11 @@ v.y += (${w} * fz_y);
   "gnomonic_proj": {
     params: [{ name: "scale", def: 1 }],
     verified: true, priority: 0, flags: [], types: ["2D"],
+    funcNames: ["atan2j"],
+    funcs: `fn atan2j(y: f32, x: f32) -> f32 { if (x == 0.0 && y == 0.0) { return select(0.0, PI, (bitcast<u32>(x) >> 31u) == 1u) * select(1.0, -1.0, (bitcast<u32>(y) >> 31u) == 1u); } return atan2(y, x); }`,
     code: (w, p) => `{
 var gp_r: f32 = sqrt(((t.x * t.x) + (t.y * t.y)));
-var gp_theta: f32 = atan2(t.y, t.x);
+var gp_theta: f32 = atan2j(t.y, t.x);
 var gp_nr: f32 = select(gp_r, (tan((gp_r * ${p[0]})) / ${p[0]}), (gp_r > 0.001));
 v.x += ((${w} * gp_nr) * cos(gp_theta));
 v.y += ((${w} * gp_nr) * sin(gp_theta));
@@ -32074,6 +39155,8 @@ v.y += ((${w} * gp_nr) * sin(gp_theta));
   "fault": {
     params: [{ name: "angle", def: 30 }, { name: "displacement", def: 0.5 }],
     verified: true, priority: 0, flags: [], types: ["2D"],
+    funcNames: ["atan2j"],
+    funcs: `fn atan2j(y: f32, x: f32) -> f32 { if (x == 0.0 && y == 0.0) { return select(0.0, PI, (bitcast<u32>(x) >> 31u) == 1u) * select(1.0, -1.0, (bitcast<u32>(y) >> 31u) == 1u); } return atan2(y, x); }`,
     code: (w, p) => `{
 var ft_angle: f32 = ((${p[0]} * 3.14159265) / 180.0);
 var ft_nx: f32 = cos((ft_angle + 1.57079632));
@@ -32094,6 +39177,8 @@ v.y += (${w} * (t.y + ((side * ${p[1]}) * ft_sin)));
   "inflate": {
     params: [{ name: "strength", def: 0.5 }],
     verified: true, priority: 0, flags: [], types: ["2D"],
+    funcNames: ["atan2j"],
+    funcs: `fn atan2j(y: f32, x: f32) -> f32 { if (x == 0.0 && y == 0.0) { return select(0.0, PI, (bitcast<u32>(x) >> 31u) == 1u) * select(1.0, -1.0, (bitcast<u32>(y) >> 31u) == 1u); } return atan2(y, x); }`,
     code: (w, p) => `{
 var il_r: f32 = sqrt(((t.x * t.x) + (t.y * t.y)));
 var il_nr: f32 = (il_r + (${p[0]} * exp(-il_r)));
@@ -32105,6 +39190,8 @@ v.y += ((${w} * t.y) * il_scale);
   "pdj_v2": {
     params: [{ name: "a", def: -0.7 }, { name: "b", def: 1 }, { name: "c", def: 0 }, { name: "d", def: 2 }, { name: "e", def: 0 }, { name: "f", def: 0 }],
     verified: true, priority: 0, flags: [], types: ["2D"],
+    funcNames: ["atan2j"],
+    funcs: `fn atan2j(y: f32, x: f32) -> f32 { if (x == 0.0 && y == 0.0) { return select(0.0, PI, (bitcast<u32>(x) >> 31u) == 1u) * select(1.0, -1.0, (bitcast<u32>(y) >> 31u) == 1u); } return atan2(y, x); }`,
     code: (w, p) => `{
 v.x += (${w} * (sin(((${p[0]} * t.y) + ${p[4]})) - cos(((${p[1]} * t.x) + ${p[4]}))));
 v.y += (${w} * (sin(((${p[2]} * t.x) + ${p[5]})) - cos(((${p[3]} * t.y) + ${p[5]}))));
@@ -32113,9 +39200,11 @@ v.y += (${w} * (sin(((${p[2]} * t.x) + ${p[5]})) - cos(((${p[3]} * t.y) + ${p[5]
   "tidal_lock": {
     params: [{ name: "ratio", def: 1 }, { name: "ecc", def: 0.3 }],
     verified: true, priority: 0, flags: [], types: ["2D"],
+    funcNames: ["atan2j"],
+    funcs: `fn atan2j(y: f32, x: f32) -> f32 { if (x == 0.0 && y == 0.0) { return select(0.0, PI, (bitcast<u32>(x) >> 31u) == 1u) * select(1.0, -1.0, (bitcast<u32>(y) >> 31u) == 1u); } return atan2(y, x); }`,
     code: (w, p) => `{
 var tl_r: f32 = sqrt(((t.x * t.x) + (t.y * t.y)));
-var tl_a: f32 = atan2(t.y, t.x);
+var tl_a: f32 = atan2j(t.y, t.x);
 var tl_new_a: f32 = ((tl_a * ${p[0]}) + (${p[1]} * sin((2.0 * tl_a))));
 v.x += ((${w} * tl_r) * cos(tl_new_a));
 v.y += ((${w} * tl_r) * sin(tl_new_a));
@@ -32124,6 +39213,8 @@ v.y += ((${w} * tl_r) * sin(tl_new_a));
   "tinkerbell": {
     params: [{ name: "a", def: -0.3 }, { name: "b", def: -0.6013 }, { name: "c", def: 2 }, { name: "d", def: 0.5 }],
     verified: true, priority: 0, flags: [], types: ["2D"],
+    funcNames: ["atan2j"],
+    funcs: `fn atan2j(y: f32, x: f32) -> f32 { if (x == 0.0 && y == 0.0) { return select(0.0, PI, (bitcast<u32>(x) >> 31u) == 1u) * select(1.0, -1.0, (bitcast<u32>(y) >> 31u) == 1u); } return atan2(y, x); }`,
     code: (w, p) => `{
 var nx: f32 = ((((t.x * t.x) - (t.y * t.y)) + (${p[0]} * t.x)) + (${p[1]} * t.y));
 var ny: f32 = ((((2.0 * t.x) * t.y) + (${p[2]} * t.x)) + (${p[3]} * t.y));
@@ -32134,6 +39225,8 @@ v.y += (${w} * ny);
   "fbm_warp": {
     params: [{ name: "freq", def: 1 }, { name: "amp", def: 0.5 }],
     verified: true, priority: 0, flags: [], types: ["2D"],
+    funcNames: ["atan2j"],
+    funcs: `fn atan2j(y: f32, x: f32) -> f32 { if (x == 0.0 && y == 0.0) { return select(0.0, PI, (bitcast<u32>(x) >> 31u) == 1u) * select(1.0, -1.0, (bitcast<u32>(y) >> 31u) == 1u); } return atan2(y, x); }`,
     code: (w, p) => `{
 var x: f32 = (t.x * ${p[0]});
 var y: f32 = (t.y * ${p[0]});
@@ -32146,10 +39239,12 @@ v.y += (${w} * (t.y + dy));
   "moebius_strip": {
     params: [{ name: "radius", def: 0.5 }],
     verified: true, priority: 0, flags: [], types: ["2D"],
+    funcNames: ["atan2j"],
+    funcs: `fn atan2j(y: f32, x: f32) -> f32 { if (x == 0.0 && y == 0.0) { return select(0.0, PI, (bitcast<u32>(x) >> 31u) == 1u) * select(1.0, -1.0, (bitcast<u32>(y) >> 31u) == 1u); } return atan2(y, x); }`,
     code: (w, p) => `{
 var ms_rad: f32 = max(abs(${p[0]}), 0.01);
 var ms_r: f32 = sqrt(((t.x * t.x) + (t.y * t.y)));
-var ms_theta: f32 = atan2(t.y, t.x);
+var ms_theta: f32 = atan2j(t.y, t.x);
 var ms_h: f32 = (ms_r - ms_rad);
 var ms_twist: f32 = (ms_theta * 0.5);
 var ms_new_h: f32 = (ms_h * cos(ms_twist));
@@ -32161,10 +39256,12 @@ v.y += ((${w} * ms_new_r) * sin(ms_theta));
   "supernova": {
     params: [{ name: "radius", def: 0.5 }, { name: "boost", def: 2 }, { name: "spin", def: 0.3 }],
     verified: true, priority: 0, flags: [], types: ["2D"],
+    funcNames: ["atan2j"],
+    funcs: `fn atan2j(y: f32, x: f32) -> f32 { if (x == 0.0 && y == 0.0) { return select(0.0, PI, (bitcast<u32>(x) >> 31u) == 1u) * select(1.0, -1.0, (bitcast<u32>(y) >> 31u) == 1u); } return atan2(y, x); }`,
     code: (w, p) => `{
 var sn_radius: f32 = max(abs(${p[0]}), 0.01);
 var sn_r: f32 = sqrt(((t.x * t.x) + (t.y * t.y)));
-var sn_theta: f32 = atan2(t.y, t.x);
+var sn_theta: f32 = atan2j(t.y, t.x);
 var sn_ring: f32 = (sn_r - sn_radius);
 var sn_env: f32 = exp(((-sn_ring * sn_ring) / (((sn_radius * sn_radius) * 0.1) + 0.000001)));
 var sn_new_r: f32 = (sn_r + ((sn_env * ${p[1]}) * sn_r));
@@ -32176,6 +39273,8 @@ v.y += ((${w} * sn_new_r) * sin(sn_new_theta));
   "turbulence": {
     params: [{ name: "freq", def: 2 }, { name: "amp", def: 0.3 }],
     verified: true, priority: 0, flags: [], types: ["2D"],
+    funcNames: ["atan2j"],
+    funcs: `fn atan2j(y: f32, x: f32) -> f32 { if (x == 0.0 && y == 0.0) { return select(0.0, PI, (bitcast<u32>(x) >> 31u) == 1u) * select(1.0, -1.0, (bitcast<u32>(y) >> 31u) == 1u); } return atan2(y, x); }`,
     code: (w, p) => `{
 var tb_f: f32 = ${p[0]};
 var tb_a: f32 = ${p[1]};
@@ -32188,6 +39287,8 @@ v.y += (${w} * (t.y + dy));
   "hammer": {
     params: [{ name: "scale", def: 1 }],
     verified: true, priority: 0, flags: [], types: ["2D"],
+    funcNames: ["atan2j"],
+    funcs: `fn atan2j(y: f32, x: f32) -> f32 { if (x == 0.0 && y == 0.0) { return select(0.0, PI, (bitcast<u32>(x) >> 31u) == 1u) * select(1.0, -1.0, (bitcast<u32>(y) >> 31u) == 1u); } return atan2(y, x); }`,
     code: (w, p) => `{
 var hm_lat: f32 = (t.y * ${p[0]});
 var hm_lon: f32 = (t.x * ${p[0]});
@@ -32200,6 +39301,8 @@ v.y += (((${w} * 1.41421356) * sin(hm_lat)) / hm_d);
   "phyllotaxis": {
     params: [{ name: "spread", def: 0.1 }, { name: "angle_step", def: 137.508 }],
     verified: true, priority: 0, flags: [], types: ["2D"],
+    funcNames: ["atan2j"],
+    funcs: `fn atan2j(y: f32, x: f32) -> f32 { if (x == 0.0 && y == 0.0) { return select(0.0, PI, (bitcast<u32>(x) >> 31u) == 1u) * select(1.0, -1.0, (bitcast<u32>(y) >> 31u) == 1u); } return atan2(y, x); }`,
     code: (w, p) => `{
 var ph_spread: f32 = max(abs(${p[0]}), 0.0001);
 var ph_step: f32 = ((${p[1]} * 3.14159265) / 180.0);
@@ -32214,6 +39317,8 @@ v.y += ((${w} * new_r) * sin(theta));
   "stereographic_plane": {
     params: [{ name: "scale", def: 1 }],
     verified: true, priority: 0, flags: [], types: ["2D"],
+    funcNames: ["atan2j"],
+    funcs: `fn atan2j(y: f32, x: f32) -> f32 { if (x == 0.0 && y == 0.0) { return select(0.0, PI, (bitcast<u32>(x) >> 31u) == 1u) * select(1.0, -1.0, (bitcast<u32>(y) >> 31u) == 1u); } return atan2(y, x); }`,
     code: (w, p) => `{
 var spp_lat: f32 = (t.y * ${p[0]});
 var spp_lon: f32 = (t.x * ${p[0]});
@@ -32226,6 +39331,8 @@ v.y += (((${w} * spp_cos_lat) * sin(spp_lon)) / spp_denom);
   "zigzag": {
     params: [{ name: "period", def: 0.5 }],
     verified: true, priority: 0, flags: [], types: ["2D"],
+    funcNames: ["atan2j"],
+    funcs: `fn atan2j(y: f32, x: f32) -> f32 { if (x == 0.0 && y == 0.0) { return select(0.0, PI, (bitcast<u32>(x) >> 31u) == 1u) * select(1.0, -1.0, (bitcast<u32>(y) >> 31u) == 1u); } return atan2(y, x); }`,
     code: (w, p) => `{
 var zz_period: f32 = max(abs(${p[0]}), 0.01);
 var zz_row: f32 = floor((t.y / zz_period));
@@ -32241,6 +39348,8 @@ v.y += (${w} * t.y);
   "tweed": {
     params: [{ name: "freq", def: 3 }, { name: "amp", def: 0.2 }],
     verified: true, priority: 0, flags: [], types: ["2D"],
+    funcNames: ["atan2j"],
+    funcs: `fn atan2j(y: f32, x: f32) -> f32 { if (x == 0.0 && y == 0.0) { return select(0.0, PI, (bitcast<u32>(x) >> 31u) == 1u) * select(1.0, -1.0, (bitcast<u32>(y) >> 31u) == 1u); } return atan2(y, x); }`,
     code: (w, p) => `{
 var tw_d1: f32 = (((t.x + t.y) * ${p[0]}) - floor(((t.x + t.y) * ${p[0]})));
 var tw_d2: f32 = (((t.x - t.y) * ${p[0]}) - floor(((t.x - t.y) * ${p[0]})));
@@ -32255,11 +39364,13 @@ v.y += (${w} * (t.y - ((${p[1]} * tw_c) * sign_tw_p)));
   "vine": {
     params: [{ name: "density", def: 1 }, { name: "scale", def: 0.5 }],
     verified: true, priority: 0, flags: [], types: ["2D"],
+    funcNames: ["atan2j"],
+    funcs: `fn atan2j(y: f32, x: f32) -> f32 { if (x == 0.0 && y == 0.0) { return select(0.0, PI, (bitcast<u32>(x) >> 31u) == 1u) * select(1.0, -1.0, (bitcast<u32>(y) >> 31u) == 1u); } return atan2(y, x); }`,
     code: (w, p) => `{
 var vn_density: f32 = max(abs(${p[0]}), 0.01);
 var vn_scale: f32 = max(abs(${p[1]}), 0.01);
 var vn_r: f32 = sqrt(((t.x * t.x) + (t.y * t.y)));
-var vn_theta: f32 = atan2(t.y, t.x);
+var vn_theta: f32 = atan2j(t.y, t.x);
 var vn_n: f32 = (vn_r * vn_density);
 var vn_spiral: f32 = (vn_theta + (vn_n * 2.39996323));
 var vn_new_r: f32 = (sqrt(vn_n) * vn_scale);
@@ -32270,9 +39381,11 @@ v.y += ((${w} * vn_new_r) * sin(vn_spiral));
   "waves3d_decay": {
     params: [{ name: "freq", def: 3 }, { name: "decay", def: 0.5 }],
     verified: true, priority: 0, flags: [], types: ["2D"],
+    funcNames: ["atan2j"],
+    funcs: `fn atan2j(y: f32, x: f32) -> f32 { if (x == 0.0 && y == 0.0) { return select(0.0, PI, (bitcast<u32>(x) >> 31u) == 1u) * select(1.0, -1.0, (bitcast<u32>(y) >> 31u) == 1u); } return atan2(y, x); }`,
     code: (w, p) => `{
 var wd_r: f32 = sqrt(((t.x * t.x) + (t.y * t.y)));
-var wd_theta: f32 = atan2(t.y, t.x);
+var wd_theta: f32 = atan2j(t.y, t.x);
 var wd_nr: f32 = (wd_r + (sin((wd_r * ${p[0]})) * exp((-wd_r * ${p[1]}))));
 v.x += ((${w} * wd_nr) * cos(wd_theta));
 v.y += ((${w} * wd_nr) * sin(wd_theta));
@@ -32281,6 +39394,8 @@ v.y += ((${w} * wd_nr) * sin(wd_theta));
   "weave": {
     params: [{ name: "scale", def: 0.5 }, { name: "warp", def: 0.3 }],
     verified: true, priority: 0, flags: [], types: ["2D"],
+    funcNames: ["atan2j"],
+    funcs: `fn atan2j(y: f32, x: f32) -> f32 { if (x == 0.0 && y == 0.0) { return select(0.0, PI, (bitcast<u32>(x) >> 31u) == 1u) * select(1.0, -1.0, (bitcast<u32>(y) >> 31u) == 1u); } return atan2(y, x); }`,
     code: (w, p) => `{
 var wv_scale: f32 = max(abs(${p[0]}), 0.01);
 var wv_col: f32 = floor((t.x / wv_scale));
@@ -32301,6 +39416,8 @@ v.y += (${w} * (t.y + (wv_dy * wv_scale)));
   "toroidal": {
     params: [{ name: "major", def: 2 }, { name: "minor", def: 0.5 }],
     verified: true, priority: 0, flags: [], types: ["2D"],
+    funcNames: ["atan2j"],
+    funcs: `fn atan2j(y: f32, x: f32) -> f32 { if (x == 0.0 && y == 0.0) { return select(0.0, PI, (bitcast<u32>(x) >> 31u) == 1u) * select(1.0, -1.0, (bitcast<u32>(y) >> 31u) == 1u); } return atan2(y, x); }`,
     code: (w, p) => `{
 var tor_x: f32 = ((${p[0]} + (${p[1]} * cos(t.y))) * cos(t.x));
 var tor_y: f32 = ((${p[0]} + (${p[1]} * cos(t.y))) * sin(t.x));
@@ -32311,6 +39428,8 @@ v.y += (${w} * tor_y);
   "tunneling": {
     params: [{ name: "barrier", def: 0.5 }, { name: "decay", def: 3 }],
     verified: true, priority: 0, flags: [], types: ["2D"],
+    funcNames: ["atan2j"],
+    funcs: `fn atan2j(y: f32, x: f32) -> f32 { if (x == 0.0 && y == 0.0) { return select(0.0, PI, (bitcast<u32>(x) >> 31u) == 1u) * select(1.0, -1.0, (bitcast<u32>(y) >> 31u) == 1u); } return atan2(y, x); }`,
     code: (w, p) => `{
 var qt_x: f32 = (t.x - ${p[0]});
 var qt_prob: f32 = select(1.0, exp((-(${p[1]}) * qt_x)), (qt_x > 0.0));
@@ -32321,9 +39440,11 @@ v.y += ((${w} * t.y) * qt_prob);
   "wave_func": {
     params: [{ name: "freq", def: 3 }, { name: "phase", def: 1 }, { name: "decay", def: 0.5 }],
     verified: true, priority: 0, flags: [], types: ["2D"],
+    funcNames: ["atan2j"],
+    funcs: `fn atan2j(y: f32, x: f32) -> f32 { if (x == 0.0 && y == 0.0) { return select(0.0, PI, (bitcast<u32>(x) >> 31u) == 1u) * select(1.0, -1.0, (bitcast<u32>(y) >> 31u) == 1u); } return atan2(y, x); }`,
     code: (w, p) => `{
 var wf_r: f32 = sqrt(((t.x * t.x) + (t.y * t.y)));
-var wf_a: f32 = atan2(t.y, t.x);
+var wf_a: f32 = atan2j(t.y, t.x);
 var wf_psi: f32 = ((cos((${p[0]} * wf_r)) * exp((-(${p[2]}) * wf_r))) * cos((${p[1]} * wf_a)));
 var wf_nr: f32 = (wf_r + wf_psi);
 v.x += ((${w} * wf_nr) * cos(wf_a));
@@ -32333,6 +39454,8 @@ v.y += ((${w} * wf_nr) * sin(wf_a));
   "waves_phase": {
     params: [{ name: "scale_x", def: 0.25 }, { name: "scale_y", def: 0.25 }, { name: "freq_x", def: 2 }, { name: "freq_y", def: 2 }, { name: "phase_x", def: 0 }, { name: "phase_y", def: 0 }],
     verified: true, priority: 0, flags: [], types: ["2D"],
+    funcNames: ["atan2j"],
+    funcs: `fn atan2j(y: f32, x: f32) -> f32 { if (x == 0.0 && y == 0.0) { return select(0.0, PI, (bitcast<u32>(x) >> 31u) == 1u) * select(1.0, -1.0, (bitcast<u32>(y) >> 31u) == 1u); } return atan2(y, x); }`,
     code: (w, p) => `{
 var safe_sx2: f32 = (${p[0]} * ${p[0]});
 if ((abs(${p[0]}) < 0.0001)) {
@@ -32351,6 +39474,8 @@ v.y += (${w} * (t.y + (${p[1]} * sin((((t.x * ${p[3]}) / safe_sy2) + ${p[5]}))))
   "taper": {
     params: [{ name: "strength", def: 0.5 }],
     verified: true, priority: 0, flags: [], types: ["2D"],
+    funcNames: ["atan2j"],
+    funcs: `fn atan2j(y: f32, x: f32) -> f32 { if (x == 0.0 && y == 0.0) { return select(0.0, PI, (bitcast<u32>(x) >> 31u) == 1u) * select(1.0, -1.0, (bitcast<u32>(y) >> 31u) == 1u); } return atan2(y, x); }`,
     code: (w, p) => `{
 var tp_scale: f32 = max((1.0 - (${p[0]} * abs(t.y))), 0.01);
 v.x += ((${w} * t.x) * tp_scale);
@@ -32360,8 +39485,10 @@ v.y += (${w} * t.y);
   "torus_knot": {
     params: [{ name: "p", def: 2 }, { name: "q", def: 3 }, { name: "r_big", def: 1 }, { name: "r_small", def: 0.3 }],
     verified: true, priority: 0, flags: [], types: ["2D"],
+    funcNames: ["atan2j"],
+    funcs: `fn atan2j(y: f32, x: f32) -> f32 { if (x == 0.0 && y == 0.0) { return select(0.0, PI, (bitcast<u32>(x) >> 31u) == 1u) * select(1.0, -1.0, (bitcast<u32>(y) >> 31u) == 1u); } return atan2(y, x); }`,
     code: (w, p) => `{
-var t_: f32 = atan2(t.y, t.x);
+var t_: f32 = atan2j(t.y, t.x);
 var outer: f32 = (${p[2]} + (${p[3]} * cos((${p[1]} * t_))));
 v.x += ((${w} * outer) * cos((${p[0]} * t_)));
 v.y += ((${w} * outer) * sin((${p[0]} * t_)));
@@ -32370,6 +39497,8 @@ v.y += ((${w} * outer) * sin((${p[0]} * t_)));
   "twist_ribbon": {
     params: [{ name: "freq", def: 3 }, { name: "width", def: 0.5 }],
     verified: true, priority: 0, flags: [], types: ["2D"],
+    funcNames: ["atan2j"],
+    funcs: `fn atan2j(y: f32, x: f32) -> f32 { if (x == 0.0 && y == 0.0) { return select(0.0, PI, (bitcast<u32>(x) >> 31u) == 1u) * select(1.0, -1.0, (bitcast<u32>(y) >> 31u) == 1u); } return atan2(y, x); }`,
     code: (w, p) => `{
 var tw_twist: f32 = (${p[0]} * t.x);
 var tw_c: f32 = cos(tw_twist);
@@ -32381,6 +39510,8 @@ v.y += (${w} * ((tw_s * t.x) + ((tw_c * t.y) * ${p[1]})));
   "weld_seam": {
     params: [{ name: "pitch", def: 0.5 }, { name: "height", def: 0.2 }, { name: "width", def: 0.2 }],
     verified: true, priority: 0, flags: [], types: ["2D"],
+    funcNames: ["atan2j"],
+    funcs: `fn atan2j(y: f32, x: f32) -> f32 { if (x == 0.0 && y == 0.0) { return select(0.0, PI, (bitcast<u32>(x) >> 31u) == 1u) * select(1.0, -1.0, (bitcast<u32>(y) >> 31u) == 1u); } return atan2(y, x); }`,
     code: (w, p) => `{
 var ws_bx: f32 = (floor(((t.x / ${p[0]}) + 0.5)) * ${p[0]});
 var ws_dx: f32 = (t.x - ws_bx);
@@ -32394,6 +39525,8 @@ v.y += (${w} * (t.y + ((ws_push * t.y) / ws_len)));
   "superposition": {
     params: [{ name: "freq1", def: 3 }, { name: "freq2", def: 5 }, { name: "phase", def: 0 }],
     verified: true, priority: 0, flags: [], types: ["2D"],
+    funcNames: ["atan2j"],
+    funcs: `fn atan2j(y: f32, x: f32) -> f32 { if (x == 0.0 && y == 0.0) { return select(0.0, PI, (bitcast<u32>(x) >> 31u) == 1u) * select(1.0, -1.0, (bitcast<u32>(y) >> 31u) == 1u); } return atan2(y, x); }`,
     code: (w, p) => `{
 var sp_r: f32 = sqrt(((t.x * t.x) + (t.y * t.y)));
 var sp_wave: f32 = (0.5 * (sin((${p[0]} * sp_r)) + sin(((${p[1]} * sp_r) + ${p[2]}))));
@@ -32404,6 +39537,8 @@ v.y += ((${w} * t.y) * sp_wave);
   "tessellate": {
     params: [{ name: "scale", def: 0.5 }],
     verified: true, priority: 0, flags: [], types: ["2D"],
+    funcNames: ["atan2j"],
+    funcs: `fn atan2j(y: f32, x: f32) -> f32 { if (x == 0.0 && y == 0.0) { return select(0.0, PI, (bitcast<u32>(x) >> 31u) == 1u) * select(1.0, -1.0, (bitcast<u32>(y) >> 31u) == 1u); } return atan2(y, x); }`,
     code: (w, p) => `{
 var ts_s: f32 = max(abs(${p[0]}), 0.01);
 var ts_nx: f32 = ((t.x + (ts_s * 0.5)) % ts_s);
@@ -32423,8 +39558,10 @@ v.y += (${w} * ts_ny);
   "tri_lattice": {
     params: [{ name: "scale", def: 2 }, { name: "morph", def: 1 }],
     verified: true, priority: 0, flags: [], types: ["2D"],
-    funcNames: ["roundc"],
-    funcs: `fn roundc(x: f32) -> f32 { return sign(x) * floor(abs(x) + 0.5); }`,
+    funcNames: ["roundc","atan2j"],
+    funcs: `fn roundc(x: f32) -> f32 { return sign(x) * floor(abs(x) + 0.5); }
+
+fn atan2j(y: f32, x: f32) -> f32 { if (x == 0.0 && y == 0.0) { return select(0.0, PI, (bitcast<u32>(x) >> 31u) == 1u) * select(1.0, -1.0, (bitcast<u32>(y) >> 31u) == 1u); } return atan2(y, x); }`,
     code: (w, p) => `{
 var tl_ax: f32 = (t.x * ${p[0]});
 var tl_ay: f32 = (t.y * ${p[0]});
@@ -32441,9 +39578,11 @@ v.y += (${w} * mix(t.y, (tl_by / ${p[0]}), ${p[1]}));
   "wood_grain": {
     params: [{ name: "freq", def: 5 }, { name: "amp", def: 0.2 }, { name: "grain", def: 0.5 }, { name: "grain_freq", def: 6 }],
     verified: true, priority: 0, flags: [], types: ["2D"],
+    funcNames: ["atan2j"],
+    funcs: `fn atan2j(y: f32, x: f32) -> f32 { if (x == 0.0 && y == 0.0) { return select(0.0, PI, (bitcast<u32>(x) >> 31u) == 1u) * select(1.0, -1.0, (bitcast<u32>(y) >> 31u) == 1u); } return atan2(y, x); }`,
     code: (w, p) => `{
 var wg_r: f32 = sqrt(((t.x * t.x) + (t.y * t.y)));
-var wg_theta: f32 = atan2(t.y, t.x);
+var wg_theta: f32 = atan2j(t.y, t.x);
 var wg_ring: f32 = sin(((${p[0]} * wg_r) + (${p[2]} * cos((${p[3]} * wg_theta)))));
 var wg_disp: f32 = (${p[1]} * wg_ring);
 v.x += (${w} * (t.x + (wg_disp * cos(wg_theta))));
@@ -32453,7 +39592,7 @@ v.y += (${w} * (t.y + (wg_disp * sin(wg_theta))));
   "worley": {
     params: [{ name: "scale", def: 1 }, { name: "jitter", def: 0.8 }],
     verified: true, priority: 0, flags: [], types: ["2D"],
-    funcNames: ["df_add","op_","df_qts","df_ts","df_mulf","hsin_","df_mul","df_sin","df_cos"],
+    funcNames: ["df_add","op_","df_qts","df_ts","df_mulf","hsin_","df_mul","df_sin","df_cos","atan2j"],
     funcs: `fn df_add(x: vec2f, y: vec2f) -> vec2f { var s = df_ts(x.x, y.x); let t = df_ts(x.y, y.y); s.y = op_(s.y + t.x); s = df_qts(s.x, s.y); s.y = op_(s.y + t.y); return df_qts(s.x, s.y); }
 
 fn op_(v: f32) -> f32 { return bitcast<f32>(bitcast<u32>(v) + df_zero); }
@@ -32508,7 +39647,9 @@ fn df_cos(x: vec2f) -> vec2f {
   s = df_add(df_mul(s, x2), vec2f(-0.5, 0.0));
   s = df_add(df_mul(s, x2), vec2f(1.0, 0.0));
   return s;
-}`,
+}
+
+fn atan2j(y: f32, x: f32) -> f32 { if (x == 0.0 && y == 0.0) { return select(0.0, PI, (bitcast<u32>(x) >> 31u) == 1u) * select(1.0, -1.0, (bitcast<u32>(y) >> 31u) == 1u); } return atan2(y, x); }`,
     code: (w, p) => `{
 var wo_s: f32 = max(abs(${p[0]}), 0.01);
 var wo_j: f32 = clamp(${p[1]}, 0.0, 1.0);

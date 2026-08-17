@@ -26,10 +26,12 @@ in the stack.
 
 ## Features
 
-- **787 variations** — 70 hand-written flam3 classics plus **784 JWildfire
-  variations ported mechanically** from JWildfire's own GPU snippets by a
-  CUDA→WGSL transpiler and **numerically verified in 3D against headless
-  JWildfire** (775 by the per-point oracle, 9 by inspection where statistics
+- **848 variations** — 70 hand-written flam3 classics plus **846 JWildfire
+  variations ported mechanically**: JWildfire's own GPU snippets and, for
+  variations that have none, its Java `transform()` code (attractors,
+  crops, erf/helix/pressure_wave, `e*` elliptic family, `x/y/z/w`, …), through
+  a CUDA→WGSL transpiler and **numerically verified in 3D against headless
+  JWildfire** (834 by the per-point oracle, 12 by inspection where statistics
   cannot compare; JWildfire's own GPU≠CPU snippet bugs are patched back to the
   Java, and shader hashes on cell ids run in double-float so cut/worley
   patterns match — see [`scripts/jwf-port/README.md`](scripts/jwf-port/README.md)).

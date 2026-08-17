@@ -66,8 +66,9 @@ public class Oracle {
       int nParams = Integer.parseInt(t[2]);
       LinkedHashMap<String, Double> params = new LinkedHashMap<>();
       for (int i = 0; i < nParams; i++) {
-        String[] kv = in.readLine().trim().split(" ");
-        params.put(kv[0], Double.parseDouble(kv[1]));
+        String kvLine = in.readLine().trim();
+        int sp = kvLine.lastIndexOf(' '); // param names may contain spaces ("range x")
+        params.put(kvLine.substring(0, sp), Double.parseDouble(kvLine.substring(sp + 1)));
       }
       final int si = setIdx++;
       StringBuilder sb = new StringBuilder();

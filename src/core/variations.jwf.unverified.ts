@@ -8,8 +8,10 @@ export const JWF_VARIATIONS_UNVERIFIED: Record<string, JwfVariationDef> = {
   "dc_gnarly": {
     params: [{ name: "mode", def: 1 }, { name: "scalex", def: 0.05 }, { name: "scaley", def: 0.05 }, { name: "freqx1", def: 3.5 }, { name: "freqy1", def: 3.5 }, { name: "freqx2", def: 2 }, { name: "freqy2", def: 2 }, { name: "freqx3", def: 5 }, { name: "freqy3", def: 5 }, { name: "dc", def: 1 }, { name: "color1", def: 5 }, { name: "color2", def: 5 }, { name: "fmag", def: 1 }, { name: "distort", def: 0 }, { name: "blur", def: 5 }, { name: "scale_z", def: 0 }, { name: "offset_z", def: 0 }, { name: "reset_z", def: 0 }],
     verified: false, priority: 0, flags: ["dc","z"], types: ["2D","DC"],
-    funcNames: ["roundc","sqrf"],
+    funcNames: ["roundc","atan2j","sqrf"],
     funcs: `fn roundc(x: f32) -> f32 { return sign(x) * floor(abs(x) + 0.5); }
+
+fn atan2j(y: f32, x: f32) -> f32 { if (x == 0.0 && y == 0.0) { return select(0.0, PI, (bitcast<u32>(x) >> 31u) == 1u) * select(1.0, -1.0, (bitcast<u32>(y) >> 31u) == 1u); } return atan2(y, x); }
 
 fn sqrf(x: f32) -> f32 {
   return (x * x);
@@ -85,7 +87,7 @@ if ((i32(roundc(min(max(${p[17]}, 0.0), 1.0))) > 0)) {
   "dc_circuits": {
     params: [{ name: "Seed", def: 1000000 }, { name: "time", def: 0 }, { name: "rate", def: 0.8 }, { name: "intensity", def: 0.9 }, { name: "focus", def: 1.5 }, { name: "pulse", def: 10 }, { name: "glow", def: 2 }, { name: "loops", def: 15 }, { name: "zoom", def: 1 }, { name: "ColorOnly", def: 0 }, { name: "Gradient", def: 0 }, { name: "scale_z", def: 0 }, { name: "offset_z", def: 0 }, { name: "reset_z", def: 1 }],
     verified: false, priority: 0, flags: ["dc","rgb","z"], types: ["SIMULATION","DC","BASE_SHAPE"],
-    funcNames: ["Mat2","read_imageStepMode","powc","Mat2_Init","times","dc_circuits_formula","dc_circuits_getRGBColor","dbl2int","greyscale","distance_color"],
+    funcNames: ["Mat2","read_imageStepMode","atan2j","powc","Mat2_Init","times","dc_circuits_formula","dc_circuits_getRGBColor","dbl2int","greyscale","distance_color"],
     funcs: `struct Mat2 {
   a00: f32,
   a01: f32,
@@ -94,6 +96,8 @@ if ((i32(roundc(min(max(${p[17]}, 0.0), 1.0))) > 0)) {
 }
 
 fn read_imageStepMode(base: u32, n: i32, t: f32) -> vec4f { return pal[base + u32(clamp(t, 0.0, 0.99999) * f32(max(n, 1)))]; }
+
+fn atan2j(y: f32, x: f32) -> f32 { if (x == 0.0 && y == 0.0) { return select(0.0, PI, (bitcast<u32>(x) >> 31u) == 1u) * select(1.0, -1.0, (bitcast<u32>(y) >> 31u) == 1u); } return atan2(y, x); }
 
 fn powc(x: f32, y: f32) -> f32 {
   if (x >= 0.0) { return pow(x, y); }

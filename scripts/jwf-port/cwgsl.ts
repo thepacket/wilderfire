@@ -738,8 +738,13 @@ for (const [cn, wn] of Object.entries({
   rintf: 'round', rint: 'round', nearbyintf: 'round',
   fract: 'fract', fracf: 'fract', normalize: 'normalize', saturate: 'saturate',
 })) BUILTINS[cn] = unaryF(wn);
-for (const [cn, wn] of Object.entries({ atan2f: 'atan2', atan2: 'atan2', step: 'step', distance: 'distance', reflect: 'reflect' }))
+for (const [cn, wn] of Object.entries({ step: 'step', distance: 'distance', reflect: 'reflect' }))
   BUILTINS[cn] = binaryF(wn);
+// atan2(0, 0): Java/IEEE give ±0 / ±π (by the sign of x); the Metal GPU gives NaN, and with the
+// shader compiler's fast-math a NaN can then collapse to 0 in later products — scalar calls go
+// through the `atan2j` helper (vector calls stay native).
+BUILTINS.atan2f = (a, em) => (isVec(a[0].ty) || isVec(a[1].ty)) ? binaryF('atan2')(a, em) : { c: `atan2j(${em.toF32(a[0])}, ${em.toF32(a[1])})`, ty: F32 };
+BUILTINS.atan2 = BUILTINS.atan2f;
 // C powf: negative bases with integer-valued exponents are defined (WGSL pow is NaN there)
 BUILTINS.powf = (a, em) => {
   if (a.length !== 2) fail('powf expects 2 args');
@@ -791,6 +796,9 @@ BUILTINS.__int_as_float = (a, em) => ({ c: `bitcast<f32>(${em.toI32(a[0])})`, ty
 BUILTINS.__float_as_int = (a, em) => ({ c: `bitcast<i32>(${em.toF32(a[0])})`, ty: I32 });
 BUILTINS.isnan = (a, em) => { const x = em.toF32(a[0]); return { c: `(${x} != ${x})`, ty: BOOL }; };
 BUILTINS.isinf = (a, em) => ({ c: `(abs(${em.toF32(a[0])}) > 3.0e38)`, ty: BOOL });
+BUILTINS.radians = (a, em) => ({ c: `radians(${em.toF32(a[0])})`, ty: F32 });
+BUILTINS.degrees = (a, em) => ({ c: `degrees(${em.toF32(a[0])})`, ty: F32 });
+BUILTINS.limitValue = (a, em) => ({ c: `clamp(${em.toF32(a[0])}, ${em.toF32(a[1])}, ${em.toF32(a[2])})`, ty: F32 });
 BUILTINS.lerpf = (a, em) => ({ c: `mix(${em.toF32(a[0])}, ${em.toF32(a[1])}, ${em.toF32(a[2])})`, ty: F32 });
 BUILTINS.lerp = BUILTINS.lerpf;
 BUILTINS.mix = (a, em) => {
@@ -937,6 +945,7 @@ export const HELPER_FUNCS: Record<string, string> = {
   //     an integer add of the runtime zero `df_zero` (set opaquely by the kernel entry point), which
   //     the optimiser cannot see through; every intermediate whose rounding matters goes through it.
   //     fma() is fused (tested) and used as is.
+  atan2j: `fn atan2j(y: f32, x: f32) -> f32 { if (x == 0.0 && y == 0.0) { return select(0.0, PI, (bitcast<u32>(x) >> 31u) == 1u) * select(1.0, -1.0, (bitcast<u32>(y) >> 31u) == 1u); } return atan2(y, x); }`,
   op_: `fn op_(v: f32) -> f32 { return bitcast<f32>(bitcast<u32>(v) + df_zero); }`,
   df_qts: `fn df_qts(a0: f32, b0: f32) -> vec2f { let a = op_(a0); let b = op_(b0); let s = op_(a + b); return vec2f(s, b - op_(s - a)); }`,
   df_ts: `fn df_ts(a0: f32, b0: f32) -> vec2f { let a = op_(a0); let b = op_(b0); let s = op_(a + b); let bb = op_(s - a); return vec2f(s, op_(a - op_(s - bb)) + op_(b - bb)); }`,
@@ -1018,6 +1027,11 @@ class Emitter {
   fnDeps: Set<string> | null = null;   // deps of the function currently being emitted
   flags: Set<string>;
   curFn: FnSig | null = null;
+  /** snippet-level `return;` support: the snippet is wrapped in `loop { … break; }` and returns become breaks;
+   *  a return nested in a loop/switch sets ret_ and every enclosing snippet-level loop re-checks it */
+  loopDepth = 0;
+  snippetReturns = false;
+  snippetNestedReturns = false;
   constructor(prog: Program, env: Env, flags: Set<string>) { this.prog = prog; this.env = env; this.flags = flags; }
 
   // ---- naming ----
@@ -1459,6 +1473,19 @@ class Emitter {
         }
         return out;
       }
+      case 'while': case 'do': case 'for': case 'switch': {
+        // loops/switches: track nesting for snippet-level returns (see case 'return')
+        this.loopDepth++;
+        let out: string;
+        try { out = this.loopStmt(s, sc, ind); } finally { this.loopDepth--; }
+        if (this.loopDepth === 0 && !sc.fn && this.snippetNestedReturns) out += `${ind}if (ret_) { break; }\n`;
+        return out;
+      }
+      default: return this.loopStmt(s, sc, ind);
+    }
+  }
+  loopStmt(s: Stmt, sc: Scope, ind: string): string {
+    switch (s.t) {
       case 'while': {
         const c = this.expr(s.c, sc);
         return `${ind}while (${this.toBool(c)}) ${this.blockOf(s.body, sc, ind)}`;
@@ -1492,6 +1519,12 @@ class Emitter {
         return `${ind}for (${init}; ${c}; ${u}) ${this.blockOf(s.body, inner, ind)}`;
       }
       case 'return': {
+        if (!s.e && !sc.fn) {
+          this.snippetReturns = true;
+          if (this.loopDepth === 0) return `${ind}break;\n`;
+          this.snippetNestedReturns = true;
+          return `${ind}{ ret_ = true; break; }\n`;
+        }
         if (!s.e) return `${ind}return;\n`;
         const fn = sc.fn;
         if (!fn) fail('return outside function');
@@ -1734,7 +1767,9 @@ export function transpileSnippet(snippet: string, libraries: LibraryInput[], env
     const sc = new Scope(null, null);
     em.curFn = null;
     em.fnDeps = null;
+    em.loopDepth = 0; em.snippetReturns = false; em.snippetNestedReturns = false;
     code = em.stmts(body.stmts, sc, '  ');
+    if (em.snippetReturns) code = (em.snippetNestedReturns ? '  var ret_ = false;\n' : '') + '  loop {\n' + code + '  break;\n  }\n';
     if (em.declsUsed.size) code = [...em.declsUsed].map((d) => `  ${d}\n`).join('') + code;
     // functions (all, so signatures/pointers get inferred even for transitively used ones)
     fnBodies.clear();

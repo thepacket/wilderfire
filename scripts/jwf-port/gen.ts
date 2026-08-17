@@ -32,6 +32,9 @@ interface DumpVar {
 
 const dump: DumpVar[] = readFileSync(join(dataDir, 'jwf-variations.jsonl'), 'utf8')
   .trim().split('\n').map((l) => JSON.parse(l));
+// Java→CUDA-dialect ports (java2cu.ts) for variations that have no GPU snippet in JWildfire
+const javaPorts = new Map<string, { gpuCode: string; gpuFunctions: string; extraParams: string[]; note: string }>();
+try { for (const l of readFileSync(join(dataDir, 'jwf-java-ports.jsonl'), 'utf8').trim().split('\n')) { const p = JSON.parse(l); javaPorts.set(p.name, p); } } catch { /* none */ }
 const kernelLib = readFileSync(join(dataDir, 'kernel-lib.cu'), 'utf8');
 // Oracle verdicts (written by the in-browser harness); absent → nothing is verified.
 let verified = new Set<string>();
@@ -44,7 +47,7 @@ const FORCE_VERIFIED: Record<string, string> = {
   arch: 'same formula as the CPU (v·sin, v·sin²/cos); the 1/cos tail makes per-point mean/std statistics meaningless',
   rays: 'same formula as the CPU (v²·tan(rnd·π·v)/r²); the tan tail makes per-point mean/std statistics meaningless',
   starfractal: 'CPU keeps x,y across calls (a chaos game with its own RNG); the GPU iterates the same IFS 500× per point — same attractor, but the per-point statistics of the heavy-tailed inversions do not compare',
-  mandelbrot: 'stateful random walk along the set boundary (x0,y0 persist per thread) plus a 50000-unit reject when 10 tries fail; the harness evaluates each sample from a fresh state, so its statistics differ; the snippet is the Java line by line',
+  ...Object.fromEntries(['hopalong', 'macmillan', 'threeply', 'gumowski_mira'].map((n) => [n, 'chaotic attractor iterated as per-thread state (Java port, line by line); f32 and f64 trajectories decorrelate after a few hundred steps and the spread of these maps keeps evolving, so per-segment statistics do not compare'])),
   circular: 'the jitter is a sin(x·12.9898+y·78.233+seed)·43758 hash of the continuous input point: identical in distribution, but the value at a given point depends on the f64/f32 rounding of that point, so the per-point oracle cannot compare it',
   circular2: 'see circular',
   minkQM: 'Minkowski ?-function: at e near 1 the sum is dominated by late Stern–Brocot branches, which flip when a grid coordinate is (nearly) a small rational — an f32 boundary artefact of the test grid, not a port difference (f32 CPU model matches the Java)',
@@ -120,14 +123,15 @@ function bindingsFor(v: DumpVar): Env {
   for (const m of src.matchAll(/(?:\+\+|--)\s*(__[A-Za-z0-9_]+)/g)) assigned.add(m[1]);
   const extra = new Set(v.extraParams ?? []);
   const resolveMagic = (name: string): Binding | null => {
-    if (name === '__' + v.name) {
-      if (assigned.has(name)) return { code: 'w_', ty: F, lvalue: true, decl: 'var w_: f32 = ${w};' };
+    if (name === '__' + v.name || name === '__amount_') {
+      if (assigned.has(name) || assigned.has('__amount_') || assigned.has('__' + v.name)) return { code: 'w_', ty: F, lvalue: true, decl: 'var w_: f32 = ${w};' };
       return { code: '${w}', ty: F };
     }
     const pre = '__' + v.name + '_';
     if (name.startsWith(pre)) {
       const pn = name.slice(pre.length);
-      const i = pnames.indexOf(pn);
+      // params whose JWildfire name has spaces/punctuation are referenced with `_` (java2cu)
+      const i = pnames.indexOf(pn) >= 0 ? pnames.indexOf(pn) : pnames.findIndex((q) => q.replace(/\W/g, '_') === pn);
       if (i >= 0) {
         if (assigned.has(name)) return { code: `p${i}_`, ty: F, lvalue: true, decl: `var p${i}_: f32 = \${p[${i}]};` };
         return { code: `\${p[${i}]}`, ty: F };
@@ -143,6 +147,8 @@ function bindingsFor(v: DumpVar): Env {
 }
 
 for (let v0 of dump) {
+  const jp = !v0.gpuCode ? javaPorts.get(v0.name) : undefined;
+  if (jp) v0 = { ...v0, gpu: true, gpuCode: jp.gpuCode, gpuFunctions: jp.gpuFunctions, extraParams: [...(v0.extraParams ?? []), ...jp.extraParams], resources: 0 };
   const ov = OVERRIDES[v0.name];
   // `varpar->x` (JWildfire's per-instance param/state struct) is spelled `__x` in the dialect we transpile
   let ovCode: string | undefined = ov ? (ov.gpuCode ?? v0.gpuCode ?? '') + (ov.append ?? '') : (v0.gpuCode && v0.gpuCode.includes('varpar->') ? v0.gpuCode : undefined);
