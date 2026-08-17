@@ -27,13 +27,13 @@ interface DumpParam { name: string; def: number | null; int: boolean; stable: bo
 interface DumpVar {
   name: string; cls: string; priority: number; types: string[]; params: DumpParam[];
   altNames?: string[]; resources: number; defaultsStable: boolean; gpu: boolean;
-  gpuCode?: string; gpuFunctions?: string; stateful?: boolean; extraParams?: string[]; error?: string;
+  gpuCode?: string; preCode?: string; gpuFunctions?: string; stateful?: boolean; extraParams?: string[]; error?: string;
 }
 
 const dump: DumpVar[] = readFileSync(join(dataDir, 'jwf-variations.jsonl'), 'utf8')
   .trim().split('\n').map((l) => JSON.parse(l));
 // Java→CUDA-dialect ports (java2cu.ts) for variations that have no GPU snippet in JWildfire
-const javaPorts = new Map<string, { gpuCode: string; gpuFunctions: string; extraParams: string[]; note: string }>();
+const javaPorts = new Map<string, { gpuCode: string; preCode?: string; gpuFunctions: string; extraParams: string[]; note: string }>();
 try { for (const l of readFileSync(join(dataDir, 'jwf-java-ports.jsonl'), 'utf8').trim().split('\n')) { const p = JSON.parse(l); javaPorts.set(p.name, p); } } catch { /* none */ }
 const kernelLib = readFileSync(join(dataDir, 'kernel-lib.cu'), 'utf8');
 // Oracle verdicts (written by the in-browser harness); absent → nothing is verified.
@@ -57,6 +57,8 @@ const FORCE_VERIFIED: Record<string, string> = {
   minkQM: 'Minkowski ?-function: at e near 1 the sum is dominated by late Stern–Brocot branches, which flip when a grid coordinate is (nearly) a small rational — an f32 boundary artefact of the test grid, not a port difference (f32 CPU model matches the Java)',
 };
 for (const n of Object.keys(FORCE_VERIFIED)) verified.add(n);
+// prepost ports carry two snippets; both must have passed (the harness reports the inverse as `name~inv`)
+for (const [n, jp] of javaPorts) if (jp.preCode && verified.has(n) && !verified.has(n + '~inv')) verified.delete(n);
 
 /** Deterministic defaults for parameters JWildfire randomizes at construction. */
 const DEFAULT_OVERRIDES: Record<string, Record<string, number>> = {
@@ -76,7 +78,7 @@ const UNSUPPORTED_FLAGS: Record<string, string> = {
 };
 
 interface GenEntry {
-  name: string; params: { name: string; def: number }[]; code: string; funcs: string; funcNames: string[];
+  name: string; params: { name: string; def: number }[]; code: string; preCode?: string; funcs: string; funcNames: string[];
   priority: number; types: string[]; flags: string[];
 }
 
@@ -154,8 +156,8 @@ function bindingsFor(v: DumpVar): Env {
 }
 
 for (let v0 of dump) {
-  const jp = !v0.gpuCode ? javaPorts.get(v0.name) : undefined;
-  if (jp) v0 = { ...v0, gpu: true, gpuCode: jp.gpuCode, gpuFunctions: jp.gpuFunctions, extraParams: [...(v0.extraParams ?? []), ...jp.extraParams], resources: 0 };
+  const jp = !v0.gpuCode || v0.gpuCode.startsWith('/*ERROR') ? javaPorts.get(v0.name) : undefined; // JWildfire's getGPUCode threw (prepost_affine) → the Java port
+  if (jp) v0 = { ...v0, gpu: true, gpuCode: jp.gpuCode, preCode: jp.preCode, gpuFunctions: jp.gpuFunctions, extraParams: [...(v0.extraParams ?? []), ...jp.extraParams], resources: 0 };
   const ov = OVERRIDES[v0.name];
   // `varpar->x` (JWildfire's per-instance param/state struct) is spelled `__x` in the dialect we transpile
   let ovCode: string | undefined = ov ? (ov.gpuCode ?? v0.gpuCode ?? '') + (ov.append ?? '') : (v0.gpuCode && v0.gpuCode.includes('varpar->') ? v0.gpuCode : undefined);
@@ -326,20 +328,26 @@ for (let v0 of dump) {
   if (v.gpuFunctions && v.gpuFunctions.trim() && !v.gpuFunctions.startsWith('/*ERROR')) libs.push({ name: v.name, source: v.gpuFunctions });
   try {
     const r = transpileSnippet(v.gpuCode, libs, bindingsFor(v));
+    // prepost variations (java2cu preCode): the inverse runs as a pre step — transpiled as a second snippet sharing the helpers
+    const rp = v.preCode ? transpileSnippet(v.preCode, libs, bindingsFor({ ...v, gpuCode: v.preCode })) : null;
+    if (rp) {
+      for (const f of rp.flags) if (!r.flags.includes(f)) r.flags.push(f);
+      for (const n of rp.functionNames) if (!r.functionNames.includes(n)) { r.functions = (r.functions ? r.functions + '\n\n' : '') + extractItem(rp.functions, n); r.functionNames.push(n); }
+    }
     const bad = r.flags.find((f) => UNSUPPORTED_FLAGS[f]);
     if (bad) { report.push({ name: v.name, status: 'skip', reason: UNSUPPORTED_FLAGS[bad], flags: r.flags }); continue; }
     if (v.stateful) r.flags.push('stateful');
     if (v.types.includes('VARTYPE_3D')) r.flags.push('3d');
     if (v.types.includes('VARTYPE_DC')) r.flags.push('dc');
     // per-thread state for JWildfire "extra GPU params"
-    let funcs = r.functions, code = r.code;
+    let funcs = r.functions, code = r.code, preCode = rp?.code;
     const funcNames: string[] = [];
     for (const pe of v.extraParams ?? []) {
       const [pn, pt] = pe.split(':');
       const wty = pt === 'float2' ? 'vec2f' : pt === 'float3' ? 'vec3f' : pt === 'int' ? 'i32' : 'f32';
       const init = pt === 'float2' ? 'vec2f(0.0)' : pt === 'float3' ? 'vec3f(0.0)' : pt === 'int' ? '0' : '0.0';
       const gname = `jwx_${v.name}_${pn}`.replace(/\W/g, '_');
-      if (new RegExp(`\\b${gname}\\b`).test(code) || new RegExp(`\\b${gname}\\b`).test(funcs ?? '')) {
+      if (new RegExp(`\\b${gname}\\b`).test(code + (preCode ?? '')) || new RegExp(`\\b${gname}\\b`).test(funcs ?? '')) {
         funcs = (funcs ? funcs + '\n\n' : '') + `var<private> ${gname}: ${wty} = ${init};`;
         funcNames.push(gname);
         fnRegistry.set(gname, `var<private> ${gname}: ${wty} = ${init};`);
@@ -353,6 +361,7 @@ for (let v0 of dump) {
         const re = new RegExp(`\\b${n}\\b`, 'g');
         funcs = funcs.replace(re, nn);
         code = code.replace(re, nn);
+        if (preCode) preCode = preCode.replace(re, nn);
         fnRegistry.set(nn, extractItem(funcs, nn));
         funcNames.push(nn);
       } else {
@@ -361,7 +370,7 @@ for (let v0 of dump) {
       }
     }
     const params = v.params.map((p) => ({ name: p.name, def: DEFAULT_OVERRIDES[v.name]?.[p.name] ?? (p.def ?? 0) }));
-    entries.push({ name: v.name, params, code, funcs, funcNames, priority: v.priority, types: v.types, flags: [...new Set(r.flags)].sort() });
+    entries.push({ name: v.name, params, code, preCode, funcs, funcNames, priority: v.priority, types: v.types, flags: [...new Set(r.flags)].sort() });
     report.push({ name: v.name, status: 'ok', flags: r.flags });
   } catch (err) {
     if (!(err instanceof TranspileError)) throw err;
@@ -396,6 +405,8 @@ export interface JwfVariationDef extends VariationDef {
   verified: boolean;
   /** JWildfire priority: -1 pre (mutates the input point), 0 normal, 1 post (mutates the output). */
   priority: number;
+  /** JWildfire "prepost" variations: this snippet runs first in the stage (priority -2), rewriting the input point (the inverse), while \`code\` runs last (priority 2) on the output. */
+  preCode?: (w: string, p: string[], A: (i: number) => string) => string;
   /** Module-scope WGSL (helper fns/consts) the snippet needs; codegen dedupes by name. */
   funcs?: string;
   funcNames?: string[];
@@ -427,6 +438,11 @@ for (const e of entries) {
     item += `    funcs: \`${esc(e.funcs)}\`,\n`;
   }
   item += `    code: ${args} => \`{\n${esc(codeBody).split('\n').map((l) => l.trimEnd()).join('\n')}\n}\`,\n`;
+  if (e.preCode) {
+    const preBody = e.preCode.replace(/^  /gm, '').trimEnd();
+    const pargs = `(${/\$\{w\}/.test(preBody) ? 'w' : '_w'}, ${/\$\{p\[/.test(preBody) ? 'p' : '_p'}${/\$\{A\(/.test(preBody) ? ', A' : ''})`;
+    item += `    preCode: ${pargs} => \`{\n${esc(preBody).split('\n').map((l) => l.trimEnd()).join('\n')}\n}\`,\n`;
+  }
   item += `  },\n`;
   if (verified.has(e.name)) ts += item; else tsU += item;
 }

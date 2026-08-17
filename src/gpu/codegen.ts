@@ -113,6 +113,8 @@ function genXformFn(name: string, x: XForm, B: number, palBase: number): string 
     let snips = '';
     for (const prio of [-2, -1, 0, 1, 2]) {
       for (const b of bound) {
+        // prepost variations: their inverse snippet rewrites the input first (prio -2), the forward one runs last (prio 2)
+        if (prio === -2 && b.def.preCode) { snips += '    ' + b.def.preCode(b.w, b.p, A) + '\n'; continue; }
         if (b.prio !== prio) continue;
         snips += '    ' + b.def.code(b.w, b.p, A) + '\n';
         if (prio === 0 && zOut && !(b.def.flags ?? []).includes('z')) {

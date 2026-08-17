@@ -17,6 +17,8 @@ import { JWF_VARIATIONS, type JwfVariationDef } from './variations.jwf.ts';
 export interface VariationDef {
   params?: { name: string; def: number }[];
   code: (w: string, p: string[], A: (i: number) => string) => string;
+  /** JWildfire "prepost" pair: runs first in the stage (priority -2) on the input point (the inverse), while `code` runs last (priority 2) on the output. */
+  preCode?: (w: string, p: string[], A: (i: number) => string) => string;
   /** JWildfire priority: -1 pre (mutates the input point t), 0 normal (adds to v), 1 post (mutates v). Default 0. */
   priority?: number;
   /** Module-scope WGSL (helper functions/consts) the snippet needs; codegen dedupes by name. */

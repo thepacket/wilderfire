@@ -28,7 +28,7 @@ JWildfire source ──Oracle.java─▶ oracle-out.jsonl ◀── oracle-spec.
 | `data/dc-base.json` | Which `dc_*` classes inherit / copy `DC_BaseFunc.transform` (sampling `rnd−0.5`) — drives the DC family fix in `gen.ts`. |
 | `data/jwf-variations.jsonl` | Metadata + GPU code for all 1026 JWildfire variations (name, params/defaults/int-ness, priority, types, GPU code, helper functions). Produced by `Dump.java`; checked in so regeneration does not need Java. |
 | `data/kernel-lib.cu` | Helper library extracted from JWildfire's `Flam4_3dKernal_TemplateJWF.cu` (Complex/Mat2/Jacobi/noise/misc); transpiled on demand. |
-| `java2cu.ts`, `data/jwf-java-ports.jsonl` | Java → CUDA-dialect pre-processor for the variations that have *no* GPU snippet in JWildfire: extracts fields, params (from `setParameter`), `init()`, helper methods and `transform()` from the Java class, rewrites the Java idioms (`pAffineTP.x`→`__x`, `pVarTP.x`→`__px`, `pAmount`→`__amount_`, `pContext.random()`, `Math.*`/MathLib statics, `sinAndCos`, `this.` fields, locals shadowing fields, `random(Integer.MAX_VALUE)`→31-bit `RANDINT`), replays setParameter-derived fields, turns per-instance state (attractors) into per-thread `varpar->` state initialised on the first call, and copies helper-used params/fields into state. GLSL-style Java (js.glsl `vec2`/`vec3`/`vec4` objects, `G.*` statics, `new mat2(…)` in `.times()`) goes through a small expression parser that turns method chains into vector arithmetic (`crop_*`, `glsl_*`, `truchetflow`); the abstract `GLSLFunc` parent's fields/params are merged in. Plain-data inner classes (`Point`, `Double2`, `RandXYData`, `SinCosPair`, …) become WGSL structs with maker/setter functions; JWildfire's `XYZPoint`, `DoubleWrapperWF`, `MarsagliaRandomGenerator` and `java.util.Random` are built-in structs (`jxyz_`, `jdw_`, `jmrg_`, `jrand_` — the last two are exact 32-bit / 48-bit-LCG ports so per-cell seeded randoms match the Java); js.glsl `mat2`/`mat3` travel as `float4` / a `mat3_` struct (`.times()` resolves matrix·vector by tracked operand kinds); helpers taking `pAffineTP`/`pVarTP` are inlined at their call sites; array/object helper params become pointers; `pXForm.getXYCoeff*()` reads the affine; static-final constants are inlined and constant tables hoisted to module scope; `long` maps to `int` (seeds/hashes); pre-priority ports refresh `__r2/__r/__phi/__theta` after rewriting the input like JWildfire's own pre snippets. Output feeds `gen.ts` exactly like a dump entry. Needs the JWildfire source tree (`--jwf`). |
+| `java2cu.ts`, `data/jwf-java-ports.jsonl` | Java → CUDA-dialect pre-processor for the variations that have *no* GPU snippet in JWildfire: extracts fields, params (from `setParameter`), `init()`, helper methods and `transform()` from the Java class, rewrites the Java idioms (`pAffineTP.x`→`__x`, `pVarTP.x`→`__px`, `pAmount`→`__amount_`, `pContext.random()`, `Math.*`/MathLib statics, `sinAndCos`, `this.` fields, locals shadowing fields, `random(Integer.MAX_VALUE)`→31-bit `RANDINT`), replays setParameter-derived fields, turns per-instance state (attractors) into per-thread `varpar->` state initialised on the first call, and copies helper-used params/fields into state. GLSL-style Java (js.glsl `vec2`/`vec3`/`vec4` objects, `G.*` statics, `new mat2(…)` in `.times()`) goes through a small expression parser that turns method chains into vector arithmetic (`crop_*`, `glsl_*`, `truchetflow`); the abstract `GLSLFunc` parent's fields/params are merged in. Plain-data inner classes (`Point`, `Double2`, `RandXYData`, `SinCosPair`, …) become WGSL structs with maker/setter functions; JWildfire's `XYZPoint`, `DoubleWrapperWF`, `MarsagliaRandomGenerator` and `java.util.Random` are built-in structs (`jxyz_`, `jdw_`, `jmrg_`, `jrand_` — the last two are exact 32-bit / 48-bit-LCG ports so per-cell seeded randoms match the Java); js.glsl `mat2`/`mat3` travel as `float4` / a `mat3_` struct (`.times()` resolves matrix·vector by tracked operand kinds); helpers taking `pAffineTP`/`pVarTP` are inlined at their call sites; array/object helper params become pointers; `pXForm.getXYCoeff*()` reads the affine; static-final constants are inlined and constant tables hoisted to module scope; `long` maps to `int` (seeds/hashes); pre-priority ports refresh `__r2/__r/__phi/__theta` after rewriting the input like JWildfire's own pre snippets. JWildfire *prepost* variations (`prepost_blob`/`mobius`/`circlize`/`affine`: `invtransform()` runs as a pre step on the affine point, `transform()` as a post step on the output) get two snippets — `preCode` (the inverse + precalc refresh) and `gpuCode` — that the codegen runs at priority −2 and 2 of the same stage; the oracle tests the inverse as its own `name~inv` entry (Oracle.java calls `invtransform`) and `gen.ts` requires both verdicts. Output feeds `gen.ts` exactly like a dump entry. Needs the JWildfire source tree (`--jwf`). |
 | `data/unportable.json` | The JWildfire variations WilderFire deliberately does not implement, by category (see *What is not ported*); `gen.ts` checks it against the registry and emits `src/core/variations.unportable.ts` for the importer. |
 | `Dump.java` | Dumps the catalogue by reflection against a compiled JWildfire tree. |
 | `Oracle.java` | Headless JWildfire oracle: evaluates each variation's Java `transform()` on the spec grid; deterministic → exact values, random → per-point mean/std/hide-fraction over 256 samples. |
@@ -76,8 +76,8 @@ node scripts/jwf-port/gen.ts            # re-emit with the new verdicts
 
 Of JWildfire's 1026 variations, 800 carry a usable GPU snippet (14 more than
 before: `REFERENCE` ressources — links to the author's page — no longer count
-as resources) and 128 more are ported straight from their Java `transform()`
-by `java2cu.ts` (928 transpile); **909 verify numerically against the Java
+as resources) and 132 more are ported straight from their Java `transform()`
+by `java2cu.ts` (932 transpile); **913 verify numerically against the Java
 oracle in 3D**, 17 more are verified by inspection where the per-point oracle
 cannot compare (`FORCE_VERIFIED` in `gen.ts`, each with its reason:
 `arch`/`rays`/`starfractal` heavy-tailed statistics, the chaotic attractors
@@ -85,14 +85,14 @@ cannot compare (`FORCE_VERIFIED` in `gen.ts`, each with its reason:
 `curliecue2` walk, `post_point_crop` and `recurrenceplot` order-dependent
 state, `minkQM` f32 boundary artefact of the test grid, `circular`/`circular2`
 hash of the continuous input point, `iconattractor_js` presetId table,
-`pre_blur3D` `& 5` ring buffer, `pre_flatten`), so 926 ship in
+`pre_blur3D` `& 5` ring buffer, `pre_flatten`), so 930 ship in
 `variations.jwf.ts`; 2 stay in `variations.jwf.unverified.ts` because the Java
 itself is order-dependent (`dc_circuits` accumulates a member `S` across
 points, `dc_gnarly` updates only 2 of its 6 gaussian summands — `& 5` — so its
 blur depends on the render's init randoms). Together with the 70 hand-written
-flam3 entries the app registry has 928 variations.
+flam3 entries the app registry has 932 variations.
 
-### What is not ported (98)
+### What is not ported (94)
 
 `data/unportable.json` is the definitive list — every JWildfire variation is
 either in the registry or in that file with a category, and `gen.ts` writes it
@@ -104,9 +104,9 @@ variation was skipped. Categories:
 | user-code | 21 | compiles user-supplied code or a formula at run time (`custom_wf`, `dc_code`, `glsl_code`, `c_var`, `ducks`, `fract_formula_*`, the `yplot2d_wf`… plot family, `colordomain`); the WebGPU kernel has no run-time compiler |
 | external-content | 29 | renders external content that would have to be uploaded to the GPU: sub-flames (`subflame_wf`, `ringsubflame`, `glynns3subfl`), images (`post_bumpmap_wf`, `displacemap_wf`, `colormap_wf`, `kaleidoimg`, `plane_wf`, `wangtiles`), meshes (`obj_mesh_wf`, `terrain3D`, `metaballs3d_wf`, `knots3D`, `sattractor3D`), `svg_wf`, `text_wf`, L-systems, brushes |
 | point-set | 32 | builds a point/segment list on the CPU at init and samples it per point: the `DrawFunc` family (`gpattern`, `mandala`, `nsudoku`, `sunflower`, `szubieta`, `triantruchet`, `curliecue`, `taprats`, `sunvoroni`), turtle/`DynamicArray` `_js` fractals (`dragon_js`, `koch_js`, `hilbert_js`, `tree_js`, …), `dla_wf`/`snowflake_wf` simulations, `inversion`, `maurer_lines`, `klein_group`, `natural_foam`, … |
-| engine | 7 | needs an engine feature WilderFire lacks: the JWildfire *prepost* pair (inverse applied pre, forward applied post — `prepost_blob`/`mobius`/`circlize`/`affine`, `ringtile`) or a variation instantiating another (`sphtiling3v2`) |
+| engine | 2 | needs an engine feature WilderFire lacks: a variation instantiating another (`sphtiling3v2`), `post_dcztransl` (no Java class) |
 | resource-params | 1 | `dc_triantess` keeps its colours as byte-array ressources |
-| not-yet | 8 | plain numeric Java the converter does not handle yet: JWildfire's `Complex` class (`exp_multi`, `quad`), `VectorD` (`pre_wave3D_wf`), a `triangle` class (`dc_triTile`), arrays returned from helpers (`cactusGlobe`), `boxfold`, per-instance random objects in helpers (`neuron3D`, `drunken_tiles`) |
+| not-yet | 9 | plain numeric Java the converter does not handle yet: JWildfire's `Complex` class (`exp_multi`, `quad`, `ringtile`), `VectorD` (`pre_wave3D_wf`), a `triangle` class (`dc_triTile`), arrays returned from helpers (`cactusGlobe`), `boxfold`, per-instance random objects in helpers (`neuron3D`, `drunken_tiles`) |
 
 Systematic GPU≠CPU families fixed at generator level: the 17 `*3D` solid
 samplers (CPU rejection-samples up to 50 times before hiding — `retry`

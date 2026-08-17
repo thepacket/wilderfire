@@ -49,7 +49,7 @@ for (const f of files) {
 }
 function walk(d: string): string[] { return fs.readdirSync(d, { withFileTypes: true }).flatMap((e) => e.isDirectory() ? walk(path.join(d, e.name)) : [path.join(d, e.name)]); }
 
-const targets = dump.filter((d) => !d.gpuCode && (!only.length || only.includes(d.name)));
+const targets = dump.filter((d) => (!d.gpuCode || d.gpuCode.startsWith('/*ERROR')) && (!only.length || only.includes(d.name)));
 
 // ---------------------------------------------------------------- utilities
 function stripComments(s: string): string {
@@ -72,7 +72,7 @@ function braceBody(s: string, from: number): { body: string; end: number } | nul
 const KNOWN_METHODS = new Set(['transform', 'init', 'initOnce', 'getName', 'getParameterNames', 'getParameterValues', 'setParameter', 'getVariationTypes',
   'dynamicParameterExpansion', 'randomize', 'mutate', 'getGPUCode', 'getGPUFunctions', 'getParameterAlternativeNames', 'getRessourceNames', 'getRessourceValues',
   'setRessource', 'getRessourceType', 'getPriority', 'isStateful', 'getGPUExtraParameterNames', 'validate', 'getInitialParameterValue', 'setSubflame',
-  'preprocess', 'getSupportedTransformationTypes', 'getSourceCode', 'getFuncSource', 'getRandomFuncName']);
+  'preprocess', 'getSupportedTransformationTypes', 'getSourceCode', 'getFuncSource', 'getRandomFuncName', 'getPreFuncType', 'getPostFuncType']);
 
 interface Method { name: string; ret: string; params: string; body: string; static: boolean }
 interface Field { type: string; name: string; init: string | null; array: number | null }
@@ -295,6 +295,9 @@ function convertJava(code: string, ctx: Ctx, extraLocals: Iterable<string> = [])
   s = s.replace(/pAffineTP\.getPrecalcSumsq\(\)/g, '__r2').replace(/pAffineTP\.getPrecalcSqrt\(\)/g, '__r')
     .replace(/pAffineTP\.getPrecalcAtan\(\)/g, '__phi').replace(/pAffineTP\.getPrecalcAtanYX\(\)/g, '__theta')
     .replace(/pAffineTP\.getPrecalcSinA\(\)/g, '(__x / __r)').replace(/pAffineTP\.getPrecalcCosA\(\)/g, '(__y / __r)');
+  // precalcs asked of the output point (a helper called with pVarTP for both points): computed on the spot
+  s = s.replace(/pVarTP\.getPrecalcSumsq\(\)/g, '(__px * __px + __py * __py)').replace(/pVarTP\.getPrecalcSqrt\(\)/g, 'sqrtf(__px * __px + __py * __py)')
+    .replace(/pVarTP\.getPrecalcAtan\(\)/g, 'atan2f(__px, __py)').replace(/pVarTP\.getPrecalcAtanYX\(\)/g, 'atan2f(__py, __px)');
   s = s.replace(/pAffineTP\.x\b/g, '__x').replace(/pAffineTP\.y\b/g, '__y').replace(/pAffineTP\.z\b/g, '__z').replace(/pAffineTP\.color\b/g, '__pal').replace(/pAffineTP\.doHide\b/g, '__doHide');
   // chained assignment `a = b = c;` → `b = c; a = b;`
   // (a single-statement if/else body keeps its shape by getting braces)
@@ -388,7 +391,7 @@ const JAVA_PATCHES: Record<string, [string | RegExp, string][]> = {
 };
 
 // ---------------------------------------------------------------- per-variation conversion
-interface Port { name: string; gpuCode: string; gpuFunctions: string; extraParams: string[]; note: string; javaFile: string }
+interface Port { name: string; gpuCode: string; preCode?: string; gpuFunctions: string; extraParams: string[]; note: string; javaFile: string }
 const MERGE_PARENTS: Record<string, string> = { GLSLFunc: 'GLSLFunc.java', AbstractFalloff3Func: 'AbstractFalloff3Func.java', AbstractAffine3DFunc: 'AbstractAffine3DFunc.java' };
 function convertVariation(d: DumpVar, src0: string, javaFile: string): Port {
   let src = src0;
@@ -414,7 +417,9 @@ function convertVariation(d: DumpVar, src0: string, javaFile: string): Port {
   }
   const transform = cls.methods.find((m) => m.name === 'transform');
   if (!transform) throw new Error('no transform()');
-  if (cls.methods.some((m) => m.name === 'invtransform')) throw new Error('prepost (invtransform)'); // TODO prepost: inverse as pre + transform as post
+  // JWildfire "prepost" (func priority 2): invtransform() runs as a pre step on the affine point and transform()
+  // as a post step on the variation output → the port carries both snippets (preCode / gpuCode)
+  const invtransform = cls.methods.find((m) => m.name === 'invtransform');
   if (!/^(VariationFunc|SimpleVariationFunc)$/.test(cls.parent)) throw new Error(`extends ${cls.parent}`);
   const s = cls.body;
   if (/RessourceType|getRessourceNames|SubFlame|subflame|Flame\b|Layer\s+\w+\s*=|getOwner\(\)|RGBPalette|SimpleImage|WFImage|BufferedImage|String\s+\w+\s*=/.test(transform.body + (cls.methods.find((m) => m.name === 'init')?.body ?? '')))
@@ -466,6 +471,8 @@ function convertVariation(d: DumpVar, src0: string, javaFile: string): Port {
     };
     transform.body = inlineInto(transform.body);
     for (const h of helpers) h.body = inlineInto(h.body);
+    const invt = cls.methods.find((m) => m.name === 'invtransform');
+    if (invt) invt.body = inlineInto(invt.body);
   }
   const init = cls.methods.find((m) => m.name === 'init');
   const initOnce = cls.methods.find((m) => m.name === 'initOnce');
@@ -672,10 +679,14 @@ function convertVariation(d: DumpVar, src0: string, javaFile: string): Port {
   if (init && /\S/.test(init.body) && !initTouchesState) {
     code += '{\n' + convertJava(init.body, ctx) + '\n}\n';
   }
+  const PRECALC = '\n__r2 = __x*__x+__y*__y; __r = sqrtf(__r2); __rinv = 1.0f/__r; __phi = atan2f(__x,__y); __theta = 0.5f*M_PI-__phi; if (__theta > M_PI) __theta -= 2.0f*M_PI;\n';
+  const preamble = code; // field locals, state init, setParameter/init replay — needed by both snippets
   code += convertJava(transform.body, ctx);
-  if ((d.priority ?? 0) < 0) code += '\n__r2 = __x*__x+__y*__y; __r = sqrtf(__r2); __rinv = 1.0f/__r; __phi = atan2f(__x,__y); __theta = 0.5f*M_PI-__phi; if (__theta > M_PI) __theta -= 2.0f*M_PI;\n';
+  if ((d.priority ?? 0) < 0) code += PRECALC;
   code = prefixHelpers(renameTables(code));
-  for (const [from, to] of JAVA_PATCHES[d.name] ?? []) { const c2 = code.replace(from, to), f2 = funcs.replace(from, to); if (c2 === code && f2 === funcs) throw new Error(`patch did not match: ${from}`); code = c2; funcs = f2; }
+  let preCode: string | undefined;
+  if (invtransform) preCode = prefixHelpers(renameTables(preamble + convertJava(invtransform.body, ctx) + PRECALC));
+  for (const [from, to] of JAVA_PATCHES[d.name] ?? []) { const c2 = code.replace(from, to), f2 = funcs.replace(from, to); if (c2 === code && f2 === funcs) throw new Error(`patch did not match: ${from}`); code = c2; funcs = f2; if (preCode) preCode = preCode.replace(from, to); }
   // sinAndCos locals
   const scv = new Set([...(code + funcs).matchAll(/\b(\w+)_v\b/g)].map((m) => m[1]));
   const declV = [...scv].filter((n) => /^(sina?|cosa?|sin\w*|cos\w*|s|c)$/.test(n) || /_v = (sinf|cosf)\(/.test(code)).map((n) => `float ${n}_v = 0.0f;`).join(' ');
@@ -686,9 +697,9 @@ function convertVariation(d: DumpVar, src0: string, javaFile: string): Port {
   const knownTypes = new Set(['M_PI', 'M_2PI', 'M_E', 'M_PI_2', 'M_PI_4', 'M_1_PI', 'M_2_PI', 'M_SQRT2', 'M_SQRT1_2', 'RANDFLOAT', 'RANDINT', 'EPSILON', 'HSIN2', 'mat3_', ...ctx.pods.values()]);
   const tm = [...(code + funcs).matchAll(/(?<![\w.])([A-Z]\w*)\s+[a-z_]\w*\s*(?:=|;|,|\))/g)].find((x) => !knownTypes.has(x[1]) && !/^[A-Z0-9_]+$/.test(x[1]));
   if (tm) throw new Error(`type ${tm[1]}`);
-  for (const o of others) if (new RegExp(`\\b${o}\\b`).test(code + funcs)) { if (process.env.JAVA2CU_DEBUG) console.error(code + funcs); throw new Error(`leftover ${o}`); }
+  for (const o of others) if (new RegExp(`\\b${o}\\b`).test(code + funcs + (preCode ?? ''))) { if (process.env.JAVA2CU_DEBUG) console.error(code + funcs); throw new Error(`leftover ${o}`); }
   const lib = [...ctx.usedLib].map((k) => LIB[k]).join('\n');
-  return { name: d.name, gpuCode: code, gpuFunctions: (lib ? lib + '\n' : '') + globalsCode + funcs, extraParams: extra, note: `java port of ${javaFile}`, javaFile };
+  return { name: d.name, gpuCode: code, preCode, gpuFunctions: (lib ? lib + '\n' : '') + globalsCode + funcs, extraParams: extra, note: `java port of ${javaFile}`, javaFile };
 }
 
 // ---------------------------------------------------------------- GLSL-style Java (js.glsl vec2/vec3/G) → CUDA dialect

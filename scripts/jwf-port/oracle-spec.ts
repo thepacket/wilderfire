@@ -65,6 +65,8 @@ for (const name of [...names].sort()) {
     }
   }
   entries.push({ name, priority: jwf?.priority ?? d.priority, source: hand && jwf ? 'both' : hand ? 'hand' : 'jwf', sets: [setA, setB, setC] });
+  // prepost ports: the inverse snippet is tested as its own pre-priority entry (Oracle.java calls invtransform for `name~inv`)
+  if (jwf?.preCode) entries.push({ name: name + '~inv', priority: -1, source: 'jwf', sets: [setA, setB, setC] });
 }
 
 // text format for Java

@@ -74,7 +74,7 @@ public class Oracle {
       StringBuilder sb = new StringBuilder();
       sb.append("{\"name\":\"").append(curName).append("\",\"set\":").append(si);
       try {
-        VariationFunc f = VariationFuncList.getVariationFuncInstance(curName, true);
+        VariationFunc f = VariationFuncList.getVariationFuncInstance(curName.replace("~inv", ""), true);
         for (Map.Entry<String, Double> e : params.entrySet()) {
           try { f.setParameter(e.getKey(), e.getValue()); } catch (Throwable ex) { sb.append(",\"paramError\":\"").append(e.getKey()).append("\""); }
         }
@@ -94,15 +94,15 @@ public class Oracle {
         for (int i = 0; i < np; i++) {
           double x1 = Double.NaN, y1 = Double.NaN, x2 = Double.NaN, y2 = Double.NaN;
           setup(a, v, px[i], py[i], pz[i], curPrio);
-          try { f.transform(ctx, xf, a, v, weight); XYZPoint o = curPrio == -1 ? a : v; x1 = o.x; y1 = o.y; } catch (Throwable ex) { }
+          try { apply(f, ctx, xf, a, v, weight, curName); XYZPoint o = curPrio == -1 ? a : v; x1 = o.x; y1 = o.y; } catch (Throwable ex) { }
           setup(a, v, px[i], py[i], pz[i], curPrio);
-          try { f.transform(ctx, xf, a, v, weight); XYZPoint o = curPrio == -1 ? a : v; x2 = o.x; y2 = o.y; } catch (Throwable ex) { }
+          try { apply(f, ctx, xf, a, v, weight, curName); XYZPoint o = curPrio == -1 ? a : v; x2 = o.x; y2 = o.y; } catch (Throwable ex) { }
           if ((x1 != x2 && !(Double.isNaN(x1) && Double.isNaN(x2))) || (y1 != y2 && !(Double.isNaN(y1) && Double.isNaN(y2)))) differs = true;
         }
         boolean random = rng.count > 0 || differs;
         int samples = random ? SAMPLES : 1;
         // Re-init for a clean state (some variations keep state)
-        f = VariationFuncList.getVariationFuncInstance(curName, true);
+        f = VariationFuncList.getVariationFuncInstance(curName.replace("~inv", ""), true);
         for (Map.Entry<String, Double> e : params.entrySet()) { try { f.setParameter(e.getKey(), e.getValue()); } catch (Throwable ex) { } }
         f.initOnce(ctx, layer, xf, weight);
         f.init(ctx, layer, xf, weight);
@@ -116,7 +116,7 @@ public class Oracle {
             setup(a, v, px[i], py[i], pz[i], curPrio);
             double ox, oy, oz, oc; boolean hide;
             try {
-              f.transform(ctx, xf, a, v, weight);
+              apply(f, ctx, xf, a, v, weight, curName);
               XYZPoint o = curPrio == -1 ? a : v;
               ox = o.x; oy = o.y; oz = o.z; oc = v.color; hide = v.doHide || a.doHide;
             } catch (Throwable ex) {
@@ -149,12 +149,16 @@ public class Oracle {
     System.err.println("oracle: " + nVars + " variations");
   }
 
+  // `name~inv` rows test a prepost variation's inverse (invtransform), everything else its transform()
+  static void apply(VariationFunc f, FlameTransformationContext ctx, XForm xf, XYZPoint a, XYZPoint v, double weight, String name) {
+    if (name.endsWith("~inv")) f.invtransform(ctx, xf, a, v, weight); else f.transform(ctx, xf, a, v, weight);
+  }
   static void setup(XYZPoint a, XYZPoint v, double x, double y, double z, int prio) {
     a.clear(); v.clear();
     a.x = x; a.y = y; a.z = z; a.color = 0.5;
     a.invalidate();
     v.color = 0.5;
-    if (prio == 1) { v.x = x; v.y = y; v.z = z; }
+    if (prio == 1 || prio == 2) { v.x = x; v.y = y; v.z = z; } // post, and the forward half of a prepost pair, read pVarTP
     else { v.x = 0; v.y = 0; v.z = 0; }
     v.invalidate();
   }

@@ -26,23 +26,23 @@ in the stack.
 
 ## Features
 
-- **928 variations** — 70 hand-written flam3 classics plus **926 JWildfire
+- **932 variations** — 70 hand-written flam3 classics plus **930 JWildfire
   variations ported mechanically**: JWildfire's own GPU snippets and, for
   variations that have none, its Java `transform()` code (attractors, the
   `crop_*` and `glsl_*` shader-art families, `synth`, `nBlur`, `falloff3`,
   the `glynn*` circles, `kifs3d`, `octapol`, `quad`-style objects, per-cell
   seeded `de_stijl`/`greebles`, …), through a CUDA→WGSL transpiler and
-  **numerically verified in 3D against headless JWildfire** (909 by the
+  **numerically verified in 3D against headless JWildfire** (913 by the
   per-point oracle, 17 by inspection where statistics cannot compare;
   JWildfire's own GPU≠CPU snippet bugs are patched back to the Java, and
   shader hashes on cell ids run in double-float so cut/worley patterns
   match — see [`scripts/jwf-port/README.md`](scripts/jwf-port/README.md)).
-  The 98 JWildfire variations that are *not* implemented are listed with
+  The 94 JWildfire variations that are *not* implemented are listed with
   their reason in `scripts/jwf-port/data/unportable.json` (user code compiled
   at run time, external content such as sub-flames/images/meshes/SVG/text,
   CPU-built point sets, …); the importer names the reason when a flame uses one.
   Parametric controls for every one, JWildfire-style **pre / normal / post
-  priority**, and **direct-colour `dc_*` variations** — both the flam3 kind
+  priority** (and the *prepost* inverse pairs), and **direct-colour `dc_*` variations** — both the flam3 kind
   that steer the palette coordinate and JWildfire's shader-art kind
   (`dc_hexagons`, `dc_menger`, `dc_voronoise`, …) that paint RGB directly
 - **Variation picker** — searchable popover with type chips (2D, 3D, blur,

@@ -2,7 +2,7 @@
 // Variations ported from JWildfire (https://github.com/thargor6/JWildfire, LGPL-2.1,
 // (c) Andreas Maschke and contributors) by transpiling each variation's CUDA GPU
 // snippet to WGSL and verifying it against JWildfire's Java implementation.
-// 926 verified of 928 transpiled (1026 in JWildfire).
+// 930 verified of 932 transpiled (1026 in JWildfire).
 //
 // Snippet scope: t (input point, var), z_ (input z), r2, r, th = atan2(x,y), ph = atan2(y,x),
 // v (output accumulator), pz_ (output z), rs (rng), cp (palette coord ptr), hd (hide-flag ptr).
@@ -16,6 +16,8 @@ export interface JwfVariationDef extends VariationDef {
   verified: boolean;
   /** JWildfire priority: -1 pre (mutates the input point), 0 normal, 1 post (mutates the output). */
   priority: number;
+  /** JWildfire "prepost" variations: this snippet runs first in the stage (priority -2), rewriting the input point (the inverse), while `code` runs last (priority 2) on the output. */
+  preCode?: (w: string, p: string[], A: (i: number) => string) => string;
   /** Module-scope WGSL (helper fns/consts) the snippet needs; codegen dedupes by name. */
   funcs?: string;
   funcNames?: string[];
@@ -19306,6 +19308,314 @@ if ((ph > PI)) {
 var r_: f32 = (${w} / (((v.x * v.x) + (v.y * v.y)) + 0.000001));
 v.x = (v.x * r_);
 v.y = (v.y * r_);
+}`,
+  },
+  "prepost_mobius": {
+    params: [{ name: "re_a", def: 1 }, { name: "re_b", def: 0 }, { name: "re_c", def: 0 }, { name: "re_d", def: 1 }, { name: "im_a", def: 0 }, { name: "im_b", def: 0 }, { name: "im_c", def: 0 }, { name: "im_d", def: 0 }],
+    verified: true, priority: 2, flags: [], types: ["2D","PREPOST"],
+    funcNames: ["atan2j"],
+    funcs: `fn atan2j(y: f32, x: f32) -> f32 { if (x == 0.0 && y == 0.0) { return select(0.0, PI, (bitcast<u32>(x) >> 31u) == 1u) * select(1.0, -1.0, (bitcast<u32>(y) >> 31u) == 1u); } return atan2(y, x); }`,
+    code: (w, p) => `{
+loop {
+if ((${w} == 0)) {
+  break;
+}
+var re_u: f32 = (((${p[0]} * v.x) - (${p[4]} * v.y)) + ${p[1]});
+var im_u: f32 = (((${p[0]} * v.y) + (${p[4]} * v.x)) + ${p[5]});
+var re_v: f32 = (((${p[2]} * v.x) - (${p[6]} * v.y)) + ${p[3]});
+var im_v: f32 = (((${p[2]} * v.y) + (${p[6]} * v.x)) + ${p[7]});
+var d: f32 = ((re_v * re_v) + (im_v * im_v));
+if ((d == 0)) {
+  break;
+}
+var rad_v: f32 = (${w} / d);
+v.x = (rad_v * ((re_u * re_v) + (im_u * im_v)));
+v.y = (rad_v * ((im_u * re_v) - (re_u * im_v)));
+break;
+}
+}`,
+    preCode: (w, p) => `{
+var rinv_: f32 = 1.0 / r;
+loop {
+if ((${w} == 0)) {
+  break;
+}
+var re_u: f32 = (((${p[3]} * t.x) - (${p[7]} * t.y)) - ${p[1]});
+var im_u: f32 = (((${p[3]} * t.y) + (${p[7]} * t.x)) - ${p[5]});
+var re_v: f32 = (((-(${p[2]}) * t.x) + (${p[6]} * t.y)) + ${p[0]});
+var im_v: f32 = (((-(${p[2]}) * t.y) - (${p[6]} * t.x)) + ${p[4]});
+var d: f32 = ((re_v * re_v) + (im_v * im_v));
+if ((d == 0)) {
+  break;
+}
+var rad_v: f32 = (1 / (${w} * d));
+t.x = (rad_v * ((re_u * re_v) + (im_u * im_v)));
+t.y = (rad_v * ((im_u * re_v) - (re_u * im_v)));
+r2 = ((t.x * t.x) + (t.y * t.y));
+r = sqrt(r2);
+rinv_ = (1.0 / r);
+th = atan2j(t.x, t.y);
+ph = ((0.5 * PI) - th);
+if ((ph > PI)) {
+  ph -= (2.0 * PI);
+}
+break;
+}
+}`,
+  },
+  "prepost_affine": {
+    params: [{ name: "scale_x", def: 1 }, { name: "scale_y", def: 1 }, { name: "scale_z", def: 1 }, { name: "yaw", def: 0 }, { name: "pitch", def: 0 }, { name: "roll", def: 0 }, { name: "move_x", def: 0 }, { name: "move_y", def: 0 }, { name: "move_z", def: 0 }],
+    verified: true, priority: 2, flags: ["3d","z"], types: ["3D","PREPOST"],
+    funcNames: ["atan2j"],
+    funcs: `fn atan2j(y: f32, x: f32) -> f32 { if (x == 0.0 && y == 0.0) { return select(0.0, PI, (bitcast<u32>(x) >> 31u) == 1u) * select(1.0, -1.0, (bitcast<u32>(y) >> 31u) == 1u); } return atan2(y, x); }`,
+    code: (w, p) => `{
+loop {
+var coefxx: f32 = 0;
+var coefxy: f32 = 0;
+var coefxz: f32 = 0;
+var coefyx: f32 = 0;
+var coefyy: f32 = 0;
+var coefyz: f32 = 0;
+var coefzx: f32 = 0;
+var coefzy: f32 = 0;
+var coefzz: f32 = 0;
+var icoefxx: f32 = 0;
+var icoefxy: f32 = 0;
+var icoefxz: f32 = 0;
+var icoefyx: f32 = 0;
+var icoefyy: f32 = 0;
+var icoefyz: f32 = 0;
+var icoefzx: f32 = 0;
+var icoefzy: f32 = 0;
+var icoefzz: f32 = 0;
+{
+  var d2r: f32 = (PI / 180);
+  var sinyaw: f32 = sin((${p[3]} * d2r));
+  var cosyaw: f32 = cos((${p[3]} * d2r));
+  var sinpitch: f32 = sin((${p[4]} * d2r));
+  var cospitch: f32 = cos((${p[4]} * d2r));
+  var sinroll: f32 = sin((${p[5]} * d2r));
+  var cosroll: f32 = cos((${p[5]} * d2r));
+  coefxx = ((cosyaw * cosroll) - ((sinyaw * sinpitch) * sinroll));
+  coefxy = ((-sinyaw * cosroll) - ((cosyaw * sinpitch) * sinroll));
+  coefxz = (-cospitch * sinroll);
+  coefyx = (sinyaw * cospitch);
+  coefyy = (cosyaw * cospitch);
+  coefyz = -sinpitch;
+  coefzx = ((cosyaw * sinroll) + ((sinyaw * sinpitch) * cosroll));
+  coefzy = (((cosyaw * sinpitch) * cosroll) - (sinyaw * sinroll));
+  coefzz = (cospitch * cosroll);
+  icoefxx = ((cosyaw * cosroll) - ((sinyaw * sinpitch) * sinroll));
+  icoefxy = (sinyaw * cospitch);
+  icoefxz = ((cosyaw * sinroll) + ((sinyaw * sinpitch) * cosroll));
+  icoefyx = ((-sinyaw * cosroll) - ((cosyaw * sinpitch) * sinroll));
+  icoefyy = (cosyaw * cospitch);
+  icoefyz = (((cosyaw * sinpitch) * cosroll) - (sinyaw * sinroll));
+  icoefzx = (-cospitch * sinroll);
+  icoefzy = -sinpitch;
+  icoefzz = (cospitch * cosroll);
+}
+if ((${w} == 0)) {
+  break;
+}
+var x: f32 = ((${w} * ${p[0]}) * v.x);
+var y: f32 = ((${w} * ${p[1]}) * v.y);
+var z: f32 = ((${w} * ${p[2]}) * pz_);
+v.x = ((((coefxx * x) + (coefxy * y)) + (coefxz * z)) + ${p[6]});
+v.y = ((((coefyx * x) + (coefyy * y)) + (coefyz * z)) + ${p[7]});
+pz_ = ((((coefzx * x) + (coefzy * y)) + (coefzz * z)) + ${p[8]});
+break;
+}
+}`,
+    preCode: (w, p) => `{
+var rinv_: f32 = 1.0 / r;
+loop {
+var coefxx: f32 = 0;
+var coefxy: f32 = 0;
+var coefxz: f32 = 0;
+var coefyx: f32 = 0;
+var coefyy: f32 = 0;
+var coefyz: f32 = 0;
+var coefzx: f32 = 0;
+var coefzy: f32 = 0;
+var coefzz: f32 = 0;
+var icoefxx: f32 = 0;
+var icoefxy: f32 = 0;
+var icoefxz: f32 = 0;
+var icoefyx: f32 = 0;
+var icoefyy: f32 = 0;
+var icoefyz: f32 = 0;
+var icoefzx: f32 = 0;
+var icoefzy: f32 = 0;
+var icoefzz: f32 = 0;
+{
+  var d2r: f32 = (PI / 180);
+  var sinyaw: f32 = sin((${p[3]} * d2r));
+  var cosyaw: f32 = cos((${p[3]} * d2r));
+  var sinpitch: f32 = sin((${p[4]} * d2r));
+  var cospitch: f32 = cos((${p[4]} * d2r));
+  var sinroll: f32 = sin((${p[5]} * d2r));
+  var cosroll: f32 = cos((${p[5]} * d2r));
+  coefxx = ((cosyaw * cosroll) - ((sinyaw * sinpitch) * sinroll));
+  coefxy = ((-sinyaw * cosroll) - ((cosyaw * sinpitch) * sinroll));
+  coefxz = (-cospitch * sinroll);
+  coefyx = (sinyaw * cospitch);
+  coefyy = (cosyaw * cospitch);
+  coefyz = -sinpitch;
+  coefzx = ((cosyaw * sinroll) + ((sinyaw * sinpitch) * cosroll));
+  coefzy = (((cosyaw * sinpitch) * cosroll) - (sinyaw * sinroll));
+  coefzz = (cospitch * cosroll);
+  icoefxx = ((cosyaw * cosroll) - ((sinyaw * sinpitch) * sinroll));
+  icoefxy = (sinyaw * cospitch);
+  icoefxz = ((cosyaw * sinroll) + ((sinyaw * sinpitch) * cosroll));
+  icoefyx = ((-sinyaw * cosroll) - ((cosyaw * sinpitch) * sinroll));
+  icoefyy = (cosyaw * cospitch);
+  icoefyz = (((cosyaw * sinpitch) * cosroll) - (sinyaw * sinroll));
+  icoefzx = (-cospitch * sinroll);
+  icoefzy = -sinpitch;
+  icoefzz = (cospitch * cosroll);
+}
+if ((${w} == 0)) {
+  break;
+}
+var x: f32 = (t.x - ${p[6]});
+var y: f32 = (t.y - ${p[7]});
+var z: f32 = (z_ - ${p[8]});
+t.x = ((((icoefxx * x) + (icoefxy * y)) + (icoefxz * z)) / (${w} * ${p[0]}));
+t.y = ((((icoefyx * x) + (icoefyy * y)) + (icoefyz * z)) / (${w} * ${p[1]}));
+z_ = ((((icoefzx * x) + (icoefzy * y)) + (icoefzz * z)) / (${w} * ${p[2]}));
+r2 = ((t.x * t.x) + (t.y * t.y));
+r = sqrt(r2);
+rinv_ = (1.0 / r);
+th = atan2j(t.x, t.y);
+ph = ((0.5 * PI) - th);
+if ((ph > PI)) {
+  ph -= (2.0 * PI);
+}
+break;
+}
+}`,
+  },
+  "prepost_circlize": {
+    params: [{ name: "n", def: 4 }, { name: "rotation", def: 45 }, { name: "reverse", def: 0 }],
+    verified: true, priority: 2, flags: [], types: ["2D","PREPOST"],
+    funcNames: ["atan2j","prepost_circlize_lerp"],
+    funcs: `fn atan2j(y: f32, x: f32) -> f32 { if (x == 0.0 && y == 0.0) { return select(0.0, PI, (bitcast<u32>(x) >> 31u) == 1u) * select(1.0, -1.0, (bitcast<u32>(y) >> 31u) == 1u); } return atan2(y, x); }
+
+fn prepost_circlize_lerp(v0: f32, v1: f32, t_: f32) -> f32 {
+  return (((1 - t_) * v0) + (t_ * v1));
+}`,
+    code: (w, p) => `{
+var p1_: f32 = ${p[1]};
+var rot_rad: f32 = (PI * 0.25);
+var pi_n: f32 = 0;
+var cospi_n: f32 = 0;
+{
+  p1_ = p1_;
+  rot_rad = ((p1_ * PI) / 180);
+}
+{
+  pi_n = (PI / min(max(${p[0]}, 3.0), 50.0));
+  cospi_n = cos(pi_n);
+}
+if ((min(max(${p[2]}, 0.0), 1.0) == 0)) {
+  {
+    var theta: f32 = atan2j(v.y, v.x);
+    var r_: f32 = sqrt(((v.x * v.x) + (v.y * v.y)));
+    var factor: f32 = (cospi_n / cos(((theta - rot_rad) - (pi_n * ((2 * floor(((min(max(${p[0]}, 3.0), 50.0) * (theta - rot_rad)) / (2.0 * PI)))) + 1)))));
+    v.x = (prepost_circlize_lerp(r_, (r_ * factor), ${w}) * cos(theta));
+    v.y = (prepost_circlize_lerp(r_, (r_ * factor), ${w}) * sin(theta));
+  }
+} else {
+  {
+    var theta: f32 = atan2j(v.y, v.x);
+    var r_: f32 = sqrt(((v.x * v.x) + (v.y * v.y)));
+    var factor: f32 = (cospi_n / cos(((theta - rot_rad) - (pi_n * ((2 * floor(((min(max(${p[0]}, 3.0), 50.0) * (theta - rot_rad)) / (2.0 * PI)))) + 1)))));
+    v.x = (prepost_circlize_lerp(r_, (r_ / factor), ${w}) * cos(theta));
+    v.y = (prepost_circlize_lerp(r_, (r_ / factor), ${w}) * sin(theta));
+  }
+}
+}`,
+    preCode: (w, p) => `{
+var p1_: f32 = ${p[1]};
+var rinv_: f32 = 1.0 / r;
+var rot_rad: f32 = (PI * 0.25);
+var pi_n: f32 = 0;
+var cospi_n: f32 = 0;
+{
+  p1_ = p1_;
+  rot_rad = ((p1_ * PI) / 180);
+}
+{
+  pi_n = (PI / ${p[0]});
+  cospi_n = cos(pi_n);
+}
+if ((${p[2]} == 0)) {
+  {
+    var theta: f32 = ph;
+    var r_: f32 = r;
+    var factor: f32 = (cospi_n / cos(((theta - rot_rad) - (pi_n * ((2 * floor(((${p[0]} * (theta - rot_rad)) / (2.0 * PI)))) + 1)))));
+    t.x = (prepost_circlize_lerp(r_, (r_ / factor), ${w}) * cos(theta));
+    t.y = (prepost_circlize_lerp(r_, (r_ / factor), ${w}) * sin(theta));
+  }
+} else {
+  {
+    var theta: f32 = ph;
+    var r_: f32 = r;
+    var factor: f32 = (cospi_n / cos(((theta - rot_rad) - (pi_n * ((2 * floor(((${p[0]} * (theta - rot_rad)) / (2.0 * PI)))) + 1)))));
+    t.x = (prepost_circlize_lerp(r_, (r_ * factor), ${w}) * cos(theta));
+    t.y = (prepost_circlize_lerp(r_, (r_ * factor), ${w}) * sin(theta));
+  }
+}
+r2 = ((t.x * t.x) + (t.y * t.y));
+r = sqrt(r2);
+rinv_ = (1.0 / r);
+th = atan2j(t.x, t.y);
+ph = ((0.5 * PI) - th);
+if ((ph > PI)) {
+  ph -= (2.0 * PI);
+}
+}`,
+  },
+  "prepost_blob": {
+    params: [{ name: "low", def: 0.8 }, { name: "high", def: 1.2 }, { name: "waves", def: 6 }],
+    verified: true, priority: 2, flags: [], types: ["2D","PREPOST"],
+    funcNames: ["atan2j"],
+    funcs: `fn atan2j(y: f32, x: f32) -> f32 { if (x == 0.0 && y == 0.0) { return select(0.0, PI, (bitcast<u32>(x) >> 31u) == 1u) * select(1.0, -1.0, (bitcast<u32>(y) >> 31u) == 1u); } return atan2(y, x); }`,
+    code: (w, p) => `{
+var alow: f32 = 0;
+var ahigh: f32 = 0;
+{
+  alow = (1 - (${w} * (1 - ${p[0]})));
+  ahigh = (1 - (${w} * (1 - ${p[1]})));
+}
+var a: f32 = atan2j(v.x, v.y);
+var r_: f32 = sqrt(((v.x * v.x) + (v.y * v.y)));
+r_ = (r_ * (alow + ((ahigh - alow) * (0.5 + (0.5 * sin((${p[2]} * a)))))));
+v.x = (sin(a) * r_);
+v.y = (cos(a) * r_);
+}`,
+    preCode: (w, p) => `{
+var rinv_: f32 = 1.0 / r;
+var alow: f32 = 0;
+var ahigh: f32 = 0;
+{
+  alow = (1 - (${w} * (1 - ${p[0]})));
+  ahigh = (1 - (${w} * (1 - ${p[1]})));
+}
+var a: f32 = atan2j(t.x, t.y);
+var r_: f32 = sqrt(((t.x * t.x) + (t.y * t.y)));
+r_ = (r_ / (alow + ((ahigh - alow) * (0.5 + (0.5 * sin((${p[2]} * a)))))));
+t.x = (sin(a) * r_);
+t.y = (cos(a) * r_);
+r2 = ((t.x * t.x) + (t.y * t.y));
+r = sqrt(r2);
+rinv_ = (1.0 / r);
+th = atan2j(t.x, t.y);
+ph = ((0.5 * PI) - th);
+if ((ph > PI)) {
+  ph -= (2.0 * PI);
+}
 }`,
   },
   "pTransform": {

@@ -79,12 +79,12 @@ fn snip_(pin: vec4f, rs: ptr<function, u32>) -> vec4f {
   var t0 = pin.xy;
   var t = t0;
   var z_ = pin.z;
-  var pz_ = ${priority === 1 ? 'z_' : '0.0'};
+  var pz_ = ${priority === 1 || priority === 2 ? 'z_' : '0.0'};
   var r2 = max(dot(t, t), 1e-12);
   var r = sqrt(r2);
   var th = atan2(t.x, t.y);
   var ph = atan2(t.y, t.x);
-  var v = ${priority === 1 ? 't' : 'vec2f(0.0, 0.0)'};
+  var v = ${priority === 1 || priority === 2 ? 't' : 'vec2f(0.0, 0.0)'}; // post (and the forward half of a prepost pair) mutate the output point
   ${snippet}
   // color + hide packed: c in [0,1], +10 when hidden
   return vec4f(${priority === -1 ? 't' : 'v'}, ${priority === -1 ? 'z_' : 'pz_'}, c + select(0.0, 10.0, hide));
@@ -188,13 +188,18 @@ export async function runVarTest(device: GPUDevice, opts: { only?: string[]; ver
   let done = 0;
   for (const e of entries) {
     const rows = oracle.get(e.name);
+    // `name~inv`: a prepost port's inverse snippet, tested as a pre-priority variation
+    const inv = e.name.endsWith('~inv');
+    const baseName = inv ? e.name.slice(0, -4) : e.name;
     const sources: ('hand' | 'jwf')[] = [];
-    if (VARIATIONS[e.name]) sources.push('hand');
-    if (JWF_VARIATIONS[e.name]) sources.push('jwf');
+    if (VARIATIONS[baseName] && !inv) sources.push('hand');
+    if (JWF_VARIATIONS[baseName]) sources.push('jwf');
     for (const source of sources) {
-      const def: VariationDef | JwfVariationDef = source === 'hand' ? VARIATIONS[e.name] : JWF_VARIATIONS[e.name];
-      const jdef = source === 'jwf' ? (def as JwfVariationDef) : null;
-      const priority = jdef?.priority ?? e.priority;
+      const def0: VariationDef | JwfVariationDef = source === 'hand' ? VARIATIONS[baseName] : JWF_VARIATIONS[baseName];
+      const jdef = source === 'jwf' ? (def0 as JwfVariationDef) : null;
+      if (inv && !jdef?.preCode) continue;
+      const def: VariationDef | JwfVariationDef = inv ? { ...def0, code: jdef!.preCode! } : def0;
+      const priority = inv ? -1 : (jdef?.priority ?? e.priority);
       const res: VarTestResult = { name: e.name, source, status: 'pass', random: false, passFrac: 1, maxErr: 0, flags: jdef?.flags };
       results.push(res);
       if (!rows) { res.status = 'oracle-missing'; continue; }
