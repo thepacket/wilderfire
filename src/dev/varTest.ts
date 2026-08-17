@@ -53,6 +53,7 @@ function buildShader(def: VariationDef, funcs: string, priority: number): string
   const A = (k: number) => `xd[${base + k}]`;
   const snippet = def.code(w, p, A);
   return `${PRELUDE}
+var<private> pal: array<vec4f, 256>; // palette stand-in for direct-colour variations
 ${funcs}
 @group(0) @binding(0) var<storage, read> inp: array<vec4f>;
 @group(0) @binding(1) var<storage, read_write> outp: array<vec4f>;
@@ -72,6 +73,9 @@ fn main(@builtin(global_invocation_id) gid: vec3u) {
   var hide: bool = false;
   let cp = &c;
   let hd = &hide;
+  var rgbo = vec4f(0.0);
+  let rgb = &rgbo;
+  let PALB_: u32 = 0u;
   var t0 = inp[pi].xy;
   var t = t0;
   var z_ = inp[pi].z;

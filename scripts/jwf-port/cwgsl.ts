@@ -843,6 +843,9 @@ BUILTINS.int = (a, em) => ({ c: em.toI32(a[0], true), ty: I32 });
 BUILTINS.uint = (a, em) => ({ c: em.toU32(a[0], true), ty: U32 });
 BUILTINS.bool = (a, em) => ({ c: em.toBool(a[0]), ty: BOOL });
 BUILTINS.RANDFLOAT = () => ({ c: 'rnd(rs)', ty: F32 });
+// JWildfire GPU palette read (dc_* direct-colour variations): `palette` binds to the
+// layer's palette base index, `numColors` to 256; helper defined in HELPER_FUNCS.
+BUILTINS.read_imageStepMode = (a, em) => ({ c: `read_imageStepMode(${em.toU32(a[0])}, ${em.toI32(a[1])}, ${em.toF32(a[2])})`, ty: vec(4, 'f32') });
 BUILTINS.RANDINT = () => ({ c: 'rndi(rs)', ty: U32 });
 BUILTINS.erff = (a, em) => ({ c: `erf(${em.toF32(a[0])})`, ty: F32 });
 BUILTINS.erf = BUILTINS.erff;
@@ -862,6 +865,7 @@ BUILTINS.rand = () => ({ c: 'rnd(rs)', ty: F32 });
 // Extra WGSL helper functions referenced by builtin mappings (included on demand).
 export const HELPER_FUNCS: Record<string, string> = {
   sqr: `fn sqr(x: f32) -> f32 { return x * x; }`,
+  read_imageStepMode: `fn read_imageStepMode(base: u32, n: i32, t: f32) -> vec4f { return pal[base + u32(clamp(t, 0.0, 0.99999) * f32(max(n, 1)))]; }`,
   // C powf semantics: a negative base with an integer-valued exponent is defined
   powc: `fn powc(x: f32, y: f32) -> f32 {
   if (x >= 0.0) { return pow(x, y); }
@@ -1426,12 +1430,22 @@ class Emitter {
         const sel = this.expr(s.e, sc);
         let out = `${ind}switch ${this.toI32(sel)} {\n`;
         let hasDefault = false;
+        // a case body that ends in break/return/continue — possibly inside a trailing block
+        const jumpEnd = (st: Stmt | undefined): 'break' | 'other' | null => {
+          if (!st) return null;
+          if (st.t === 'break') return 'break';
+          if (st.t === 'return' || st.t === 'continue') return 'other';
+          if (st.t === 'block') return jumpEnd(st.stmts[st.stmts.length - 1]);
+          return null;
+        };
         s.cases.forEach((cs, idx) => {
           const last = cs.body[cs.body.length - 1];
-          const terminated = !cs.body.length ? false : (last.t === 'break' || last.t === 'return' || last.t === 'continue');
+          const je = jumpEnd(last);
+          const terminated = je !== null;
           if (!terminated && idx !== s.cases.length - 1 && cs.body.length) fail('switch fallthrough not supported');
           const labels = cs.vals.map((v) => v === null ? (hasDefault = true, 'default') : this.toI32(this.expr(v, sc)));
-          const body = terminated && last.t === 'break' ? cs.body.slice(0, -1) : cs.body;
+          // drop a direct trailing break (WGSL cases don't fall through); a break nested in a block is harmless
+          const body = je === 'break' && last.t === 'break' ? cs.body.slice(0, -1) : cs.body;
           const inner = new Scope(sc, sc.fn);
           out += `${ind}  case ${labels.join(', ')}: {\n${this.stmts(body, inner, ind + '    ')}${ind}  }\n`;
         });

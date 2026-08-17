@@ -110,6 +110,18 @@ if (_d != 0.f) {
     note: 'GPU snippet dropped the z output (CPU: pVarTP.z += z1 + pAffineTP.z).',
     append: '\n__pz += z1 + __z;',
   },
+  // --- JWildfire GPU snippet syntax/copy-paste bugs (semantics unchanged) ---
+  rings3: {
+    note: "GPU snippet is rings2's code with a missing ';' and rings2's param names.",
+    gpuCode: `float l = sqrtf(__x * __x + __y * __y);
+float _dx = __rings3_val * __rings3_val ADD_EPSILON;
+float c = 2.f * (_dx - _dx * _dx);
+if (_dx == 0.f || l == 0.f) { return; }
+float k = (int) ((l / _dx + 1.f) / 2.f);
+float r = __rings3 * (2.f - _dx * (k * 2.f / l + 1.f) - __rings3_n * (k * c - 1.f) / l);
+__px += r * __x;
+__py += r * __y;`,
+  },
   // 3D solid samplers: CPU tries up to 50 random points inside the SDF before
   // hiding; the GPU snippet tries once (mostly hidden, wrong density).
   ...Object.fromEntries([

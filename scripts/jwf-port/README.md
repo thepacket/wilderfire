@@ -70,18 +70,25 @@ node scripts/jwf-port/gen.ts            # re-emit with the new verdicts
 
 ## Status
 
-Of JWildfire's 1026 variations, 726 transpile; **690 verify against the Java
-oracle in 3D** and ship in `variations.jwf.ts` (`pre_flatten` and `cut_bricks`
-are force-verified in `gen.ts` — see the notes there), 36 transpile but diverge
-(f32 hash noise, a few GPU≠CPU snippets, missing helpers) and stay in
-`variations.jwf.unverified.ts`, and the rest have no GPU snippet or need
-resources/custom code. Together with the 70 hand-written flam3 entries the app
-registry has 694 variations. Two systematic GPU≠CPU families were fixed with
-generator-level overrides: the 17 `*3D` solid samplers (CPU rejection-samples up
-to 50 times before hiding — `retry` override) and Java `setParameter()` clamps
-(`data/param-clamps.json`, extracted from the Java by `extract-clamps.py`,
-applied to every param read). The oracle uses a Mersenne-Twister RNG because
-JWildfire's Marsaglia generator degenerates for some seeds. Run
+Of JWildfire's 1026 variations, 780 transpile; **733 verify against the Java
+oracle in 3D** (+2 force-verified: `pre_flatten`, `cut_bricks` — see `gen.ts`)
+and ship in `variations.jwf.ts`; 47 transpile but diverge (f32 hash noise, a
+few GPU≠CPU snippets, param-only mismatches) and stay in
+`variations.jwf.unverified.ts`; 6 (`fract_*`) need struct-pointer state the
+transpiler lacks; the rest have no GPU snippet or need resources/custom code.
+Together with the 70 hand-written flam3 entries the app registry has 739
+variations. Systematic GPU≠CPU families fixed at generator level: the 17 `*3D`
+solid samplers (CPU rejection-samples up to 50 times before hiding — `retry`
+override), Java `setParameter()` clamps (`data/param-clamps.json` from
+`extract-clamps.py`, applied to every param read), the `DC_BaseFunc` shader-art
+family (CPU samples `rnd−0.5` and sets z = greyscale(colour); the GPU sampled
+`2·rnd−1` and left z = 0.5 — `data/dc-base.json` says which classes inherit the
+base transform), mistyped param names, and a few C-isms (`++i` in conditions,
+chained assignment, `case a: case b:` groups). Direct RGB colour (`__useRgb`,
+`__colorR/G/B`) and palette reads (`read_imageStepMode`, `numColors`) are now
+supported: the kernel passes an `rgb` out-pointer and each layer's palette base
+(`PALB_`) into every transform function. The oracle uses a Mersenne-Twister RNG
+because JWildfire's Marsaglia generator degenerates for some seeds. Run
 `await window.wilderfire.varTest()` in the dev console for the current verdicts
 and `await window.wilderfire.flameTest()` to import + compile every fixture flame.
 

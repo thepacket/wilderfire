@@ -26,13 +26,14 @@ in the stack.
 
 ## Features
 
-- **694 variations** — 70 hand-written flam3 classics plus **690 JWildfire
+- **739 variations** — 70 hand-written flam3 classics plus **735 JWildfire
   variations ported mechanically** from JWildfire's own GPU snippets by a
   CUDA→WGSL transpiler and **numerically verified in 3D against headless
   JWildfire** (see [`scripts/jwf-port/README.md`](scripts/jwf-port/README.md)).
   Parametric controls for every one, JWildfire-style **pre / normal / post
-  priority**, and **direct-color `dc_*` variations** that paint the palette
-  coordinate from geometry
+  priority**, and **direct-colour `dc_*` variations** — both the flam3 kind
+  that steer the palette coordinate and JWildfire's shader-art kind
+  (`dc_hexagons`, `dc_menger`, `dc_voronoise`, …) that paint RGB directly
 - **Variation picker** — searchable popover with type chips (2D, 3D, blur,
   DC, pre, post, crop, …) and pinned classics, replacing a 700-entry dropdown
 - **3D** — points carry z, every variation stage can read/write depth,

@@ -86,7 +86,7 @@ function splitItems(blob: string): [string, string][] {
   return out;
 }
 
-function genXformFn(name: string, x: XForm, B: number): string {
+function genXformFn(name: string, x: XForm, B: number, palBase: number): string {
   const A = (i: number) => `xd[${B + i}u]`;
   const [pre, main, post] = varLists(x);
   let off = B + HEADER;
@@ -151,7 +151,8 @@ ${snips}    ${output} = v;${zOut ? `\n    ${zOut} = pz_;` : ''}
   body += genStage(main, 't0', 'vout', 'vec2f(0.0, 0.0)', 'zin', 'zout');
   if (post.length) body += genStage(post, 'vout', 'vout', 'vec2f(0.0, 0.0)', 'zout', null);
 
-  return `fn ${name}(pin: vec3f, cp: ptr<function, f32>, rs: ptr<function, u32>, hd: ptr<function, bool>) -> vec3f {
+  return `fn ${name}(pin: vec3f, cp: ptr<function, f32>, rs: ptr<function, u32>, hd: ptr<function, bool>, rgb: ptr<function, vec4f>) -> vec3f {
+  let PALB_: u32 = ${palBase}u; // this layer's palette base (direct-colour variations read it)
 ${body}  let px1 = ${A(6)}*vout.x + ${A(7)}*vout.y;
   let py1 = ${A(9)}*vout.x + ${A(10)}*vout.y;
   let py2 = ${A(28)}*py1 + ${A(29)}*zout;
@@ -185,9 +186,9 @@ export function compileFlame(flame: Flame, nPoints: number): CompiledFlame {
   layers.forEach((ly, li) => {
     const info = infos[li];
     ly.xforms.forEach((x, i) => {
-      funcs += genXformFn(`applyX${li}_${i}`, x, info.bases[i]) + '\n\n';
+      funcs += genXformFn(`applyX${li}_${i}`, x, info.bases[i], li * 256) + '\n\n';
     });
-    if (ly.final) funcs += genXformFn(`applyF${li}`, ly.final, info.finalBase) + '\n\n';
+    if (ly.final) funcs += genXformFn(`applyF${li}`, ly.final, info.finalBase, li * 256) + '\n\n';
 
     let sel = `    let cb = ${info.cdfBase}u + (prev + 1u) * ${CDF_ROW}u;\n    var xi = 0u;\n`;
     for (let i = 0; i < info.n - 1; i++) {
@@ -200,7 +201,7 @@ export function compileFlame(flame: Flame, nPoints: number): CompiledFlame {
         let cs = xd[${b + 13}u];
         c = c * (1.0 - cs) + xd[${b + 12}u] * cs;
         op = xd[${b + 14}u];
-        np = applyX${li}_${i}(p, &c, &rs, &hide);
+        np = applyX${li}_${i}(p, &c, &rs, &hide, &rgbo);
       }`;
     }).join('\n');
     const finalBlock = ly.final ? `
@@ -208,7 +209,7 @@ export function compileFlame(flame: Flame, nPoints: number): CompiledFlame {
         let fcs = xd[${info.finalBase + 13}u];
         dc = dc * (1.0 - fcs) + xd[${info.finalBase + 12}u] * fcs;
       }
-      dp = applyF${li}(p, &dc, &rs, &hide);` : '';
+      dp = applyF${li}(p, &dc, &rs, &hide, &rgbo);` : '';
 
     iterFns += `
 fn iterLayer${li}(idx: u32) {
@@ -230,6 +231,7 @@ ${sel}
     var np = p;
     var op = 1.0;
     var hide = false;
+    var rgbo = vec4f(0.0); // direct RGB colour from dc_* variations (w = 1 when set)
     switch xi {
 ${cases}
       default: {}
@@ -315,6 +317,7 @@ ${cases}
     if (visible && fx >= 0.0 && fy >= 0.0 && fx < f32(P.width) && fy < f32(P.height)) {
       let hi = (u32(fy) * P.width + u32(fx)) * 4u;
       var col = pal[${li * 256}u + min(u32(clamp(dc, 0.0, 1.0) * 255.99), 255u)];
+      if (rgbo.w > 0.5) { col = vec4f(clamp(rgbo.xyz, vec3f(0.0), vec3f(1.0)), 1.0); }
       if (dz < 1.0) { col = vec4f(mix(P.dimColor.xyz, col.xyz, dz), col.w); }
       atomicAdd(&hist[hi + 0u], u32(col.x * op * 255.0));
       atomicAdd(&hist[hi + 1u], u32(col.y * op * 255.0));

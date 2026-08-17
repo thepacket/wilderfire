@@ -13,6 +13,8 @@ import { transpileSnippet, TranspileError, type Binding, type Env } from './cwgs
 import { OVERRIDES } from './overrides.ts';
 import clampsJson from './data/param-clamps.json' with { type: 'json' };
 const PARAM_CLAMPS = clampsJson as Record<string, Record<string, [number, number]>>;
+import dcBaseJson from './data/dc-base.json' with { type: 'json' };
+const DC_BASE = dcBaseJson as { inherit: string[]; own2: string[]; ownOther: string[] };
 
 const here = dirname(fileURLToPath(import.meta.url));
 const dataDir = join(here, 'data');
@@ -53,7 +55,6 @@ const EXCLUDE: Record<string, string> = {
 };
 
 const UNSUPPORTED_FLAGS: Record<string, string> = {
-  rgb: 'direct RGB color output',
   wfield: 'weighting fields',
 };
 
@@ -70,7 +71,7 @@ const fnRegistry = new Map<string, string>();
 
 function bindingsFor(v: DumpVar): Env {
   const b = new Map<string, Binding>();
-  const F = { k: 'f32' } as const, B = { k: 'bool' } as const;
+  const F = { k: 'f32' } as const, B = { k: 'bool' } as const, I = { k: 'i32' } as const, U = { k: 'u32' } as const;
   b.set('__x', { code: 't.x', ty: F, lvalue: true });
   b.set('__y', { code: 't.y', ty: F, lvalue: true });
   // z_ / pz_ are declared by the codegen stage (input z, output z accumulator)
@@ -88,8 +89,15 @@ function bindingsFor(v: DumpVar): Env {
   b.set('__x0', { code: 't0.x', ty: F, lvalue: false, flag: 'x0' });
   b.set('__y0', { code: 't0.y', ty: F, lvalue: false, flag: 'x0' });
   b.set('__z0', { code: 'z_', ty: F, lvalue: false, flag: 'z' });
-  for (const n of ['__colorR', '__colorG', '__colorB', '__colorA']) b.set(n, { code: n.slice(2) + '_', ty: F, lvalue: true, flag: 'rgb', decl: `var ${n.slice(2)}_: f32 = 0.0;` });
-  b.set('__useRgb', { code: 'useRgb_', ty: B, lvalue: true, flag: 'rgb', decl: 'var useRgb_: bool = false;' });
+  // Direct RGB colour: written through the xform function's `rgb` out-pointer
+  // (x,y,z = colour, w = 1 when set); the kernel plots it instead of the palette lookup.
+  b.set('__colorR', { code: '(*rgb).x', ty: F, lvalue: true, flag: 'rgb' });
+  b.set('__colorG', { code: '(*rgb).y', ty: F, lvalue: true, flag: 'rgb' });
+  b.set('__colorB', { code: '(*rgb).z', ty: F, lvalue: true, flag: 'rgb' });
+  b.set('__colorA', { code: 'colorA_', ty: F, lvalue: true, flag: 'rgb', decl: 'var colorA_: f32 = 1.0;' });
+  b.set('__useRgb', { code: '(*rgb).w', ty: F, lvalue: true, flag: 'rgb' });
+  b.set('numColors', { code: '256', ty: I, lvalue: false });
+  b.set('palette', { code: 'PALB_', ty: U, lvalue: false });
   b.set('__wFieldValue', { code: '0.0', ty: F, flag: 'wfield' });
   b.set('__wFieldAmountScale', { code: '1.0', ty: F, flag: 'wfield' });
   b.set('__was_pre', { code: 'false', ty: B, flag: 'waspre' });
@@ -124,15 +132,64 @@ function bindingsFor(v: DumpVar): Env {
   return { bindings: b, resolveMagic };
 }
 
-for (const v0 of dump) {
+for (let v0 of dump) {
   const ov = OVERRIDES[v0.name];
-  let ovCode = ov ? (ov.gpuCode ?? v0.gpuCode ?? '') + (ov.append ?? '') : undefined;
+  // `varpar->x` (JWildfire's per-instance param/state struct) is spelled `__x` in the dialect we transpile
+  let ovCode: string | undefined = ov ? (ov.gpuCode ?? v0.gpuCode ?? '') + (ov.append ?? '') : (v0.gpuCode && v0.gpuCode.includes('varpar->') ? v0.gpuCode : undefined);
+  if (ovCode) ovCode = ovCode.replace(/varpar->/g, '__');
   if (ov?.retry && ovCode) {
     // wrap in `for (_try < N) { … break-on-success }`: the snippet sets __doHide=true
     // then `if (distance < 0) { __doHide=false; __px=…; }` — add a break inside that block.
     const close = ovCode.lastIndexOf('}');
     if (close < 0) throw new Error(`retry override: no if-block in ${v0.name}`);
     ovCode = `for (int _try = 0; _try < ${ov.retry}; _try++) {\n${ovCode.slice(0, close)} break; }\n}`;
+  }
+  // Small C-isms the transpiler does not support, rewritten at source level:
+  //   `if (++i > n)` → `i++; if (i > n)`; chained `a=b=c` → two statements;
+  //   `while ((k++<10) && cond)` → `while (k < 10 && cond) { k++; …` (k++ evaluated first
+  //   in C, so the body sees k+1 and k ends one higher — reproduced by incrementing at loop top)
+  {
+    const fix: Record<string, (c: string, f: string) => [string, string]> = {
+      circleRand: (c, f) => [c.replace(/if \(\+\+iter > maxIter\) \{/, 'iter = iter + 1; if (iter > maxIter) {'), f],
+      circleTrans1: (c, f) => [c, f.replace(/if \(\+\+iter > maxIter\) break;/g, 'iter = iter + 1; if (iter > maxIter) break;')],
+      mandelbrot: (c, f) => [c
+        .replace(/while \(\(k\+\+<10\) && \(/, 'while ((k < 10) && (')
+        .replace(/x1=y1=50000\.0-RANDFLOAT\(\)\*100000;/, 'y1 = 50000.0 - RANDFLOAT() * 100000; x1 = y1;'), f],
+      dc_circuits: (c, f) => [c, f.replace(/float o,ot2,ot=ot2=1000\.0;/, 'float o; float ot2 = 1000.0; float ot = 1000.0;')],
+      dc_moebiuslog: (c, f) => [c, f.replace(/\(logf\(length\(U=U\+\.5\)\)\)/, '(logf(length(U + .5)))').replace(/if\(Log==1\.0\)(\s*)U =/, 'if(Log==1.0) { U = U + .5; }\n if(Log==1.0)$1U =')],
+    };
+    const fx = fix[v0.name];
+    if (fx) {
+      const [c, f] = fx((ovCode ?? v0.gpuCode ?? '').replace(/varpar->/g, '__'), v0.gpuFunctions ?? '');
+      ovCode = c;
+      if (f !== (v0.gpuFunctions ?? '')) v0 = { ...v0, gpuFunctions: f };
+    }
+  }
+  // Param-name typos in JWildfire GPU snippets (snippet uses a name the class doesn't declare)
+  {
+    const aliases: Record<string, Record<string, string>> = {
+      post_circlecrop: { scatterarea: 'scatter_area' },
+      standing_wave: { freqx: 'freq_x', freqy: 'freq_y' },
+    };
+    const al = aliases[v0.name];
+    if (al) {
+      let code = (ovCode ?? v0.gpuCode ?? '').replace(/varpar->/g, '__');
+      for (const [bad, good] of Object.entries(al)) code = code.replace(new RegExp(`__${v0.name}_${bad}(?![A-Za-z0-9_])`, 'g'), `__${v0.name}_${good}`);
+      ovCode = code;
+    }
+  }
+  // DC_BaseFunc family (dc_* shader-art variations): JWildfire's GPU snippets sample
+  // x,y = 2·rnd−1 where the CPU samples rnd−0.5, and leave the outer `z = 0.5` where
+  // the CPU sets z = greyscale(colour) (the GPU re-declares z in a nested block).
+  {
+    let code = ovCode ?? v0.gpuCode ?? '';
+    if (/float z\s*=\s*0\.5;/.test(code) && /_getRGBColor\(/.test(code)) {
+      // sampling: only classes that inherit DC_BaseFunc.transform (data/dc-base.json);
+      // the ones with their own transform() really do use 2·rnd−1 on the CPU too
+      if (DC_BASE.inherit.includes(v0.name)) code = code.replace(/2\.0\*RANDFLOAT\(\)-1\.0/g, '(RANDFLOAT()-0.5)');
+      code = code.replace(/(color\s*=\s*\w+_getRGBColor\([^;]*\);)/, '$1 { int3 zc_ = dbl2int(color); z = greyscale((float)zc_.x, (float)zc_.y, (float)zc_.z); }');
+      ovCode = code;
+    }
   }
   // Java setParameter() clamps (data/param-clamps.json, extracted by extract-clamps.py)
   // plus any per-override clamps: wrap every read of the param in the same clamp.

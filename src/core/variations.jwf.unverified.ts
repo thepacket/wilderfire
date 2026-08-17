@@ -77,6 +77,104 @@ if (((${p[2]} > 0.0) && (rnd(rs) < 0.5))) {
 }
 }`,
   },
+  "post_circlecrop": {
+    params: [{ name: "radius", def: 1 }, { name: "x", def: 0 }, { name: "y", def: 0 }, { name: "scatter_area", def: 0 }, { name: "zero", def: 1 }],
+    verified: false, priority: 1, flags: [], types: ["CROP","POST"],
+    code: (w, p) => `{
+var _cA: f32 = max(-1.0, min(${p[3]}, 1.0));
+var x0: f32 = ${p[1]};
+var y0: f32 = ${p[2]};
+var cr: f32 = ${p[0]};
+var ca: f32 = _cA;
+var vv: f32 = ${w};
+v.x -= x0;
+v.y -= y0;
+var rad: f32 = sqrt(((v.x * v.x) + (v.y * v.y)));
+var ang: f32 = atan2(v.y, v.x);
+var rdc: f32 = (cr + ((rnd(rs) * 0.5) * ca));
+var esc: bool = (rad > cr);
+var cr0: bool = (${p[4]} != 0.0);
+var c: f32;
+var s: f32;
+s = sin(ang);
+c = cos(ang);
+if ((cr0 && esc)) {
+  v.y = 0.0;
+  v.x = v.y;
+} else if ((cr0 && !esc)) {
+  v.x += ((vv * v.x) + x0);
+  v.y += ((vv * v.y) + y0);
+} else if ((!cr0 && esc)) {
+  v.x += (((vv * rdc) * c) + x0);
+  v.y += (((vv * rdc) * s) + y0);
+} else if ((!cr0 && !esc)) {
+  v.x += ((vv * v.x) + x0);
+  v.y += ((vv * v.y) + y0);
+}
+}`,
+  },
+  "mandelbrot": {
+    params: [{ name: "iter", def: 100 }, { name: "xmin", def: -1.6 }, { name: "xmax", def: 1.6 }, { name: "ymin", def: -1.2 }, { name: "ymax", def: 1.2 }, { name: "invert", def: 0 }, { name: "skin", def: 0.012 }, { name: "cx", def: 0 }, { name: "cy", def: 0 }, { name: "max_points", def: -1 }, { name: "seed", def: 1234 }, { name: "rnd_z_range", def: 0 }],
+    verified: false, priority: 0, flags: ["3d","state","z"], types: ["3D","SIMULATION","BASE_SHAPE","ESCAPE_TIME_FRACTAL"],
+    funcNames: ["jwx_mandelbrot_x0","jwx_mandelbrot_y0","jwx_mandelbrot_z0"],
+    funcs: `var<private> jwx_mandelbrot_x0: f32 = 0.0;
+
+var<private> jwx_mandelbrot_y0: f32 = 0.0;
+
+var<private> jwx_mandelbrot_z0: f32 = 0.0;`,
+    code: (w, p) => `{
+var _x0: f32 = jwx_mandelbrot_x0;
+var _y0: f32 = jwx_mandelbrot_y0;
+var _z0: f32 = jwx_mandelbrot_z0;
+var x1: f32 = _x0;
+var x: f32 = _x0;
+var y1: f32 = _y0;
+var y: f32 = _y0;
+var currIter: i32;
+var inverted: i32 = select(0, 1, (rnd(rs) < ${p[5]}));
+if ((inverted != 0)) {
+  currIter = 0;
+} else {
+  currIter = i32(${p[0]});
+}
+var k: i32 = 0;
+while (((k < 10) && (((inverted != 0) && (f32(currIter) < ${p[0]})) || (!(inverted != 0) && ((f32(currIter) >= ${p[0]}) || ((${p[6]} < 1) && (f32(currIter) < ((0.1 * ${p[0]}) * (1 - ${p[6]}))))))))) {
+  if (((_x0 == 0) && (_y0 == 0))) {
+    _x0 = (((${p[2]} - ${p[1]}) * rnd(rs)) + ${p[1]});
+    _y0 = (((${p[4]} - ${p[3]}) * rnd(rs)) + ${p[3]});
+    _z0 = (rnd(rs) * ${p[11]});
+  } else {
+    _x0 = (((${p[6]} + 0.001) * (rnd(rs) - 0.5)) + _x0);
+    _y0 = (((${p[6]} + 0.001) * (rnd(rs) - 0.5)) + _y0);
+  }
+  x1 = _x0;
+  y1 = _y0;
+  x = _x0;
+  y = _y0;
+  currIter = 0;
+  while (((((x * x) + (y * y)) < f32((2 * 2))) && (f32(currIter) < ${p[0]}))) {
+    var xtemp: f32 = (((x * x) - (y * y)) + _x0);
+    y = (((2.0 * x) * y) + _y0);
+    x = xtemp;
+    currIter++;
+  }
+  if ((((f32(currIter) >= ${p[0]}) || (${p[6]} == 1)) || (f32(currIter) < (0.1 * (${p[0]} * (1 - ${p[6]})))))) {
+    _x0 = 0;
+    _y0 = 0;
+  }
+}
+if ((k >= 10)) {
+  y1 = (50000.0 - (rnd(rs) * 100000));
+  x1 = y1;
+}
+v.x += (${w} * (x1 + (${p[7]} * x)));
+v.y += (${w} * (y1 + (${p[8]} * y)));
+pz_ += _z0;
+(*&(jwx_mandelbrot_x0)) = _x0;
+(*&(jwx_mandelbrot_y0)) = _y0;
+(*&(jwx_mandelbrot_z0)) = _z0;
+}`,
+  },
   "post_colorscale_wf": {
     params: [{ name: "scale_x", def: 0 }, { name: "scale_y", def: 0 }, { name: "scale_z", def: 0.5 }, { name: "offset_z", def: 0 }, { name: "reset_z", def: 0 }, { name: "sides", def: 0 }],
     verified: false, priority: 1, flags: ["3d","dc","z"], types: ["3D","POST"],
@@ -1000,6 +1098,710 @@ pz_ += (${w} * sin(((6.0 * cos(rad)) - (${p[0]} * ang))));
 (*cp) = abs(sin(((6.0 * cos(rad)) - (${p[0]} * ang))));
 }`,
   },
+  "dc_circuits": {
+    params: [{ name: "Seed", def: 1000000 }, { name: "time", def: 0 }, { name: "rate", def: 0.8 }, { name: "intensity", def: 0.9 }, { name: "focus", def: 1.5 }, { name: "pulse", def: 10 }, { name: "glow", def: 2 }, { name: "loops", def: 15 }, { name: "zoom", def: 1 }, { name: "ColorOnly", def: 0 }, { name: "Gradient", def: 0 }, { name: "scale_z", def: 0 }, { name: "offset_z", def: 0 }, { name: "reset_z", def: 1 }],
+    verified: false, priority: 0, flags: ["dc","rgb","z"], types: ["SIMULATION","DC","BASE_SHAPE"],
+    funcNames: ["Mat2","read_imageStepMode","powc","Mat2_Init","times","dc_circuits_formula","dc_circuits_getRGBColor","dbl2int","greyscale","distance_color"],
+    funcs: `struct Mat2 {
+  a00: f32,
+  a01: f32,
+  a10: f32,
+  a11: f32,
+}
+
+fn read_imageStepMode(base: u32, n: i32, t: f32) -> vec4f { return pal[base + u32(clamp(t, 0.0, 0.99999) * f32(max(n, 1)))]; }
+
+fn powc(x: f32, y: f32) -> f32 {
+  if (x >= 0.0) { return pow(x, y); }
+  let yi = round(y);
+  if (abs(y - yi) > 1e-6) { return pow(x, y); }
+  let m = pow(-x, y);
+  return select(m, -m, (i32(yi) & 1) != 0);
+}
+
+fn Mat2_Init(m: ptr<function, Mat2>, v00: f32, v10: f32, v01: f32, v11: f32) {
+  (*m).a00 = v00;
+  (*m).a01 = v01;
+  (*m).a10 = v10;
+  (*m).a11 = v11;
+}
+
+fn times(m: ptr<function, Mat2>, v_: vec2f) -> vec2f {
+  return vec2f((((*m).a00 * v_.x) + ((*m).a01 * v_.y)), (((*m).a10 * v_.x) + ((*m).a11 * v_.y)));
+}
+
+fn dc_circuits_formula(z_in: vec2f, t_: f32, loops: f32, zoom: f32, intensity: f32, glow: f32, pulse: f32) -> vec3f {
+  var z: vec2f = z_in;
+  var M: f32 = 0.0;
+  var S: f32 = ((101.0 + glow) * intensity);
+  var o: f32;
+  var ot2: f32 = 1000.0;
+  var ot: f32 = 1000.0;
+  var K: f32 = floor(((loops / 4.0) + floor((5.0 * zoom))));
+  var color: vec3f = vec3f(0.0, 0.0, 0.0);
+  for (var i: i32 = 0; (i < 11); i++) {
+    z = ((abs(z) / vec2f(clamp(dot(z, z), 0.1, 0.5))) - vec2f(t_));
+    var l: f32 = length(z);
+    o = min(max(abs(min(z.x, z.y)), (-l + 0.25)), abs((l - 0.25)));
+    ot = min(ot, o);
+    ot2 = min((l * 0.1), ot2);
+    M = max(M, (f32(i) * (1.0 - abs(sign((ot - o))))));
+    if ((K <= 0.0)) {
+      break;
+    }
+    K -= 1.0;
+  }
+  M += 1.0;
+  var w_: f32 = ((intensity * zoom) * M);
+  var circ: f32 = powc((max(0.0, (w_ - ot2)) / w_), 6.0);
+  var t99: f32 = powc((max(0.0, (w_ - ot)) / w_), 0.25);
+  S = (S + max(t99, circ));
+  var t1: vec3f = (vec3f(0.1, 0.1, 0.1) + vec3f(0.45, 0.75, (M * 0.1)));
+  var col: vec3f = normalize(t1);
+  var t100: f32 = (0.4 + mmod((((M / 9.0) - (t_ * pulse)) + (ot2 * 2.0)), 1.0));
+  var t2: vec3f = vec3f(t100, t100, t100);
+  color = (color + (col * t2));
+  var f1: f32 = ((circ * (10.0 - M)) * 3.0);
+  color = (color + (vec3f(1.0, 0.7, 0.3) * vec3f(f1)));
+  return color;
+}
+
+fn dc_circuits_getRGBColor(pos: vec2f, time: f32, rate: f32, zoom: f32, focus: f32, loops: f32, glow: f32, intensity: f32, pulse: f32) -> vec3f {
+  var color: vec3f = vec3f(0.0, 0.0, 0.0);
+  var S: f32 = ((101.0 + glow) * intensity);
+  var center: vec2f = vec2f(0.0, 0.0);
+  var R: f32 = 0.0;
+  var N: f32 = ((time * 0.01) * rate);
+  var T: f32 = (2.0 * rate);
+  if ((N > (6.0 * rate))) {
+    R += 1.0;
+    N -= ((R * 8.0) * rate);
+  }
+  if ((N < (4.0 * rate))) {
+    T += N;
+  } else {
+    T = ((8.0 * rate) - N);
+  }
+  var Z: f32 = (1.05 - zoom);
+  var uv: vec2f = (pos + center);
+  var sph: f32 = (length(uv) * 0.1);
+  sph = (sqrt((1.0 - (sph * sph))) * 2.0);
+  var a: f32 = (T * PI);
+  var b: f32 = (a + T);
+  var c: f32 = (cos(a) + sin(b));
+  var M: Mat2;
+  Mat2_Init(&(M), cos(b), sin(b), -(sin(b)), cos(b));
+  uv = times(&(M), uv);
+  var M1: Mat2;
+  Mat2_Init(&(M1), cos(a), -(sin(a)), sin(a), cos(a));
+  uv = times(&(M1), uv);
+  uv = (uv - (vec2f(sin(c), cos(c)) / vec2f(PI)));
+  uv = (uv * vec2f(Z));
+  var pix: f32 = (((0.5 / 1000.0) * Z) / sph);
+  var dof: f32 = ((zoom * focus) + (T * 0.25));
+  var L: f32 = floor(loops);
+  for (var aa: i32 = 0; (aa < 24); aa++) {
+    var aauv: vec2f = floor(vec2f((f32(aa) / 6.0), mmod(f32(aa), 6.0)));
+    color = dc_circuits_formula((uv + ((aauv * vec2f(pix)) * vec2f(dof))), T, loops, zoom, intensity, glow, pulse);
+    if ((L <= 0.0)) {
+      break;
+    }
+    L = (L - 1.0);
+  }
+  S = (S / floor(loops));
+  color = (color / vec3f(floor(loops)));
+  var colo: vec3f = (mix(vec3f(0.15, 0.15, 0.15), color, S) * vec3f((1.0 - length(pos))));
+  colo = (colo * vec3f(1.2, 1.1, 1.0));
+  return colo;
+}
+
+fn dbl2int(theColor: vec3f) -> vec3i {
+  var red: i32 = max(0, min(255, i32(floor((theColor.x * 256.0)))));
+  var green: i32 = max(0, min(255, i32(floor((theColor.y * 256.0)))));
+  var blue: i32 = max(0, min(255, i32(floor((theColor.z * 256.0)))));
+  return vec3i(red, green, blue);
+}
+
+fn greyscale(r_: i32, g: i32, b: i32) -> f32 {
+  var lum: i32;
+  var red: i32;
+  var green: i32;
+  var blue: i32;
+  red = i32((f32(r_) * 0.299));
+  green = i32((f32(g) * 0.587));
+  blue = i32((f32(b) * 0.114));
+  lum = ((red + green) + blue);
+  return (f32(lum) / 255.0);
+}
+
+fn distance_color(p_red: f32, p_green: f32, p_blue: f32, red: f32, green: f32, blue: f32) -> f32 {
+  var dist_r: f32 = abs((p_red - red));
+  var dist_g: f32 = abs((p_green - green));
+  var dist_b: f32 = abs((p_blue - blue));
+  var dist_3d_sqd: f32 = (((dist_r * dist_r) + (dist_g * dist_g)) + (dist_b * dist_b));
+  return dist_3d_sqd;
+}`,
+    code: (w, p) => `{
+var colorA_: f32 = 1.0;
+var x: f32;
+var y: f32;
+var color: vec3f = vec3f(1.0, 1.0, 0.0);
+var z: f32 = 0.5;
+if ((${p[9]} == 1)) {
+  x = t.x;
+  y = t.y;
+} else {
+  x = ((2.0 * rnd(rs)) - 1.0);
+  y = ((2.0 * rnd(rs)) - 1.0);
+}
+var uv: vec2f = vec2f(x, y);
+color = dc_circuits_getRGBColor(uv, ${p[1]}, ${p[2]}, ${p[8]}, ${p[4]}, ${p[7]}, ${p[6]}, ${p[3]}, ${p[5]});
+{
+  var zc_: vec3i = dbl2int(color);
+  z = greyscale(i32(f32(zc_.x)), i32(f32(zc_.y)), i32(f32(zc_.z)));
+}
+if ((${p[10]} == 0)) {
+  (*rgb).w = select(0.0, 1.0, true);
+  (*rgb).x = color.x;
+  (*rgb).y = color.y;
+  (*rgb).z = color.z;
+  colorA_ = 1.0;
+} else if ((${p[10]} == 1)) {
+  var pal_color: vec4f = vec4f(color.x, color.y, color.z, 1.0);
+  var simcol: vec4f = pal_color;
+  var diff: f32 = 1000000000.0;
+  for (var index: i32 = 0; (index < 256); index++) {
+    pal_color = read_imageStepMode(PALB_, 256, (f32(index) / f32(256)));
+    var pal_color3: vec3f = vec3f(pal_color.x, pal_color.y, pal_color.z);
+    var dvalue: f32 = distance_color(color.x, color.y, color.z, pal_color.x, pal_color.y, pal_color.z);
+    if ((diff > dvalue)) {
+      diff = dvalue;
+      simcol = pal_color;
+    }
+  }
+  (*rgb).w = select(0.0, 1.0, true);
+  (*rgb).x = simcol.x;
+  (*rgb).y = simcol.y;
+  (*rgb).z = simcol.z;
+  colorA_ = 1.0;
+} else if ((${p[10]} == 2)) {
+  var icolor: vec3i = dbl2int(color);
+  var z: f32 = greyscale(i32(f32(icolor.x)), i32(f32(icolor.y)), i32(f32(icolor.z)));
+  (*cp) = z;
+}
+v.x += (${w} * x);
+v.y += (${w} * y);
+var dz: f32 = ((z * ${p[11]}) + ${p[12]});
+if ((${p[13]} == 1)) {
+  pz_ = dz;
+} else {
+  pz_ += dz;
+}
+}`,
+  },
+  "dc_hoshi": {
+    params: [{ name: "seed", def: 100000 }, { name: "time", def: 10 }, { name: "steps", def: 28 }, { name: "scale", def: 1.25 }, { name: "translate", def: 1.5 }, { name: "ColorOnly", def: 0 }, { name: "Gradient", def: 0 }, { name: "scale_z", def: 0 }, { name: "offset_z", def: 0 }, { name: "reset_z", def: 1 }],
+    verified: false, priority: 0, flags: ["dc","rgb","z"], types: ["SIMULATION","DC","BASE_SHAPE"],
+    funcNames: ["read_imageStepMode","mmod2","dc_hoshi_rotate","dc_hoshi_hsv","dc_hoshi_getRGBColor","dbl2int","greyscale","distance_color"],
+    funcs: `fn read_imageStepMode(base: u32, n: i32, t: f32) -> vec4f { return pal[base + u32(clamp(t, 0.0, 0.99999) * f32(max(n, 1)))]; }
+
+fn mmod2(a: vec2f, b: vec2f) -> vec2f { return a - b * floor(a / b); }
+
+fn dc_hoshi_rotate(p_: vec2f, a: f32) -> vec2f {
+  return vec2f(((p_.x * cos(a)) - (p_.y * sin(a))), ((p_.x * sin(a)) + (p_.y * cos(a))));
+}
+
+fn dc_hoshi_hsv(h: f32, s: f32, v_: f32) -> vec3f {
+  var t1: vec3f = vec3f(3.0, 2.0, 1.0);
+  t1 = (t1 + vec3f((h / 3.0)));
+  var t2: vec3f = ((fract(t1) * vec3f(6.0)) - vec3f(3.0));
+  t2 = (abs(t2) - vec3f(1.0));
+  t2 = clamp(t2, vec3f(0.0), vec3f(1.0));
+  return (mix(vec3f(3.1, 3.1, 3.1), t2, s) * vec3f(v_));
+}
+
+fn dc_hoshi_getRGBColor(p__in: vec2f, time: f32, steps: f32, scale: f32, translate: f32) -> vec3f {
+  var p_: vec2f = p__in;
+  p_ = (p_ * vec2f(0.182));
+  var fold: vec2f = vec2f(-0.5, -0.5);
+  var x: f32 = p_.y;
+  p_ = abs((mmod2(p_, vec2f(4.0)) - vec2f(2.0)));
+  for (var i: i32 = i32(steps); (i > 0); i--) {
+    p_ = (abs((p_ - fold)) + fold);
+    p_ = ((p_ * vec2f(scale)) - vec2f(translate));
+    p_ = dc_hoshi_rotate(p_, (-PI / ((((0.1 + (sin(((time * 0.0005) + (f32(i) * 0.5000001))) * 0.4999)) + 0.5) + (10.0 / time)) + (sin(time) / 100.0))));
+  }
+  var i: f32 = (((x * x) + atan2(p_.y, p_.x)) + (time * 0.02));
+  var h: f32 = ((floor((i * 4.0)) / 8.0) + 1.107);
+  h += ((smoothstep(-0.1, 0.8, (mmod(((i * 2.0) / 5.0), (1.0 / 4.0)) * 900.0)) / 0.01) - 0.5);
+  var color: vec3f = dc_hoshi_hsv(h, 1.0, smoothstep(-3.0, 3.0, (length(p_) * 1.0)));
+  return color;
+}
+
+fn dbl2int(theColor: vec3f) -> vec3i {
+  var red: i32 = max(0, min(255, i32(floor((theColor.x * 256.0)))));
+  var green: i32 = max(0, min(255, i32(floor((theColor.y * 256.0)))));
+  var blue: i32 = max(0, min(255, i32(floor((theColor.z * 256.0)))));
+  return vec3i(red, green, blue);
+}
+
+fn greyscale(r_: i32, g: i32, b: i32) -> f32 {
+  var lum: i32;
+  var red: i32;
+  var green: i32;
+  var blue: i32;
+  red = i32((f32(r_) * 0.299));
+  green = i32((f32(g) * 0.587));
+  blue = i32((f32(b) * 0.114));
+  lum = ((red + green) + blue);
+  return (f32(lum) / 255.0);
+}
+
+fn distance_color(p_red: f32, p_green: f32, p_blue: f32, red: f32, green: f32, blue: f32) -> f32 {
+  var dist_r: f32 = abs((p_red - red));
+  var dist_g: f32 = abs((p_green - green));
+  var dist_b: f32 = abs((p_blue - blue));
+  var dist_3d_sqd: f32 = (((dist_r * dist_r) + (dist_g * dist_g)) + (dist_b * dist_b));
+  return dist_3d_sqd;
+}`,
+    code: (w, p) => `{
+var colorA_: f32 = 1.0;
+var x: f32;
+var y: f32;
+var color: vec3f = vec3f(1.0, 1.0, 0.0);
+var z: f32 = 0.5;
+if ((${p[5]} == 1)) {
+  x = t.x;
+  y = t.y;
+} else {
+  x = ((2.0 * rnd(rs)) - 1.0);
+  y = ((2.0 * rnd(rs)) - 1.0);
+}
+var uv: vec2f = vec2f(x, y);
+color = dc_hoshi_getRGBColor(uv, ${p[1]}, min(max(${p[2]}, 1.0), 60.0), min(max(${p[3]}, 1.0), 5.0), min(max(${p[4]}, 0.0), 5.0));
+{
+  var zc_: vec3i = dbl2int(color);
+  z = greyscale(i32(f32(zc_.x)), i32(f32(zc_.y)), i32(f32(zc_.z)));
+}
+if ((${p[6]} == 0)) {
+  (*rgb).w = select(0.0, 1.0, true);
+  (*rgb).x = color.x;
+  (*rgb).y = color.y;
+  (*rgb).z = color.z;
+  colorA_ = 1.0;
+} else if ((${p[6]} == 1)) {
+  var pal_color: vec4f = vec4f(color.x, color.y, color.z, 1.0);
+  var simcol: vec4f = pal_color;
+  var diff: f32 = 1000000000.0;
+  for (var index: i32 = 0; (index < 256); index++) {
+    pal_color = read_imageStepMode(PALB_, 256, (f32(index) / f32(256)));
+    var pal_color3: vec3f = vec3f(pal_color.x, pal_color.y, pal_color.z);
+    var dvalue: f32 = distance_color(color.x, color.y, color.z, pal_color.x, pal_color.y, pal_color.z);
+    if ((diff > dvalue)) {
+      diff = dvalue;
+      simcol = pal_color;
+    }
+  }
+  (*rgb).w = select(0.0, 1.0, true);
+  (*rgb).x = simcol.x;
+  (*rgb).y = simcol.y;
+  (*rgb).z = simcol.z;
+  colorA_ = 1.0;
+} else if ((${p[6]} == 2)) {
+  var icolor: vec3i = dbl2int(color);
+  var z: f32 = greyscale(i32(f32(icolor.x)), i32(f32(icolor.y)), i32(f32(icolor.z)));
+  (*cp) = z;
+}
+v.x += (${w} * x);
+v.y += (${w} * y);
+var dz: f32 = ((z * ${p[7]}) + ${p[8]});
+if ((${p[9]} == 1)) {
+  pz_ = dz;
+} else {
+  pz_ += dz;
+}
+}`,
+  },
+  "dc_mandbrot": {
+    params: [{ name: "nIters", def: 250 }, { name: "N", def: 8 }, { name: "Complexity", def: 0.995 }, { name: "seed", def: 10000 }, { name: "time", def: 0 }, { name: "zoom", def: 4 }, { name: "red", def: 0.0314 }, { name: "green", def: 0.02 }, { name: "blue", def: 0.011 }, { name: "ColorOnly", def: 0 }, { name: "Gradient", def: 0 }, { name: "scale_z", def: 0 }, { name: "offset_z", def: 0 }, { name: "reset_z", def: 1 }],
+    verified: false, priority: 0, flags: ["dc","rgb","z"], types: ["SIMULATION","DC","BASE_SHAPE"],
+    funcNames: ["Mat2","read_imageStepMode","powc","Mat2_Init","times","dc_mandbrot_fractalize2","dc_mandbrot_mandelbrot","dc_mandbrot_getRGBColor","dbl2int","greyscale","distance_color"],
+    funcs: `struct Mat2 {
+  a00: f32,
+  a01: f32,
+  a10: f32,
+  a11: f32,
+}
+
+fn read_imageStepMode(base: u32, n: i32, t: f32) -> vec4f { return pal[base + u32(clamp(t, 0.0, 0.99999) * f32(max(n, 1)))]; }
+
+fn powc(x: f32, y: f32) -> f32 {
+  if (x >= 0.0) { return pow(x, y); }
+  let yi = round(y);
+  if (abs(y - yi) > 1e-6) { return pow(x, y); }
+  let m = pow(-x, y);
+  return select(m, -m, (i32(yi) & 1) != 0);
+}
+
+fn Mat2_Init(m: ptr<function, Mat2>, v00: f32, v10: f32, v01: f32, v11: f32) {
+  (*m).a00 = v00;
+  (*m).a01 = v01;
+  (*m).a10 = v10;
+  (*m).a11 = v11;
+}
+
+fn times(m: ptr<function, Mat2>, v_: vec2f) -> vec2f {
+  return vec2f((((*m).a00 * v_.x) + ((*m).a01 * v_.y)), (((*m).a10 * v_.x) + ((*m).a11 * v_.y)));
+}
+
+fn dc_mandbrot_fractalize2(p__in: vec2f, time: f32, N: f32, complexity: f32) -> vec2f {
+  var p_: vec2f = p__in;
+  var s: f32 = 0.5;
+  var cs: f32 = cos(time);
+  var sn: f32 = sin(time);
+  var rot: Mat2;
+  Mat2_Init(&(rot), cs, sn, -sn, cs);
+  for (var i: i32 = 0; (i < i32(N)); i++) {
+    p_ = ((abs(p_) / vec2f(dot(p_, p_))) - vec2f(s));
+    p_ = times(&(rot), p_);
+    s *= complexity;
+  }
+  return p_;
+}
+
+fn dc_mandbrot_mandelbrot(p_: vec2f, nIters: f32, red: f32, green: f32, blue: f32) -> vec3f {
+  var s: vec2f = p_;
+  var d: f32 = 0.0;
+  var l: f32;
+  for (var i: i32 = 0; (f32(i) < nIters); i++) {
+    s = vec2f((((s.x * s.x) - (s.y * s.y)) + p_.x), (((2.0 * s.x) * s.y) + p_.y));
+    l = length(s);
+    d += (l + 0.5);
+    if ((l > 2.0)) {
+      return vec3f(sin((d * red)), sin((d * green)), sin((d * blue)));
+    }
+  }
+  return vec3f(0.0, 0.0, 0.0);
+}
+
+fn dc_mandbrot_getRGBColor(p__in: vec2f, time: f32, N: f32, nIters: f32, Complexity: f32, red: f32, green: f32, blue: f32) -> vec3f {
+  var p_: vec2f = p__in;
+  var t_: f32 = ((time / 65.0) * 10.0);
+  var col: vec3f = vec3f(0.0, 0.0, 0.0);
+  p_ = (p_ * vec2f(((fract((t_ * 0.0001)) * 100.0) + 1.0)));
+  p_ = dc_mandbrot_fractalize2(p_, t_, N, Complexity);
+  var f: f32 = ((sin(((t_ * 0.1) + 99.0)) * 0.5) + 0.5);
+  p_ = (p_ * vec2f(powc(1.5, (f * -31.0))));
+  p_ = (p_ + vec2f(-1.002029, 0.303864));
+  col = (vec3f(1.0, 1.0, 1.0) - dc_mandbrot_mandelbrot(p_, nIters, red, green, blue));
+  return col;
+}
+
+fn dbl2int(theColor: vec3f) -> vec3i {
+  var red: i32 = max(0, min(255, i32(floor((theColor.x * 256.0)))));
+  var green: i32 = max(0, min(255, i32(floor((theColor.y * 256.0)))));
+  var blue: i32 = max(0, min(255, i32(floor((theColor.z * 256.0)))));
+  return vec3i(red, green, blue);
+}
+
+fn greyscale(r_: i32, g: i32, b: i32) -> f32 {
+  var lum: i32;
+  var red: i32;
+  var green: i32;
+  var blue: i32;
+  red = i32((f32(r_) * 0.299));
+  green = i32((f32(g) * 0.587));
+  blue = i32((f32(b) * 0.114));
+  lum = ((red + green) + blue);
+  return (f32(lum) / 255.0);
+}
+
+fn distance_color(p_red: f32, p_green: f32, p_blue: f32, red: f32, green: f32, blue: f32) -> f32 {
+  var dist_r: f32 = abs((p_red - red));
+  var dist_g: f32 = abs((p_green - green));
+  var dist_b: f32 = abs((p_blue - blue));
+  var dist_3d_sqd: f32 = (((dist_r * dist_r) + (dist_g * dist_g)) + (dist_b * dist_b));
+  return dist_3d_sqd;
+}`,
+    code: (w, p) => `{
+var colorA_: f32 = 1.0;
+var x: f32;
+var y: f32;
+var color: vec3f = vec3f(1.0, 1.0, 0.0);
+var z: f32 = 0.5;
+if ((${p[9]} == 1)) {
+  x = t.x;
+  y = t.y;
+} else {
+  x = ((2.0 * rnd(rs)) - 1.0);
+  y = ((2.0 * rnd(rs)) - 1.0);
+}
+var uv: vec2f = (vec2f(x, y) * vec2f(${p[5]}));
+color = dc_mandbrot_getRGBColor(uv, ${p[4]}, min(max(${p[1]}, 2.0), 10.0), min(max(${p[0]}, 10.0), 1000.0), min(max(${p[2]}, 0.0), 1.0), min(max(${p[6]}, 0.0), 1.0), min(max(${p[7]}, 0.0), 1.0), min(max(${p[8]}, 0.0), 1.0));
+{
+  var zc_: vec3i = dbl2int(color);
+  z = greyscale(i32(f32(zc_.x)), i32(f32(zc_.y)), i32(f32(zc_.z)));
+}
+if ((${p[10]} == 0)) {
+  (*rgb).w = select(0.0, 1.0, true);
+  (*rgb).x = color.x;
+  (*rgb).y = color.y;
+  (*rgb).z = color.z;
+  colorA_ = 1.0;
+} else if ((${p[10]} == 1)) {
+  var pal_color: vec4f = vec4f(color.x, color.y, color.z, 1.0);
+  var simcol: vec4f = pal_color;
+  var diff: f32 = 1000000000.0;
+  for (var index: i32 = 0; (index < 256); index++) {
+    pal_color = read_imageStepMode(PALB_, 256, (f32(index) / f32(256)));
+    var pal_color3: vec3f = vec3f(pal_color.x, pal_color.y, pal_color.z);
+    var dvalue: f32 = distance_color(color.x, color.y, color.z, pal_color.x, pal_color.y, pal_color.z);
+    if ((diff > dvalue)) {
+      diff = dvalue;
+      simcol = pal_color;
+    }
+  }
+  (*rgb).w = select(0.0, 1.0, true);
+  (*rgb).x = simcol.x;
+  (*rgb).y = simcol.y;
+  (*rgb).z = simcol.z;
+  colorA_ = 1.0;
+} else if ((${p[10]} == 2)) {
+  var icolor: vec3i = dbl2int(color);
+  z = greyscale(i32(f32(icolor.x)), i32(f32(icolor.y)), i32(f32(icolor.z)));
+  (*cp) = z;
+}
+v.x += (${w} * x);
+v.y += (${w} * y);
+var dz: f32 = ((z * ${p[11]}) + ${p[12]});
+if ((${p[13]} == 1)) {
+  pz_ = dz;
+} else {
+  pz_ += dz;
+}
+}`,
+  },
+  "dc_ducks": {
+    params: [{ name: "seed", def: 10000 }, { name: "time", def: 10 }, { name: "zoom", def: 1 }, { name: "ColorOnly", def: 0 }, { name: "Gradient", def: 0 }, { name: "scale_z", def: 0 }, { name: "offset_z", def: 0 }, { name: "reset_z", def: 1 }],
+    verified: false, priority: 0, flags: ["dc","rgb","z"], types: ["SIMULATION","DC","BASE_SHAPE"],
+    funcNames: ["read_imageStepMode","dc_ducks_Bfunc","dc_ducks_Ffunc","dc_ducks_getRGBColor","dbl2int","greyscale","distance_color"],
+    funcs: `fn read_imageStepMode(base: u32, n: i32, t: f32) -> vec4f { return pal[base + u32(clamp(t, 0.0, 0.99999) * f32(max(n, 1)))]; }
+
+fn dc_ducks_Bfunc(a: vec2f) -> vec2f {
+  return vec2f(log(length(a)), (atan2(a.y, a.x) - 6.2));
+}
+
+fn dc_ducks_Ffunc(uv: vec2f, time: f32) -> vec3f {
+  var e: vec2f = uv;
+  var c: f32 = 0.0;
+  for (var i: i32 = 0; (i < 50); i++) {
+    var tmp: vec2f = dc_ducks_Bfunc(vec2f(e.x, abs(e.y)));
+    e = (tmp + vec2f(((0.1 * sin((time / 3.0))) - 0.1), (5.0 + (0.1 * cos((time / 5.0))))));
+    c += length(e);
+  }
+  var d: f32 = (log2(log2((c * 0.05))) * 6.0);
+  var flori: vec3f = vec3f((0.1 + (0.7 * sin(d))), (0.1 + (0.5 * sin((d - 0.7)))), (0.7 + (0.7 * cos((d - 0.7)))));
+  var t0: vec3f = floor((vec3f(0.5, 0.5, 0.5) + (flori * vec3f(1.1))));
+  return (t0 / vec3f(1.1));
+}
+
+fn dc_ducks_getRGBColor(uv: vec2f, time: f32) -> vec3f {
+  var t_: f32 = ((time * 30.0) / 65.0);
+  var col: vec3f;
+  var t0: vec3f = dc_ducks_Ffunc(uv, t_);
+  col = vec3f(t0.z, t0.x, t0.y);
+  return col;
+}
+
+fn dbl2int(theColor: vec3f) -> vec3i {
+  var red: i32 = max(0, min(255, i32(floor((theColor.x * 256.0)))));
+  var green: i32 = max(0, min(255, i32(floor((theColor.y * 256.0)))));
+  var blue: i32 = max(0, min(255, i32(floor((theColor.z * 256.0)))));
+  return vec3i(red, green, blue);
+}
+
+fn greyscale(r_: i32, g: i32, b: i32) -> f32 {
+  var lum: i32;
+  var red: i32;
+  var green: i32;
+  var blue: i32;
+  red = i32((f32(r_) * 0.299));
+  green = i32((f32(g) * 0.587));
+  blue = i32((f32(b) * 0.114));
+  lum = ((red + green) + blue);
+  return (f32(lum) / 255.0);
+}
+
+fn distance_color(p_red: f32, p_green: f32, p_blue: f32, red: f32, green: f32, blue: f32) -> f32 {
+  var dist_r: f32 = abs((p_red - red));
+  var dist_g: f32 = abs((p_green - green));
+  var dist_b: f32 = abs((p_blue - blue));
+  var dist_3d_sqd: f32 = (((dist_r * dist_r) + (dist_g * dist_g)) + (dist_b * dist_b));
+  return dist_3d_sqd;
+}`,
+    code: (w, p) => `{
+var colorA_: f32 = 1.0;
+var x: f32;
+var y: f32;
+var color: vec3f = vec3f(1.0, 1.0, 0.0);
+var z: f32 = 0.5;
+if ((${p[3]} == 1)) {
+  x = t.x;
+  y = t.y;
+} else {
+  x = ((2.0 * rnd(rs)) - 1.0);
+  y = ((2.0 * rnd(rs)) - 1.0);
+}
+var uv: vec2f = (vec2f(x, y) * vec2f(${p[2]}));
+color = dc_ducks_getRGBColor(uv, ${p[1]});
+{
+  var zc_: vec3i = dbl2int(color);
+  z = greyscale(i32(f32(zc_.x)), i32(f32(zc_.y)), i32(f32(zc_.z)));
+}
+if ((${p[4]} == 0)) {
+  (*rgb).w = select(0.0, 1.0, true);
+  (*rgb).x = color.x;
+  (*rgb).y = color.y;
+  (*rgb).z = color.z;
+  colorA_ = 1.0;
+} else if ((${p[4]} == 1)) {
+  var pal_color: vec4f = vec4f(color.x, color.y, color.z, 1.0);
+  var simcol: vec4f = pal_color;
+  var diff: f32 = 1000000000.0;
+  for (var index: i32 = 0; (index < 256); index++) {
+    pal_color = read_imageStepMode(PALB_, 256, (f32(index) / f32(256)));
+    var pal_color3: vec3f = vec3f(pal_color.x, pal_color.y, pal_color.z);
+    var dvalue: f32 = distance_color(color.x, color.y, color.z, pal_color.x, pal_color.y, pal_color.z);
+    if ((diff > dvalue)) {
+      diff = dvalue;
+      simcol = pal_color;
+    }
+  }
+  (*rgb).w = select(0.0, 1.0, true);
+  (*rgb).x = simcol.x;
+  (*rgb).y = simcol.y;
+  (*rgb).z = simcol.z;
+  colorA_ = 1.0;
+} else if ((${p[4]} == 2)) {
+  var icolor: vec3i = dbl2int(color);
+  var z: f32 = greyscale(i32(f32(icolor.x)), i32(f32(icolor.y)), i32(f32(icolor.z)));
+  (*cp) = z;
+}
+v.x += (${w} * x);
+v.y += (${w} * y);
+var dz: f32 = ((z * ${p[5]}) + ${p[6]});
+if ((${p[7]} == 1)) {
+  pz_ = dz;
+} else {
+  pz_ += dz;
+}
+}`,
+  },
+  "dc_turbulence": {
+    params: [{ name: "seed", def: 10000 }, { name: "time", def: 0 }, { name: "zoom", def: 8 }, { name: "level", def: 3 }, { name: "ColorOnly", def: 0 }, { name: "Gradient", def: 0 }, { name: "scale_z", def: 0 }, { name: "offset_z", def: 0 }, { name: "reset_z", def: 1 }],
+    verified: false, priority: 0, flags: ["dc","rgb","z"], types: ["SIMULATION","DC","BASE_SHAPE"],
+    funcNames: ["read_imageStepMode","dc_turbulence_getRGBColor","dbl2int","greyscale","distance_color"],
+    funcs: `fn read_imageStepMode(base: u32, n: i32, t: f32) -> vec4f { return pal[base + u32(clamp(t, 0.0, 0.99999) * f32(max(n, 1)))]; }
+
+fn dc_turbulence_getRGBColor(p_: vec2f, time: f32, level: f32) -> vec3f {
+  var ik: vec2f = p_;
+  var c: f32 = 1.0;
+  var inten: f32 = 0.05;
+  for (var n: i32 = 0; (f32(n) < level); n++) {
+    var t_: f32 = (time * (1.0 - (3.0 / f32((n + 1)))));
+    ik = (p_ + vec2f((cos((t_ - ik.x)) + sin((t_ + ik.y))), (sin((t_ - ik.y)) + cos((t_ + ik.x)))));
+    c += (1.0 / length(vec2f((p_.x / (sin((ik.x + t_)) / inten)), (p_.y / (cos((ik.y + t_)) / inten)))));
+  }
+  c /= level;
+  c = (1.5 - sqrt(c));
+  var color: f32 = (((c * c) * c) * c);
+  return vec3f(color, color, color);
+}
+
+fn dbl2int(theColor: vec3f) -> vec3i {
+  var red: i32 = max(0, min(255, i32(floor((theColor.x * 256.0)))));
+  var green: i32 = max(0, min(255, i32(floor((theColor.y * 256.0)))));
+  var blue: i32 = max(0, min(255, i32(floor((theColor.z * 256.0)))));
+  return vec3i(red, green, blue);
+}
+
+fn greyscale(r_: i32, g: i32, b: i32) -> f32 {
+  var lum: i32;
+  var red: i32;
+  var green: i32;
+  var blue: i32;
+  red = i32((f32(r_) * 0.299));
+  green = i32((f32(g) * 0.587));
+  blue = i32((f32(b) * 0.114));
+  lum = ((red + green) + blue);
+  return (f32(lum) / 255.0);
+}
+
+fn distance_color(p_red: f32, p_green: f32, p_blue: f32, red: f32, green: f32, blue: f32) -> f32 {
+  var dist_r: f32 = abs((p_red - red));
+  var dist_g: f32 = abs((p_green - green));
+  var dist_b: f32 = abs((p_blue - blue));
+  var dist_3d_sqd: f32 = (((dist_r * dist_r) + (dist_g * dist_g)) + (dist_b * dist_b));
+  return dist_3d_sqd;
+}`,
+    code: (w, p) => `{
+var colorA_: f32 = 1.0;
+var x: f32;
+var y: f32;
+var color: vec3f = vec3f(1.0, 1.0, 0.0);
+var z: f32 = 0.5;
+if ((${p[4]} == 1)) {
+  x = t.x;
+  y = t.y;
+} else {
+  x = (rnd(rs) - 0.5);
+  y = (rnd(rs) - 0.5);
+}
+var uv: vec2f = ((vec2f(x, y) * vec2f(${p[2]})) - vec2f(20.0));
+color = dc_turbulence_getRGBColor(uv, min(max(${p[1]}, 1.0), 1000.0), ${p[2]});
+{
+  var zc_: vec3i = dbl2int(color);
+  z = greyscale(i32(f32(zc_.x)), i32(f32(zc_.y)), i32(f32(zc_.z)));
+}
+if ((${p[5]} == 0)) {
+  (*rgb).w = select(0.0, 1.0, true);
+  (*rgb).x = color.x;
+  (*rgb).y = color.y;
+  (*rgb).z = color.z;
+  colorA_ = 1.0;
+} else if ((${p[5]} == 1)) {
+  var pal_color: vec4f = vec4f(color.x, color.y, color.z, 1.0);
+  var simcol: vec4f = pal_color;
+  var diff: f32 = 1000000000.0;
+  for (var index: i32 = 0; (index < 256); index++) {
+    pal_color = read_imageStepMode(PALB_, 256, (f32(index) / f32(256)));
+    var pal_color3: vec3f = vec3f(pal_color.x, pal_color.y, pal_color.z);
+    var dvalue: f32 = distance_color(color.x, color.y, color.z, pal_color.x, pal_color.y, pal_color.z);
+    if ((diff > dvalue)) {
+      diff = dvalue;
+      simcol = pal_color;
+    }
+  }
+  (*rgb).w = select(0.0, 1.0, true);
+  (*rgb).x = simcol.x;
+  (*rgb).y = simcol.y;
+  (*rgb).z = simcol.z;
+  colorA_ = 1.0;
+} else if ((${p[5]} == 2)) {
+  var icolor: vec3i = dbl2int(color);
+  var z: f32 = greyscale(i32(f32(icolor.x)), i32(f32(icolor.y)), i32(f32(icolor.z)));
+  (*cp) = z;
+}
+v.x += (${w} * x);
+v.y += (${w} * y);
+var dz: f32 = ((z * ${p[6]}) + ${p[7]});
+if ((${p[8]} == 1)) {
+  pz_ = dz;
+} else {
+  pz_ += dz;
+}
+}`,
+  },
   "waves42": {
     params: [{ name: "scalex", def: 0.05 }, { name: "scaley", def: 0.05 }, { name: "freqx", def: 7 }, { name: "freqy", def: 13 }, { name: "cont", def: 0 }, { name: "yfact", def: 0.1 }, { name: "freqx2", def: 1 }],
     verified: false, priority: 0, flags: [], types: ["2D"],
@@ -1736,6 +2538,148 @@ v.x = (${w} * (x - px_center));
 v.y = (${w} * (y - py_center));
 }`,
   },
+  "dc_butterflies": {
+    params: [{ name: "seed", def: 1000 }, { name: "time", def: 0 }, { name: "zoom", def: 1 }, { name: "red", def: 1 }, { name: "green", def: 1 }, { name: "blue", def: 1 }, { name: "ColorOnly", def: 0 }, { name: "Gradient", def: 0 }, { name: "scale_z", def: 0 }, { name: "offset_z", def: 0 }, { name: "reset_z", def: 1 }],
+    verified: false, priority: 0, flags: ["dc","rgb","z"], types: ["SIMULATION","DC","BASE_SHAPE"],
+    funcNames: ["read_imageStepMode","powc","dc_butterflies_cpow","dc_butterflies_csin","dc_butterflies_func","dc_butterflies_getRGBColor","dbl2int","greyscale","distance_color"],
+    funcs: `fn read_imageStepMode(base: u32, n: i32, t: f32) -> vec4f { return pal[base + u32(clamp(t, 0.0, 0.99999) * f32(max(n, 1)))]; }
+
+fn powc(x: f32, y: f32) -> f32 {
+  if (x >= 0.0) { return pow(x, y); }
+  let yi = round(y);
+  if (abs(y - yi) > 1e-6) { return pow(x, y); }
+  let m = pow(-x, y);
+  return select(m, -m, (i32(yi) & 1) != 0);
+}
+
+fn dc_butterflies_cpow(z: vec2f, n: f32) -> vec2f {
+  var r_: f32 = length(z);
+  var a: f32 = atan2(z.y, z.x);
+  return (vec2f(cos((a * n)), sin((a * n))) * vec2f(powc(r_, n)));
+}
+
+fn dc_butterflies_csin(z: vec2f) -> vec2f {
+  var r_: f32 = exp(z.y);
+  return (vec2f(((r_ + (1.0 / r_)) * sin(z.x)), ((r_ - (1.0 / r_)) * cos(z.x))) * vec2f(0.5));
+}
+
+fn dc_butterflies_func(x: vec2f, time: f32, z0: vec2f) -> vec2f {
+  return ((dc_butterflies_csin(dc_butterflies_cpow((x + z0), -4.0)) - (x * vec2f((0.9 * (1.0 + (2.0 * sin((0.1 * time)))))))) + z0);
+}
+
+fn dc_butterflies_getRGBColor(uv: vec2f, time: f32, red: f32, green: f32, blue: f32) -> vec3f {
+  var range: f32 = 4.0;
+  var z: vec2f = uv;
+  var z0: vec2f = uv;
+  var g: f32 = 10000000000.0;
+  var k: f32 = 100.0;
+  var dz: f32;
+  for (var i: i32 = 0; (i < 100); i++) {
+    var prevz: vec2f = z;
+    z = dc_butterflies_func(z, time, z0);
+    g = min(g, dot((z - vec2f(1.0)), (z - vec2f(1.0))));
+    dz = dot((z - prevz), (z - prevz));
+    if ((dz < 0.00001)) {
+      k = (dz / 0.00001);
+      z = ((z * vec2f(k)) + (prevz * vec2f((1.0 - k))));
+      k = (k + f32(i));
+      break;
+    }
+    if ((dz > 10000.0)) {
+      k = (10000.0 / dz);
+      z = ((z * vec2f(k)) + (prevz * vec2f((1.0 - k))));
+      k = (k + f32(i));
+      break;
+    }
+  }
+  var color: vec3f = ((sin((vec3f(red, green, blue) + vec3f((2.3 + log((g * abs((z.y * z.x)))))))) * vec3f(0.5)) + vec3f(0.5));
+  return color;
+}
+
+fn dbl2int(theColor: vec3f) -> vec3i {
+  var red: i32 = max(0, min(255, i32(floor((theColor.x * 256.0)))));
+  var green: i32 = max(0, min(255, i32(floor((theColor.y * 256.0)))));
+  var blue: i32 = max(0, min(255, i32(floor((theColor.z * 256.0)))));
+  return vec3i(red, green, blue);
+}
+
+fn greyscale(r_: i32, g: i32, b: i32) -> f32 {
+  var lum: i32;
+  var red: i32;
+  var green: i32;
+  var blue: i32;
+  red = i32((f32(r_) * 0.299));
+  green = i32((f32(g) * 0.587));
+  blue = i32((f32(b) * 0.114));
+  lum = ((red + green) + blue);
+  return (f32(lum) / 255.0);
+}
+
+fn distance_color(p_red: f32, p_green: f32, p_blue: f32, red: f32, green: f32, blue: f32) -> f32 {
+  var dist_r: f32 = abs((p_red - red));
+  var dist_g: f32 = abs((p_green - green));
+  var dist_b: f32 = abs((p_blue - blue));
+  var dist_3d_sqd: f32 = (((dist_r * dist_r) + (dist_g * dist_g)) + (dist_b * dist_b));
+  return dist_3d_sqd;
+}`,
+    code: (w, p) => `{
+var colorA_: f32 = 1.0;
+var x: f32;
+var y: f32;
+var color: vec3f = vec3f(1.0, 1.0, 1.0);
+var z: f32 = 0.5;
+if ((min(max(${p[6]}, 0.0), 1.0) == 1)) {
+  x = t.x;
+  y = t.y;
+} else {
+  x = ((2.0 * rnd(rs)) - 1.0);
+  y = ((2.0 * rnd(rs)) - 1.0);
+}
+var uv: vec2f = (vec2f(x, y) * vec2f(${p[2]}));
+color = dc_butterflies_getRGBColor(uv, ${p[1]}, min(max(${p[3]}, -1.0), 1.0), min(max(${p[4]}, -1.0), 1.0), min(max(${p[5]}, -1.0), 1.0));
+{
+  var zc_: vec3i = dbl2int(color);
+  z = greyscale(i32(f32(zc_.x)), i32(f32(zc_.y)), i32(f32(zc_.z)));
+}
+if ((min(max(${p[7]}, 0.0), 2.0) == 0)) {
+  (*rgb).w = select(0.0, 1.0, true);
+  (*rgb).x = color.x;
+  (*rgb).y = color.y;
+  (*rgb).z = color.z;
+  colorA_ = 1.0;
+} else if ((min(max(${p[7]}, 0.0), 2.0) == 1)) {
+  var pal_color: vec4f = vec4f(color.x, color.y, color.z, 1.0);
+  var simcol: vec4f = pal_color;
+  var diff: f32 = 1000000000.0;
+  for (var index: i32 = 0; (index < 256); index++) {
+    pal_color = read_imageStepMode(PALB_, 256, (f32(index) / f32(256)));
+    var pal_color3: vec3f = vec3f(pal_color.x, pal_color.y, pal_color.z);
+    var dvalue: f32 = distance_color(color.x, color.y, color.z, pal_color.x, pal_color.y, pal_color.z);
+    if ((diff > dvalue)) {
+      diff = dvalue;
+      simcol = pal_color;
+    }
+  }
+  (*rgb).w = select(0.0, 1.0, true);
+  (*rgb).x = simcol.x;
+  (*rgb).y = simcol.y;
+  (*rgb).z = simcol.z;
+  colorA_ = 1.0;
+} else if ((min(max(${p[7]}, 0.0), 2.0) == 2)) {
+  var icolor: vec3i = dbl2int(color);
+  var z: f32 = greyscale(i32(f32(icolor.x)), i32(f32(icolor.y)), i32(f32(icolor.z)));
+  (*cp) = z;
+}
+v.x += (${w} * x);
+v.y += (${w} * y);
+var dz: f32 = ((z * ${p[8]}) + ${p[9]});
+if ((min(max(${p[10]}, 0.0), 1.0) == 1)) {
+  pz_ = dz;
+} else {
+  pz_ += dz;
+}
+}`,
+  },
   "pixel_flow": {
     params: [{ name: "angle", def: 90 }, { name: "len", def: 0.1 }, { name: "width", def: 200 }, { name: "seed", def: 42 }, { name: "enable_dc", def: 0 }],
     verified: false, priority: 0, flags: ["dc"], types: ["2D","DC"],
@@ -1894,6 +2838,194 @@ if ((min(max(${p[4]}, 0.0), 1.0) == 0)) {
 }
 v.x = (${w} * x);
 v.y = (${w} * y);
+}`,
+  },
+  "dc_gmandelbroot": {
+    params: [{ name: "randomize", def: 10000 }, { name: "colormode", def: 0 }, { name: "iters", def: 128 }, { name: "exp_re", def: 2 }, { name: "exp_im", def: 0 }, { name: "n", def: 0 }, { name: "m", def: 0 }, { name: "burnigship", def: 0 }, { name: "conjugate", def: 0 }, { name: "julia", def: 0 }, { name: "jre", def: 0 }, { name: "jim", def: 0 }, { name: "panX", def: 0.5 }, { name: "panY", def: 0 }, { name: "zoom", def: 4 }, { name: "ColorOnly", def: 0 }, { name: "Gradient", def: 0 }, { name: "scale_z", def: 0 }, { name: "offset_z", def: 0 }, { name: "reset_z", def: 1 }],
+    verified: false, priority: 0, flags: ["dc","rgb","z"], types: ["SIMULATION","DC","BASE_SHAPE","ESCAPE_TIME_FRACTAL"],
+    funcNames: ["read_imageStepMode","powc","roundc","dc_gmandelbroot_hsv","dc_gmandelbroot_gen_mandelbroot","dc_gmandelbroot_getRGBColor","distance_color","dbl2int","greyscale"],
+    funcs: `fn read_imageStepMode(base: u32, n: i32, t: f32) -> vec4f { return pal[base + u32(clamp(t, 0.0, 0.99999) * f32(max(n, 1)))]; }
+
+fn powc(x: f32, y: f32) -> f32 {
+  if (x >= 0.0) { return pow(x, y); }
+  let yi = round(y);
+  if (abs(y - yi) > 1e-6) { return pow(x, y); }
+  let m = pow(-x, y);
+  return select(m, -m, (i32(yi) & 1) != 0);
+}
+
+fn roundc(x: f32) -> f32 { return sign(x) * floor(abs(x) + 0.5); }
+
+fn dc_gmandelbroot_hsv(h: f32, s: f32, v_: f32) -> vec3f {
+  var t1: vec3f = vec3f(3.0, 2.0, 1.0);
+  t1 = (t1 + vec3f((h / 3.0)));
+  var t2: vec3f = ((fract(t1) * vec3f(6.0)) - vec3f(3.0));
+  t2 = (abs(t2) - vec3f(1.0));
+  t2 = clamp(t2, vec3f(0.0), vec3f(1.0));
+  return (mix(vec3f(3.1, 3.1, 3.1), t2, s) * vec3f(v_));
+}
+
+fn dc_gmandelbroot_gen_mandelbroot(p_: vec2f, exp_: vec2f, colmode: f32, iters_: f32, n: f32, m: f32, burningShip: f32, conjugate: f32, julia: f32, jre: f32, jim: f32) -> vec3f {
+  var d: f32 = exp_.x;
+  var k: f32 = exp_.y;
+  var ii: f32 = 0.0;
+  var r_: f32 = 0.0;
+  var f: f32 = 100000000000000000000.0;
+  var z: vec2f = vec2f(p_.x, p_.y);
+  for (var i: i32 = 0; (f32(i) < iters_); i++) {
+    if ((burningShip == 1.0)) {
+      z = vec2f(abs(z.x), abs(z.y));
+    }
+    if ((conjugate == 1.0)) {
+      z.y = -z.y;
+    }
+    var q1: f32 = atan2(z.y, z.x);
+    r_ = ((z.x * z.x) + (z.y * z.y));
+    var q2: f32 = (((q1 * d) + ((k / 2.0) * log((r_ + m)))) + ((2 * PI) * n));
+    var q3: f32 = (powc(r_, (d / 2.0)) / exp((k * q1)));
+    z = (vec2f((q3 * cos(q2)), (q3 * sin(q2))) + p_);
+    if (((m == 0.0) && (julia == 0.0))) {
+      if ((i == 0)) {
+        r_ = 0.0;
+        z.x = z.x;
+        z.y = z.y;
+      }
+    }
+    if ((julia == 1.0)) {
+      z = (vec2f((q3 * cos(q2)), (q3 * sin(q2))) + vec2f(jre, jim));
+    }
+    if ((r_ > iters_)) {
+      ii = f32(i);
+      break;
+    }
+  }
+  var q: f32 = 0;
+  var rrr: f32 = 0.0;
+  var ggg: f32 = 0.0;
+  var bbb: f32 = 0.0;
+  var color: vec3f = vec3f(0.0, 0.0, 0.0);
+  if ((d == 0.0)) {
+    q = (((ii * powc(r_, 0.5)) * powc(ii, 0.75)) / 255.0);
+  } else {
+    q = (((ii * powc(r_, ((abs(d) / d) * 0.5))) * powc(ii, 0.75)) / 255.0);
+  }
+  if ((colmode == 0.0)) {
+    var s: f32 = (0.125662 * ii);
+    color = vec3f(cos((s + 0.9)), cos((s + 0.3)), cos((s + 0.2)));
+    var val: vec3f = ((color * vec3f(0.4)) + vec3f(0.6));
+    color = vec3f(val.x, val.y, val.z);
+  } else if ((colmode == 1.0)) {
+    var ss: f32 = roundc(((powc(1.12, ii) - 1.0) / (1.12 - 1.0)));
+    rrr = roundc(((ss / 256.0) / 256.0));
+    ggg = roundc(((ss - ((rrr * 256.0) * 256.0)) / 256.0));
+    bbb = roundc(((ss - ((rrr * 256.0) * 256.0)) - (ggg * 256.0)));
+    var hue: f32 = floor(((255.0 * ii) / iters_));
+    var saturation: f32 = 255.0;
+    var value: f32 = 0.0;
+    if ((ii <= iters_)) {
+      value = 255.0;
+    }
+    color = dc_gmandelbroot_hsv((hue / 255.0), (saturation / 255.0), (value / 255.0));
+  } else if ((colmode == 2.0)) {
+    color = vec3f((((rrr * q) + (((z.x * z.x) * ii) / 255.0)) / 255.0), (((ggg * q) - (((z.y * z.y) * ii) / 255.0)) / 255.0), (((bbb * q) - (((ii * ii) * ii) / 255.0)) / 255.0));
+  } else if ((colmode == 3.0)) {
+    color = vec3f((((rrr * q) + (powc(((z.x * z.x) * ii), 0.5) / 255.0)) / 255.0), (((ggg * q) + (powc(((z.y * z.y) * ii), 0.5) / 255.0)) / 255.0), ((bbb * q) + (powc(((ii * ii) * ii), 3) / 255.0)));
+  } else if ((colmode == 4.0)) {
+    color = vec3f(((ii * powc(((r_ * ii) / iters_), 0.45)) / 255.0), ((ii * powc(((r_ * ii) / iters_), 0.35)) / 255.0), ((ii * powc(((r_ * ii) / iters_), 0.25)) / 255.0));
+  } else if ((colmode == 5.0)) {
+    f = min(f, dot(z, z));
+    f = (1.0 + (log2(f) / 16.0));
+    color = vec3f(f, (f * f), ((f * f) * f));
+  }
+  return color;
+}
+
+fn dc_gmandelbroot_getRGBColor(uv: vec2f, colmode: f32, iters_: f32, exp_re: f32, exp_im: f32, n: f32, m: f32, burningship: f32, conjugate: f32, julia: f32, jre: f32, jim: f32) -> vec3f {
+  var color: vec3f = vec3f(0.0, 0.0, 0.0);
+  var tmp: vec2f = vec2f(exp_re, exp_im);
+  color = dc_gmandelbroot_gen_mandelbroot(uv, tmp, colmode, iters_, n, m, burningship, conjugate, julia, jre, jim);
+  return color;
+}
+
+fn distance_color(p_red: f32, p_green: f32, p_blue: f32, red: f32, green: f32, blue: f32) -> f32 {
+  var dist_r: f32 = abs((p_red - red));
+  var dist_g: f32 = abs((p_green - green));
+  var dist_b: f32 = abs((p_blue - blue));
+  var dist_3d_sqd: f32 = (((dist_r * dist_r) + (dist_g * dist_g)) + (dist_b * dist_b));
+  return dist_3d_sqd;
+}
+
+fn dbl2int(theColor: vec3f) -> vec3i {
+  var red: i32 = max(0, min(255, i32(floor((theColor.x * 256.0)))));
+  var green: i32 = max(0, min(255, i32(floor((theColor.y * 256.0)))));
+  var blue: i32 = max(0, min(255, i32(floor((theColor.z * 256.0)))));
+  return vec3i(red, green, blue);
+}
+
+fn greyscale(r_: i32, g: i32, b: i32) -> f32 {
+  var lum: i32;
+  var red: i32;
+  var green: i32;
+  var blue: i32;
+  red = i32((f32(r_) * 0.299));
+  green = i32((f32(g) * 0.587));
+  blue = i32((f32(b) * 0.114));
+  lum = ((red + green) + blue);
+  return (f32(lum) / 255.0);
+}`,
+    code: (w, p) => `{
+var colorA_: f32 = 1.0;
+var x: f32;
+var y: f32;
+var color: vec3f = vec3f(1.0, 1.0, 0.0);
+var z: f32 = 0.5;
+if ((${p[15]} == 1)) {
+  x = t.x;
+  y = t.y;
+} else {
+  x = ((2.0 * rnd(rs)) - 1.0);
+  y = ((2.0 * rnd(rs)) - 1.0);
+}
+var uv: vec2f = vec2f(x, y);
+uv = ((uv * vec2f(min(max(${p[14]}, 0.0), 100.0))) - vec2f(min(max(${p[12]}, -2.0), 2.0), min(max(${p[13]}, -2.0), 2.0)));
+color = dc_gmandelbroot_getRGBColor(uv, min(max(${p[1]}, 0.0), 5.0), min(max(${p[2]}, 1.0), 255.0), ${p[3]}, ${p[4]}, ${p[5]}, ${p[6]}, min(max(${p[7]}, 0.0), 1.0), min(max(${p[8]}, 0.0), 1.0), min(max(${p[9]}, 0.0), 1.0), ${p[10]}, ${p[11]});
+if ((${p[16]} == 0)) {
+  (*rgb).w = select(0.0, 1.0, true);
+  (*rgb).x = color.x;
+  (*rgb).y = color.y;
+  (*rgb).z = color.z;
+  colorA_ = 1.0;
+} else if ((${p[16]} == 1)) {
+  var pal_color: vec4f = vec4f(color.x, color.y, color.z, 1.0);
+  var simcol: vec4f = pal_color;
+  var diff: f32 = 1000000000.0;
+  for (var index: i32 = 0; (index < 256); index++) {
+    pal_color = read_imageStepMode(PALB_, 256, (f32(index) / f32(256)));
+    var pal_color3: vec3f = vec3f(pal_color.x, pal_color.y, pal_color.z);
+    var dvalue: f32 = distance_color(color.x, color.y, color.z, pal_color.x, pal_color.y, pal_color.z);
+    if ((diff > dvalue)) {
+      diff = dvalue;
+      simcol = pal_color;
+    }
+  }
+  (*rgb).w = select(0.0, 1.0, true);
+  (*rgb).x = simcol.x;
+  (*rgb).y = simcol.y;
+  (*rgb).z = simcol.z;
+  colorA_ = 1.0;
+} else if ((${p[16]} == 2)) {
+  var icolor: vec3i = dbl2int(color);
+  var z: f32 = greyscale(i32(f32(icolor.x)), i32(f32(icolor.y)), i32(f32(icolor.z)));
+  (*cp) = z;
+}
+v.x += (${w} * x);
+v.y += (${w} * y);
+var dz: f32 = ((z * ${p[17]}) + ${p[18]});
+if ((${p[19]} == 1)) {
+  pz_ = dz;
+} else {
+  pz_ += dz;
+}
 }`,
   },
   "sym_ng13": {
