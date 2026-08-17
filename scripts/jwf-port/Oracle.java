@@ -117,8 +117,11 @@ public class Oracle {
             double ox, oy, oz, oc; boolean hide;
             try {
               apply(f, ctx, xf, a, v, weight, curName);
-              XYZPoint o = curPrio == -1 ? a : v;
-              ox = o.x; oy = o.y; oz = o.z; oc = v.color; hide = v.doHide || a.doHide;
+              // pre-priority (and `~inv`) rows report input + accumulator: JWildfire zeroes pVarT before the pre
+              // steps and keeps whatever they add into it for the main sum (ringtile's inverse writes pVarTP)
+              if (curPrio == -1) { ox = a.x + v.x; oy = a.y + v.y; oz = a.z + v.z; }
+              else { ox = v.x; oy = v.y; oz = v.z; }
+              oc = v.color; hide = v.doHide || a.doHide;
             } catch (Throwable ex) {
               ox = Double.NaN; oy = Double.NaN; oz = Double.NaN; oc = Double.NaN; hide = false;
               if (err == null) err = ex.getClass().getSimpleName() + ": " + ex.getMessage();

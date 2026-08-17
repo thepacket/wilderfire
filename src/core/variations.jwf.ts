@@ -2,7 +2,7 @@
 // Variations ported from JWildfire (https://github.com/thargor6/JWildfire, LGPL-2.1,
 // (c) Andreas Maschke and contributors) by transpiling each variation's CUDA GPU
 // snippet to WGSL and verifying it against JWildfire's Java implementation.
-// 930 verified of 932 transpiled (1026 in JWildfire).
+// 938 verified of 940 transpiled (1026 in JWildfire).
 //
 // Snippet scope: t (input point, var), z_ (input z), r2, r, th = atan2(x,y), ph = atan2(y,x),
 // v (output accumulator), pz_ (output z), rs (rng), cp (palette coord ptr), hd (hide-flag ptr).
@@ -456,7 +456,7 @@ v.y += ((${w} * rn1) * sin(((2.0 * PI) * rn2)));
     funcs: `fn atan2j(y: f32, x: f32) -> f32 { if (x == 0.0 && y == 0.0) { return select(0.0, PI, (bitcast<u32>(x) >> 31u) == 1u) * select(1.0, -1.0, (bitcast<u32>(y) >> 31u) == 1u); } return atan2(y, x); }`,
     code: (w, _p) => `{
 var rinv_: f32 = 1.0 / r;
-var rndG: f32 = (${w} * ((((((rnd(rs) + rnd(rs)) + rnd(rs)) + rnd(rs)) + rnd(rs)) + rnd(rs)) - 3.0));
+var rndG: f32 = (${w} * ((rnd(rs) + rnd(rs)) - 1.0));
 var rndA: f32 = ((rnd(rs) * 2.0) * PI);
 t.x += (rndG * cos(rndA));
 t.y += (rndG * sin(rndA));
@@ -2006,6 +2006,67 @@ if ((abs(${w}) > 1.0e-8)) {
     pz_ = (-pz_ - ${p[5]});
     (*cp) = (((*cp) + ${p[10]}) % 1.0);
   }
+}
+}`,
+  },
+  "pre_wave3D_wf": {
+    params: [{ name: "axis", def: 2, int: true }, { name: "wavelen", def: 0.5 }, { name: "phase", def: 0 }, { name: "damping", def: 0.01 }, { name: "centre_x", def: 0 }, { name: "centre_y", def: 0 }, { name: "centre_z", def: 0 }],
+    verified: true, priority: -1, flags: ["3d","z"], types: ["3D","PRE"],
+    funcNames: ["sqr","atan2j"],
+    funcs: `fn sqr(x: f32) -> f32 { return x * x; }
+
+fn atan2j(y: f32, x: f32) -> f32 { if (x == 0.0 && y == 0.0) { return select(0.0, PI, (bitcast<u32>(x) >> 31u) == 1u) * select(1.0, -1.0, (bitcast<u32>(y) >> 31u) == 1u); } return atan2(y, x); }`,
+    code: (w, p) => `{
+var rinv_: f32 = 1.0 / r;
+var r_: f32;
+switch i32(${p[0]}) {
+  case 3: {
+    r_ = sqrt(((sqr((t.x - ${p[4]})) + sqr((t.y - ${p[5]}))) + sqr((z_ - ${p[6]}))));
+  }
+  case 1: {
+    r_ = sqrt((sqr((t.y - ${p[5]})) + sqr((z_ - ${p[6]}))));
+  }
+  case 2: {
+    r_ = sqrt((sqr((z_ - ${p[6]})) + sqr((t.x - ${p[4]}))));
+  }
+  case 0, default: {
+    r_ = sqrt((sqr((t.x - ${p[4]})) + sqr((t.y - ${p[5]}))));
+  }
+}
+var dl: f32 = (r_ / ${p[1]});
+var amplitude: f32 = ${w};
+if ((abs(${p[3]}) > 1.0e-30)) {
+  var dmp: f32 = (-dl * ${p[3]});
+  amplitude *= exp(dmp);
+}
+var amp: f32 = (amplitude * sin((((2.0 * PI) * dl) + ${p[2]})));
+switch i32(${p[0]}) {
+  case 3: {
+    var d_l: f32 = (sqrt(((sqr((t.x - ${p[4]})) + sqr((t.y - ${p[5]}))) + sqr((z_ - ${p[6]})))) + 1.0e-16);
+    var d_x: f32 = ((t.x - ${p[4]}) / d_l);
+    var d_y: f32 = ((t.y - ${p[5]}) / d_l);
+    var d_z: f32 = ((z_ - ${p[6]}) / d_l);
+    t.x += (d_x * amp);
+    t.y += (d_y * amp);
+    z_ += (d_z * amp);
+  }
+  case 1: {
+    t.x += amp;
+  }
+  case 2: {
+    t.y += amp;
+  }
+  case 0, default: {
+    z_ += amp;
+  }
+}
+r2 = ((t.x * t.x) + (t.y * t.y));
+r = sqrt(r2);
+rinv_ = (1.0 / r);
+th = atan2j(t.x, t.y);
+ph = ((0.5 * PI) - th);
+if ((ph > PI)) {
+  ph -= (2.0 * PI);
 }
 }`,
   },
@@ -18389,6 +18450,1082 @@ v.x += ((vv * rad) * c);
 v.y += ((vv * rad) * s);
 }`,
   },
+  "dc_triTile": {
+    params: [{ name: "type", def: 1, int: true }, { name: "t", def: 2, int: true }, { name: "col1", def: 0.43 }, { name: "col2", def: 0.63 }, { name: "on", def: 0, int: true }, { name: "itt", def: 2, int: true }, { name: "eq", def: 1, int: true }, { name: "depth", def: 3, int: true }, { name: "on1", def: 0, int: true }, { name: "itt1", def: 3, int: true }, { name: "eq1", def: 2, int: true }, { name: "depth1", def: 0, int: true }, { name: "on2", def: 1, int: true }, { name: "itt2", def: 4, int: true }, { name: "eq2", def: 2, int: true }, { name: "depth2", def: 1, int: true }],
+    verified: true, priority: 0, flags: ["dc","state","z"], types: ["SIMULATION","DC","BASE_SHAPE"],
+    funcNames: ["jwx_dc_triTile_col1_c","jwx_dc_triTile_col2_c","jwx_dc_triTile_type_c","jwx_dc_triTile_inited_","jwx_dc_triTile_alfa","jxyz_","dc_triTile_Triangle","atan2j","sqr","dc_triTile_Triangle_zero","dc_triTile_fiveFoldInit","dc_triTile_trihexInit","dc_triTile_equiThirdsInit","dc_triTile_ortInit","dc_triTile_pinwheelInit","dc_triTile_goldInit","jxyz__zero","dc_triTile_fiveFoldDevis","dc_triTile_trihexDevis","dc_triTile_equiThirdsDevis","dc_triTile_ortDevis","dc_triTile_pinwheelDevis","dc_triTile_goldDevis","dc_triTile_devis","dc_triTile_discretNoise","dc_triTile_blur"],
+    funcs: `struct jxyz_ {
+  x: f32,
+  y: f32,
+  z: f32,
+  color: f32,
+}
+
+struct dc_triTile_Triangle {
+  type_: i32,
+  x1: f32,
+  y1: f32,
+  x2: f32,
+  y2: f32,
+  x3: f32,
+  y3: f32,
+  col: f32,
+}
+
+fn atan2j(y: f32, x: f32) -> f32 { if (x == 0.0 && y == 0.0) { return select(0.0, PI, (bitcast<u32>(x) >> 31u) == 1u) * select(1.0, -1.0, (bitcast<u32>(y) >> 31u) == 1u); } return atan2(y, x); }
+
+fn sqr(x: f32) -> f32 { return x * x; }
+
+fn dc_triTile_Triangle_zero() -> dc_triTile_Triangle {
+  var r_: dc_triTile_Triangle;
+  return r_;
+}
+
+fn dc_triTile_fiveFoldInit(t_: i32, orig: ptr<function, dc_triTile_Triangle>) {
+  switch t_ {
+    case 1: {
+      (*orig).type_ = 1;
+      (*orig).col = jwx_dc_triTile_col1_c;
+      (*orig).x1 = 0.0;
+      (*orig).y1 = 0.0;
+      (*orig).x2 = cos(((2.0 * PI) / 5));
+      (*orig).y2 = sin(((2.0 * PI) / 5));
+      (*orig).x3 = (2 * (*orig).x2);
+      (*orig).y3 = 0.0;
+    }
+    case 2: {
+      (*orig).type_ = 2;
+      (*orig).col = jwx_dc_triTile_col2_c;
+      (*orig).x1 = 0.0;
+      (*orig).y1 = 0.0;
+      (*orig).x2 = cos((PI / 5));
+      (*orig).y2 = sin((PI / 5));
+      (*orig).x3 = (2 * (*orig).x2);
+      (*orig).y3 = 0.0;
+    }
+    default: {}
+  }
+  jwx_dc_triTile_alfa = (2 * cos(((2.0 * PI) / 5)));
+}
+
+fn dc_triTile_trihexInit(t_: i32, orig: ptr<function, dc_triTile_Triangle>) {
+  switch t_ {
+    case 1: {
+      (*orig).type_ = 1;
+      (*orig).col = jwx_dc_triTile_col1_c;
+      (*orig).x1 = 0.0;
+      (*orig).y1 = 0.0;
+      (*orig).x2 = cos((PI / 3));
+      (*orig).y2 = 0.0;
+      (*orig).x3 = 0.0;
+      (*orig).y3 = sin((PI / 3));
+    }
+    case 2: {
+      (*orig).type_ = 2;
+      (*orig).col = jwx_dc_triTile_col2_c;
+      (*orig).x1 = 0.0;
+      (*orig).y1 = 0.0;
+      (*orig).x2 = cos((PI / 3));
+      (*orig).y2 = 0.0;
+      (*orig).x3 = 0.0;
+      (*orig).y3 = sin((PI / 3));
+    }
+    default: {}
+  }
+}
+
+fn dc_triTile_equiThirdsInit(t_: i32, orig: ptr<function, dc_triTile_Triangle>) {
+  switch t_ {
+    case 1: {
+      (*orig).type_ = 1;
+      (*orig).col = jwx_dc_triTile_col1_c;
+      (*orig).x1 = 0.0;
+      (*orig).y1 = 0.0;
+      (*orig).x2 = cos((PI / 3));
+      (*orig).y2 = sin((PI / 3));
+      (*orig).x3 = (2 * (*orig).x2);
+      (*orig).y3 = 0.0;
+    }
+    case 2: {
+      (*orig).type_ = 2;
+      (*orig).col = jwx_dc_triTile_col2_c;
+      (*orig).x1 = 0.0;
+      (*orig).y1 = 0.0;
+      (*orig).x2 = cos((PI / 6));
+      (*orig).y2 = sin((PI / 6));
+      (*orig).x3 = (2 * (*orig).x2);
+      (*orig).y3 = 0.0;
+    }
+    default: {}
+  }
+  jwx_dc_triTile_alfa = (1.0 / 3.0);
+}
+
+fn dc_triTile_ortInit(t_: i32, orig: ptr<function, dc_triTile_Triangle>) {
+  switch t_ {
+    case 1: {
+      (*orig).type_ = 1;
+      (*orig).col = jwx_dc_triTile_col1_c;
+      (*orig).x1 = 0.0;
+      (*orig).y1 = 0.0;
+      (*orig).x2 = cos(((2.0 * PI) / 5));
+      (*orig).y2 = sin(((2.0 * PI) / 5));
+      (*orig).x3 = (2 * (*orig).x2);
+      (*orig).y3 = 0.0;
+    }
+    case 2: {
+      (*orig).type_ = 2;
+      (*orig).col = jwx_dc_triTile_col2_c;
+      (*orig).x1 = 0.0;
+      (*orig).y1 = 0.0;
+      (*orig).x2 = cos(((2.0 * PI) / 5));
+      (*orig).y2 = sin(((2.0 * PI) / 5));
+      (*orig).x3 = (2 * (*orig).x2);
+      (*orig).y3 = 0.0;
+    }
+    default: {}
+  }
+  jwx_dc_triTile_alfa = (2 * cos(((2.0 * PI) / 5)));
+}
+
+fn dc_triTile_pinwheelInit(t_: i32, orig: ptr<function, dc_triTile_Triangle>) {
+  switch t_ {
+    case 1: {
+      (*orig).type_ = 1;
+      (*orig).col = jwx_dc_triTile_col1_c;
+      (*orig).x1 = 0.0;
+      (*orig).y1 = 0.0;
+      (*orig).x2 = 0.0;
+      (*orig).y2 = 1.0;
+      (*orig).x3 = 2.0;
+      (*orig).y3 = 0.0;
+    }
+    case 2: {
+      (*orig).type_ = 2;
+      (*orig).col = jwx_dc_triTile_col2_c;
+      (*orig).x1 = 0.0;
+      (*orig).y1 = 0.0;
+      (*orig).x2 = 0.0;
+      (*orig).y2 = 2.0;
+      (*orig).x3 = 1.0;
+      (*orig).y3 = 0.0;
+    }
+    default: {}
+  }
+}
+
+fn dc_triTile_goldInit(t_: i32, orig: ptr<function, dc_triTile_Triangle>) {
+  switch t_ {
+    case 1: {
+      (*orig).type_ = 1;
+      (*orig).col = jwx_dc_triTile_col1_c;
+      (*orig).x1 = 0.0;
+      (*orig).y1 = 0.0;
+      (*orig).x2 = (1.0 / 1.618033988749895);
+      (*orig).y2 = sqrt((1.0 / 1.618033988749895));
+      (*orig).x3 = (*orig).x2;
+      (*orig).y3 = 0.0;
+    }
+    case 2: {
+      (*orig).type_ = 2;
+      (*orig).col = jwx_dc_triTile_col2_c;
+      (*orig).x1 = 0.0;
+      (*orig).y1 = 0.0;
+      (*orig).x2 = 0.0;
+      (*orig).y2 = sqrt((1.0 / 1.618033988749895));
+      (*orig).x3 = 1.0;
+      (*orig).y3 = 0.0;
+    }
+    default: {}
+  }
+  jwx_dc_triTile_alfa = sqr((1.0 / 1.618033988749895));
+}
+
+fn jxyz__zero() -> jxyz_ {
+  var r_: jxyz_;
+  return r_;
+}
+
+fn dc_triTile_fiveFoldDevis(in_: dc_triTile_Triangle, out_: ptr<function, dc_triTile_Triangle>, rs: ptr<function, u32>) {
+  var x4: f32;
+  var y4: f32;
+  var x5: f32;
+  var y5: f32;
+  var w_: f32;
+  switch in_.type_ {
+    case 1: {
+      x4 = (in_.x2 + (jwx_dc_triTile_alfa * (in_.x3 - in_.x2)));
+      y4 = (in_.y2 + (jwx_dc_triTile_alfa * (in_.y3 - in_.y2)));
+      w_ = rnd(rs);
+      if ((w_ < (jwx_dc_triTile_alfa * jwx_dc_triTile_alfa))) {
+        (*out_).type_ = 1;
+        (*out_).col = jwx_dc_triTile_col1_c;
+        (*out_).x1 = in_.x3;
+        (*out_).y1 = in_.y3;
+        (*out_).x2 = in_.x1;
+        (*out_).y2 = in_.y1;
+        (*out_).x3 = x4;
+        (*out_).y3 = y4;
+      } else {
+        (*out_).type_ = 2;
+        (*out_).col = jwx_dc_triTile_col2_c;
+        (*out_).x1 = in_.x2;
+        (*out_).y1 = in_.y2;
+        (*out_).x2 = x4;
+        (*out_).y2 = y4;
+        (*out_).x3 = in_.x1;
+        (*out_).y3 = in_.y1;
+      }
+    }
+    case 2: {
+      x4 = (in_.x3 + (jwx_dc_triTile_alfa * (in_.x1 - in_.x3)));
+      y4 = (in_.y3 + (jwx_dc_triTile_alfa * (in_.y1 - in_.y3)));
+      x5 = (in_.x3 + (jwx_dc_triTile_alfa * (in_.x2 - in_.x3)));
+      y5 = (in_.y3 + (jwx_dc_triTile_alfa * (in_.y2 - in_.y3)));
+      w_ = rnd(rs);
+      if ((w_ < (jwx_dc_triTile_alfa * jwx_dc_triTile_alfa))) {
+        (*out_).type_ = 2;
+        (*out_).col = jwx_dc_triTile_col2_c;
+        (*out_).x1 = in_.x2;
+        (*out_).y1 = in_.y2;
+        (*out_).x2 = x4;
+        (*out_).y2 = y4;
+        (*out_).x3 = in_.x1;
+        (*out_).y3 = in_.y1;
+      } else if ((w_ < ((2 * jwx_dc_triTile_alfa) * jwx_dc_triTile_alfa))) {
+        (*out_).type_ = 2;
+        (*out_).col = jwx_dc_triTile_col2_c;
+        (*out_).x1 = in_.x3;
+        (*out_).y1 = in_.y3;
+        (*out_).x2 = x5;
+        (*out_).y2 = y5;
+        (*out_).x3 = x4;
+        (*out_).y3 = y4;
+      } else {
+        (*out_).type_ = 1;
+        (*out_).col = jwx_dc_triTile_col1_c;
+        (*out_).x1 = in_.x2;
+        (*out_).y1 = in_.y2;
+        (*out_).x2 = x4;
+        (*out_).y2 = y4;
+        (*out_).x3 = x5;
+        (*out_).y3 = y5;
+      }
+    }
+    default: {}
+  }
+}
+
+fn dc_triTile_trihexDevis(in_: dc_triTile_Triangle, out_: ptr<function, dc_triTile_Triangle>, rs: ptr<function, u32>) {
+  var x4: f32;
+  var y4: f32;
+  var x5: f32;
+  var y5: f32;
+  var x6: f32;
+  var y6: f32;
+  var w_: f32;
+  x4 = ((in_.x1 + in_.x3) / 2);
+  y4 = ((in_.y1 + in_.y3) / 2);
+  x5 = ((in_.x2 + in_.x3) / 2);
+  y5 = ((in_.y2 + in_.y3) / 2);
+  x6 = ((in_.x1 + x5) / 2);
+  y6 = ((in_.y1 + y5) / 2);
+  w_ = rnd(rs);
+  if ((w_ < 0.25)) {
+    (*out_).type_ = in_.type_;
+    (*out_).col = select(jwx_dc_triTile_col2_c, jwx_dc_triTile_col1_c, (in_.type_ == 1));
+    (*out_).x1 = x4;
+    (*out_).y1 = y4;
+    (*out_).x2 = x5;
+    (*out_).y2 = y5;
+    (*out_).x3 = in_.x3;
+    (*out_).y3 = in_.y3;
+  } else if ((w_ < 0.5)) {
+    (*out_).type_ = (3 - in_.type_);
+    (*out_).col = select(jwx_dc_triTile_col1_c, jwx_dc_triTile_col2_c, (in_.type_ == 1));
+    (*out_).x1 = x4;
+    (*out_).y1 = y4;
+    (*out_).x2 = x5;
+    (*out_).y2 = y5;
+    (*out_).x3 = in_.x1;
+    (*out_).y3 = in_.y1;
+  } else if ((w_ < 0.75)) {
+    (*out_).type_ = (3 - in_.type_);
+    (*out_).col = select(jwx_dc_triTile_col1_c, jwx_dc_triTile_col2_c, (in_.type_ == 1));
+    (*out_).x1 = x6;
+    (*out_).y1 = y6;
+    (*out_).x2 = x5;
+    (*out_).y2 = y5;
+    (*out_).x3 = in_.x2;
+    (*out_).y3 = in_.y2;
+  } else {
+    (*out_).type_ = in_.type_;
+    (*out_).col = select(jwx_dc_triTile_col2_c, jwx_dc_triTile_col1_c, (in_.type_ == 1));
+    (*out_).x1 = x6;
+    (*out_).y1 = y6;
+    (*out_).x2 = in_.x1;
+    (*out_).y2 = in_.y1;
+    (*out_).x3 = in_.x2;
+    (*out_).y3 = in_.y2;
+  }
+}
+
+fn dc_triTile_equiThirdsDevis(in_: dc_triTile_Triangle, out_: ptr<function, dc_triTile_Triangle>, rs: ptr<function, u32>) {
+  var x4: f32;
+  var y4: f32;
+  var x5: f32;
+  var y5: f32;
+  var w_: f32;
+  switch in_.type_ {
+    case 1: {
+      x4 = (in_.x1 + (0.5 * (in_.x3 - in_.x1)));
+      y4 = (in_.y1 + (0.5 * (in_.y3 - in_.y1)));
+      x5 = (x4 + (jwx_dc_triTile_alfa * (in_.x2 - x4)));
+      y5 = (y4 + (jwx_dc_triTile_alfa * (in_.y2 - y4)));
+      w_ = rnd(rs);
+      if ((w_ < jwx_dc_triTile_alfa)) {
+        (*out_).type_ = 2;
+        (*out_).col = jwx_dc_triTile_col2_c;
+        (*out_).x1 = in_.x2;
+        (*out_).y1 = in_.y2;
+        (*out_).x2 = x5;
+        (*out_).y2 = y5;
+        (*out_).x3 = in_.x1;
+        (*out_).y3 = in_.y1;
+      } else if ((w_ < (2 * jwx_dc_triTile_alfa))) {
+        (*out_).type_ = 2;
+        (*out_).col = jwx_dc_triTile_col2_c;
+        (*out_).x1 = in_.x3;
+        (*out_).y1 = in_.y3;
+        (*out_).x2 = x5;
+        (*out_).y2 = y5;
+        (*out_).x3 = in_.x2;
+        (*out_).y3 = in_.y2;
+      } else {
+        (*out_).type_ = 2;
+        (*out_).col = jwx_dc_triTile_col2_c;
+        (*out_).x1 = in_.x1;
+        (*out_).y1 = in_.y1;
+        (*out_).x2 = x5;
+        (*out_).y2 = y5;
+        (*out_).x3 = in_.x3;
+        (*out_).y3 = in_.y3;
+      }
+    }
+    case 2: {
+      x4 = (in_.x1 + (jwx_dc_triTile_alfa * (in_.x3 - in_.x1)));
+      y4 = (in_.y1 + (jwx_dc_triTile_alfa * (in_.y3 - in_.y1)));
+      x5 = (in_.x3 + (jwx_dc_triTile_alfa * (in_.x1 - in_.x3)));
+      y5 = (in_.y3 + (jwx_dc_triTile_alfa * (in_.y1 - in_.y3)));
+      w_ = rnd(rs);
+      if ((w_ < jwx_dc_triTile_alfa)) {
+        (*out_).type_ = 2;
+        (*out_).col = jwx_dc_triTile_col2_c;
+        (*out_).x1 = in_.x2;
+        (*out_).y1 = in_.y2;
+        (*out_).x2 = x4;
+        (*out_).y2 = y4;
+        (*out_).x3 = in_.x1;
+        (*out_).y3 = in_.y1;
+      } else if ((w_ < (2 * jwx_dc_triTile_alfa))) {
+        (*out_).type_ = 2;
+        (*out_).col = jwx_dc_triTile_col2_c;
+        (*out_).x1 = in_.x3;
+        (*out_).y1 = in_.y3;
+        (*out_).x2 = x5;
+        (*out_).y2 = y5;
+        (*out_).x3 = in_.x2;
+        (*out_).y3 = in_.y2;
+      } else {
+        (*out_).type_ = 1;
+        (*out_).col = jwx_dc_triTile_col1_c;
+        (*out_).x1 = x4;
+        (*out_).y1 = y4;
+        (*out_).x2 = in_.x2;
+        (*out_).y2 = in_.y2;
+        (*out_).x3 = x5;
+        (*out_).y3 = y5;
+      }
+    }
+    default: {}
+  }
+}
+
+fn dc_triTile_ortDevis(in_: dc_triTile_Triangle, out_: ptr<function, dc_triTile_Triangle>, rs: ptr<function, u32>) {
+  var x4: f32;
+  var y4: f32;
+  var x5: f32;
+  var y5: f32;
+  var x6: f32;
+  var y6: f32;
+  var w_: f32;
+  x4 = (in_.x2 + (jwx_dc_triTile_alfa * (in_.x1 - in_.x2)));
+  y4 = (in_.y2 + (jwx_dc_triTile_alfa * (in_.y1 - in_.y2)));
+  x5 = (in_.x1 + (jwx_dc_triTile_alfa * (in_.x2 - in_.x1)));
+  y5 = (in_.y1 + (jwx_dc_triTile_alfa * (in_.y2 - in_.y1)));
+  x6 = (in_.x2 + (jwx_dc_triTile_alfa * (in_.x3 - in_.x2)));
+  y6 = (in_.y2 + (jwx_dc_triTile_alfa * (in_.y3 - in_.y2)));
+  w_ = rnd(rs);
+  if ((w_ < 0.3)) {
+    (*out_).type_ = 2;
+    (*out_).col = jwx_dc_triTile_col2_c;
+    (*out_).x1 = x4;
+    (*out_).y1 = y4;
+    (*out_).x2 = in_.x2;
+    (*out_).y2 = in_.y2;
+    (*out_).x3 = x6;
+    (*out_).y3 = y6;
+  } else if ((w_ < 0.63)) {
+    (*out_).type_ = (3 - in_.type_);
+    (*out_).col = select(jwx_dc_triTile_col1_c, jwx_dc_triTile_col2_c, (in_.type_ == 1));
+    (*out_).x1 = x6;
+    (*out_).y1 = y6;
+    (*out_).x2 = in_.x1;
+    (*out_).y2 = in_.y1;
+    (*out_).x3 = x5;
+    (*out_).y3 = y5;
+  } else {
+    (*out_).type_ = 1;
+    (*out_).col = jwx_dc_triTile_col1_c;
+    (*out_).x1 = in_.x3;
+    (*out_).y1 = in_.y3;
+    (*out_).x2 = in_.x1;
+    (*out_).y2 = in_.y1;
+    (*out_).x3 = x6;
+    (*out_).y3 = y6;
+  }
+}
+
+fn dc_triTile_pinwheelDevis(in_: dc_triTile_Triangle, out_: ptr<function, dc_triTile_Triangle>, rs: ptr<function, u32>) {
+  var x4: f32;
+  var y4: f32;
+  var x5: f32;
+  var y5: f32;
+  var x6: f32;
+  var y6: f32;
+  var x7: f32;
+  var y7: f32;
+  var w_: i32;
+  switch in_.type_ {
+    case 1: {
+      x4 = (in_.x2 + (0.2 * (in_.x3 - in_.x2)));
+      y4 = (in_.y2 + (0.2 * (in_.y3 - in_.y2)));
+      x5 = (in_.x2 + (0.6 * (in_.x3 - in_.x2)));
+      y5 = (in_.y2 + (0.6 * (in_.y3 - in_.y2)));
+      x6 = (in_.x1 + (0.5 * (in_.x3 - in_.x1)));
+      y6 = (in_.y1 + (0.5 * (in_.y3 - in_.y1)));
+      x7 = (in_.x1 + (0.5 * (x4 - in_.x1)));
+      y7 = (in_.y1 + (0.5 * (y4 - in_.y1)));
+      w_ = i32((rnd(rs) * 5));
+      switch w_ {
+        case 0: {
+          (*out_).type_ = 2;
+          (*out_).col = jwx_dc_triTile_col2_c;
+          (*out_).x1 = x4;
+          (*out_).y1 = y4;
+          (*out_).x2 = in_.x1;
+          (*out_).y2 = in_.y1;
+          (*out_).x3 = in_.x2;
+          (*out_).y3 = in_.y2;
+        }
+        case 1: {
+          (*out_).type_ = 2;
+          (*out_).col = jwx_dc_triTile_col2_c;
+          (*out_).x1 = x7;
+          (*out_).y1 = y7;
+          (*out_).x2 = x6;
+          (*out_).y2 = y6;
+          (*out_).x3 = in_.x1;
+          (*out_).y3 = in_.y1;
+        }
+        case 2: {
+          (*out_).type_ = 1;
+          (*out_).col = jwx_dc_triTile_col1_c;
+          (*out_).x1 = x7;
+          (*out_).y1 = y7;
+          (*out_).x2 = x4;
+          (*out_).y2 = y4;
+          (*out_).x3 = x6;
+          (*out_).y3 = y6;
+        }
+        case 3: {
+          (*out_).type_ = 1;
+          (*out_).col = jwx_dc_triTile_col1_c;
+          (*out_).x1 = x5;
+          (*out_).y1 = y5;
+          (*out_).x2 = x6;
+          (*out_).y2 = y6;
+          (*out_).x3 = x4;
+          (*out_).y3 = y4;
+        }
+        case 4: {
+          (*out_).type_ = 2;
+          (*out_).col = jwx_dc_triTile_col2_c;
+          (*out_).x1 = x5;
+          (*out_).y1 = y5;
+          (*out_).x2 = in_.x3;
+          (*out_).y2 = in_.y3;
+          (*out_).x3 = x6;
+          (*out_).y3 = y6;
+        }
+        default: {}
+      }
+    }
+    case 2: {
+      x4 = (in_.x3 + (0.2 * (in_.x2 - in_.x3)));
+      y4 = (in_.y3 + (0.2 * (in_.y2 - in_.y3)));
+      x5 = (in_.x3 + (0.6 * (in_.x2 - in_.x3)));
+      y5 = (in_.y3 + (0.6 * (in_.y2 - in_.y3)));
+      x6 = (in_.x1 + (0.5 * (in_.x2 - in_.x1)));
+      y6 = (in_.y1 + (0.5 * (in_.y2 - in_.y1)));
+      x7 = (in_.x1 + (0.5 * (x4 - in_.x1)));
+      y7 = (in_.y1 + (0.5 * (y4 - in_.y1)));
+      w_ = i32((rnd(rs) * 5));
+      switch w_ {
+        case 0: {
+          (*out_).type_ = 1;
+          (*out_).col = jwx_dc_triTile_col1_c;
+          (*out_).x1 = x4;
+          (*out_).y1 = y4;
+          (*out_).x2 = in_.x3;
+          (*out_).y2 = in_.y3;
+          (*out_).x3 = in_.x1;
+          (*out_).y3 = in_.y1;
+        }
+        case 1: {
+          (*out_).type_ = 1;
+          (*out_).col = jwx_dc_triTile_col1_c;
+          (*out_).x1 = x7;
+          (*out_).y1 = y7;
+          (*out_).x2 = in_.x1;
+          (*out_).y2 = in_.y1;
+          (*out_).x3 = x6;
+          (*out_).y3 = y6;
+        }
+        case 2: {
+          (*out_).type_ = 2;
+          (*out_).col = jwx_dc_triTile_col2_c;
+          (*out_).x1 = x7;
+          (*out_).y1 = y7;
+          (*out_).x2 = x6;
+          (*out_).y2 = y6;
+          (*out_).x3 = x4;
+          (*out_).y3 = y4;
+        }
+        case 3: {
+          (*out_).type_ = 2;
+          (*out_).col = jwx_dc_triTile_col2_c;
+          (*out_).x1 = x5;
+          (*out_).y1 = y5;
+          (*out_).x2 = x4;
+          (*out_).y2 = y4;
+          (*out_).x3 = x6;
+          (*out_).y3 = y6;
+        }
+        case 4: {
+          (*out_).type_ = 1;
+          (*out_).col = jwx_dc_triTile_col1_c;
+          (*out_).x1 = x5;
+          (*out_).y1 = y5;
+          (*out_).x2 = x6;
+          (*out_).y2 = y6;
+          (*out_).x3 = in_.x2;
+          (*out_).y3 = in_.y2;
+        }
+        default: {}
+      }
+    }
+    default: {}
+  }
+}
+
+fn dc_triTile_goldDevis(in_: dc_triTile_Triangle, out_: ptr<function, dc_triTile_Triangle>, rs: ptr<function, u32>) {
+  var x4: f32;
+  var y4: f32;
+  var x5: f32;
+  var y5: f32;
+  var x6: f32;
+  var y6: f32;
+  var x7: f32;
+  var y7: f32;
+  var x8: f32;
+  var y8: f32;
+  var x9: f32;
+  var y9: f32;
+  var x10: f32;
+  var y10: f32;
+  var w_: f32;
+  switch in_.type_ {
+    case 1: {
+      x4 = (in_.x1 + (jwx_dc_triTile_alfa * (in_.x2 - in_.x1)));
+      y4 = (in_.y1 + (jwx_dc_triTile_alfa * (in_.y2 - in_.y1)));
+      x5 = (in_.x2 + (jwx_dc_triTile_alfa * (in_.x1 - in_.x2)));
+      y5 = (in_.y2 + (jwx_dc_triTile_alfa * (in_.y1 - in_.y2)));
+      x6 = (in_.x3 + (jwx_dc_triTile_alfa * (in_.x2 - in_.x3)));
+      y6 = (in_.y3 + (jwx_dc_triTile_alfa * (in_.y2 - in_.y3)));
+      x7 = (in_.x1 + (jwx_dc_triTile_alfa * (in_.x3 - in_.x1)));
+      y7 = (in_.y1 + (jwx_dc_triTile_alfa * (in_.y3 - in_.y1)));
+      w_ = rnd(rs);
+      if ((w_ < 0.146)) {
+        (*out_).type_ = 1;
+        (*out_).col = jwx_dc_triTile_col1_c;
+        (*out_).x1 = in_.x1;
+        (*out_).y1 = in_.y1;
+        (*out_).x2 = x4;
+        (*out_).y2 = y4;
+        (*out_).x3 = x7;
+        (*out_).y3 = y7;
+      } else if ((w_ < 0.382)) {
+        (*out_).type_ = 2;
+        (*out_).col = jwx_dc_triTile_col2_c;
+        (*out_).x1 = x4;
+        (*out_).y1 = y4;
+        (*out_).x2 = x7;
+        (*out_).y2 = y7;
+        (*out_).x3 = x6;
+        (*out_).y3 = y6;
+      } else if ((w_ < 0.618)) {
+        (*out_).type_ = 2;
+        (*out_).col = jwx_dc_triTile_col2_c;
+        (*out_).x1 = in_.x3;
+        (*out_).y1 = in_.y3;
+        (*out_).x2 = x6;
+        (*out_).y2 = y6;
+        (*out_).x3 = x7;
+        (*out_).y3 = y7;
+      } else if ((w_ < 0.764)) {
+        (*out_).type_ = 1;
+        (*out_).col = jwx_dc_triTile_col1_c;
+        (*out_).x1 = x4;
+        (*out_).y1 = y4;
+        (*out_).x2 = x6;
+        (*out_).y2 = y6;
+        (*out_).x3 = x5;
+        (*out_).y3 = y5;
+      } else {
+        (*out_).type_ = 2;
+        (*out_).col = jwx_dc_triTile_col2_c;
+        (*out_).x1 = x5;
+        (*out_).y1 = y5;
+        (*out_).x2 = x6;
+        (*out_).y2 = y6;
+        (*out_).x3 = in_.x2;
+        (*out_).y3 = in_.y2;
+      }
+    }
+    case 2: {
+      x4 = (in_.x2 + (jwx_dc_triTile_alfa * (in_.x1 - in_.x2)));
+      y4 = (in_.y2 + (jwx_dc_triTile_alfa * (in_.y1 - in_.y2)));
+      x5 = (in_.x2 + (jwx_dc_triTile_alfa * (in_.x3 - in_.x2)));
+      y5 = (in_.y2 + (jwx_dc_triTile_alfa * (in_.y3 - in_.y2)));
+      x6 = (in_.x3 + (jwx_dc_triTile_alfa * (in_.x2 - in_.x3)));
+      y6 = (in_.y3 + (jwx_dc_triTile_alfa * (in_.y2 - in_.y3)));
+      x7 = (in_.x1 + (jwx_dc_triTile_alfa * (in_.x3 - in_.x1)));
+      y7 = (in_.y1 + (jwx_dc_triTile_alfa * (in_.y3 - in_.y1)));
+      x8 = (in_.x3 + (jwx_dc_triTile_alfa * (in_.x1 - in_.x3)));
+      y8 = (in_.y3 + (jwx_dc_triTile_alfa * (in_.y1 - in_.y3)));
+      x9 = (x4 + (jwx_dc_triTile_alfa * (x7 - x4)));
+      y9 = (y4 + (jwx_dc_triTile_alfa * (y7 - y4)));
+      x10 = (x7 + (jwx_dc_triTile_alfa * (x4 - x7)));
+      y10 = (y7 + (jwx_dc_triTile_alfa * (y4 - y7)));
+      w_ = rnd(rs);
+      if ((w_ < 0.146)) {
+        (*out_).type_ = 2;
+        (*out_).col = jwx_dc_triTile_col2_c;
+        (*out_).x1 = x4;
+        (*out_).y1 = y4;
+        (*out_).x2 = in_.x2;
+        (*out_).y2 = in_.y2;
+        (*out_).x3 = x5;
+        (*out_).y3 = y5;
+      } else if ((w_ < 0.236)) {
+        (*out_).type_ = 1;
+        (*out_).col = jwx_dc_triTile_col1_c;
+        (*out_).x1 = x4;
+        (*out_).y1 = y4;
+        (*out_).x2 = x5;
+        (*out_).y2 = y5;
+        (*out_).x3 = x9;
+        (*out_).y3 = y9;
+      } else if ((w_ < 0.382)) {
+        (*out_).type_ = 2;
+        (*out_).col = jwx_dc_triTile_col2_c;
+        (*out_).x1 = x10;
+        (*out_).y1 = y10;
+        (*out_).x2 = in_.x1;
+        (*out_).y2 = in_.y1;
+        (*out_).x3 = x4;
+        (*out_).y3 = y4;
+      } else if ((w_ < 0.472)) {
+        (*out_).type_ = 1;
+        (*out_).col = jwx_dc_triTile_col1_c;
+        (*out_).x1 = x7;
+        (*out_).y1 = y7;
+        (*out_).x2 = in_.x1;
+        (*out_).y2 = in_.y1;
+        (*out_).x3 = x10;
+        (*out_).y3 = y10;
+      } else if ((w_ < 0.618)) {
+        (*out_).type_ = 2;
+        (*out_).col = jwx_dc_triTile_col2_c;
+        (*out_).x1 = x9;
+        (*out_).y1 = y9;
+        (*out_).x2 = x5;
+        (*out_).y2 = y5;
+        (*out_).x3 = x7;
+        (*out_).y3 = y7;
+      } else if ((w_ < 0.764)) {
+        (*out_).type_ = 2;
+        (*out_).col = jwx_dc_triTile_col2_c;
+        (*out_).x1 = x6;
+        (*out_).y1 = y6;
+        (*out_).x2 = x5;
+        (*out_).y2 = y5;
+        (*out_).x3 = x7;
+        (*out_).y3 = y7;
+      } else if ((w_ < 0.854)) {
+        (*out_).type_ = 1;
+        (*out_).col = jwx_dc_triTile_col1_c;
+        (*out_).x1 = x7;
+        (*out_).y1 = y7;
+        (*out_).x2 = x6;
+        (*out_).y2 = y6;
+        (*out_).x3 = x8;
+        (*out_).y3 = y8;
+      } else {
+        (*out_).type_ = 2;
+        (*out_).col = jwx_dc_triTile_col2_c;
+        (*out_).x1 = x8;
+        (*out_).y1 = y8;
+        (*out_).x2 = x6;
+        (*out_).y2 = y6;
+        (*out_).x3 = in_.x3;
+        (*out_).y3 = in_.y3;
+      }
+    }
+    default: {}
+  }
+}
+
+fn dc_triTile_devis(t1: dc_triTile_Triangle, t2: ptr<function, dc_triTile_Triangle>, rs: ptr<function, u32>) {
+  switch i32(jwx_dc_triTile_type_c) {
+    case 1: {
+      dc_triTile_fiveFoldDevis(t1, t2, rs);
+    }
+    case 2: {
+      dc_triTile_trihexDevis(t1, t2, rs);
+    }
+    case 3: {
+      dc_triTile_equiThirdsDevis(t1, t2, rs);
+    }
+    case 4: {
+      dc_triTile_ortDevis(t1, t2, rs);
+    }
+    case 5: {
+      dc_triTile_pinwheelDevis(t1, t2, rs);
+    }
+    case 6: {
+      dc_triTile_goldDevis(t1, t2, rs);
+    }
+    default: {}
+  }
+}
+
+fn dc_triTile_discretNoise(x: i32) -> f32 {
+  var n: i32 = x;
+  n = ((n << 13) ^ n);
+  return (f32((((n * (((n * n) * 15731) + 789221)) + 1376312589) & 2147483647)) / 2147483647);
+}
+
+fn dc_triTile_blur(self_: dc_triTile_Triangle, p_: ptr<function, jxyz_>, rs: ptr<function, u32>) {
+  var u: f32;
+  var v_: f32;
+  var v1: f32;
+  var v2: f32;
+  var w_: f32;
+  var x: f32;
+  var x0: f32;
+  var x1: f32;
+  var x2: f32;
+  var x3: f32;
+  var x4: f32;
+  var x5: f32;
+  var x6: f32;
+  var y: f32;
+  var y0: f32;
+  var y1: f32;
+  var y2: f32;
+  var y3: f32;
+  var y4: f32;
+  var y5: f32;
+  var y6: f32;
+  if (((self_.x1 <= self_.x2) && (self_.x1 <= self_.x3))) {
+    if ((self_.x2 <= self_.x3)) {
+      x1 = self_.x1;
+      y1 = self_.y1;
+      x2 = self_.x2;
+      y2 = self_.y2;
+      x3 = self_.x3;
+      y3 = self_.y3;
+    } else {
+      x1 = self_.x1;
+      y1 = self_.y1;
+      x2 = self_.x3;
+      y2 = self_.y3;
+      x3 = self_.x2;
+      y3 = self_.y2;
+    }
+  } else if (((self_.x2 <= self_.x1) && (self_.x2 <= self_.x3))) {
+    if ((self_.x1 <= self_.x3)) {
+      x1 = self_.x2;
+      y1 = self_.y2;
+      x2 = self_.x1;
+      y2 = self_.y1;
+      x3 = self_.x3;
+      y3 = self_.y3;
+    } else {
+      x1 = self_.x2;
+      y1 = self_.y2;
+      x2 = self_.x3;
+      y2 = self_.y3;
+      x3 = self_.x1;
+      y3 = self_.y1;
+    }
+  } else {
+    if ((self_.x1 <= self_.x2)) {
+      x1 = self_.x3;
+      y1 = self_.y3;
+      x2 = self_.x1;
+      y2 = self_.y1;
+      x3 = self_.x2;
+      y3 = self_.y2;
+    } else {
+      x1 = self_.x3;
+      y1 = self_.y3;
+      x2 = self_.x2;
+      y2 = self_.y2;
+      x3 = self_.x1;
+      y3 = self_.y1;
+    }
+  }
+  var r1: f32 = rnd(rs);
+  var r2_: f32 = rnd(rs);
+  if (((x1 == x2) && (x2 == x3))) {
+    u = x1;
+    if (((y1 <= y2) && (y1 <= y3))) {
+      v1 = y1;
+      v2 = select(y3, y2, (y3 > y2));
+    } else if (((y2 <= y1) && (y2 <= y3))) {
+      v1 = y2;
+      v2 = select(y3, y1, (y3 > y1));
+    } else {
+      v1 = y3;
+      v2 = select(y2, y1, (y2 > y1));
+    }
+    v_ = (v1 + (r1 * (v2 - v1)));
+  } else if ((x1 == x2)) {
+    x4 = ((x1 + x3) / 2);
+    y4 = ((y1 + y3) / 2);
+    x5 = ((x3 + x2) - x4);
+    y5 = ((y3 + y2) - y4);
+    x6 = ((x1 + x2) - x4);
+    y6 = ((y1 + y2) - y4);
+    x = (x3 + (r1 * (x4 - x3)));
+    y = (y3 + (r1 * (y4 - y3)));
+    x0 = (x5 + (r1 * (x2 - x5)));
+    y0 = (y5 + (r1 * (y2 - y5)));
+    u = (x + (r2_ * (x0 - x)));
+    v_ = (y + (r2_ * (y0 - y)));
+    w_ = (y3 + (((y2 - y3) / (x2 - x3)) * (u - x3)));
+    if ((y2 > (y3 + (((y3 - y1) / (x3 - x1)) * (x2 - x3))))) {
+      if ((v_ > w_)) {
+        x = (x4 + (r1 * (x1 - x4)));
+        y = (y4 + (r1 * (y1 - y4)));
+        x0 = (x2 + (r1 * (x6 - x2)));
+        y0 = (y2 + (r1 * (y6 - y2)));
+        u = (x0 + (r2_ * (x - x0)));
+        v_ = (y0 + (r2_ * (y - y0)));
+      }
+    } else {
+      if ((v_ < w_)) {
+        x = (x4 + (r1 * (x1 - x4)));
+        y = (y4 + (r1 * (y1 - y4)));
+        x0 = (x2 + (r1 * (x6 - x2)));
+        y0 = (y2 + (r1 * (y6 - y2)));
+        u = (x0 + (r2_ * (x - x0)));
+        v_ = (y0 + (r2_ * (y - y0)));
+      }
+    }
+  } else {
+    x4 = ((x1 + x3) / 2);
+    y4 = ((y1 + y3) / 2);
+    x5 = ((x1 + x2) - x4);
+    y5 = ((y1 + y2) - y4);
+    x6 = ((x3 + x2) - x4);
+    y6 = ((y3 + y2) - y4);
+    x = (x1 + (r1 * (x4 - x1)));
+    y = (y1 + (r1 * (y4 - y1)));
+    x0 = (x5 + (r1 * (x2 - x5)));
+    y0 = (y5 + (r1 * (y2 - y5)));
+    u = (x + (r2_ * (x0 - x)));
+    v_ = (y + (r2_ * (y0 - y)));
+    w_ = (y1 + (((y2 - y1) / (x2 - x1)) * (u - x1)));
+    if ((y2 > (y1 + (((y3 - y1) / (x3 - x1)) * (x2 - x1))))) {
+      if ((v_ > w_)) {
+        x = (x4 + (r1 * (x3 - x4)));
+        y = (y4 + (r1 * (y3 - y4)));
+        x0 = (x2 + (r1 * (x6 - x2)));
+        y0 = (y2 + (r1 * (y6 - y2)));
+        u = (x0 + (r2_ * (x - x0)));
+        v_ = (y0 + (r2_ * (y - y0)));
+      }
+    } else {
+      if ((v_ < w_)) {
+        x = (x4 + (r1 * (x3 - x4)));
+        y = (y4 + (r1 * (y3 - y4)));
+        x0 = (x2 + (r1 * (x6 - x2)));
+        y0 = (y2 + (r1 * (y6 - y2)));
+        u = (x0 + (r2_ * (x - x0)));
+        v_ = (y0 + (r2_ * (y - y0)));
+      }
+    }
+  }
+  if (((x1 == x2) && (y1 == y2))) {
+    u = (x1 + (r1 * (x3 - x1)));
+    v_ = (y1 + (r1 * (y3 - y1)));
+  }
+  if (((x1 == x3) && (y1 == y3))) {
+    u = (x1 + (r1 * (x2 - x1)));
+    v_ = (y1 + (r1 * (y2 - y1)));
+  }
+  if (((x2 == x3) && (y2 == y3))) {
+    u = (x1 + (r1 * (x2 - x1)));
+    v_ = (y1 + (r1 * (y2 - y1)));
+  }
+  (*p_).x = u;
+  (*p_).y = v_;
+  (*p_).z = 0;
+}
+
+var<private> jwx_dc_triTile_col1_c: f32 = 0.0;
+
+var<private> jwx_dc_triTile_col2_c: f32 = 0.0;
+
+var<private> jwx_dc_triTile_type_c: f32 = 0.0;
+
+var<private> jwx_dc_triTile_inited_: f32 = 0.0;
+
+var<private> jwx_dc_triTile_alfa: f32 = 0.0;`,
+    code: (w, p) => `{
+jwx_dc_triTile_col1_c = ${p[2]};
+jwx_dc_triTile_col2_c = ${p[3]};
+jwx_dc_triTile_type_c = ${p[0]};
+var orig: dc_triTile_Triangle;
+if ((jwx_dc_triTile_inited_ == 0.0)) {
+  jwx_dc_triTile_inited_ = 1.0;
+  jwx_dc_triTile_alfa = 0;
+}
+{
+  orig = dc_triTile_Triangle_zero();
+  switch i32(${p[0]}) {
+    case 1: {
+      dc_triTile_fiveFoldInit(i32(${p[1]}), &(orig));
+    }
+    case 2: {
+      dc_triTile_trihexInit(i32(${p[1]}), &(orig));
+    }
+    case 3: {
+      dc_triTile_equiThirdsInit(i32(${p[1]}), &(orig));
+    }
+    case 4: {
+      dc_triTile_ortInit(i32(${p[1]}), &(orig));
+    }
+    case 5: {
+      dc_triTile_pinwheelInit(i32(${p[1]}), &(orig));
+    }
+    case 6: {
+      dc_triTile_goldInit(i32(${p[1]}), &(orig));
+    }
+    default: {}
+  }
+}
+var t1: dc_triTile_Triangle = dc_triTile_Triangle_zero();
+var t2: dc_triTile_Triangle = dc_triTile_Triangle_zero();
+var p_: jxyz_ = jxyz__zero();
+t1 = orig;
+t1.col = 0.25;
+t2 = orig;
+t2.col = 0.0;
+var n: i32 = i32(${p[5]});
+var k: i32 = 1;
+while ((n > 0)) {
+  dc_triTile_devis(t1, &(t2), rs);
+  t1 = t2;
+  if ((${p[4]} == 0)) {
+    if (((k == i32(${p[5]})) && (f32(t1.type_) != ${p[6]}))) {
+      n = (n + i32(${p[7]}));
+    }
+  } else {
+    if ((((k >= i32(${p[5]})) && (k < (i32(${p[5]}) + i32(${p[7]})))) && (f32(t1.type_) != ${p[6]}))) {
+      n = (n + 1);
+    }
+  }
+  n = (n - 1);
+  k = (k + 1);
+}
+var m: i32 = 0;
+switch t1.type_ {
+  case 1: {
+    n = i32(${p[9]});
+    k = 1;
+    while ((n > 0)) {
+      dc_triTile_devis(t1, &(t2), rs);
+      t1 = t2;
+      m = (((2 * m) + t2.type_) - 1);
+      if ((${p[8]} == 0)) {
+        if (((k == i32(${p[9]})) && (f32(t1.type_) != ${p[10]}))) {
+          n = (n + i32(${p[11]}));
+        }
+      } else {
+        if ((((k >= i32(${p[9]})) && (k < (i32(${p[9]}) + i32(${p[11]})))) && (f32(t1.type_) != ${p[10]}))) {
+          n = (n + 1);
+        }
+      }
+      n = (n - 1);
+      k = (k + 1);
+    }
+    t1.col = dc_triTile_discretNoise((m + 43));
+  }
+  case 2: {
+    n = i32(${p[13]});
+    k = 1;
+    while ((n > 0)) {
+      dc_triTile_devis(t1, &(t2), rs);
+      t1 = t2;
+      m = (((2 * m) + t2.type_) - 1);
+      if ((${p[12]} == 0)) {
+        if (((k == i32(${p[13]})) && (f32(t1.type_) != ${p[14]}))) {
+          n = (n + i32(${p[15]}));
+        }
+      } else {
+        if ((((k >= i32(${p[13]})) && (k < (i32(${p[13]}) + i32(${p[15]})))) && (f32(t1.type_) != ${p[14]}))) {
+          n = (n + 1);
+        }
+      }
+      n = (n - 1);
+      k = (k + 1);
+    }
+    t1.col = dc_triTile_discretNoise((m + 31));
+  }
+  default: {}
+}
+dc_triTile_blur(t2, &(p_), rs);
+v.x += (${w} * p_.x);
+v.y += (${w} * p_.y);
+pz_ += (${w} * p_.z);
+(*cp) = ((t1.col + t2.col) % 1.0);
+}`,
+  },
   "jubiQ": {
     params: [{ name: "power", def: 3, int: true }, { name: "dist", def: 1 }, { name: "a", def: 1 }, { name: "b", def: 0 }, { name: "c", def: 0 }, { name: "d", def: 1 }, { name: "e", def: 0 }, { name: "f", def: 0 }, { name: "qat", def: 0 }, { name: "qax", def: 0 }, { name: "qay", def: 0 }, { name: "qaz", def: 0 }, { name: "qbt", def: 0 }, { name: "qbx", def: 0 }, { name: "qby", def: 0 }, { name: "qbz", def: 0 }, { name: "qct", def: 0 }, { name: "qcx", def: 0 }, { name: "qcy", def: 0 }, { name: "qcz", def: 0 }, { name: "qdt", def: 1 }, { name: "qdx", def: 0 }, { name: "qdy", def: 0 }, { name: "qdz", def: 0 }, { name: "zmode", def: 0, int: true }],
     verified: true, priority: 0, flags: ["3d","z"], types: ["3D"],
@@ -32596,6 +33733,273 @@ v.x += (${w} * ((FX * 0.5) + FX_h));
 v.y += (${w} * ((FY * 0.5) + FY_h));
 }`,
   },
+  "exp_multi": {
+    params: [{ name: "re", def: 1 }, { name: "im", def: 0 }, { name: "re_add", def: 0 }, { name: "im_add", def: 0 }, { name: "sqr", def: 0 }, { name: "asech", def: 0 }, { name: "acosech", def: 0 }, { name: "acoth", def: 1 }],
+    verified: true, priority: 0, flags: ["z"], types: ["2D"],
+    funcNames: ["jcx_","atan2j","powc","jcx__zero","jcx_make","jcx_UnP","jcx_Copy","jcx_Exp","jcx_Mag2","jcx_MagInv","jcx_Div","jcx_Sqr","jcx_Scale","jcx_Mul","jcx_Add","jcx_Radius","jcx_Neg","jcx_Sqrt","jcx_Recip","jcx_make_ov2","jcx_Inc","jcx_One","jcx_Arg","jcx_ToP","jcx_Pow","jcx_Mag2eps","jcx_Log","jcx_AsinH","jcx_AsecH","jcx_Dec","jcx_AcosH","jcx_AcosecH","jcx_AtanH","jcx_AcotH"],
+    funcs: `struct jcx_ {
+  re: f32,
+  im: f32,
+  save_re: f32,
+  save_im: f32,
+  per_fix: f32,
+}
+
+fn atan2j(y: f32, x: f32) -> f32 { if (x == 0.0 && y == 0.0) { return select(0.0, PI, (bitcast<u32>(x) >> 31u) == 1u) * select(1.0, -1.0, (bitcast<u32>(y) >> 31u) == 1u); } return atan2(y, x); }
+
+fn powc(x: f32, y: f32) -> f32 {
+  if (x >= 0.0) { return pow(x, y); }
+  let yi = round(y);
+  if (abs(y - yi) > 1e-6) { return pow(x, y); }
+  let m = pow(-x, y);
+  return select(m, -m, (i32(yi) & 1) != 0);
+}
+
+fn jcx__zero() -> jcx_ {
+  var z: jcx_;
+  z.re = 0.0;
+  z.im = 0.0;
+  z.save_re = 0.0;
+  z.save_im = 0.0;
+  z.per_fix = 0.0;
+  return z;
+}
+
+fn jcx_make(re: f32, im: f32) -> jcx_ {
+  var z: jcx_ = jcx__zero();
+  z.re = re;
+  z.im = im;
+  return z;
+}
+
+fn jcx_UnP(z: ptr<function, jcx_>) -> jcx_ {
+  return jcx_make(((*z).re * cos((*z).im)), ((*z).re * sin((*z).im)));
+}
+
+fn jcx_Copy(z: ptr<function, jcx_>, zz: jcx_) {
+  (*z).re = zz.re;
+  (*z).im = zz.im;
+}
+
+fn jcx_Exp(z: ptr<function, jcx_>) {
+  (*z).re = exp((*z).re);
+  jcx_Copy(z, jcx_UnP(z));
+}
+
+fn jcx_Mag2(z: ptr<function, jcx_>) -> f32 {
+  return (((*z).re * (*z).re) + ((*z).im * (*z).im));
+}
+
+fn jcx_MagInv(z: ptr<function, jcx_>) -> f32 {
+  var M2: f32 = jcx_Mag2(z);
+  return select((1.0 / M2), 1.0, (M2 < 1.0e-37));
+}
+
+fn jcx_Div(z: ptr<function, jcx_>, zz_in: jcx_) {
+  var zz: jcx_ = zz_in;
+  var r2_: f32 = (((*z).im * zz.im) + ((*z).re * zz.re));
+  var i2: f32 = (((*z).im * zz.re) - ((*z).re * zz.im));
+  var M2: f32 = jcx_MagInv(&(zz));
+  (*z).re = (r2_ * M2);
+  (*z).im = (i2 * M2);
+}
+
+fn jcx_Sqr(z: ptr<function, jcx_>) {
+  var r2_: f32 = (((*z).re * (*z).re) - ((*z).im * (*z).im));
+  var i2: f32 = ((2.0 * (*z).re) * (*z).im);
+  (*z).re = r2_;
+  (*z).im = i2;
+}
+
+fn jcx_Scale(z: ptr<function, jcx_>, mul: f32) {
+  (*z).re = ((*z).re * mul);
+  (*z).im = ((*z).im * mul);
+}
+
+fn jcx_Mul(z: ptr<function, jcx_>, zz: jcx_) {
+  if ((zz.im == 0.0)) {
+    jcx_Scale(z, zz.re);
+    return;
+  }
+  var r2_: f32 = (((*z).re * zz.re) - ((*z).im * zz.im));
+  var i2: f32 = (((*z).re * zz.im) + ((*z).im * zz.re));
+  (*z).re = r2_;
+  (*z).im = i2;
+}
+
+fn jcx_Add(z: ptr<function, jcx_>, zz: jcx_) {
+  (*z).re += zz.re;
+  (*z).im += zz.im;
+}
+
+fn jcx_Radius(z: ptr<function, jcx_>) -> f32 {
+  return length(vec2f((*z).re, (*z).im));
+}
+
+fn jcx_Neg(z: ptr<function, jcx_>) {
+  (*z).re = -((*z).re);
+  (*z).im = -((*z).im);
+}
+
+fn jcx_Sqrt(z: ptr<function, jcx_>) {
+  var Rad: f32 = jcx_Radius(z);
+  var sb: f32 = select(1.0, -1.0, ((*z).im < 0.0));
+  (*z).im = (sb * sqrt((0.5 * (Rad - (*z).re))));
+  (*z).re = sqrt((0.5 * (Rad + (*z).re)));
+  if (((*z).per_fix < 0.0)) {
+    jcx_Neg(z);
+  }
+}
+
+fn jcx_Recip(z: ptr<function, jcx_>) {
+  var mi: f32 = jcx_MagInv(z);
+  (*z).re = ((*z).re * mi);
+  (*z).im = (-((*z).im) * mi);
+}
+
+fn jcx_make_ov2(zz: jcx_) -> jcx_ {
+  return jcx_make(zz.re, zz.im);
+}
+
+fn jcx_Inc(z: ptr<function, jcx_>) {
+  (*z).re += 1.0;
+}
+
+fn jcx_One(z: ptr<function, jcx_>) {
+  (*z).re = 1.0;
+  (*z).im = 0.0;
+}
+
+fn jcx_Arg(z: ptr<function, jcx_>) -> f32 {
+  return ((*z).per_fix + atan2j((*z).im, (*z).re));
+}
+
+fn jcx_ToP(z: ptr<function, jcx_>) -> jcx_ {
+  return jcx_make(jcx_Radius(z), jcx_Arg(z));
+}
+
+fn jcx_Pow(z: ptr<function, jcx_>, ex0: f32) {
+  if ((ex0 == 0.0)) {
+    jcx_One(z);
+    return;
+  }
+  var ex: f32 = abs(ex0);
+  if ((ex0 < 0.0)) {
+    jcx_Recip(z);
+  }
+  if ((ex == 0.5)) {
+    jcx_Sqrt(z);
+    return;
+  }
+  if ((ex == 1.0)) {
+    return;
+  }
+  if ((ex == 2.0)) {
+    jcx_Sqr(z);
+    return;
+  }
+  var PF: jcx_ = jcx_ToP(z);
+  PF.re = powc(PF.re, ex);
+  PF.im = (PF.im * ex);
+  jcx_Copy(z, jcx_UnP(&(PF)));
+}
+
+fn jcx_Mag2eps(z: ptr<function, jcx_>) -> f32 {
+  return ((((*z).re * (*z).re) + ((*z).im * (*z).im)) + 1.0e-20);
+}
+
+fn jcx_Log(z: ptr<function, jcx_>) {
+  var L: jcx_ = jcx_make((0.5 * log(jcx_Mag2eps(z))), jcx_Arg(z));
+  jcx_Copy(z, L);
+}
+
+fn jcx_AsinH(z: ptr<function, jcx_>) {
+  var D: jcx_ = jcx_make_ov2((*z));
+  jcx_Sqr(&(D));
+  jcx_Inc(&(D));
+  jcx_Pow(&(D), 0.5);
+  jcx_Add(z, D);
+  jcx_Log(z);
+}
+
+fn jcx_AsecH(z: ptr<function, jcx_>) {
+  jcx_Recip(z);
+  jcx_AsinH(z);
+}
+
+fn jcx_Dec(z: ptr<function, jcx_>) {
+  (*z).re -= 1.0;
+}
+
+fn jcx_AcosH(z: ptr<function, jcx_>) {
+  var D: jcx_ = jcx_make_ov2((*z));
+  jcx_Sqr(&(D));
+  jcx_Dec(&(D));
+  jcx_Pow(&(D), 0.5);
+  jcx_Add(z, D);
+  jcx_Log(z);
+}
+
+fn jcx_AcosecH(z: ptr<function, jcx_>) {
+  jcx_Recip(z);
+  jcx_AcosH(z);
+}
+
+fn jcx_AtanH(z: ptr<function, jcx_>) {
+  var D: jcx_ = jcx_make_ov2((*z));
+  jcx_Dec(&(D));
+  jcx_Neg(&(D));
+  jcx_Inc(z);
+  jcx_Div(z, D);
+  jcx_Log(z);
+  jcx_Scale(z, 0.5);
+}
+
+fn jcx_AcotH(z: ptr<function, jcx_>) {
+  jcx_Recip(z);
+  jcx_AtanH(z);
+}`,
+    code: (w, p) => `{
+var z: jcx_ = jcx_make(t.x, t.y);
+var z2: jcx_ = jcx_make(${p[0]}, ${p[1]});
+var z3: jcx_ = jcx_make(${p[2]}, ${p[3]});
+var Acoth: jcx_ = jcx_make(${p[7]}, 0);
+var Acosech: jcx_ = jcx_make(${p[6]}, 0);
+var Asech: jcx_ = jcx_make(${p[5]}, 0);
+var Sqr: jcx_ = jcx_make(${p[4]}, 0);
+jcx_Exp(&(z));
+jcx_Div(&(z), z2);
+if ((${p[4]} != 0)) {
+  jcx_Sqr(&(z));
+  jcx_Mul(&(z), Sqr);
+}
+jcx_Add(&(z), z3);
+jcx_Sqrt(&(z));
+if ((${p[5]} != 0)) {
+  jcx_AsecH(&(z));
+  jcx_Mul(&(z), Asech);
+}
+if ((${p[6]} != 0)) {
+  jcx_AcosecH(&(z));
+  jcx_Mul(&(z), Acosech);
+}
+if ((${p[7]} != 0)) {
+  jcx_AcotH(&(z));
+  jcx_Mul(&(z), Acoth);
+}
+jcx_Scale(&(z), (${w} * (2.0 / PI)));
+if ((rnd(rs) < 0.5)) {
+  v.x += z.re;
+  v.y += z.im;
+} else {
+  v.x += -z.re;
+  v.y += -z.im;
+}
+if (false) {
+  pz_ += (${w} * z_);
+}
+}`,
+  },
   "parallel": {
     params: [{ name: "x1width", def: 5 }, { name: "x1tilesize", def: 0.5 }, { name: "x1mod1", def: 0.3 }, { name: "x1mod2", def: 1 }, { name: "x1height", def: 0.5 }, { name: "x1move", def: 1 }, { name: "x2width", def: 5 }, { name: "x2tilesize", def: 0.5 }, { name: "x2mod1", def: 0.3 }, { name: "x2mod2", def: 1 }, { name: "x2height", def: 0.5 }, { name: "x2move", def: 1 }],
     verified: true, priority: 0, flags: [], types: ["2D"],
@@ -43428,6 +44832,3708 @@ v.y = z.im;
 (*cp) = zc;
 }`,
   },
+  "quad": {
+    params: [{ name: "mode", def: 0, int: true }, { name: "ul_quad", def: 0, int: true }, { name: "ul_amount", def: 1 }, { name: "ul_shiftx", def: 0 }, { name: "ul_shifty", def: 0 }, { name: "ul_seed", def: 0, int: true }, { name: "ul_1a", def: 1 }, { name: "ul_1b", def: 1 }, { name: "ur_quad", def: 0, int: true }, { name: "ur_amount", def: 1 }, { name: "ur_shiftx", def: 0 }, { name: "ur_shifty", def: 0 }, { name: "ur_seed", def: 0, int: true }, { name: "ur_1a", def: 1 }, { name: "ur_1b", def: 1 }, { name: "ll_quad", def: 1, int: true }, { name: "ll_amount", def: 1 }, { name: "ll_shiftx", def: 0 }, { name: "ll_shifty", def: 0 }, { name: "ll_seed", def: 0, int: true }, { name: "ll_1a", def: 1 }, { name: "ll_1b", def: 1 }, { name: "lr_quad", def: 1, int: true }, { name: "lr_amount", def: 1 }, { name: "lr_shiftx", def: 0 }, { name: "lr_shifty", def: 0 }, { name: "lr_seed", def: 0, int: true }, { name: "lr_1a", def: 1 }, { name: "lr_1b", def: 1 }],
+    verified: true, priority: 0, flags: ["z"], types: ["2D"],
+    funcNames: ["jmrg_","jdw_","jcx_","powc","sqr","atan2j","jcx__zero","jcx_make","jcx_Mag2","jcx_MagInv","jcx_Recip","jcx_make_ov2","jcx_Sqr","jcx_Dec","jcx_One","jcx_Radius","jcx_Neg","jcx_Sqrt","jcx_Arg","jcx_ToP","jcx_UnP","jcx_Copy","jcx_Pow","jcx_Add","jcx_Mag2eps","jcx_Log","jcx_AcosH","jcx_AcosecH","jcx_Flip","jcx_Scale","jcx_Inc","jcx_Div","jcx_AtanH","jcx_AcotH","jcx_AsinH","quad_sqrt_safe","quad_sqrt_safe_e"],
+    funcs: `struct jmrg_ {
+  u: i32,
+  v_: i32,
+}
+
+struct jdw_ {
+  value: f32,
+}
+
+struct jcx_ {
+  re: f32,
+  im: f32,
+  save_re: f32,
+  save_im: f32,
+  per_fix: f32,
+}
+
+fn powc(x: f32, y: f32) -> f32 {
+  if (x >= 0.0) { return pow(x, y); }
+  let yi = round(y);
+  if (abs(y - yi) > 1e-6) { return pow(x, y); }
+  let m = pow(-x, y);
+  return select(m, -m, (i32(yi) & 1) != 0);
+}
+
+fn sqr(x: f32) -> f32 { return x * x; }
+
+fn atan2j(y: f32, x: f32) -> f32 { if (x == 0.0 && y == 0.0) { return select(0.0, PI, (bitcast<u32>(x) >> 31u) == 1u) * select(1.0, -1.0, (bitcast<u32>(y) >> 31u) == 1u); } return atan2(y, x); }
+
+fn jcx__zero() -> jcx_ {
+  var z: jcx_;
+  z.re = 0.0;
+  z.im = 0.0;
+  z.save_re = 0.0;
+  z.save_im = 0.0;
+  z.per_fix = 0.0;
+  return z;
+}
+
+fn jcx_make(re: f32, im: f32) -> jcx_ {
+  var z: jcx_ = jcx__zero();
+  z.re = re;
+  z.im = im;
+  return z;
+}
+
+fn jcx_Mag2(z: ptr<function, jcx_>) -> f32 {
+  return (((*z).re * (*z).re) + ((*z).im * (*z).im));
+}
+
+fn jcx_MagInv(z: ptr<function, jcx_>) -> f32 {
+  var M2: f32 = jcx_Mag2(z);
+  return select((1.0 / M2), 1.0, (M2 < 1.0e-37));
+}
+
+fn jcx_Recip(z: ptr<function, jcx_>) {
+  var mi: f32 = jcx_MagInv(z);
+  (*z).re = ((*z).re * mi);
+  (*z).im = (-((*z).im) * mi);
+}
+
+fn jcx_make_ov2(zz: jcx_) -> jcx_ {
+  return jcx_make(zz.re, zz.im);
+}
+
+fn jcx_Sqr(z: ptr<function, jcx_>) {
+  var r2_: f32 = (((*z).re * (*z).re) - ((*z).im * (*z).im));
+  var i2: f32 = ((2.0 * (*z).re) * (*z).im);
+  (*z).re = r2_;
+  (*z).im = i2;
+}
+
+fn jcx_Dec(z: ptr<function, jcx_>) {
+  (*z).re -= 1.0;
+}
+
+fn jcx_One(z: ptr<function, jcx_>) {
+  (*z).re = 1.0;
+  (*z).im = 0.0;
+}
+
+fn jcx_Radius(z: ptr<function, jcx_>) -> f32 {
+  return length(vec2f((*z).re, (*z).im));
+}
+
+fn jcx_Neg(z: ptr<function, jcx_>) {
+  (*z).re = -((*z).re);
+  (*z).im = -((*z).im);
+}
+
+fn jcx_Sqrt(z: ptr<function, jcx_>) {
+  var Rad: f32 = jcx_Radius(z);
+  var sb: f32 = select(1.0, -1.0, ((*z).im < 0.0));
+  (*z).im = (sb * sqrt((0.5 * (Rad - (*z).re))));
+  (*z).re = sqrt((0.5 * (Rad + (*z).re)));
+  if (((*z).per_fix < 0.0)) {
+    jcx_Neg(z);
+  }
+}
+
+fn jcx_Arg(z: ptr<function, jcx_>) -> f32 {
+  return ((*z).per_fix + atan2j((*z).im, (*z).re));
+}
+
+fn jcx_ToP(z: ptr<function, jcx_>) -> jcx_ {
+  return jcx_make(jcx_Radius(z), jcx_Arg(z));
+}
+
+fn jcx_UnP(z: ptr<function, jcx_>) -> jcx_ {
+  return jcx_make(((*z).re * cos((*z).im)), ((*z).re * sin((*z).im)));
+}
+
+fn jcx_Copy(z: ptr<function, jcx_>, zz: jcx_) {
+  (*z).re = zz.re;
+  (*z).im = zz.im;
+}
+
+fn jcx_Pow(z: ptr<function, jcx_>, ex0: f32) {
+  if ((ex0 == 0.0)) {
+    jcx_One(z);
+    return;
+  }
+  var ex: f32 = abs(ex0);
+  if ((ex0 < 0.0)) {
+    jcx_Recip(z);
+  }
+  if ((ex == 0.5)) {
+    jcx_Sqrt(z);
+    return;
+  }
+  if ((ex == 1.0)) {
+    return;
+  }
+  if ((ex == 2.0)) {
+    jcx_Sqr(z);
+    return;
+  }
+  var PF: jcx_ = jcx_ToP(z);
+  PF.re = powc(PF.re, ex);
+  PF.im = (PF.im * ex);
+  jcx_Copy(z, jcx_UnP(&(PF)));
+}
+
+fn jcx_Add(z: ptr<function, jcx_>, zz: jcx_) {
+  (*z).re += zz.re;
+  (*z).im += zz.im;
+}
+
+fn jcx_Mag2eps(z: ptr<function, jcx_>) -> f32 {
+  return ((((*z).re * (*z).re) + ((*z).im * (*z).im)) + 1.0e-20);
+}
+
+fn jcx_Log(z: ptr<function, jcx_>) {
+  var L: jcx_ = jcx_make((0.5 * log(jcx_Mag2eps(z))), jcx_Arg(z));
+  jcx_Copy(z, L);
+}
+
+fn jcx_AcosH(z: ptr<function, jcx_>) {
+  var D: jcx_ = jcx_make_ov2((*z));
+  jcx_Sqr(&(D));
+  jcx_Dec(&(D));
+  jcx_Pow(&(D), 0.5);
+  jcx_Add(z, D);
+  jcx_Log(z);
+}
+
+fn jcx_AcosecH(z: ptr<function, jcx_>) {
+  jcx_Recip(z);
+  jcx_AcosH(z);
+}
+
+fn jcx_Flip(z: ptr<function, jcx_>) {
+  var r2_: f32 = (*z).im;
+  var i2: f32 = (*z).re;
+  (*z).re = r2_;
+  (*z).im = i2;
+}
+
+fn jcx_Scale(z: ptr<function, jcx_>, mul: f32) {
+  (*z).re = ((*z).re * mul);
+  (*z).im = ((*z).im * mul);
+}
+
+fn jcx_Inc(z: ptr<function, jcx_>) {
+  (*z).re += 1.0;
+}
+
+fn jcx_Div(z: ptr<function, jcx_>, zz_in: jcx_) {
+  var zz: jcx_ = zz_in;
+  var r2_: f32 = (((*z).im * zz.im) + ((*z).re * zz.re));
+  var i2: f32 = (((*z).im * zz.re) - ((*z).re * zz.im));
+  var M2: f32 = jcx_MagInv(&(zz));
+  (*z).re = (r2_ * M2);
+  (*z).im = (i2 * M2);
+}
+
+fn jcx_AtanH(z: ptr<function, jcx_>) {
+  var D: jcx_ = jcx_make_ov2((*z));
+  jcx_Dec(&(D));
+  jcx_Neg(&(D));
+  jcx_Inc(z);
+  jcx_Div(z, D);
+  jcx_Log(z);
+  jcx_Scale(z, 0.5);
+}
+
+fn jcx_AcotH(z: ptr<function, jcx_>) {
+  jcx_Recip(z);
+  jcx_AtanH(z);
+}
+
+fn jcx_AsinH(z: ptr<function, jcx_>) {
+  var D: jcx_ = jcx_make_ov2((*z));
+  jcx_Sqr(&(D));
+  jcx_Inc(&(D));
+  jcx_Pow(&(D), 0.5);
+  jcx_Add(z, D);
+  jcx_Log(z);
+}
+
+fn quad_sqrt_safe(x: f32) -> f32 {
+  if ((x <= 0.0)) {
+    return 0.0;
+  }
+  return sqrt(x);
+}
+
+fn quad_sqrt_safe_e(x: f32) -> f32 {
+  return select(sqrt(x), 0.0, (x < 1.0e-30));
+}`,
+    code: (w, p) => `{
+loop {
+var myRandGen: jmrg_;
+var sina: jdw_;
+var cosa: jdw_;
+var lr_sign: i32 = 0;
+var ur_sign: i32 = 0;
+var ll_sign: i32 = 0;
+var ul_sign: i32 = 0;
+var lr_absPower_julian: i32 = 0;
+var ur_absPower_julian: i32 = 0;
+var ll_absPower_julian: i32 = 0;
+var ul_absPower_julian: i32 = 0;
+var lr_bCa: f32 = 0;
+var ur_bCa: f32 = 0;
+var ll_bCa: f32 = 0;
+var ul_bCa: f32 = 0;
+var lr_bCn_pi: f32 = 0;
+var ur_bCn_pi: f32 = 0;
+var ll_bCn_pi: f32 = 0;
+var ul_bCn_pi: f32 = 0;
+var lr_bCa_bCn: f32 = 0;
+var ur_bCa_bCn: f32 = 0;
+var ll_bCa_bCn: f32 = 0;
+var ul_bCa_bCn: f32 = 0;
+var lr_pi_bCn: f32 = 0;
+var ur_pi_bCn: f32 = 0;
+var ll_pi_bCn: f32 = 0;
+var ul_pi_bCn: f32 = 0;
+var lr_kn_pi: f32 = 0;
+var ur_kn_pi: f32 = 0;
+var ll_kn_pi: f32 = 0;
+var ul_kn_pi: f32 = 0;
+var lr_pi_kn: f32 = 0;
+var ur_pi_kn: f32 = 0;
+var ll_pi_kn: f32 = 0;
+var ul_pi_kn: f32 = 0;
+var lr_ka: f32 = 0;
+var ur_ka: f32 = 0;
+var ll_ka: f32 = 0;
+var ul_ka: f32 = 0;
+var lr_ka_kn: f32 = 0;
+var ur_ka_kn: f32 = 0;
+var ll_ka_kn: f32 = 0;
+var ul_ka_kn: f32 = 0;
+var lr_eCa: f32 = 0;
+var ur_eCa: f32 = 0;
+var ll_eCa: f32 = 0;
+var ul_eCa: f32 = 0;
+var lr_eCn_pi: f32 = 0;
+var ur_eCn_pi: f32 = 0;
+var ll_eCn_pi: f32 = 0;
+var ul_eCn_pi: f32 = 0;
+var lr_eCa_eCn: f32 = 0;
+var ur_eCa_eCn: f32 = 0;
+var ll_eCa_eCn: f32 = 0;
+var ul_eCa_eCn: f32 = 0;
+var lr_pi_eCn: f32 = 0;
+var ur_pi_eCn: f32 = 0;
+var ll_pi_eCn: f32 = 0;
+var ul_pi_eCn: f32 = 0;
+var lr_v: f32 = 0;
+var ur_v: f32 = 0;
+var ll_v: f32 = 0;
+var ul_v: f32 = 0;
+var lr_vvar2: f32 = 0;
+var ur_vvar2: f32 = 0;
+var ll_vvar2: f32 = 0;
+var ul_vvar2: f32 = 0;
+var lr_v_idisc: f32 = 0;
+var ur_v_idisc: f32 = 0;
+var ll_v_idisc: f32 = 0;
+var ul_v_idisc: f32 = 0;
+var lr_cPower_julian: f32 = 0;
+var ur_cPower_julian: f32 = 0;
+var ll_cPower_julian: f32 = 0;
+var ul_cPower_julian: f32 = 0;
+{
+  lr_bCn_pi = (${p[27]} * (1.0 / PI));
+  ur_bCn_pi = (${p[13]} * (1.0 / PI));
+  ll_bCn_pi = (${p[20]} * (1.0 / PI));
+  ul_bCn_pi = (${p[6]} * (1.0 / PI));
+  lr_pi_bCn = (PI / ${p[27]});
+  ur_pi_bCn = (PI / ${p[13]});
+  ll_pi_bCn = (PI / ${p[20]});
+  ul_pi_bCn = (PI / ${p[6]});
+  lr_bCa = (PI * ${p[28]});
+  ur_bCa = (PI * ${p[14]});
+  ll_bCa = (PI * ${p[21]});
+  ul_bCa = (PI * ${p[7]});
+  lr_bCa_bCn = (lr_bCa / ${p[27]});
+  ur_bCa_bCn = (ur_bCa / ${p[13]});
+  ll_bCa_bCn = (ll_bCa / ${p[20]});
+  ul_bCa_bCn = (ul_bCa / ${p[6]});
+  lr_kn_pi = (${p[28]} * (1.0 / PI));
+  ur_kn_pi = (${p[14]} * (1.0 / PI));
+  ll_kn_pi = (${p[21]} * (1.0 / PI));
+  ul_kn_pi = (${p[7]} * (1.0 / PI));
+  lr_pi_kn = (PI / ${p[28]});
+  ur_pi_kn = (PI / ${p[14]});
+  ll_pi_kn = (PI / ${p[21]});
+  ul_pi_kn = (PI / ${p[7]});
+  lr_ka = (PI * ${p[27]});
+  ur_ka = (PI * ${p[13]});
+  ll_ka = (PI * ${p[20]});
+  ul_ka = (PI * ${p[6]});
+  lr_ka_kn = (lr_ka / ${p[28]});
+  ur_ka_kn = (ur_ka / ${p[14]});
+  ll_ka_kn = (ll_ka / ${p[21]});
+  ul_ka_kn = (ul_ka / ${p[7]});
+  lr_eCn_pi = (${p[27]} * (1.0 / PI));
+  ur_eCn_pi = (${p[13]} * (1.0 / PI));
+  ll_eCn_pi = (${p[20]} * (1.0 / PI));
+  ul_eCn_pi = (${p[6]} * (1.0 / PI));
+  lr_pi_eCn = (PI / ${p[27]});
+  ur_pi_eCn = (PI / ${p[13]});
+  ll_pi_eCn = (PI / ${p[20]});
+  ul_pi_eCn = (PI / ${p[6]});
+  lr_eCa = (PI * ${p[28]});
+  ur_eCa = (PI * ${p[14]});
+  ll_eCa = (PI * ${p[21]});
+  ul_eCa = (PI * ${p[7]});
+  lr_eCa_eCn = (lr_eCa / ${p[27]});
+  ur_eCa_eCn = (ur_eCa / ${p[13]});
+  ll_eCa_eCn = (ll_eCa / ${p[20]});
+  ul_eCa_eCn = (ul_eCa / ${p[6]});
+  lr_sign = 1;
+  if ((${p[27]} < 0)) {
+    lr_sign = -1;
+  }
+  ur_sign = 1;
+  if ((${p[13]} < 0)) {
+    ur_sign = -1;
+  }
+  ll_sign = 1;
+  if ((${p[20]} < 0)) {
+    ll_sign = -1;
+  }
+  ul_sign = 1;
+  if ((${p[6]} < 0)) {
+    ul_sign = -1;
+  }
+  lr_v = ((${w} * ${p[23]}) / (PI / 2.0));
+  ur_v = ((${w} * ${p[9]}) / (PI / 2.0));
+  ll_v = ((${w} * ${p[16]}) / (PI / 2.0));
+  ul_v = ((${w} * ${p[2]}) / (PI / 2.0));
+  lr_vvar2 = (((${w} * ${p[23]}) * sqrt(2.0)) / 2.0);
+  ur_vvar2 = (((${w} * ${p[9]}) * sqrt(2.0)) / 2.0);
+  ll_vvar2 = (((${w} * ${p[16]}) * sqrt(2.0)) / 2.0);
+  ul_vvar2 = (((${w} * ${p[2]}) * sqrt(2.0)) / 2.0);
+  lr_v_idisc = ((${w} * ${p[23]}) * (1.0 / PI));
+  ur_v_idisc = ((${w} * ${p[9]}) * (1.0 / PI));
+  ll_v_idisc = ((${w} * ${p[16]}) * (1.0 / PI));
+  ul_v_idisc = ((${w} * ${p[2]}) * (1.0 / PI));
+  lr_absPower_julian = i32(abs(${p[27]}));
+  lr_cPower_julian = ((${p[28]} / ${p[27]}) * 0.5);
+  ur_absPower_julian = i32(abs(${p[13]}));
+  ur_cPower_julian = ((${p[14]} / ${p[13]}) * 0.5);
+  ll_absPower_julian = i32(abs(${p[20]}));
+  ll_cPower_julian = ((${p[21]} / ${p[20]}) * 0.5);
+  ul_absPower_julian = i32(abs(${p[6]}));
+  ul_cPower_julian = ((${p[7]} / ${p[6]}) * 0.5);
+}
+var count: i32 = 0;
+var qquadxx: f32 = 0.0;
+var qquadyy: f32 = 0.0;
+if (((t.x > ${p[24]}) && (t.y > ${p[25]}))) {
+  if ((min(max(${p[22]}, 0.0), 50.0) == 0)) {
+    qquadxx += ((${w} * ${p[23]}) * t.x);
+    qquadyy += ((${w} * ${p[23]}) * t.y);
+  } else if ((min(max(${p[22]}, 0.0), 50.0) == 1)) {
+    var r_: f32 = ((${w} * ${p[23]}) / ((((t.x * t.x) * ${p[27]}) + ((t.y * t.y) * ${p[28]})) + 1.0e-30));
+    qquadxx += (t.x * r_);
+    qquadyy += (t.y * r_);
+  } else if ((min(max(${p[22]}, 0.0), 50.0) == 2)) {
+    var z: jcx_ = jcx_make(t.x, t.y);
+    jcx_AcosecH(&(z));
+    jcx_Flip(&(z));
+    jcx_Scale(&(z), ((${w} * ${p[23]}) * (2.0 / PI)));
+    if ((rnd(rs) < 0.5)) {
+      qquadyy += z.im;
+      qquadxx += z.re;
+    } else {
+      qquadyy += -z.im;
+      qquadxx += -z.re;
+    }
+  } else if ((min(max(${p[22]}, 0.0), 50.0) == 3)) {
+    var z: jcx_ = jcx_make(t.x, t.y);
+    jcx_AcosH(&(z));
+    jcx_Scale(&(z), ((${w} * ${p[23]}) * (2.0 / PI)));
+    if ((rnd(rs) < 0.5)) {
+      qquadyy += z.im;
+      qquadxx += z.re;
+    } else {
+      qquadyy += -z.im;
+      qquadxx += -z.re;
+    }
+  } else if ((min(max(${p[22]}, 0.0), 50.0) == 4)) {
+    var z: jcx_ = jcx_make(t.x, t.y);
+    jcx_AcotH(&(z));
+    jcx_Flip(&(z));
+    jcx_Scale(&(z), ((${w} * ${p[23]}) * (2.0 / PI)));
+    qquadyy += z.im;
+    qquadxx += z.re;
+  } else if ((min(max(${p[22]}, 0.0), 50.0) == 5)) {
+    var xxx: f32;
+    var yyy: f32;
+    var a0: f32;
+    var b0: f32;
+    var f1x: f32;
+    var f1y: f32;
+    var r_: f32 = sqrt(3.0);
+    a0 = (((3.0 * ((1.0 + r_) - t.x)) / (powc(((1.0 + r_) - t.x), 2.0) + (t.y * t.y))) - ((1.0 + r_) / (2.0 + r_)));
+    b0 = ((3.0 * t.y) / (powc(((1.0 + r_) - t.x), 2.0) + (t.y * t.y)));
+    f1x = (a0 / ((a0 * a0) + (b0 * b0)));
+    f1y = (-b0 / ((a0 * a0) + (b0 * b0)));
+    var w_: i32 = i32((4.0 * rnd(rs)));
+    if (((w_ % 3) == 0)) {
+      xxx = a0;
+      yyy = b0;
+    } else if (((w_ % 3) == 1)) {
+      xxx = ((-f1x / 2.0) - ((f1y * r_) / 2.0));
+      yyy = (((f1x * r_) / 2.0) - (f1y / 2.0));
+    } else {
+      xxx = ((-f1x / 2.0) + ((f1y * r_) / 2.0));
+      yyy = (((-f1x * r_) / 2.0) - (f1y / 2.0));
+    }
+    qquadxx += ((xxx * ${w}) * ${p[23]});
+    qquadyy += ((yyy * ${w}) * ${p[23]});
+  } else if ((min(max(${p[22]}, 0.0), 50.0) == 6)) {
+    var z: jcx_ = jcx_make(t.x, t.y);
+    jcx_AsinH(&(z));
+    jcx_Scale(&(z), ((${w} * ${p[23]}) * (2.0 / PI)));
+    qquadyy += z.im;
+    qquadxx += z.re;
+  } else if ((min(max(${p[22]}, 0.0), 50.0) == 7)) {
+    var z: jcx_ = jcx_make(t.x, t.y);
+    var z2: jcx_ = jcx_make_ov2(z);
+    jcx_Scale(&(z2), -1.0);
+    jcx_Inc(&(z2));
+    var z3: jcx_ = jcx_make_ov2(z);
+    jcx_Inc(&(z3));
+    jcx_Div(&(z3), z2);
+    jcx_Log(&(z3));
+    jcx_Scale(&(z3), ((${w} * ${p[23]}) * (2.0 / PI)));
+    qquadxx += z3.re;
+    qquadyy += z3.im;
+  } else if ((min(max(${p[22]}, 0.0), 50.0) == 8)) {
+    var norm: f32 = (((1.0 / (PI * 0.5)) * ${w}) * ${p[23]});
+    qquadxx += (norm * atan((${p[27]} * t.x)));
+    qquadyy += (norm * atan((${p[28]} * t.y)));
+  } else if ((min(max(${p[22]}, 0.0), 50.0) == 9)) {
+    var tau: f32;
+    var sigma: f32;
+    var temp: f32;
+    var cosht: f32;
+    var sinht: f32;
+    var sins: f32;
+    var coss: f32;
+    var alt: i32;
+    tau = (0.5 * (log((sqr((t.x + 1.0)) + sqr(t.y))) - log((sqr((t.x - 1.0)) + sqr(t.y)))));
+    sigma = ((PI - atan2j(t.y, (t.x + 1.0))) - atan2j(t.y, (1.0 - t.x)));
+    alt = i32((sigma * lr_bCn_pi));
+    if (((alt % 2) == 0)) {
+      sigma = ((f32(alt) * lr_pi_bCn) + ((sigma + lr_bCa_bCn) % lr_pi_bCn));
+    } else {
+      sigma = ((f32(alt) * lr_pi_bCn) + ((sigma - lr_bCa_bCn) % lr_pi_bCn));
+    }
+    sinht = sinh(tau);
+    cosht = cosh(tau);
+    sins = sin(sigma);
+    coss = cos(sigma);
+    temp = (cosht - coss);
+    qquadxx += (((${w} * ${p[23]}) * sinht) / temp);
+    qquadyy += (((${w} * ${p[23]}) * sins) / temp);
+  } else if ((min(max(${p[22]}, 0.0), 50.0) == 10)) {
+    var tau: f32;
+    var sigma: f32;
+    var temp: f32;
+    var cosht: f32;
+    var sinht: f32;
+    var sins: f32;
+    var coss: f32;
+    tau = (0.5 * (log((sqr((t.x + 1.0)) + sqr(t.y))) - log((sqr((t.x - 1.0)) + sqr(t.y)))));
+    sigma = ((PI - atan2j(t.y, (t.x + 1.0))) - atan2j(t.y, (1.0 - t.x)));
+    if (((tau < ${p[27]}) && (-tau < ${p[27]}))) {
+      tau = ((((tau + ${p[27]}) + (${p[28]} * ${p[27]})) % (2.0 * ${p[27]})) - ${p[27]});
+    }
+    sinht = sinh(tau);
+    cosht = cosh(tau);
+    sins = sin(sigma);
+    coss = cos(sigma);
+    temp = (cosht - coss);
+    if ((temp == 0)) {
+      break;
+    }
+    qquadxx += (((${w} * ${p[23]}) * sinht) / temp);
+    qquadyy += (((${w} * ${p[23]}) * sins) / temp);
+  } else if ((min(max(${p[22]}, 0.0), 50.0) == 11)) {
+    var tau: f32;
+    var sigma: f32;
+    var temp: f32;
+    var cosht: f32;
+    var sinht: f32;
+    var sins: f32;
+    var coss: f32;
+    tau = (0.5 * (log((sqr((t.x + 1.0)) + sqr(t.y))) - log((sqr((t.x - 1.0)) + sqr(t.y)))));
+    sigma = ((PI - atan2j(t.y, (t.x + 1.0))) - atan2j(t.y, (1.0 - t.x)));
+    sigma = ((sigma + (tau * ${p[28]})) + (${p[27]} / tau));
+    sinht = sinh(tau);
+    cosht = cosh(tau);
+    sins = sin(sigma);
+    coss = cos(sigma);
+    temp = (cosht - coss);
+    if ((temp == 0)) {
+      break;
+    }
+    qquadxx += (((${w} * ${p[23]}) * sinht) / temp);
+    qquadyy += (((${w} * ${p[23]}) * sins) / temp);
+  } else if ((min(max(${p[22]}, 0.0), 50.0) == 12)) {
+    var tau: f32;
+    var sigma: f32;
+    var temp: f32;
+    var cosht: f32;
+    var sinht: f32;
+    var sins: f32;
+    var coss: f32;
+    tau = (((0.5 * (log((sqr((t.x + 1.0)) + sqr(t.y))) - log((sqr((t.x - 1.0)) + sqr(t.y))))) / ${p[27]}) + 0);
+    sigma = (((PI - atan2j(t.y, (t.x + 1.0))) - atan2j(t.y, (1.0 - t.x))) + 0);
+    sigma = ((sigma / ${p[27]}) + (((2.0 * PI) / ${p[27]}) * floor((rnd(rs) * ${p[27]}))));
+    if ((t.x >= 0.0)) {
+      tau += ${p[28]};
+    } else {
+      tau -= ${p[28]};
+    }
+    sinht = sinh(tau);
+    cosht = cosh(tau);
+    sins = sin(sigma);
+    coss = cos(sigma);
+    temp = (cosht - coss);
+    qquadxx += (((${w} * ${p[23]}) * sinht) / temp);
+    qquadyy += (((${w} * ${p[23]}) * sins) / temp);
+  } else if ((min(max(${p[22]}, 0.0), 50.0) == 13)) {
+    var nx: f32 = t.x;
+    var ny: f32 = t.y;
+    if ((nx < 0)) {
+      nx = (nx * ${p[27]});
+    }
+    if ((ny < 0)) {
+      ny = (ny * ${p[28]});
+    }
+    qquadxx += ((${w} * ${p[23]}) * nx);
+    qquadyy += ((${w} * ${p[23]}) * ny);
+  } else if ((min(max(${p[22]}, 0.0), 50.0) == 14)) {
+    var x2y2: f32 = ((t.x * t.x) + (t.y * t.y));
+    var t_: f32 = (x2y2 + ${p[28]});
+    var x2: f32 = (2 * t.x);
+    var ps: f32 = (-(PI * 0.5) * ${p[27]});
+    var yb: f32 = ((0.5 * atan2j((2.0 * t.y), (x2y2 - 1.0))) + ps);
+    if ((yb > (PI * 0.5))) {
+      yb = (-(PI * 0.5) + ((yb + (PI * 0.5)) % PI));
+    } else if ((yb < -(PI * 0.5))) {
+      yb = ((PI * 0.5) - (((PI * 0.5) - yb) % PI));
+    }
+    var f: f32 = (t_ + x2);
+    var g: f32 = (t_ - x2);
+    if (((g == 0) || ((f / g) <= 0))) {
+      break;
+    }
+    qquadxx += ((((${w} * ${p[23]}) * 0.25) * (2.0 / PI)) * log(((t_ + x2) / (t_ - x2))));
+    qquadyy += (((${w} * ${p[23]}) * (2.0 / PI)) * yb);
+  } else if ((min(max(${p[22]}, 0.0), 50.0) == 15)) {
+    var a: f32 = atan2j(t.x, t.y);
+    var r_: f32 = sqrt(((t.x * t.x) + (t.y * t.y)));
+    r_ = (r_ * (${p[27]} + ((${p[28]} - ${p[27]}) * (0.5 + (0.5 * sin((6 * a)))))));
+    var nx: f32 = (sin(a) * r_);
+    var ny: f32 = (cos(a) * r_);
+    qquadxx += ((${w} * ${p[23]}) * nx);
+    qquadyy += ((${w} * ${p[23]}) * ny);
+  } else if ((min(max(${p[22]}, 0.0), 50.0) == 16)) {
+    var wx: f32 = ((${w} * ${p[23]}) * ${p[27]});
+    var y2: f32 = (t.y * ${p[28]});
+    var r_: f32 = (wx * sqrt((abs((t.y * t.x)) / ((1.0e-30 + (t.x * t.x)) + (y2 * y2)))));
+    qquadxx += (r_ * t.x);
+    qquadyy += (r_ * y2);
+  } else if ((min(max(${p[22]}, 0.0), 50.0) == 17)) {
+    var aaa: f32 = atan2j(t.y, t.x);
+    var r_: f32 = ((${w} * ${p[23]}) * sqrt((sqr(t.x) + sqr(t.y))));
+    var alt: i32;
+    if ((aaa >= 0.0)) {
+      alt = i32((aaa * lr_kn_pi));
+      if (((alt % 2) == 0)) {
+        aaa = ((f32(alt) * lr_pi_kn) + ((lr_ka_kn + aaa) % lr_pi_kn));
+      } else {
+        aaa = ((f32(alt) * lr_pi_kn) + ((-lr_ka_kn + aaa) % lr_pi_kn));
+      }
+    } else {
+      alt = i32((-aaa * lr_kn_pi));
+      if (((alt % 2) != 0)) {
+        aaa = -((f32(alt) * lr_pi_kn) + ((-lr_ka_kn - aaa) % lr_pi_kn));
+      } else {
+        aaa = -((f32(alt) * lr_pi_kn) + ((lr_ka_kn - aaa) % lr_pi_kn));
+      }
+    }
+    var s: f32 = sin(aaa);
+    var c: f32 = cos(aaa);
+    qquadxx += (r_ * c);
+    qquadyy += (r_ * s);
+  } else if ((min(max(${p[22]}, 0.0), 50.0) == 18)) {
+    var a: f32 = ph;
+    var lnr: f32 = (0.5 * log(r2));
+    var va: f32 = ((2.0 * PI) / 2);
+    var vc: f32 = (${p[27]} / 2);
+    var vd: f32 = (${p[28]} / 2);
+    var ang: f32 = (((vc * a) + (vd * lnr)) + (va * floor((2 * rnd(rs)))));
+    var m: f32 = ((${w} * ${p[23]}) * exp(((vc * lnr) - (vd * a))));
+    var sa: f32 = sin(ang);
+    var ca: f32 = cos(ang);
+    qquadxx += (m * ca);
+    qquadyy += (m * sa);
+  } else if ((min(max(${p[22]}, 0.0), 50.0) == 19)) {
+    var re: f32 = ((1 + (${p[27]} * t.x)) + (${p[28]} * (sqr(t.x) - sqr(t.y))));
+    var im: f32 = ((${p[27]} * t.y) + (((${p[28]} * 2) * t.x) * t.y));
+    var r_: f32 = ((${w} * ${p[23]}) / (sqr(re) + sqr(im)));
+    qquadxx += (((t.x * re) + (t.y * im)) * r_);
+    qquadyy += (((t.y * re) - (t.x * im)) * r_);
+  } else if ((min(max(${p[22]}, 0.0), 50.0) == 20)) {
+    var xx: f32 = t.x;
+    var yy: f32 = t.y;
+    var r2_: f32 = (1.0 / ((xx * xx) + (yy * yy)));
+    var r_: f32 = (powc(((xx * xx) + (((r2_ * 1) * yy) * yy)), ${p[28]}) - powc(((yy * yy) + (((r2_ * 2) * xx) * xx)), ${p[28]}));
+    if ((r_ > 100)) {
+      r_ = 100;
+    } else if ((r_ < -0.24)) {
+      r_ = -0.24;
+    }
+    r_ = (${p[27]} * r_);
+    qquadxx += ((${p[23]} * xx) * (1 + r_));
+    qquadyy += ((${p[23]} * yy) * (1 + r_));
+  } else if ((min(max(${p[22]}, 0.0), 50.0) == 21)) {
+    var rPI: f32 = ((PI * sqrt(((t.x * t.x) + (t.y * t.y)))) * ${p[27]});
+    var sinr: f32 = sin(rPI);
+    var cosr: f32 = cos(rPI);
+    var r_: f32 = (((${w} * ${p[23]}) * th) / PI);
+    qquadxx += (sinr * r_);
+    qquadyy += (cosr * r_);
+  } else if ((min(max(${p[22]}, 0.0), 50.0) == 22)) {
+    var tmp: f32 = (((t.y * t.y) + (t.x * t.x)) + 1.0);
+    var tmp2: f32 = (2.0 * t.x);
+    var xmax: f32 = ((quad_sqrt_safe((tmp + tmp2)) + quad_sqrt_safe((tmp - tmp2))) * 0.5);
+    var sinnu: f32;
+    var cosnu: f32;
+    var alt: i32;
+    if ((xmax < 1.0)) {
+      xmax = 1.0;
+    }
+    var t_: f32 = (t.x / xmax);
+    if ((t_ > 1.0)) {
+      t_ = 1.0;
+    } else if ((t_ < -1.0)) {
+      t_ = -1.0;
+    }
+    var nu: f32 = acos(t_);
+    alt = i32((nu * lr_eCn_pi));
+    if (((alt % 2) == 0)) {
+      nu = ((f32(alt) * lr_pi_eCn) + ((nu + lr_eCa_eCn) % lr_pi_eCn));
+    } else {
+      nu = ((f32(alt) * lr_pi_eCn) + ((nu - lr_eCa_eCn) % lr_pi_eCn));
+    }
+    if ((t.y <= 0.0)) {
+      nu *= -1.0;
+    }
+    sinnu = sin(nu);
+    cosnu = cos(nu);
+    qquadxx += (((${w} * ${p[23]}) * xmax) * cosnu);
+    qquadyy += ((((${w} * ${p[23]}) * sqrt((xmax - 1.0))) * sqrt((xmax + 1.0))) * sinnu);
+  } else if ((min(max(${p[22]}, 0.0), 50.0) == 23)) {
+    var tmp: f32 = (r2 + 1.0);
+    var tmp2: f32 = (2.0 * t.x);
+    var r1: f32 = sqrt((tmp + tmp2));
+    var r2_: f32 = sqrt((tmp - tmp2));
+    var xmax: f32 = ((r1 + r2_) * 0.5);
+    var a1: f32 = log((xmax + sqrt((xmax - 1.0))));
+    var a2: f32 = -(acos((t.x / xmax)));
+    var w_: f32 = ((${w} * ${p[23]}) / 11.57034632);
+    var snv: f32 = sin(a1);
+    var csv: f32 = cos(a1);
+    var snhu: f32 = sinh(a2);
+    var cshu: f32 = cosh(a2);
+    if ((t.y > 0.0)) {
+      snv = -snv;
+    }
+    qquadxx += ((w_ * cshu) * csv);
+    qquadyy += ((w_ * snhu) * snv);
+  } else if ((min(max(${p[22]}, 0.0), 50.0) == 24)) {
+    var r2_: f32 = ((t.y * t.y) + (t.x * t.x));
+    var tmp2: f32;
+    var x: f32;
+    if ((lr_sign == 1)) {
+      x = t.x;
+    } else {
+      r2_ = (1.0 / r2_);
+      x = (t.x * r2_);
+    }
+    var tmp: f32 = (r2_ + 1.0);
+    tmp2 = (2.0 * x);
+    var xmax: f32 = ((quad_sqrt_safe((tmp + tmp2)) + quad_sqrt_safe((tmp - tmp2))) * 0.5);
+    if ((xmax < 1.0)) {
+      xmax = 1.0;
+    }
+    var sinhmu: f32;
+    var coshmu: f32;
+    var sinnu: f32;
+    var cosnu: f32;
+    var mu: f32 = acosh(xmax);
+    var t_: f32 = (x / xmax);
+    if ((t_ > 1.0)) {
+      t_ = 1.0;
+    } else if ((t_ < -1.0)) {
+      t_ = -1.0;
+    }
+    var nu: f32 = acos(t_);
+    if ((t.y < 0)) {
+      nu *= -1.0;
+    }
+    nu = ((nu / ${p[27]}) + (((2.0 * PI) / ${p[27]}) * floor((rnd(rs) * ${p[27]}))));
+    mu /= ${p[27]};
+    sinhmu = sinh(mu);
+    coshmu = cosh(mu);
+    sinnu = sin(nu);
+    cosnu = cos(nu);
+    qquadxx += (((${w} * ${p[23]}) * coshmu) * cosnu);
+    qquadyy += (((${w} * ${p[23]}) * sinhmu) * sinnu);
+  } else if ((min(max(${p[22]}, 0.0), 50.0) == 25)) {
+    var tmp: f32 = (((t.y * t.y) + (t.x * t.x)) + 1.0);
+    var tmp2: f32 = (2.0 * t.x);
+    var xmax: f32 = ((quad_sqrt_safe((tmp + tmp2)) + quad_sqrt_safe((tmp - tmp2))) * 0.5);
+    if ((xmax < 1.0)) {
+      xmax = 1.0;
+    }
+    var sinhmu: f32;
+    var coshmu: f32;
+    var mu: f32 = acosh(xmax);
+    var t_: f32 = (t.x / xmax);
+    if ((t_ > 1.0)) {
+      t_ = 1.0;
+    } else if ((t_ < -1.0)) {
+      t_ = -1.0;
+    }
+    var nu: f32 = acos(t_);
+    if ((t.y < 0)) {
+      nu *= -1.0;
+    }
+    if (((mu < ${p[27]}) && (-mu < ${p[27]}))) {
+      if ((nu > 0.0)) {
+        mu = ((((mu + ${p[27]}) + (${p[28]} * ${p[27]})) % (2.0 * ${p[27]})) - ${p[27]});
+      } else {
+        mu = ((((mu - ${p[27]}) - (${p[28]} * ${p[27]})) % (2.0 * ${p[27]})) + ${p[27]});
+      }
+    }
+    sinhmu = sinh(mu);
+    coshmu = cosh(mu);
+    qquadxx += (((${w} * ${p[23]}) * coshmu) * cos(nu));
+    qquadyy += (((${w} * ${p[23]}) * sinhmu) * sin(nu));
+  } else if ((min(max(${p[22]}, 0.0), 50.0) == 26)) {
+    if ((abs(t.y) <= ${w})) {
+      var c_2: f32 = sqrt((sqr(${w}) - sqr(t.y)));
+      if ((abs(t.x) <= c_2)) {
+        var x: f32 = (t.x + ((${p[27]} * ${w}) * ${p[23]}));
+        if ((abs(x) >= c_2)) {
+          qquadxx -= ((${w} * ${p[23]}) * t.x);
+        } else {
+          qquadxx += ((${w} * ${p[23]}) * x);
+        }
+      } else {
+        qquadxx += ((${w} * ${p[23]}) * t.x);
+      }
+      qquadyy += ((${w} * ${p[23]}) * t.y);
+    } else {
+      qquadxx += ((${w} * ${p[23]}) * t.x);
+      qquadyy += ((${w} * ${p[23]}) * t.y);
+    }
+  } else if ((min(max(${p[22]}, 0.0), 50.0) == 27)) {
+    var tmp: f32 = (((t.y * t.y) + (t.x * t.x)) + ${p[27]});
+    var x2: f32 = (2.0 * t.x);
+    var xmax: f32 = (0.5 * (sqrt((tmp + x2)) + sqrt((tmp - x2))));
+    var a: f32 = (t.x / xmax);
+    var b: f32 = quad_sqrt_safe_e((${p[28]} - (a * a)));
+    qquadxx += (lr_v * atan2j(a, b));
+    if ((rnd(rs) < 0.5)) {
+      qquadyy += (lr_v * log((xmax + quad_sqrt_safe_e((xmax - 1.0)))));
+    } else {
+      qquadyy -= (lr_v * log((xmax + quad_sqrt_safe_e((xmax - 1.0)))));
+    }
+  } else if ((min(max(${p[22]}, 0.0), 50.0) == 28)) {
+    var r_: f32 = sqrt(((t.x * t.x) + (t.y * t.y)));
+    var angle: f32;
+    if (((((t.x < -1.0e-30) || (t.x > 1.0e-30)) || (t.y < -1.0e-30)) || (t.y > 1.0e-30))) {
+      angle = atan2j(t.x, t.y);
+    } else {
+      angle = 0.0;
+    }
+    var dy: f32 = ${p[28]};
+    var dx: f32 = ((PI * (${p[27]} * ${p[27]})) + 1.0e-30);
+    var dx2: f32 = (dx * 0.5);
+    var t_: f32 = ((angle + dy) - (f32(i32(((angle + dy) / dx))) * dx));
+    var a: f32;
+    if ((t_ > dx2)) {
+      a = (angle - dx2);
+    } else {
+      a = (angle + dx2);
+    }
+    qquadxx += (((${w} * ${p[23]}) * r_) * sin(a));
+    qquadyy += (((${w} * ${p[23]}) * r_) * cos(a));
+  } else if ((min(max(${p[22]}, 0.0), 50.0) == 29)) {
+    var expx: f32 = (exp(t.x) * 0.5);
+    var expnx: f32 = (0.25 / expx);
+    if (((expx <= 1.0e-30) || (expnx <= 1.0e-30))) {
+      break;
+    }
+    var siny: f32 = sin(t.y);
+    var cosy: f32 = cos(t.y);
+    var tmp: f32 = ((expx + expnx) - cosy);
+    if ((tmp == 0)) {
+      break;
+    }
+    tmp = ((${w} * ${p[23]}) / tmp);
+    qquadxx += ((expx - expnx) * tmp);
+    qquadyy += (siny * tmp);
+  } else if ((min(max(${p[22]}, 0.0), 50.0) == 30)) {
+    var r_: f32 = sqrt((sqr(t.x) + sqr(t.y)));
+    var d: f32;
+    if ((r_ >= 1.0)) {
+      if ((rnd(rs) > 0.5)) {
+        d = sqrt((r_ + t.x));
+        if ((d == 0)) {
+          break;
+        }
+        qquadxx += (lr_vvar2 * d);
+        qquadyy -= ((lr_vvar2 / d) * t.y);
+      } else {
+        d = (r_ + t.x);
+        var dx: f32 = sqrt((r_ * (sqr(t.y) + sqr(d))));
+        if ((dx == 0)) {
+          break;
+        }
+        r_ = ((${w} * ${p[23]}) / dx);
+        qquadxx += (r_ * d);
+        qquadyy += (r_ * t.y);
+      }
+    } else {
+      if ((rnd(rs) > 0.5)) {
+        d = sqrt((r_ + t.x));
+        if ((d == 0)) {
+          break;
+        }
+        qquadxx -= (lr_vvar2 * d);
+        qquadyy -= ((lr_vvar2 / d) * t.y);
+      } else {
+        d = (r_ + t.x);
+        var dx: f32 = sqrt((r_ * (sqr(t.y) + sqr(d))));
+        if ((dx == 0)) {
+          break;
+        }
+        r_ = ((${w} * ${p[23]}) / dx);
+        qquadxx -= (r_ * d);
+        qquadyy += (r_ * t.y);
+      }
+    }
+  } else if ((min(max(${p[22]}, 0.0), 50.0) == 31)) {
+    var alpha: f32 = atan2j(t.y, t.x);
+    var delta: f32 = powc(((alpha / PI) + 1.0), ${p[27]});
+    var r_: f32;
+    if ((${p[28]} != 0)) {
+      r_ = (((${w} * ${p[23]}) * delta) / (((t.x * t.x) + (t.y * t.y)) + delta));
+    } else {
+      r_ = ((${w} * ${p[23]}) * sqrt((((t.x * t.x) + (t.y * t.y)) + delta)));
+    }
+    var s: f32 = sin(alpha);
+    var c: f32 = cos(alpha);
+    qquadxx += (r_ * c);
+    qquadyy += (r_ * s);
+  } else if ((min(max(${p[22]}, 0.0), 50.0) == 32)) {
+    var a: f32 = (PI / (sqrt((sqr(t.x) + sqr(t.y))) + 1.0));
+    var r_: f32 = (atan2j(t.y, t.x) * lr_v_idisc);
+    sina.value = sin(a);
+    cosa.value = cos(a);
+    qquadxx += (r_ * cosa.value);
+    qquadyy += (r_ * sina.value);
+  } else if ((min(max(${p[22]}, 0.0), 50.0) == 33)) {
+    var a: f32 = ((atan2j(t.y, t.x) + ((2 * PI) * f32(i32((rnd(rs) * f32(lr_absPower_julian)))))) / ${p[27]});
+    var sina: f32 = sin(a);
+    var cosa: f32 = cos(a);
+    var r_: f32 = ((${w} * ${p[23]}) * powc((sqr(t.x) + sqr(t.y)), lr_cPower_julian));
+    qquadxx = (qquadxx + (r_ * cosa));
+    qquadyy = (qquadyy + (r_ * sina));
+  } else if ((min(max(${p[22]}, 0.0), 50.0) == 34)) {
+    if ((${p[27]} != 0.0)) {
+      var nr: f32 = f32(i32(floor((t.x * ${p[27]}))));
+      if ((nr >= 0)) {
+        if (((nr % 2) == 1)) {
+          t.x = -t.x;
+        }
+      } else {
+        if (((nr % 2) == 0)) {
+          t.x = -t.x;
+        }
+      }
+    }
+    if ((${p[28]} != 0.0)) {
+      var nr: f32 = f32(i32(floor((t.y * ${p[28]}))));
+      if ((nr >= 0)) {
+        if (((nr % 2) == 1)) {
+          t.y = -t.y;
+        }
+      } else {
+        if (((nr % 2) == 0)) {
+          t.y = -t.y;
+        }
+      }
+    }
+    qquadxx += ((${w} * ${p[23]}) * t.x);
+    qquadyy += ((${w} * ${p[23]}) * t.y);
+  } else if ((min(max(${p[22]}, 0.0), 50.0) == 35)) {
+    var x: f32 = 0.0;
+    var y: f32 = 0.0;
+    var xx: f32 = (t.x - x);
+    var yy: f32 = (t.y + y);
+    var rr: f32 = sqrt(((xx * xx) + (yy * yy)));
+    if ((rr < ${w})) {
+      var a: f32 = ((atan2j(yy, xx) + ${p[28]}) + (${p[27]} * ((${w} * ${p[23]}) - rr)));
+      var sina: f32 = sin(a);
+      var cosa: f32 = cos(a);
+      rr = ((${w} * ${p[23]}) * rr);
+      qquadxx += ((rr * cosa) + x);
+      qquadyy += ((rr * sina) - y);
+    } else {
+      rr = ((${w} * ${p[23]}) * (1.0 + (0.0 / rr)));
+      qquadxx += ((rr * xx) + x);
+      qquadyy += ((rr * yy) - y);
+    }
+  } else if ((min(max(${p[22]}, 0.0), 50.0) == 36)) {
+    var _p2: f32;
+    var _invp: f32;
+    var _vp: f32;
+    var _sina: f32;
+    var _cosa: f32;
+    var _a: f32;
+    var _r: f32;
+    var _re: f32;
+    var _im: f32;
+    var _rl: f32;
+    _p2 = (${p[28]} / 2.0);
+    if ((${p[28]} != 0)) {
+      _invp = (1.0 / ${p[28]});
+      if ((${p[27]} == -1)) {
+        _vp = 0;
+      } else {
+        _vp = ((${w} * ${p[23]}) * powc((${p[27]} + 1), (2.0 / ${p[28]})));
+      }
+    } else {
+      _invp = 100000000000.0;
+      _vp = ((${w} * ${p[23]}) * powc((${p[27]} + 1), 4));
+    }
+    _a = (atan2j(t.y, t.x) * ${p[28]});
+    _sina = sin(_a);
+    _cosa = cos(_a);
+    _r = (${p[27]} * powc((sqr(t.x) + sqr(t.y)), _p2));
+    _re = ((_r * _cosa) + 1);
+    _im = (_r * _sina);
+    _r = powc((sqr(_re) + sqr(_im)), _invp);
+    _a = ((atan2j(_im, _re) * 2.0) * _invp);
+    _re = (_r * cos(_a));
+    _im = (_r * sin(_a));
+    _rl = (_vp / sqr(_r));
+    qquadxx += (_rl * ((t.x * _re) + (t.y * _im)));
+    qquadyy += (_rl * ((t.y * _re) - (t.x * _im)));
+  } else if ((min(max(${p[22]}, 0.0), 50.0) == 37)) {
+    var r_: f32;
+    var a: f32;
+    var ta: f32;
+    var xo: f32;
+    var ro: f32;
+    var c: f32;
+    var s: f32;
+    var x: f32;
+    var y: f32;
+    var tc: f32;
+    var ts: f32;
+    var theta: f32;
+    r_ = (sqr(t.x) + sqr(t.y));
+    if ((r_ < 1.0)) {
+      if ((t.x >= 0.0)) {
+        xo = ((r_ + 1.0) / (2.0 * t.x));
+        ro = sqrt((sqr((t.x - xo)) + sqr(t.y)));
+        theta = atan2j(1.0, ro);
+        a = (((((${p[27]} * theta) + atan2j(t.y, (xo - t.x))) + theta) % (2.0 * theta)) - theta);
+        s = sin(a);
+        c = cos(a);
+        qquadxx += ((${w} * ${p[23]}) * (xo - (c * ro)));
+        qquadyy += (((${w} * ${p[23]}) * s) * ro);
+      } else {
+        xo = (-(r_ + 1.0) / (2.0 * t.x));
+        ro = sqrt((sqr((-t.x - xo)) + sqr(t.y)));
+        theta = atan2j(1.0, ro);
+        a = (((((${p[27]} * theta) + atan2j(t.y, (xo + t.x))) + theta) % (2.0 * theta)) - theta);
+        s = sin(a);
+        c = cos(a);
+        qquadxx -= ((${w} * ${p[23]}) * (xo - (c * ro)));
+        qquadyy += (((${w} * ${p[23]}) * s) * ro);
+      }
+    } else {
+      r_ = (1.0 / sqrt(r_));
+      ta = atan2j(t.y, t.x);
+      ts = sin(ta);
+      tc = cos(ta);
+      x = (r_ * tc);
+      y = (r_ * ts);
+      if ((x >= 0.0)) {
+        xo = (((sqr(x) + sqr(y)) + 1.0) / (2.0 * x));
+        ro = sqrt((sqr((x - xo)) + sqr(y)));
+        theta = atan2j(1.0, ro);
+        a = (((((${p[28]} * theta) + atan2j(y, (xo - x))) + theta) % (2.0 * theta)) - theta);
+        s = sin(a);
+        c = cos(a);
+        x = (xo - (c * ro));
+        y = (s * ro);
+        ta = atan2j(y, x);
+        ts = sin(ta);
+        tc = cos(ta);
+        r_ = (1.0 / sqrt((sqr(x) + sqr(y))));
+        qquadxx += (((${w} * ${p[23]}) * r_) * tc);
+        qquadyy += (((${w} * ${p[23]}) * r_) * ts);
+      } else {
+        xo = (-((sqr(x) + sqr(y)) + 1.0) / (2.0 * x));
+        ro = sqrt((sqr((-x - xo)) + sqr(y)));
+        theta = atan2j(1.0, ro);
+        a = (((((${p[28]} * theta) + atan2j(y, (xo + x))) + theta) % (2.0 * theta)) - theta);
+        s = sin(a);
+        c = cos(a);
+        x = (xo - (c * ro));
+        y = (s * ro);
+        ta = atan2j(y, x);
+        ts = sin(ta);
+        tc = cos(ta);
+        r_ = (1.0 / sqrt((sqr(x) + sqr(y))));
+        qquadxx -= (((${w} * ${p[23]}) * r_) * tc);
+        qquadyy += (((${w} * ${p[23]}) * r_) * ts);
+      }
+    }
+  } else if ((min(max(${p[22]}, 0.0), 50.0) == 38)) {
+    if ((abs(${p[27]}) < 1.0e-9)) {
+      qquadxx += ((${w} * ${p[23]}) * t.x);
+    } else {
+      qquadxx += ((${w} * ${p[23]}) * ((((2 * floor((t.x / ${p[27]}))) + 1) * ${p[27]}) - t.x));
+    }
+    if ((abs(${p[28]}) < 1.0e-9)) {
+      qquadyy += ((${w} * ${p[23]}) * t.y);
+    } else {
+      qquadyy += ((${w} * ${p[23]}) * ((((2 * floor((t.y / ${p[28]}))) + 1) * ${p[28]}) - t.y));
+    }
+  } else if ((min(max(${p[22]}, 0.0), 50.0) == 39)) {
+    qquadxx += ((${w} * ${p[23]}) * sin(t.x));
+    qquadyy += ((${w} * ${p[23]}) * sin(t.y));
+  } else if ((min(max(${p[22]}, 0.0), 50.0) == 40)) {
+    var R: f32 = powc(sqrt((sqr(t.x) + sqr(t.y))), ${p[28]});
+    var N: i32 = i32(floor((${p[27]} * rnd(rs))));
+    var alpha: f32 = (atan2j(t.y, t.x) + ((f32(N) * (2.0 * PI)) / floor(${p[27]})));
+    var sina: f32 = sin(alpha);
+    var cosa: f32 = cos(alpha);
+    if ((R > 1.0e-30)) {
+      qquadxx += (((${w} * ${p[23]}) * cosa) / R);
+      qquadyy += (((${w} * ${p[23]}) * sina) / R);
+    }
+  } else if ((min(max(${p[22]}, 0.0), 50.0) == 41)) {
+    qquadxx += ((${w} * ${p[23]}) * (t.x + (${p[27]} * sin((t.y * ${p[28]})))));
+    qquadyy += ((${w} * ${p[23]}) * (t.y + (${p[27]} * sin((t.x * ${p[28]})))));
+  } else if ((min(max(${p[22]}, 0.0), 50.0) == 42)) {
+    var x0: f32 = t.x;
+    var y0: f32 = t.y;
+    var modex: i32 = 0;
+    var modey: i32 = 0;
+    var sinx: f32;
+    var siny: f32;
+    var px: i32 = i32(2.0);
+    var py: i32 = i32(2.0);
+    if ((f32(modex) < 0.5)) {
+      sinx = sin((y0 * ${p[28]}));
+    } else {
+      sinx = (0.5 * (1.0 + sin((y0 * ${p[28]}))));
+    }
+    var offsetx: f32 = (powc(sinx, f32(px)) * ${p[27]});
+    if ((f32(modey) < 0.5)) {
+      siny = sin((x0 * ${p[28]}));
+    } else {
+      siny = (0.5 * (1.0 + sin((x0 * ${p[28]}))));
+    }
+    var offsety: f32 = (powc(siny, f32(py)) * ${p[27]});
+    qquadxx += ((${w} * ${p[23]}) * (x0 + offsetx));
+    qquadyy += ((${w} * ${p[23]}) * (y0 + offsety));
+  } else if ((min(max(${p[22]}, 0.0), 50.0) == 43)) {
+    var x0: f32 = t.x;
+    var y0: f32 = t.y;
+    var mx: f32 = ((y0 * ${p[28]}) * (0.5 / PI));
+    var fx: f32 = (mx - floor(mx));
+    if ((fx > 0.5)) {
+      fx = (0.5 - fx);
+    }
+    var my: f32 = ((x0 * ${p[28]}) * (0.5 / PI));
+    var fy: f32 = (my - floor(my));
+    if ((fy > 0.5)) {
+      fy = (0.5 - fy);
+    }
+    qquadxx += ((${w} * ${p[23]}) * (x0 + (fx * ${p[27]})));
+    qquadyy += ((${w} * ${p[23]}) * (y0 + (fy * ${p[27]})));
+  } else if ((min(max(${p[22]}, 0.0), 50.0) == 44)) {
+    var x0: f32 = t.x;
+    var y0: f32 = t.y;
+    var scalexx: f32 = ((0.5 * ${p[27]}) * (1.0 + sin((y0 * 0.0))));
+    var scaleyy: f32 = ((0.5 * ${p[27]}) * (1.0 + sin((x0 * 2.0))));
+    qquadxx += ((${w} * ${p[23]}) * (x0 + (sin((y0 * ${p[28]})) * scalexx)));
+    qquadyy += ((${w} * ${p[23]}) * (y0 + (sin((x0 * ${p[28]})) * scaleyy)));
+  } else if ((min(max(${p[22]}, 0.0), 50.0) == 45)) {
+    var x0: f32 = t.x;
+    var y0: f32 = t.y;
+    var cont: i32 = 0;
+    var ax: f32 = floor(((y0 * ${p[28]}) / (2.0 * PI)));
+    ax = (sin(((((ax * 12.9898) + (ax * 78.233)) + 1.0) + ((y0 * 0.001) * 0.1))) * 43758.5453);
+    ax = (ax - f32(i32(ax)));
+    if ((cont == 1)) {
+      ax = select(0.0, 1.0, (ax > 0.5));
+    }
+    qquadxx += ((${w} * ${p[23]}) * (x0 + (((sin((y0 * ${p[28]})) * ax) * ax) * ${p[27]})));
+    qquadyy += ((${w} * ${p[23]}) * (y0 + (sin((x0 * ${p[28]})) * ${p[27]})));
+  } else if ((min(max(${p[22]}, 0.0), 50.0) == 46)) {
+    var x0: f32 = t.x;
+    var y0: f32 = t.y;
+    var cont: i32 = 0;
+    var ax: f32 = floor((y0 * ${p[28]}));
+    ax = (sin(((((ax * 12.9898) + (ax * 78.233)) + 1.0) + ((y0 * 0.001) * 0.1))) * 43758.5453);
+    ax = (ax - f32(i32(ax)));
+    if ((cont == 1)) {
+      ax = select(0.0, 1.0, (ax > 0.5));
+    }
+    qquadxx += ((${w} * ${p[23]}) * (x0 + (((sin((y0 * ${p[28]})) * ax) * ax) * ${p[27]})));
+    qquadyy += ((${w} * ${p[23]}) * (y0 + (sin((x0 * ${p[28]})) * ${p[27]})));
+  } else if ((min(max(${p[22]}, 0.0), 50.0) == 47)) {
+    var a: f32 = (PI / (sqrt((sqr(t.x) + sqr(t.y))) + ${p[27]}));
+    var r_: f32 = (atan2j(t.y, t.x) * (1.0 / PI));
+    if ((r_ > 0.0)) {
+      a = (PI - a);
+    }
+    sina.value = sin(a);
+    cosa.value = cos(a);
+    qquadxx += (((${w} * ${p[23]}) * r_) * cosa.value);
+    qquadyy += (((${w} * ${p[23]}) * r_) * sina.value);
+  } else if ((min(max(${p[22]}, 0.0), 50.0) == 48)) {
+    var r_: f32 = r;
+    var a: f32;
+    if ((r_ < ${w})) {
+      a = (ph + (${p[27]} / (${w} - r_)));
+    } else {
+      a = (ph + (${p[28]} / (${w} - r_)));
+    }
+    var sa: f32 = sin(a);
+    var ca: f32 = cos(a);
+    qquadxx += (((${w} * ${p[23]}) * r_) * ca);
+    qquadyy += (((${w} * ${p[23]}) * r_) * sa);
+  }
+  count += 1;
+}
+if (((t.x > ${p[10]}) && (t.y < ${p[11]}))) {
+  if ((min(max(${p[8]}, 0.0), 50.0) == 0)) {
+    qquadxx += ((${w} * ${p[9]}) * t.x);
+    qquadyy += ((${w} * ${p[9]}) * t.y);
+  } else if ((min(max(${p[8]}, 0.0), 50.0) == 1)) {
+    var r_: f32 = ((${w} * ${p[9]}) / ((((t.x * t.x) * ${p[13]}) + ((t.y * t.y) * ${p[14]})) + 1.0e-30));
+    qquadxx += (t.x * r_);
+    qquadyy += (t.y * r_);
+  } else if ((min(max(${p[8]}, 0.0), 50.0) == 2)) {
+    var z: jcx_ = jcx_make(t.x, t.y);
+    jcx_AcosecH(&(z));
+    jcx_Flip(&(z));
+    jcx_Scale(&(z), ((${w} * ${p[9]}) * (2.0 / PI)));
+    if ((rnd(rs) < 0.5)) {
+      qquadyy += z.im;
+      qquadxx += z.re;
+    } else {
+      qquadyy += -z.im;
+      qquadxx += -z.re;
+    }
+  } else if ((min(max(${p[8]}, 0.0), 50.0) == 3)) {
+    var z: jcx_ = jcx_make(t.x, t.y);
+    jcx_AcosH(&(z));
+    jcx_Scale(&(z), ((${w} * ${p[9]}) * (2.0 / PI)));
+    if ((rnd(rs) < 0.5)) {
+      qquadyy += z.im;
+      qquadxx += z.re;
+    } else {
+      qquadyy += -z.im;
+      qquadxx += -z.re;
+    }
+  } else if ((min(max(${p[8]}, 0.0), 50.0) == 4)) {
+    var z: jcx_ = jcx_make(t.x, t.y);
+    jcx_AcotH(&(z));
+    jcx_Flip(&(z));
+    jcx_Scale(&(z), ((${w} * ${p[9]}) * (2.0 / PI)));
+    qquadyy += z.im;
+    qquadxx += z.re;
+  } else if ((min(max(${p[8]}, 0.0), 50.0) == 5)) {
+    var xxx: f32;
+    var yyy: f32;
+    var a0: f32;
+    var b0: f32;
+    var f1x: f32;
+    var f1y: f32;
+    var r_: f32 = sqrt(3.0);
+    a0 = (((3.0 * ((1.0 + r_) - t.x)) / (powc(((1.0 + r_) - t.x), 2.0) + (t.y * t.y))) - ((1.0 + r_) / (2.0 + r_)));
+    b0 = ((3.0 * t.y) / (powc(((1.0 + r_) - t.x), 2.0) + (t.y * t.y)));
+    f1x = (a0 / ((a0 * a0) + (b0 * b0)));
+    f1y = (-b0 / ((a0 * a0) + (b0 * b0)));
+    var w_: i32 = i32((4.0 * rnd(rs)));
+    if (((w_ % 3) == 0)) {
+      xxx = a0;
+      yyy = b0;
+    } else if (((w_ % 3) == 1)) {
+      xxx = ((-f1x / 2.0) - ((f1y * r_) / 2.0));
+      yyy = (((f1x * r_) / 2.0) - (f1y / 2.0));
+    } else {
+      xxx = ((-f1x / 2.0) + ((f1y * r_) / 2.0));
+      yyy = (((-f1x * r_) / 2.0) - (f1y / 2.0));
+    }
+    qquadxx += ((xxx * ${w}) * ${p[9]});
+    qquadyy += ((yyy * ${w}) * ${p[9]});
+  } else if ((min(max(${p[8]}, 0.0), 50.0) == 6)) {
+    var z: jcx_ = jcx_make(t.x, t.y);
+    jcx_AsinH(&(z));
+    jcx_Scale(&(z), ((${w} * ${p[9]}) * (2.0 / PI)));
+    qquadyy += z.im;
+    qquadxx += z.re;
+  } else if ((min(max(${p[8]}, 0.0), 50.0) == 7)) {
+    var z: jcx_ = jcx_make(t.x, t.y);
+    var z2: jcx_ = jcx_make_ov2(z);
+    jcx_Scale(&(z2), -1.0);
+    jcx_Inc(&(z2));
+    var z3: jcx_ = jcx_make_ov2(z);
+    jcx_Inc(&(z3));
+    jcx_Div(&(z3), z2);
+    jcx_Log(&(z3));
+    jcx_Scale(&(z3), ((${w} * ${p[9]}) * (2.0 / PI)));
+    qquadxx += z3.re;
+    qquadyy += z3.im;
+  } else if ((min(max(${p[8]}, 0.0), 50.0) == 8)) {
+    var norm: f32 = (((1.0 / (PI * 0.5)) * ${w}) * ${p[9]});
+    qquadxx += (norm * atan((${p[13]} * t.x)));
+    qquadyy += (norm * atan((${p[14]} * t.y)));
+  } else if ((min(max(${p[8]}, 0.0), 50.0) == 9)) {
+    var tau: f32;
+    var sigma: f32;
+    var temp: f32;
+    var cosht: f32;
+    var sinht: f32;
+    var sins: f32;
+    var coss: f32;
+    var alt: i32;
+    tau = (0.5 * (log((sqr((t.x + 1.0)) + sqr(t.y))) - log((sqr((t.x - 1.0)) + sqr(t.y)))));
+    sigma = ((PI - atan2j(t.y, (t.x + 1.0))) - atan2j(t.y, (1.0 - t.x)));
+    alt = i32((sigma * ur_bCn_pi));
+    if (((alt % 2) == 0)) {
+      sigma = ((f32(alt) * ur_pi_bCn) + ((sigma + ur_bCa_bCn) % ur_pi_bCn));
+    } else {
+      sigma = ((f32(alt) * ur_pi_bCn) + ((sigma - ur_bCa_bCn) % ur_pi_bCn));
+    }
+    sinht = sinh(tau);
+    cosht = cosh(tau);
+    sins = sin(sigma);
+    coss = cos(sigma);
+    temp = (cosht - coss);
+    qquadxx += (((${w} * ${p[9]}) * sinht) / temp);
+    qquadyy += (((${w} * ${p[9]}) * sins) / temp);
+  } else if ((min(max(${p[8]}, 0.0), 50.0) == 10)) {
+    var tau: f32;
+    var sigma: f32;
+    var temp: f32;
+    var cosht: f32;
+    var sinht: f32;
+    var sins: f32;
+    var coss: f32;
+    tau = (0.5 * (log((sqr((t.x + 1.0)) + sqr(t.y))) - log((sqr((t.x - 1.0)) + sqr(t.y)))));
+    sigma = ((PI - atan2j(t.y, (t.x + 1.0))) - atan2j(t.y, (1.0 - t.x)));
+    if (((tau < ${p[13]}) && (-tau < ${p[13]}))) {
+      tau = ((((tau + ${p[13]}) + (${p[14]} * ${p[13]})) % (2.0 * ${p[13]})) - ${p[13]});
+    }
+    sinht = sinh(tau);
+    cosht = cosh(tau);
+    sins = sin(sigma);
+    coss = cos(sigma);
+    temp = (cosht - coss);
+    if ((temp == 0)) {
+      break;
+    }
+    qquadxx += (((${w} * ${p[9]}) * sinht) / temp);
+    qquadyy += (((${w} * ${p[9]}) * sins) / temp);
+  } else if ((min(max(${p[8]}, 0.0), 50.0) == 11)) {
+    var tau: f32;
+    var sigma: f32;
+    var temp: f32;
+    var cosht: f32;
+    var sinht: f32;
+    var sins: f32;
+    var coss: f32;
+    tau = (0.5 * (log((sqr((t.x + 1.0)) + sqr(t.y))) - log((sqr((t.x - 1.0)) + sqr(t.y)))));
+    sigma = ((PI - atan2j(t.y, (t.x + 1.0))) - atan2j(t.y, (1.0 - t.x)));
+    sigma = ((sigma + (tau * ${p[14]})) + (${p[13]} / tau));
+    sinht = sinh(tau);
+    cosht = cosh(tau);
+    sins = sin(sigma);
+    coss = cos(sigma);
+    temp = (cosht - coss);
+    if ((temp == 0)) {
+      break;
+    }
+    qquadxx += (((${w} * ${p[9]}) * sinht) / temp);
+    qquadyy += (((${w} * ${p[9]}) * sins) / temp);
+  } else if ((min(max(${p[8]}, 0.0), 50.0) == 12)) {
+    var tau: f32;
+    var sigma: f32;
+    var temp: f32;
+    var cosht: f32;
+    var sinht: f32;
+    var sins: f32;
+    var coss: f32;
+    tau = (((0.5 * (log((sqr((t.x + 1.0)) + sqr(t.y))) - log((sqr((t.x - 1.0)) + sqr(t.y))))) / ${p[13]}) + 0);
+    sigma = (((PI - atan2j(t.y, (t.x + 1.0))) - atan2j(t.y, (1.0 - t.x))) + 0);
+    sigma = ((sigma / ${p[13]}) + (((2.0 * PI) / ${p[13]}) * floor((rnd(rs) * ${p[13]}))));
+    if ((t.x >= 0.0)) {
+      tau += ${p[14]};
+    } else {
+      tau -= ${p[14]};
+    }
+    sinht = sinh(tau);
+    cosht = cosh(tau);
+    sins = sin(sigma);
+    coss = cos(sigma);
+    temp = (cosht - coss);
+    qquadxx += (((${w} * ${p[9]}) * sinht) / temp);
+    qquadyy += (((${w} * ${p[9]}) * sins) / temp);
+  } else if ((min(max(${p[8]}, 0.0), 50.0) == 13)) {
+    var nx: f32 = t.x;
+    var ny: f32 = t.y;
+    if ((nx < 0)) {
+      nx = (nx * ${p[13]});
+    }
+    if ((ny < 0)) {
+      ny = (ny * ${p[14]});
+    }
+    qquadxx += ((${w} * ${p[9]}) * nx);
+    qquadyy += ((${w} * ${p[9]}) * ny);
+  } else if ((min(max(${p[8]}, 0.0), 50.0) == 14)) {
+    var x2y2: f32 = ((t.x * t.x) + (t.y * t.y));
+    var t_: f32 = (x2y2 + ${p[14]});
+    var x2: f32 = (2 * t.x);
+    var ps: f32 = (-(PI * 0.5) * ${p[13]});
+    var yb: f32 = ((0.5 * atan2j((2.0 * t.y), (x2y2 - 1.0))) + ps);
+    if ((yb > (PI * 0.5))) {
+      yb = (-(PI * 0.5) + ((yb + (PI * 0.5)) % PI));
+    } else if ((yb < -(PI * 0.5))) {
+      yb = ((PI * 0.5) - (((PI * 0.5) - yb) % PI));
+    }
+    var f: f32 = (t_ + x2);
+    var g: f32 = (t_ - x2);
+    if (((g == 0) || ((f / g) <= 0))) {
+      break;
+    }
+    qquadxx += ((((${w} * ${p[9]}) * 0.25) * (2.0 / PI)) * log(((t_ + x2) / (t_ - x2))));
+    qquadyy += (((${w} * ${p[9]}) * (2.0 / PI)) * yb);
+  } else if ((min(max(${p[8]}, 0.0), 50.0) == 15)) {
+    var a: f32 = atan2j(t.x, t.y);
+    var r_: f32 = sqrt(((t.x * t.x) + (t.y * t.y)));
+    r_ = (r_ * (${p[13]} + ((${p[14]} - ${p[13]}) * (0.5 + (0.5 * sin((6 * a)))))));
+    var nx: f32 = (sin(a) * r_);
+    var ny: f32 = (cos(a) * r_);
+    qquadxx += ((${w} * ${p[9]}) * nx);
+    qquadyy += ((${w} * ${p[9]}) * ny);
+  } else if ((min(max(${p[8]}, 0.0), 50.0) == 16)) {
+    var wx: f32 = ((${w} * ${p[9]}) * ${p[13]});
+    var y2: f32 = (t.y * ${p[14]});
+    var r_: f32 = (wx * sqrt((abs((t.y * t.x)) / ((1.0e-30 + (t.x * t.x)) + (y2 * y2)))));
+    qquadxx += (r_ * t.x);
+    qquadyy += (r_ * y2);
+  } else if ((min(max(${p[8]}, 0.0), 50.0) == 17)) {
+    var aaa: f32 = atan2j(t.y, t.x);
+    var r_: f32 = ((${w} * ${p[9]}) * sqrt((sqr(t.x) + sqr(t.y))));
+    var alt: i32;
+    if ((aaa >= 0.0)) {
+      alt = i32((aaa * ur_kn_pi));
+      if (((alt % 2) == 0)) {
+        aaa = ((f32(alt) * ur_pi_kn) + ((ur_ka_kn + aaa) % ur_pi_kn));
+      } else {
+        aaa = ((f32(alt) * ur_pi_kn) + ((-ur_ka_kn + aaa) % ur_pi_kn));
+      }
+    } else {
+      alt = i32((-aaa * ur_kn_pi));
+      if (((alt % 2) != 0)) {
+        aaa = -((f32(alt) * ur_pi_kn) + ((-ur_ka_kn - aaa) % ur_pi_kn));
+      } else {
+        aaa = -((f32(alt) * ur_pi_kn) + ((ur_ka_kn - aaa) % ur_pi_kn));
+      }
+    }
+    var s: f32 = sin(aaa);
+    var c: f32 = cos(aaa);
+    qquadxx += (r_ * c);
+    qquadyy += (r_ * s);
+  } else if ((min(max(${p[8]}, 0.0), 50.0) == 18)) {
+    var a: f32 = ph;
+    var lnr: f32 = (0.5 * log(r2));
+    var va: f32 = ((2.0 * PI) / 2);
+    var vc: f32 = (${p[13]} / 2);
+    var vd: f32 = (${p[14]} / 2);
+    var ang: f32 = (((vc * a) + (vd * lnr)) + (va * floor((2 * rnd(rs)))));
+    var m: f32 = ((${w} * ${p[9]}) * exp(((vc * lnr) - (vd * a))));
+    var sa: f32 = sin(ang);
+    var ca: f32 = cos(ang);
+    qquadxx += (m * ca);
+    qquadyy += (m * sa);
+  } else if ((min(max(${p[8]}, 0.0), 50.0) == 19)) {
+    var re: f32 = ((1 + (${p[13]} * t.x)) + (${p[14]} * (sqr(t.x) - sqr(t.y))));
+    var im: f32 = ((${p[13]} * t.y) + (((${p[14]} * 2) * t.x) * t.y));
+    var r_: f32 = ((${w} * ${p[9]}) / (sqr(re) + sqr(im)));
+    qquadxx += (((t.x * re) + (t.y * im)) * r_);
+    qquadyy += (((t.y * re) - (t.x * im)) * r_);
+  } else if ((min(max(${p[8]}, 0.0), 50.0) == 20)) {
+    var xx: f32 = t.x;
+    var yy: f32 = t.y;
+    var r2_: f32 = (1.0 / ((xx * xx) + (yy * yy)));
+    var r_: f32 = (powc(((xx * xx) + (((r2_ * 1) * yy) * yy)), ${p[14]}) - powc(((yy * yy) + (((r2_ * 2) * xx) * xx)), ${p[14]}));
+    if ((r_ > 100)) {
+      r_ = 100;
+    } else if ((r_ < -0.24)) {
+      r_ = -0.24;
+    }
+    r_ = (${p[13]} * r_);
+    qquadxx += ((${p[9]} * xx) * (1 + r_));
+    qquadyy += ((${p[9]} * yy) * (1 + r_));
+  } else if ((min(max(${p[8]}, 0.0), 50.0) == 21)) {
+    var rPI: f32 = ((PI * sqrt(((t.x * t.x) + (t.y * t.y)))) * ${p[13]});
+    var sinr: f32 = sin(rPI);
+    var cosr: f32 = cos(rPI);
+    var r_: f32 = (((${w} * ${p[9]}) * th) / PI);
+    qquadxx += (sinr * r_);
+    qquadyy += (cosr * r_);
+  } else if ((min(max(${p[8]}, 0.0), 50.0) == 22)) {
+    var tmp: f32 = (((t.y * t.y) + (t.x * t.x)) + 1.0);
+    var tmp2: f32 = (2.0 * t.x);
+    var xmax: f32 = ((quad_sqrt_safe((tmp + tmp2)) + quad_sqrt_safe((tmp - tmp2))) * 0.5);
+    var sinnu: f32;
+    var cosnu: f32;
+    var alt: i32;
+    if ((xmax < 1.0)) {
+      xmax = 1.0;
+    }
+    var t_: f32 = (t.x / xmax);
+    if ((t_ > 1.0)) {
+      t_ = 1.0;
+    } else if ((t_ < -1.0)) {
+      t_ = -1.0;
+    }
+    var nu: f32 = acos(t_);
+    alt = i32((nu * ur_eCn_pi));
+    if (((alt % 2) == 0)) {
+      nu = ((f32(alt) * ur_pi_eCn) + ((nu + ur_eCa_eCn) % ur_pi_eCn));
+    } else {
+      nu = ((f32(alt) * ur_pi_eCn) + ((nu - ur_eCa_eCn) % ur_pi_eCn));
+    }
+    if ((t.y <= 0.0)) {
+      nu *= -1.0;
+    }
+    sinnu = sin(nu);
+    cosnu = cos(nu);
+    qquadxx += (((${w} * ${p[9]}) * xmax) * cosnu);
+    qquadyy += ((((${w} * ${p[9]}) * sqrt((xmax - 1.0))) * sqrt((xmax + 1.0))) * sinnu);
+  } else if ((min(max(${p[8]}, 0.0), 50.0) == 23)) {
+    var tmp: f32 = (r2 + 1.0);
+    var tmp2: f32 = (2.0 * t.x);
+    var r1: f32 = sqrt((tmp + tmp2));
+    var r2_: f32 = sqrt((tmp - tmp2));
+    var xmax: f32 = ((r1 + r2_) * 0.5);
+    var a1: f32 = log((xmax + sqrt((xmax - 1.0))));
+    var a2: f32 = -(acos((t.x / xmax)));
+    var w_: f32 = ((${w} * ${p[9]}) / 11.57034632);
+    var snv: f32 = sin(a1);
+    var csv: f32 = cos(a1);
+    var snhu: f32 = sinh(a2);
+    var cshu: f32 = cosh(a2);
+    if ((t.y > 0.0)) {
+      snv = -snv;
+    }
+    qquadxx += ((w_ * cshu) * csv);
+    qquadyy += ((w_ * snhu) * snv);
+  } else if ((min(max(${p[8]}, 0.0), 50.0) == 24)) {
+    var r2_: f32 = ((t.y * t.y) + (t.x * t.x));
+    var tmp2: f32;
+    var x: f32;
+    if ((ur_sign == 1)) {
+      x = t.x;
+    } else {
+      r2_ = (1.0 / r2_);
+      x = (t.x * r2_);
+    }
+    var tmp: f32 = (r2_ + 1.0);
+    tmp2 = (2.0 * x);
+    var xmax: f32 = ((quad_sqrt_safe((tmp + tmp2)) + quad_sqrt_safe((tmp - tmp2))) * 0.5);
+    if ((xmax < 1.0)) {
+      xmax = 1.0;
+    }
+    var sinhmu: f32;
+    var coshmu: f32;
+    var sinnu: f32;
+    var cosnu: f32;
+    var mu: f32 = acosh(xmax);
+    var t_: f32 = (x / xmax);
+    if ((t_ > 1.0)) {
+      t_ = 1.0;
+    } else if ((t_ < -1.0)) {
+      t_ = -1.0;
+    }
+    var nu: f32 = acos(t_);
+    if ((t.y < 0)) {
+      nu *= -1.0;
+    }
+    nu = ((nu / ${p[13]}) + (((2.0 * PI) / ${p[13]}) * floor((rnd(rs) * ${p[13]}))));
+    mu /= ${p[13]};
+    sinhmu = sinh(mu);
+    coshmu = cosh(mu);
+    sinnu = sin(nu);
+    cosnu = cos(nu);
+    qquadxx += (((${w} * ${p[9]}) * coshmu) * cosnu);
+    qquadyy += (((${w} * ${p[9]}) * sinhmu) * sinnu);
+  } else if ((min(max(${p[8]}, 0.0), 50.0) == 25)) {
+    var tmp: f32 = (((t.y * t.y) + (t.x * t.x)) + 1.0);
+    var tmp2: f32 = (2.0 * t.x);
+    var xmax: f32 = ((quad_sqrt_safe((tmp + tmp2)) + quad_sqrt_safe((tmp - tmp2))) * 0.5);
+    if ((xmax < 1.0)) {
+      xmax = 1.0;
+    }
+    var sinhmu: f32;
+    var coshmu: f32;
+    var mu: f32 = acosh(xmax);
+    var t_: f32 = (t.x / xmax);
+    if ((t_ > 1.0)) {
+      t_ = 1.0;
+    } else if ((t_ < -1.0)) {
+      t_ = -1.0;
+    }
+    var nu: f32 = acos(t_);
+    if ((t.y < 0)) {
+      nu *= -1.0;
+    }
+    if (((mu < ${p[13]}) && (-mu < ${p[13]}))) {
+      if ((nu > 0.0)) {
+        mu = ((((mu + ${p[13]}) + (${p[14]} * ${p[13]})) % (2.0 * ${p[13]})) - ${p[13]});
+      } else {
+        mu = ((((mu - ${p[13]}) - (${p[14]} * ${p[13]})) % (2.0 * ${p[13]})) + ${p[13]});
+      }
+    }
+    sinhmu = sinh(mu);
+    coshmu = cosh(mu);
+    qquadxx += (((${w} * ${p[9]}) * coshmu) * cos(nu));
+    qquadyy += (((${w} * ${p[9]}) * sinhmu) * sin(nu));
+  } else if ((min(max(${p[8]}, 0.0), 50.0) == 26)) {
+    if ((abs(t.y) <= ${w})) {
+      var c_2: f32 = sqrt((sqr(${w}) - sqr(t.y)));
+      if ((abs(t.x) <= c_2)) {
+        var x: f32 = (t.x + ((${p[13]} * ${w}) * ${p[9]}));
+        if ((abs(x) >= c_2)) {
+          qquadxx -= ((${w} * ${p[9]}) * t.x);
+        } else {
+          qquadxx += ((${w} * ${p[9]}) * x);
+        }
+      } else {
+        qquadxx += ((${w} * ${p[9]}) * t.x);
+      }
+      qquadyy += ((${w} * ${p[9]}) * t.y);
+    } else {
+      qquadxx += ((${w} * ${p[9]}) * t.x);
+      qquadyy += ((${w} * ${p[9]}) * t.y);
+    }
+  } else if ((min(max(${p[8]}, 0.0), 50.0) == 27)) {
+    var tmp: f32 = (((t.y * t.y) + (t.x * t.x)) + ${p[13]});
+    var x2: f32 = (2.0 * t.x);
+    var xmax: f32 = (0.5 * (sqrt((tmp + x2)) + sqrt((tmp - x2))));
+    var a: f32 = (t.x / xmax);
+    var b: f32 = quad_sqrt_safe_e((${p[14]} - (a * a)));
+    qquadxx += (ur_v * atan2j(a, b));
+    if ((rnd(rs) < 0.5)) {
+      qquadyy += (ur_v * log((xmax + quad_sqrt_safe_e((xmax - 1.0)))));
+    } else {
+      qquadyy -= (ur_v * log((xmax + quad_sqrt_safe_e((xmax - 1.0)))));
+    }
+  } else if ((min(max(${p[8]}, 0.0), 50.0) == 28)) {
+    var r_: f32 = sqrt(((t.x * t.x) + (t.y * t.y)));
+    var angle: f32;
+    if (((((t.x < -1.0e-30) || (t.x > 1.0e-30)) || (t.y < -1.0e-30)) || (t.y > 1.0e-30))) {
+      angle = atan2j(t.x, t.y);
+    } else {
+      angle = 0.0;
+    }
+    var dy: f32 = ${p[14]};
+    var dx: f32 = ((PI * (${p[13]} * ${p[13]})) + 1.0e-30);
+    var dx2: f32 = (dx * 0.5);
+    var t_: f32 = ((angle + dy) - (f32(i32(((angle + dy) / dx))) * dx));
+    var a: f32;
+    if ((t_ > dx2)) {
+      a = (angle - dx2);
+    } else {
+      a = (angle + dx2);
+    }
+    qquadxx += (((${w} * ${p[9]}) * r_) * sin(a));
+    qquadyy += (((${w} * ${p[9]}) * r_) * cos(a));
+  } else if ((min(max(${p[8]}, 0.0), 50.0) == 29)) {
+    var expx: f32 = (exp(t.x) * 0.5);
+    var expnx: f32 = (0.25 / expx);
+    if (((expx <= 1.0e-30) || (expnx <= 1.0e-30))) {
+      break;
+    }
+    var siny: f32 = sin(t.y);
+    var cosy: f32 = cos(t.y);
+    var tmp: f32 = ((expx + expnx) - cosy);
+    if ((tmp == 0)) {
+      break;
+    }
+    tmp = ((${w} * ${p[9]}) / tmp);
+    qquadxx += ((expx - expnx) * tmp);
+    qquadyy += (siny * tmp);
+  } else if ((min(max(${p[8]}, 0.0), 50.0) == 30)) {
+    var r_: f32 = sqrt((sqr(t.x) + sqr(t.y)));
+    var d: f32;
+    if ((r_ >= 1.0)) {
+      if ((rnd(rs) > 0.5)) {
+        d = sqrt((r_ + t.x));
+        if ((d == 0)) {
+          break;
+        }
+        qquadxx += (ur_vvar2 * d);
+        qquadyy -= ((ur_vvar2 / d) * t.y);
+      } else {
+        d = (r_ + t.x);
+        var dx: f32 = sqrt((r_ * (sqr(t.y) + sqr(d))));
+        if ((dx == 0)) {
+          break;
+        }
+        r_ = ((${w} * ${p[9]}) / dx);
+        qquadxx += (r_ * d);
+        qquadyy += (r_ * t.y);
+      }
+    } else {
+      if ((rnd(rs) > 0.5)) {
+        d = sqrt((r_ + t.x));
+        if ((d == 0)) {
+          break;
+        }
+        qquadxx -= (ur_vvar2 * d);
+        qquadyy -= ((ur_vvar2 / d) * t.y);
+      } else {
+        d = (r_ + t.x);
+        var dx: f32 = sqrt((r_ * (sqr(t.y) + sqr(d))));
+        if ((dx == 0)) {
+          break;
+        }
+        r_ = ((${w} * ${p[9]}) / dx);
+        qquadxx -= (r_ * d);
+        qquadyy += (r_ * t.y);
+      }
+    }
+  } else if ((min(max(${p[8]}, 0.0), 50.0) == 31)) {
+    var alpha: f32 = atan2j(t.y, t.x);
+    var delta: f32 = powc(((alpha / PI) + 1.0), ${p[13]});
+    var r_: f32;
+    if ((${p[14]} != 0)) {
+      r_ = (((${w} * ${p[9]}) * delta) / (((t.x * t.x) + (t.y * t.y)) + delta));
+    } else {
+      r_ = ((${w} * ${p[9]}) * sqrt((((t.x * t.x) + (t.y * t.y)) + delta)));
+    }
+    var s: f32 = sin(alpha);
+    var c: f32 = cos(alpha);
+    qquadxx += (r_ * c);
+    qquadyy += (r_ * s);
+  } else if ((min(max(${p[8]}, 0.0), 50.0) == 32)) {
+    var a: f32 = (PI / (sqrt((sqr(t.x) + sqr(t.y))) + 1.0));
+    var r_: f32 = (atan2j(t.y, t.x) * ur_v_idisc);
+    sina.value = sin(a);
+    cosa.value = cos(a);
+    qquadxx += (r_ * cosa.value);
+    qquadyy += (r_ * sina.value);
+  } else if ((min(max(${p[8]}, 0.0), 50.0) == 33)) {
+    var a: f32 = ((atan2j(t.y, t.x) + ((2 * PI) * f32(i32((rnd(rs) * f32(ur_absPower_julian)))))) / ${p[13]});
+    var sina: f32 = sin(a);
+    var cosa: f32 = cos(a);
+    var r_: f32 = ((${w} * ${p[9]}) * powc((sqr(t.x) + sqr(t.y)), ur_cPower_julian));
+    qquadxx = (qquadxx + (r_ * cosa));
+    qquadyy = (qquadyy + (r_ * sina));
+  } else if ((min(max(${p[8]}, 0.0), 50.0) == 34)) {
+    if ((${p[13]} != 0.0)) {
+      var nr: f32 = f32(i32(floor((t.x * ${p[13]}))));
+      if ((nr >= 0)) {
+        if (((nr % 2) == 1)) {
+          t.x = -t.x;
+        }
+      } else {
+        if (((nr % 2) == 0)) {
+          t.x = -t.x;
+        }
+      }
+    }
+    if ((${p[14]} != 0.0)) {
+      var nr: f32 = f32(i32(floor((t.y * ${p[14]}))));
+      if ((nr >= 0)) {
+        if (((nr % 2) == 1)) {
+          t.y = -t.y;
+        }
+      } else {
+        if (((nr % 2) == 0)) {
+          t.y = -t.y;
+        }
+      }
+    }
+    qquadxx += ((${w} * ${p[9]}) * t.x);
+    qquadyy += ((${w} * ${p[9]}) * t.y);
+  } else if ((min(max(${p[8]}, 0.0), 50.0) == 35)) {
+    var x: f32 = 0.0;
+    var y: f32 = 0.0;
+    var xx: f32 = (t.x - x);
+    var yy: f32 = (t.y + y);
+    var rr: f32 = sqrt(((xx * xx) + (yy * yy)));
+    if ((rr < ${w})) {
+      var a: f32 = ((atan2j(yy, xx) + ${p[14]}) + (${p[13]} * ((${w} * ${p[9]}) - rr)));
+      var sina: f32 = sin(a);
+      var cosa: f32 = cos(a);
+      rr = ((${w} * ${p[9]}) * rr);
+      qquadxx += ((rr * cosa) + x);
+      qquadyy += ((rr * sina) - y);
+    } else {
+      rr = ((${w} * ${p[9]}) * (1.0 + (0.0 / rr)));
+      qquadxx += ((rr * xx) + x);
+      qquadyy += ((rr * yy) - y);
+    }
+  } else if ((min(max(${p[8]}, 0.0), 50.0) == 36)) {
+    var _p2: f32;
+    var _invp: f32;
+    var _vp: f32;
+    var _sina: f32;
+    var _cosa: f32;
+    var _a: f32;
+    var _r: f32;
+    var _re: f32;
+    var _im: f32;
+    var _rl: f32;
+    _p2 = (${p[14]} / 2.0);
+    if ((${p[14]} != 0)) {
+      _invp = (1.0 / ${p[14]});
+      if ((${p[13]} == -1)) {
+        _vp = 0;
+      } else {
+        _vp = ((${w} * ${p[9]}) * powc((${p[13]} + 1), (2.0 / ${p[14]})));
+      }
+    } else {
+      _invp = 100000000000.0;
+      _vp = ((${w} * ${p[9]}) * powc((${p[13]} + 1), 4));
+    }
+    _a = (atan2j(t.y, t.x) * ${p[14]});
+    _sina = sin(_a);
+    _cosa = cos(_a);
+    _r = (${p[13]} * powc((sqr(t.x) + sqr(t.y)), _p2));
+    _re = ((_r * _cosa) + 1);
+    _im = (_r * _sina);
+    _r = powc((sqr(_re) + sqr(_im)), _invp);
+    _a = ((atan2j(_im, _re) * 2.0) * _invp);
+    _re = (_r * cos(_a));
+    _im = (_r * sin(_a));
+    _rl = (_vp / sqr(_r));
+    qquadxx += (_rl * ((t.x * _re) + (t.y * _im)));
+    qquadyy += (_rl * ((t.y * _re) - (t.x * _im)));
+  } else if ((min(max(${p[8]}, 0.0), 50.0) == 37)) {
+    var r_: f32;
+    var a: f32;
+    var ta: f32;
+    var xo: f32;
+    var ro: f32;
+    var c: f32;
+    var s: f32;
+    var x: f32;
+    var y: f32;
+    var tc: f32;
+    var ts: f32;
+    var theta: f32;
+    r_ = (sqr(t.x) + sqr(t.y));
+    if ((r_ < 1.0)) {
+      if ((t.x >= 0.0)) {
+        xo = ((r_ + 1.0) / (2.0 * t.x));
+        ro = sqrt((sqr((t.x - xo)) + sqr(t.y)));
+        theta = atan2j(1.0, ro);
+        a = (((((${p[13]} * theta) + atan2j(t.y, (xo - t.x))) + theta) % (2.0 * theta)) - theta);
+        s = sin(a);
+        c = cos(a);
+        qquadxx += ((${w} * ${p[9]}) * (xo - (c * ro)));
+        qquadyy += (((${w} * ${p[9]}) * s) * ro);
+      } else {
+        xo = (-(r_ + 1.0) / (2.0 * t.x));
+        ro = sqrt((sqr((-t.x - xo)) + sqr(t.y)));
+        theta = atan2j(1.0, ro);
+        a = (((((${p[13]} * theta) + atan2j(t.y, (xo + t.x))) + theta) % (2.0 * theta)) - theta);
+        s = sin(a);
+        c = cos(a);
+        qquadxx -= ((${w} * ${p[9]}) * (xo - (c * ro)));
+        qquadyy += (((${w} * ${p[9]}) * s) * ro);
+      }
+    } else {
+      r_ = (1.0 / sqrt(r_));
+      ta = atan2j(t.y, t.x);
+      ts = sin(ta);
+      tc = cos(ta);
+      x = (r_ * tc);
+      y = (r_ * ts);
+      if ((x >= 0.0)) {
+        xo = (((sqr(x) + sqr(y)) + 1.0) / (2.0 * x));
+        ro = sqrt((sqr((x - xo)) + sqr(y)));
+        theta = atan2j(1.0, ro);
+        a = (((((${p[14]} * theta) + atan2j(y, (xo - x))) + theta) % (2.0 * theta)) - theta);
+        s = sin(a);
+        c = cos(a);
+        x = (xo - (c * ro));
+        y = (s * ro);
+        ta = atan2j(y, x);
+        ts = sin(ta);
+        tc = cos(ta);
+        r_ = (1.0 / sqrt((sqr(x) + sqr(y))));
+        qquadxx += (((${w} * ${p[9]}) * r_) * tc);
+        qquadyy += (((${w} * ${p[9]}) * r_) * ts);
+      } else {
+        xo = (-((sqr(x) + sqr(y)) + 1.0) / (2.0 * x));
+        ro = sqrt((sqr((-x - xo)) + sqr(y)));
+        theta = atan2j(1.0, ro);
+        a = (((((${p[14]} * theta) + atan2j(y, (xo + x))) + theta) % (2.0 * theta)) - theta);
+        s = sin(a);
+        c = cos(a);
+        x = (xo - (c * ro));
+        y = (s * ro);
+        ta = atan2j(y, x);
+        ts = sin(ta);
+        tc = cos(ta);
+        r_ = (1.0 / sqrt((sqr(x) + sqr(y))));
+        qquadxx -= (((${w} * ${p[9]}) * r_) * tc);
+        qquadyy += (((${w} * ${p[9]}) * r_) * ts);
+      }
+    }
+  } else if ((min(max(${p[8]}, 0.0), 50.0) == 38)) {
+    if ((abs(${p[13]}) < 1.0e-9)) {
+      qquadxx += ((${w} * ${p[9]}) * t.x);
+    } else {
+      qquadxx += ((${w} * ${p[9]}) * ((((2 * floor((t.x / ${p[13]}))) + 1) * ${p[13]}) - t.x));
+    }
+    if ((abs(${p[14]}) < 1.0e-9)) {
+      qquadyy += ((${w} * ${p[9]}) * t.y);
+    } else {
+      qquadyy += ((${w} * ${p[9]}) * ((((2 * floor((t.y / ${p[14]}))) + 1) * ${p[14]}) - t.y));
+    }
+  } else if ((min(max(${p[8]}, 0.0), 50.0) == 39)) {
+    qquadxx += ((${w} * ${p[9]}) * sin(t.x));
+    qquadyy += ((${w} * ${p[9]}) * sin(t.y));
+  } else if ((min(max(${p[8]}, 0.0), 50.0) == 40)) {
+    var R: f32 = powc(sqrt((sqr(t.x) + sqr(t.y))), ${p[14]});
+    var N: i32 = i32(floor((${p[13]} * rnd(rs))));
+    var alpha: f32 = (atan2j(t.y, t.x) + ((f32(N) * (2.0 * PI)) / floor(${p[13]})));
+    var sina: f32 = sin(alpha);
+    var cosa: f32 = cos(alpha);
+    if ((R > 1.0e-30)) {
+      qquadxx += (((${w} * ${p[9]}) * cosa) / R);
+      qquadyy += (((${w} * ${p[9]}) * sina) / R);
+    }
+  } else if ((min(max(${p[8]}, 0.0), 50.0) == 41)) {
+    qquadxx += ((${w} * ${p[9]}) * (t.x + (${p[13]} * sin((t.y * ${p[14]})))));
+    qquadyy += ((${w} * ${p[9]}) * (t.y + (${p[13]} * sin((t.x * ${p[14]})))));
+  } else if ((min(max(${p[8]}, 0.0), 50.0) == 42)) {
+    var x0: f32 = t.x;
+    var y0: f32 = t.y;
+    var modex: i32 = 0;
+    var modey: i32 = 0;
+    var sinx: f32;
+    var siny: f32;
+    var px: i32 = i32(2.0);
+    var py: i32 = i32(2.0);
+    if ((f32(modex) < 0.5)) {
+      sinx = sin((y0 * ${p[14]}));
+    } else {
+      sinx = (0.5 * (1.0 + sin((y0 * ${p[14]}))));
+    }
+    var offsetx: f32 = (powc(sinx, f32(px)) * ${p[13]});
+    if ((f32(modey) < 0.5)) {
+      siny = sin((x0 * ${p[14]}));
+    } else {
+      siny = (0.5 * (1.0 + sin((x0 * ${p[14]}))));
+    }
+    var offsety: f32 = (powc(siny, f32(py)) * ${p[13]});
+    qquadxx += ((${w} * ${p[9]}) * (x0 + offsetx));
+    qquadyy += ((${w} * ${p[9]}) * (y0 + offsety));
+  } else if ((min(max(${p[8]}, 0.0), 50.0) == 43)) {
+    var x0: f32 = t.x;
+    var y0: f32 = t.y;
+    var mx: f32 = ((y0 * ${p[14]}) * (0.5 / PI));
+    var fx: f32 = (mx - floor(mx));
+    if ((fx > 0.5)) {
+      fx = (0.5 - fx);
+    }
+    var my: f32 = ((x0 * ${p[14]}) * (0.5 / PI));
+    var fy: f32 = (my - floor(my));
+    if ((fy > 0.5)) {
+      fy = (0.5 - fy);
+    }
+    qquadxx += ((${w} * ${p[9]}) * (x0 + (fx * ${p[13]})));
+    qquadyy += ((${w} * ${p[9]}) * (y0 + (fy * ${p[13]})));
+  } else if ((min(max(${p[8]}, 0.0), 50.0) == 44)) {
+    var x0: f32 = t.x;
+    var y0: f32 = t.y;
+    var scalexx: f32 = ((0.5 * ${p[13]}) * (1.0 + sin((y0 * 0.0))));
+    var scaleyy: f32 = ((0.5 * ${p[13]}) * (1.0 + sin((x0 * 2.0))));
+    qquadxx += ((${w} * ${p[9]}) * (x0 + (sin((y0 * ${p[14]})) * scalexx)));
+    qquadyy += ((${w} * ${p[9]}) * (y0 + (sin((x0 * ${p[14]})) * scaleyy)));
+  } else if ((min(max(${p[8]}, 0.0), 50.0) == 45)) {
+    var x0: f32 = t.x;
+    var y0: f32 = t.y;
+    var ax: f32 = floor(((y0 * ${p[14]}) / (2.0 * PI)));
+    ax = (sin(((((ax * 12.9898) + (ax * 78.233)) + 1.0) + ((y0 * 0.001) * 0.1))) * 43758.5453);
+    ax = (ax - f32(i32(ax)));
+    qquadxx += ((${w} * ${p[9]}) * (x0 + (((sin((y0 * ${p[14]})) * ax) * ax) * ${p[13]})));
+    qquadyy += ((${w} * ${p[9]}) * (y0 + (sin((x0 * ${p[14]})) * ${p[13]})));
+  } else if ((min(max(${p[8]}, 0.0), 50.0) == 46)) {
+    var x0: f32 = t.x;
+    var y0: f32 = t.y;
+    var ax: f32 = floor((y0 * ${p[14]}));
+    ax = (sin(((((ax * 12.9898) + (ax * 78.233)) + 1.0) + ((y0 * 0.001) * 0.1))) * 43758.5453);
+    ax = (ax - f32(i32(ax)));
+    qquadxx += ((${w} * ${p[9]}) * (x0 + (((sin((y0 * ${p[14]})) * ax) * ax) * ${p[13]})));
+    qquadyy += ((${w} * ${p[9]}) * (y0 + (sin((x0 * ${p[14]})) * ${p[13]})));
+  } else if ((min(max(${p[8]}, 0.0), 50.0) == 47)) {
+    var a: f32 = (PI / (sqrt((sqr(t.x) + sqr(t.y))) + ${p[13]}));
+    var r_: f32 = (atan2j(t.y, t.x) * (1.0 / PI));
+    if ((r_ > 0.0)) {
+      a = (PI - a);
+    }
+    sina.value = sin(a);
+    cosa.value = cos(a);
+    qquadxx += (((${w} * ${p[9]}) * r_) * cosa.value);
+    qquadyy += (((${w} * ${p[9]}) * r_) * sina.value);
+  } else if ((min(max(${p[8]}, 0.0), 50.0) == 48)) {
+    var r_: f32 = r;
+    var a: f32;
+    if ((r_ < ${w})) {
+      a = (ph + (${p[13]} / (${w} - r_)));
+    } else {
+      a = (ph + (${p[14]} / (${w} - r_)));
+    }
+    var sa: f32 = sin(a);
+    var ca: f32 = cos(a);
+    qquadxx += (((${w} * ${p[9]}) * r_) * ca);
+    qquadyy += (((${w} * ${p[9]}) * r_) * sa);
+  }
+  count += 1;
+}
+if (((t.x < ${p[17]}) && (t.y > ${p[18]}))) {
+  if ((min(max(${p[15]}, 0.0), 50.0) == 0)) {
+    qquadxx += ((${w} * ${p[16]}) * t.x);
+    qquadyy += ((${w} * ${p[16]}) * t.y);
+  } else if ((min(max(${p[15]}, 0.0), 50.0) == 1)) {
+    var r_: f32 = ((${w} * ${p[16]}) / ((((t.x * t.x) * ${p[20]}) + ((t.y * t.y) * ${p[21]})) + 1.0e-30));
+    qquadxx += (t.x * r_);
+    qquadyy += (t.y * r_);
+  } else if ((min(max(${p[15]}, 0.0), 50.0) == 2)) {
+    var z: jcx_ = jcx_make(t.x, t.y);
+    jcx_AcosecH(&(z));
+    jcx_Flip(&(z));
+    jcx_Scale(&(z), ((${w} * ${p[16]}) * (2.0 / PI)));
+    if ((rnd(rs) < 0.5)) {
+      qquadyy += z.im;
+      qquadxx += z.re;
+    } else {
+      qquadyy += -z.im;
+      qquadxx += -z.re;
+    }
+  } else if ((min(max(${p[15]}, 0.0), 50.0) == 3)) {
+    var z: jcx_ = jcx_make(t.x, t.y);
+    jcx_AcosH(&(z));
+    jcx_Scale(&(z), ((${w} * ${p[16]}) * (2.0 / PI)));
+    if ((rnd(rs) < 0.5)) {
+      qquadyy += z.im;
+      qquadxx += z.re;
+    } else {
+      qquadyy += -z.im;
+      qquadxx += -z.re;
+    }
+  } else if ((min(max(${p[15]}, 0.0), 50.0) == 4)) {
+    var z: jcx_ = jcx_make(t.x, t.y);
+    jcx_AcotH(&(z));
+    jcx_Flip(&(z));
+    jcx_Scale(&(z), ((${w} * ${p[16]}) * (2.0 / PI)));
+    qquadyy += z.im;
+    qquadxx += z.re;
+  } else if ((min(max(${p[15]}, 0.0), 50.0) == 5)) {
+    var xxx: f32;
+    var yyy: f32;
+    var a0: f32;
+    var b0: f32;
+    var f1x: f32;
+    var f1y: f32;
+    var r_: f32 = sqrt(3.0);
+    a0 = (((3.0 * ((1.0 + r_) - t.x)) / (powc(((1.0 + r_) - t.x), 2.0) + (t.y * t.y))) - ((1.0 + r_) / (2.0 + r_)));
+    b0 = ((3.0 * t.y) / (powc(((1.0 + r_) - t.x), 2.0) + (t.y * t.y)));
+    f1x = (a0 / ((a0 * a0) + (b0 * b0)));
+    f1y = (-b0 / ((a0 * a0) + (b0 * b0)));
+    var w_: i32 = i32((4.0 * rnd(rs)));
+    if (((w_ % 3) == 0)) {
+      xxx = a0;
+      yyy = b0;
+    } else if (((w_ % 3) == 1)) {
+      xxx = ((-f1x / 2.0) - ((f1y * r_) / 2.0));
+      yyy = (((f1x * r_) / 2.0) - (f1y / 2.0));
+    } else {
+      xxx = ((-f1x / 2.0) + ((f1y * r_) / 2.0));
+      yyy = (((-f1x * r_) / 2.0) - (f1y / 2.0));
+    }
+    qquadxx += ((xxx * ${w}) * ${p[16]});
+    qquadyy += ((yyy * ${w}) * ${p[16]});
+  } else if ((min(max(${p[15]}, 0.0), 50.0) == 6)) {
+    var z: jcx_ = jcx_make(t.x, t.y);
+    jcx_AsinH(&(z));
+    jcx_Scale(&(z), ((${w} * ${p[16]}) * (2.0 / PI)));
+    qquadyy += z.im;
+    qquadxx += z.re;
+  } else if ((min(max(${p[15]}, 0.0), 50.0) == 7)) {
+    var z: jcx_ = jcx_make(t.x, t.y);
+    var z2: jcx_ = jcx_make_ov2(z);
+    jcx_Scale(&(z2), -1.0);
+    jcx_Inc(&(z2));
+    var z3: jcx_ = jcx_make_ov2(z);
+    jcx_Inc(&(z3));
+    jcx_Div(&(z3), z2);
+    jcx_Log(&(z3));
+    jcx_Scale(&(z3), ((${w} * ${p[16]}) * (2.0 / PI)));
+    qquadxx += z3.re;
+    qquadyy += z3.im;
+  } else if ((min(max(${p[15]}, 0.0), 50.0) == 8)) {
+    var norm: f32 = (((1.0 / (PI * 0.5)) * ${w}) * ${p[16]});
+    qquadxx += (norm * atan((${p[20]} * t.x)));
+    qquadyy += (norm * atan((${p[21]} * t.y)));
+  } else if ((min(max(${p[15]}, 0.0), 50.0) == 9)) {
+    var tau: f32;
+    var sigma: f32;
+    var temp: f32;
+    var cosht: f32;
+    var sinht: f32;
+    var sins: f32;
+    var coss: f32;
+    var alt: i32;
+    tau = (0.5 * (log((sqr((t.x + 1.0)) + sqr(t.y))) - log((sqr((t.x - 1.0)) + sqr(t.y)))));
+    sigma = ((PI - atan2j(t.y, (t.x + 1.0))) - atan2j(t.y, (1.0 - t.x)));
+    alt = i32((sigma * ll_bCn_pi));
+    if (((alt % 2) == 0)) {
+      sigma = ((f32(alt) * ll_pi_bCn) + ((sigma + ll_bCa_bCn) % ll_pi_bCn));
+    } else {
+      sigma = ((f32(alt) * ll_pi_bCn) + ((sigma - ll_bCa_bCn) % ll_pi_bCn));
+    }
+    sinht = sinh(tau);
+    cosht = cosh(tau);
+    sins = sin(sigma);
+    coss = cos(sigma);
+    temp = (cosht - coss);
+    qquadxx += (((${w} * ${p[16]}) * sinht) / temp);
+    qquadyy += (((${w} * ${p[16]}) * sins) / temp);
+  } else if ((min(max(${p[15]}, 0.0), 50.0) == 10)) {
+    var tau: f32;
+    var sigma: f32;
+    var temp: f32;
+    var cosht: f32;
+    var sinht: f32;
+    var sins: f32;
+    var coss: f32;
+    tau = (0.5 * (log((sqr((t.x + 1.0)) + sqr(t.y))) - log((sqr((t.x - 1.0)) + sqr(t.y)))));
+    sigma = ((PI - atan2j(t.y, (t.x + 1.0))) - atan2j(t.y, (1.0 - t.x)));
+    if (((tau < ${p[20]}) && (-tau < ${p[20]}))) {
+      tau = ((((tau + ${p[20]}) + (${p[21]} * ${p[20]})) % (2.0 * ${p[20]})) - ${p[20]});
+    }
+    sinht = sinh(tau);
+    cosht = cosh(tau);
+    sins = sin(sigma);
+    coss = cos(sigma);
+    temp = (cosht - coss);
+    if ((temp == 0)) {
+      break;
+    }
+    qquadxx += (((${w} * ${p[16]}) * sinht) / temp);
+    qquadyy += (((${w} * ${p[16]}) * sins) / temp);
+  } else if ((min(max(${p[15]}, 0.0), 50.0) == 11)) {
+    var tau: f32;
+    var sigma: f32;
+    var temp: f32;
+    var cosht: f32;
+    var sinht: f32;
+    var sins: f32;
+    var coss: f32;
+    tau = (0.5 * (log((sqr((t.x + 1.0)) + sqr(t.y))) - log((sqr((t.x - 1.0)) + sqr(t.y)))));
+    sigma = ((PI - atan2j(t.y, (t.x + 1.0))) - atan2j(t.y, (1.0 - t.x)));
+    sigma = ((sigma + (tau * ${p[21]})) + (${p[20]} / tau));
+    sinht = sinh(tau);
+    cosht = cosh(tau);
+    sins = sin(sigma);
+    coss = cos(sigma);
+    temp = (cosht - coss);
+    if ((temp == 0)) {
+      break;
+    }
+    qquadxx += (((${w} * ${p[16]}) * sinht) / temp);
+    qquadyy += (((${w} * ${p[16]}) * sins) / temp);
+  } else if ((min(max(${p[15]}, 0.0), 50.0) == 12)) {
+    var tau: f32;
+    var sigma: f32;
+    var temp: f32;
+    var cosht: f32;
+    var sinht: f32;
+    var sins: f32;
+    var coss: f32;
+    tau = (((0.5 * (log((sqr((t.x + 1.0)) + sqr(t.y))) - log((sqr((t.x - 1.0)) + sqr(t.y))))) / ${p[20]}) + 0);
+    sigma = (((PI - atan2j(t.y, (t.x + 1.0))) - atan2j(t.y, (1.0 - t.x))) + 0);
+    sigma = ((sigma / ${p[20]}) + (((2.0 * PI) / ${p[20]}) * floor((rnd(rs) * ${p[20]}))));
+    if ((t.x >= 0.0)) {
+      tau += ${p[21]};
+    } else {
+      tau -= ${p[21]};
+    }
+    sinht = sinh(tau);
+    cosht = cosh(tau);
+    sins = sin(sigma);
+    coss = cos(sigma);
+    temp = (cosht - coss);
+    qquadxx += (((${w} * ${p[16]}) * sinht) / temp);
+    qquadyy += (((${w} * ${p[16]}) * sins) / temp);
+  } else if ((min(max(${p[15]}, 0.0), 50.0) == 13)) {
+    var nx: f32 = t.x;
+    var ny: f32 = t.y;
+    if ((nx < 0)) {
+      nx = (nx * ${p[20]});
+    }
+    if ((ny < 0)) {
+      ny = (ny * ${p[21]});
+    }
+    qquadxx += ((${w} * ${p[16]}) * nx);
+    qquadyy += ((${w} * ${p[16]}) * ny);
+  } else if ((min(max(${p[15]}, 0.0), 50.0) == 14)) {
+    var x2y2: f32 = ((t.x * t.x) + (t.y * t.y));
+    var t_: f32 = (x2y2 + ${p[21]});
+    var x2: f32 = (2 * t.x);
+    var ps: f32 = (-(PI * 0.5) * ${p[20]});
+    var yb: f32 = ((0.5 * atan2j((2.0 * t.y), (x2y2 - 1.0))) + ps);
+    if ((yb > (PI * 0.5))) {
+      yb = (-(PI * 0.5) + ((yb + (PI * 0.5)) % PI));
+    } else if ((yb < -(PI * 0.5))) {
+      yb = ((PI * 0.5) - (((PI * 0.5) - yb) % PI));
+    }
+    var f: f32 = (t_ + x2);
+    var g: f32 = (t_ - x2);
+    if (((g == 0) || ((f / g) <= 0))) {
+      break;
+    }
+    qquadxx += ((((${w} * ${p[16]}) * 0.25) * (2.0 / PI)) * log(((t_ + x2) / (t_ - x2))));
+    qquadyy += (((${w} * ${p[16]}) * (2.0 / PI)) * yb);
+  } else if ((min(max(${p[15]}, 0.0), 50.0) == 15)) {
+    var a: f32 = atan2j(t.x, t.y);
+    var r_: f32 = sqrt(((t.x * t.x) + (t.y * t.y)));
+    r_ = (r_ * (${p[20]} + ((${p[21]} - ${p[20]}) * (0.5 + (0.5 * sin((6 * a)))))));
+    var nx: f32 = (sin(a) * r_);
+    var ny: f32 = (cos(a) * r_);
+    qquadxx += ((${w} * ${p[16]}) * nx);
+    qquadyy += ((${w} * ${p[16]}) * ny);
+  } else if ((min(max(${p[15]}, 0.0), 50.0) == 16)) {
+    var wx: f32 = ((${w} * ${p[16]}) * ${p[20]});
+    var y2: f32 = (t.y * ${p[21]});
+    var r_: f32 = (wx * sqrt((abs((t.y * t.x)) / ((1.0e-30 + (t.x * t.x)) + (y2 * y2)))));
+    qquadxx += (r_ * t.x);
+    qquadyy += (r_ * y2);
+  } else if ((min(max(${p[15]}, 0.0), 50.0) == 17)) {
+    var aaa: f32 = atan2j(t.y, t.x);
+    var r_: f32 = ((${w} * ${p[16]}) * sqrt((sqr(t.x) + sqr(t.y))));
+    var alt: i32;
+    if ((aaa >= 0.0)) {
+      alt = i32((aaa * ll_kn_pi));
+      if (((alt % 2) == 0)) {
+        aaa = ((f32(alt) * ll_pi_kn) + ((ll_ka_kn + aaa) % ll_pi_kn));
+      } else {
+        aaa = ((f32(alt) * ll_pi_kn) + ((-ll_ka_kn + aaa) % ll_pi_kn));
+      }
+    } else {
+      alt = i32((-aaa * ll_kn_pi));
+      if (((alt % 2) != 0)) {
+        aaa = -((f32(alt) * ll_pi_kn) + ((-ll_ka_kn - aaa) % ll_pi_kn));
+      } else {
+        aaa = -((f32(alt) * ll_pi_kn) + ((ll_ka_kn - aaa) % ll_pi_kn));
+      }
+    }
+    var s: f32 = sin(aaa);
+    var c: f32 = cos(aaa);
+    qquadxx += (r_ * c);
+    qquadyy += (r_ * s);
+  } else if ((min(max(${p[15]}, 0.0), 50.0) == 18)) {
+    var a: f32 = ph;
+    var lnr: f32 = (0.5 * log(r2));
+    var va: f32 = ((2.0 * PI) / 2);
+    var vc: f32 = (${p[20]} / 2);
+    var vd: f32 = (${p[21]} / 2);
+    var ang: f32 = (((vc * a) + (vd * lnr)) + (va * floor((2 * rnd(rs)))));
+    var m: f32 = ((${w} * ${p[16]}) * exp(((vc * lnr) - (vd * a))));
+    var sa: f32 = sin(ang);
+    var ca: f32 = cos(ang);
+    qquadxx += (m * ca);
+    qquadyy += (m * sa);
+  } else if ((min(max(${p[15]}, 0.0), 50.0) == 19)) {
+    var re: f32 = ((1 + (${p[20]} * t.x)) + (${p[21]} * (sqr(t.x) - sqr(t.y))));
+    var im: f32 = ((${p[20]} * t.y) + (((${p[21]} * 2) * t.x) * t.y));
+    var r_: f32 = ((${w} * ${p[16]}) / (sqr(re) + sqr(im)));
+    qquadxx += (((t.x * re) + (t.y * im)) * r_);
+    qquadyy += (((t.y * re) - (t.x * im)) * r_);
+  } else if ((min(max(${p[15]}, 0.0), 50.0) == 20)) {
+    var xx: f32 = t.x;
+    var yy: f32 = t.y;
+    var r2_: f32 = (1.0 / ((xx * xx) + (yy * yy)));
+    var r_: f32 = (powc(((xx * xx) + (((r2_ * 1) * yy) * yy)), ${p[21]}) - powc(((yy * yy) + (((r2_ * 2) * xx) * xx)), ${p[21]}));
+    if ((r_ > 100)) {
+      r_ = 100;
+    } else if ((r_ < -0.24)) {
+      r_ = -0.24;
+    }
+    r_ = (${p[20]} * r_);
+    qquadxx += ((${p[16]} * xx) * (1 + r_));
+    qquadyy += ((${p[16]} * yy) * (1 + r_));
+  } else if ((min(max(${p[15]}, 0.0), 50.0) == 21)) {
+    var rPI: f32 = ((PI * sqrt(((t.x * t.x) + (t.y * t.y)))) * ${p[20]});
+    var sinr: f32 = sin(rPI);
+    var cosr: f32 = cos(rPI);
+    var r_: f32 = (((${w} * ${p[16]}) * th) / PI);
+    qquadxx += (sinr * r_);
+    qquadyy += (cosr * r_);
+  } else if ((min(max(${p[15]}, 0.0), 50.0) == 22)) {
+    var tmp: f32 = (((t.y * t.y) + (t.x * t.x)) + 1.0);
+    var tmp2: f32 = (2.0 * t.x);
+    var xmax: f32 = ((quad_sqrt_safe((tmp + tmp2)) + quad_sqrt_safe((tmp - tmp2))) * 0.5);
+    var sinnu: f32;
+    var cosnu: f32;
+    var alt: i32;
+    if ((xmax < 1.0)) {
+      xmax = 1.0;
+    }
+    var t_: f32 = (t.x / xmax);
+    if ((t_ > 1.0)) {
+      t_ = 1.0;
+    } else if ((t_ < -1.0)) {
+      t_ = -1.0;
+    }
+    var nu: f32 = acos(t_);
+    alt = i32((nu * ll_eCn_pi));
+    if (((alt % 2) == 0)) {
+      nu = ((f32(alt) * ll_pi_eCn) + ((nu + ll_eCa_eCn) % ll_pi_eCn));
+    } else {
+      nu = ((f32(alt) * ll_pi_eCn) + ((nu - ll_eCa_eCn) % ll_pi_eCn));
+    }
+    if ((t.y <= 0.0)) {
+      nu *= -1.0;
+    }
+    sinnu = sin(nu);
+    cosnu = cos(nu);
+    qquadxx += (((${w} * ${p[16]}) * xmax) * cosnu);
+    qquadyy += ((((${w} * ${p[16]}) * sqrt((xmax - 1.0))) * sqrt((xmax + 1.0))) * sinnu);
+  } else if ((min(max(${p[15]}, 0.0), 50.0) == 23)) {
+    var tmp: f32 = (r2 + 1.0);
+    var tmp2: f32 = (2.0 * t.x);
+    var r1: f32 = sqrt((tmp + tmp2));
+    var r2_: f32 = sqrt((tmp - tmp2));
+    var xmax: f32 = ((r1 + r2_) * 0.5);
+    var a1: f32 = log((xmax + sqrt((xmax - 1.0))));
+    var a2: f32 = -(acos((t.x / xmax)));
+    var w_: f32 = ((${w} * ${p[16]}) / 11.57034632);
+    var snv: f32 = sin(a1);
+    var csv: f32 = cos(a1);
+    var snhu: f32 = sinh(a2);
+    var cshu: f32 = cosh(a2);
+    if ((t.y > 0.0)) {
+      snv = -snv;
+    }
+    qquadxx += ((w_ * cshu) * csv);
+    qquadyy += ((w_ * snhu) * snv);
+  } else if ((min(max(${p[15]}, 0.0), 50.0) == 24)) {
+    var r2_: f32 = ((t.y * t.y) + (t.x * t.x));
+    var tmp2: f32;
+    var x: f32;
+    if ((ll_sign == 1)) {
+      x = t.x;
+    } else {
+      r2_ = (1.0 / r2_);
+      x = (t.x * r2_);
+    }
+    var tmp: f32 = (r2_ + 1.0);
+    tmp2 = (2.0 * x);
+    var xmax: f32 = ((quad_sqrt_safe((tmp + tmp2)) + quad_sqrt_safe((tmp - tmp2))) * 0.5);
+    if ((xmax < 1.0)) {
+      xmax = 1.0;
+    }
+    var sinhmu: f32;
+    var coshmu: f32;
+    var sinnu: f32;
+    var cosnu: f32;
+    var mu: f32 = acosh(xmax);
+    var t_: f32 = (x / xmax);
+    if ((t_ > 1.0)) {
+      t_ = 1.0;
+    } else if ((t_ < -1.0)) {
+      t_ = -1.0;
+    }
+    var nu: f32 = acos(t_);
+    if ((t.y < 0)) {
+      nu *= -1.0;
+    }
+    nu = ((nu / ${p[20]}) + (((2.0 * PI) / ${p[20]}) * floor((rnd(rs) * ${p[20]}))));
+    mu /= ${p[20]};
+    sinhmu = sinh(mu);
+    coshmu = cosh(mu);
+    sinnu = sin(nu);
+    cosnu = cos(nu);
+    qquadxx += (((${w} * ${p[16]}) * coshmu) * cosnu);
+    qquadyy += (((${w} * ${p[16]}) * sinhmu) * sinnu);
+  } else if ((min(max(${p[15]}, 0.0), 50.0) == 25)) {
+    var tmp: f32 = (((t.y * t.y) + (t.x * t.x)) + 1.0);
+    var tmp2: f32 = (2.0 * t.x);
+    var xmax: f32 = ((quad_sqrt_safe((tmp + tmp2)) + quad_sqrt_safe((tmp - tmp2))) * 0.5);
+    if ((xmax < 1.0)) {
+      xmax = 1.0;
+    }
+    var sinhmu: f32;
+    var coshmu: f32;
+    var mu: f32 = acosh(xmax);
+    var t_: f32 = (t.x / xmax);
+    if ((t_ > 1.0)) {
+      t_ = 1.0;
+    } else if ((t_ < -1.0)) {
+      t_ = -1.0;
+    }
+    var nu: f32 = acos(t_);
+    if ((t.y < 0)) {
+      nu *= -1.0;
+    }
+    if (((mu < ${p[20]}) && (-mu < ${p[20]}))) {
+      if ((nu > 0.0)) {
+        mu = ((((mu + ${p[20]}) + (${p[21]} * ${p[20]})) % (2.0 * ${p[20]})) - ${p[20]});
+      } else {
+        mu = ((((mu - ${p[20]}) - (${p[21]} * ${p[20]})) % (2.0 * ${p[20]})) + ${p[20]});
+      }
+    }
+    sinhmu = sinh(mu);
+    coshmu = cosh(mu);
+    qquadxx += (((${w} * ${p[16]}) * coshmu) * cos(nu));
+    qquadyy += (((${w} * ${p[16]}) * sinhmu) * sin(nu));
+  } else if ((min(max(${p[15]}, 0.0), 50.0) == 26)) {
+    if ((abs(t.y) <= ${w})) {
+      var c_2: f32 = sqrt((sqr(${w}) - sqr(t.y)));
+      if ((abs(t.x) <= c_2)) {
+        var x: f32 = (t.x + ((${p[20]} * ${w}) * ${p[16]}));
+        if ((abs(x) >= c_2)) {
+          qquadxx -= ((${w} * ${p[16]}) * t.x);
+        } else {
+          qquadxx += ((${w} * ${p[16]}) * x);
+        }
+      } else {
+        qquadxx += ((${w} * ${p[16]}) * t.x);
+      }
+      qquadyy += ((${w} * ${p[16]}) * t.y);
+    } else {
+      qquadxx += ((${w} * ${p[16]}) * t.x);
+      qquadyy += ((${w} * ${p[16]}) * t.y);
+    }
+  } else if ((min(max(${p[15]}, 0.0), 50.0) == 27)) {
+    var tmp: f32 = (((t.y * t.y) + (t.x * t.x)) + ${p[20]});
+    var x2: f32 = (2.0 * t.x);
+    var xmax: f32 = (0.5 * (sqrt((tmp + x2)) + sqrt((tmp - x2))));
+    var a: f32 = (t.x / xmax);
+    var b: f32 = quad_sqrt_safe_e((${p[21]} - (a * a)));
+    qquadxx += (ll_v * atan2j(a, b));
+    if ((rnd(rs) < 0.5)) {
+      qquadyy += (ll_v * log((xmax + quad_sqrt_safe_e((xmax - 1.0)))));
+    } else {
+      qquadyy -= (ll_v * log((xmax + quad_sqrt_safe_e((xmax - 1.0)))));
+    }
+  } else if ((min(max(${p[15]}, 0.0), 50.0) == 28)) {
+    var r_: f32 = sqrt(((t.x * t.x) + (t.y * t.y)));
+    var angle: f32;
+    if (((((t.x < -1.0e-30) || (t.x > 1.0e-30)) || (t.y < -1.0e-30)) || (t.y > 1.0e-30))) {
+      angle = atan2j(t.x, t.y);
+    } else {
+      angle = 0.0;
+    }
+    var dy: f32 = ${p[21]};
+    var dx: f32 = ((PI * (${p[20]} * ${p[20]})) + 1.0e-30);
+    var dx2: f32 = (dx * 0.5);
+    var t_: f32 = ((angle + dy) - (f32(i32(((angle + dy) / dx))) * dx));
+    var a: f32;
+    if ((t_ > dx2)) {
+      a = (angle - dx2);
+    } else {
+      a = (angle + dx2);
+    }
+    qquadxx += (((${w} * ${p[16]}) * r_) * sin(a));
+    qquadyy += (((${w} * ${p[16]}) * r_) * cos(a));
+  } else if ((min(max(${p[15]}, 0.0), 50.0) == 29)) {
+    var expx: f32 = (exp(t.x) * 0.5);
+    var expnx: f32 = (0.25 / expx);
+    if (((expx <= 1.0e-30) || (expnx <= 1.0e-30))) {
+      break;
+    }
+    var siny: f32 = sin(t.y);
+    var cosy: f32 = cos(t.y);
+    var tmp: f32 = ((expx + expnx) - cosy);
+    if ((tmp == 0)) {
+      break;
+    }
+    tmp = ((${w} * ${p[16]}) / tmp);
+    qquadxx += ((expx - expnx) * tmp);
+    qquadyy += (siny * tmp);
+  } else if ((min(max(${p[15]}, 0.0), 50.0) == 30)) {
+    var r_: f32 = sqrt((sqr(t.x) + sqr(t.y)));
+    var d: f32;
+    if ((r_ >= 1.0)) {
+      if ((rnd(rs) > 0.5)) {
+        d = sqrt((r_ + t.x));
+        if ((d == 0)) {
+          break;
+        }
+        qquadxx += (ll_vvar2 * d);
+        qquadyy -= ((ll_vvar2 / d) * t.y);
+      } else {
+        d = (r_ + t.x);
+        var dx: f32 = sqrt((r_ * (sqr(t.y) + sqr(d))));
+        if ((dx == 0)) {
+          break;
+        }
+        r_ = ((${w} * ${p[16]}) / dx);
+        qquadxx += (r_ * d);
+        qquadyy += (r_ * t.y);
+      }
+    } else {
+      if ((rnd(rs) > 0.5)) {
+        d = sqrt((r_ + t.x));
+        if ((d == 0)) {
+          break;
+        }
+        qquadxx -= (ll_vvar2 * d);
+        qquadyy -= ((ll_vvar2 / d) * t.y);
+      } else {
+        d = (r_ + t.x);
+        var dx: f32 = sqrt((r_ * (sqr(t.y) + sqr(d))));
+        if ((dx == 0)) {
+          break;
+        }
+        r_ = ((${w} * ${p[16]}) / dx);
+        qquadxx -= (r_ * d);
+        qquadyy += (r_ * t.y);
+      }
+    }
+  } else if ((min(max(${p[15]}, 0.0), 50.0) == 31)) {
+    var alpha: f32 = atan2j(t.y, t.x);
+    var delta: f32 = powc(((alpha / PI) + 1.0), ${p[20]});
+    var r_: f32;
+    if ((${p[21]} != 0)) {
+      r_ = (((${w} * ${p[16]}) * delta) / (((t.x * t.x) + (t.y * t.y)) + delta));
+    } else {
+      r_ = ((${w} * ${p[16]}) * sqrt((((t.x * t.x) + (t.y * t.y)) + delta)));
+    }
+    var s: f32 = sin(alpha);
+    var c: f32 = cos(alpha);
+    qquadxx += (r_ * c);
+    qquadyy += (r_ * s);
+  } else if ((min(max(${p[15]}, 0.0), 50.0) == 32)) {
+    var a: f32 = (PI / (sqrt((sqr(t.x) + sqr(t.y))) + 1.0));
+    var r_: f32 = (atan2j(t.y, t.x) * ll_v_idisc);
+    sina.value = sin(a);
+    cosa.value = cos(a);
+    qquadxx += (r_ * cosa.value);
+    qquadyy += (r_ * sina.value);
+  } else if ((min(max(${p[15]}, 0.0), 50.0) == 33)) {
+    var a: f32 = ((atan2j(t.y, t.x) + ((2 * PI) * f32(i32((rnd(rs) * f32(ll_absPower_julian)))))) / ${p[20]});
+    var sina: f32 = sin(a);
+    var cosa: f32 = cos(a);
+    var r_: f32 = ((${w} * ${p[16]}) * powc((sqr(t.x) + sqr(t.y)), ll_cPower_julian));
+    qquadxx = (qquadxx + (r_ * cosa));
+    qquadyy = (qquadyy + (r_ * sina));
+  } else if ((min(max(${p[15]}, 0.0), 50.0) == 34)) {
+    if ((${p[20]} != 0.0)) {
+      var nr: f32 = f32(i32(floor((t.x * ${p[20]}))));
+      if ((nr >= 0)) {
+        if (((nr % 2) == 1)) {
+          t.x = -t.x;
+        }
+      } else {
+        if (((nr % 2) == 0)) {
+          t.x = -t.x;
+        }
+      }
+    }
+    if ((${p[21]} != 0.0)) {
+      var nr: f32 = f32(i32(floor((t.y * ${p[21]}))));
+      if ((nr >= 0)) {
+        if (((nr % 2) == 1)) {
+          t.y = -t.y;
+        }
+      } else {
+        if (((nr % 2) == 0)) {
+          t.y = -t.y;
+        }
+      }
+    }
+    qquadxx += ((${w} * ${p[16]}) * t.x);
+    qquadyy += ((${w} * ${p[16]}) * t.y);
+  } else if ((min(max(${p[15]}, 0.0), 50.0) == 35)) {
+    var x: f32 = 0.0;
+    var y: f32 = 0.0;
+    var xx: f32 = (t.x - x);
+    var yy: f32 = (t.y + y);
+    var rr: f32 = sqrt(((xx * xx) + (yy * yy)));
+    if ((rr < ${w})) {
+      var a: f32 = ((atan2j(yy, xx) + ${p[21]}) + (${p[20]} * ((${w} * ${p[16]}) - rr)));
+      var sina: f32 = sin(a);
+      var cosa: f32 = cos(a);
+      rr = ((${w} * ${p[16]}) * rr);
+      qquadxx += ((rr * cosa) + x);
+      qquadyy += ((rr * sina) - y);
+    } else {
+      rr = ((${w} * ${p[16]}) * (1.0 + (0.0 / rr)));
+      qquadxx += ((rr * xx) + x);
+      qquadyy += ((rr * yy) - y);
+    }
+  } else if ((min(max(${p[15]}, 0.0), 50.0) == 36)) {
+    var _p2: f32;
+    var _invp: f32;
+    var _vp: f32;
+    var _sina: f32;
+    var _cosa: f32;
+    var _a: f32;
+    var _r: f32;
+    var _re: f32;
+    var _im: f32;
+    var _rl: f32;
+    _p2 = (${p[21]} / 2.0);
+    if ((${p[21]} != 0)) {
+      _invp = (1.0 / ${p[21]});
+      if ((${p[20]} == -1)) {
+        _vp = 0;
+      } else {
+        _vp = ((${w} * ${p[16]}) * powc((${p[20]} + 1), (2.0 / ${p[21]})));
+      }
+    } else {
+      _invp = 100000000000.0;
+      _vp = ((${w} * ${p[16]}) * powc((${p[20]} + 1), 4));
+    }
+    _a = (atan2j(t.y, t.x) * ${p[21]});
+    _sina = sin(_a);
+    _cosa = cos(_a);
+    _r = (${p[20]} * powc((sqr(t.x) + sqr(t.y)), _p2));
+    _re = ((_r * _cosa) + 1);
+    _im = (_r * _sina);
+    _r = powc((sqr(_re) + sqr(_im)), _invp);
+    _a = ((atan2j(_im, _re) * 2.0) * _invp);
+    _re = (_r * cos(_a));
+    _im = (_r * sin(_a));
+    _rl = (_vp / sqr(_r));
+    qquadxx += (_rl * ((t.x * _re) + (t.y * _im)));
+    qquadyy += (_rl * ((t.y * _re) - (t.x * _im)));
+  } else if ((min(max(${p[15]}, 0.0), 50.0) == 37)) {
+    var r_: f32;
+    var a: f32;
+    var ta: f32;
+    var xo: f32;
+    var ro: f32;
+    var c: f32;
+    var s: f32;
+    var x: f32;
+    var y: f32;
+    var tc: f32;
+    var ts: f32;
+    var theta: f32;
+    r_ = (sqr(t.x) + sqr(t.y));
+    if ((r_ < 1.0)) {
+      if ((t.x >= 0.0)) {
+        xo = ((r_ + 1.0) / (2.0 * t.x));
+        ro = sqrt((sqr((t.x - xo)) + sqr(t.y)));
+        theta = atan2j(1.0, ro);
+        a = (((((${p[20]} * theta) + atan2j(t.y, (xo - t.x))) + theta) % (2.0 * theta)) - theta);
+        s = sin(a);
+        c = cos(a);
+        qquadxx += ((${w} * ${p[16]}) * (xo - (c * ro)));
+        qquadyy += (((${w} * ${p[16]}) * s) * ro);
+      } else {
+        xo = (-(r_ + 1.0) / (2.0 * t.x));
+        ro = sqrt((sqr((-t.x - xo)) + sqr(t.y)));
+        theta = atan2j(1.0, ro);
+        a = (((((${p[20]} * theta) + atan2j(t.y, (xo + t.x))) + theta) % (2.0 * theta)) - theta);
+        s = sin(a);
+        c = cos(a);
+        qquadxx -= ((${w} * ${p[16]}) * (xo - (c * ro)));
+        qquadyy += (((${w} * ${p[16]}) * s) * ro);
+      }
+    } else {
+      r_ = (1.0 / sqrt(r_));
+      ta = atan2j(t.y, t.x);
+      ts = sin(ta);
+      tc = cos(ta);
+      x = (r_ * tc);
+      y = (r_ * ts);
+      if ((x >= 0.0)) {
+        xo = (((sqr(x) + sqr(y)) + 1.0) / (2.0 * x));
+        ro = sqrt((sqr((x - xo)) + sqr(y)));
+        theta = atan2j(1.0, ro);
+        a = (((((${p[21]} * theta) + atan2j(y, (xo - x))) + theta) % (2.0 * theta)) - theta);
+        s = sin(a);
+        c = cos(a);
+        x = (xo - (c * ro));
+        y = (s * ro);
+        ta = atan2j(y, x);
+        ts = sin(ta);
+        tc = cos(ta);
+        r_ = (1.0 / sqrt((sqr(x) + sqr(y))));
+        qquadxx += (((${w} * ${p[16]}) * r_) * tc);
+        qquadyy += (((${w} * ${p[16]}) * r_) * ts);
+      } else {
+        xo = (-((sqr(x) + sqr(y)) + 1.0) / (2.0 * x));
+        ro = sqrt((sqr((-x - xo)) + sqr(y)));
+        theta = atan2j(1.0, ro);
+        a = (((((${p[21]} * theta) + atan2j(y, (xo + x))) + theta) % (2.0 * theta)) - theta);
+        s = sin(a);
+        c = cos(a);
+        x = (xo - (c * ro));
+        y = (s * ro);
+        ta = atan2j(y, x);
+        ts = sin(ta);
+        tc = cos(ta);
+        r_ = (1.0 / sqrt((sqr(x) + sqr(y))));
+        qquadxx -= (((${w} * ${p[16]}) * r_) * tc);
+        qquadyy += (((${w} * ${p[16]}) * r_) * ts);
+      }
+    }
+  } else if ((min(max(${p[15]}, 0.0), 50.0) == 38)) {
+    if ((abs(${p[20]}) < 1.0e-9)) {
+      qquadxx += ((${w} * ${p[16]}) * t.x);
+    } else {
+      qquadxx += ((${w} * ${p[16]}) * ((((2 * floor((t.x / ${p[20]}))) + 1) * ${p[20]}) - t.x));
+    }
+    if ((abs(${p[21]}) < 1.0e-9)) {
+      qquadyy += ((${w} * ${p[16]}) * t.y);
+    } else {
+      qquadyy += ((${w} * ${p[16]}) * ((((2 * floor((t.y / ${p[21]}))) + 1) * ${p[21]}) - t.y));
+    }
+  } else if ((min(max(${p[15]}, 0.0), 50.0) == 39)) {
+    qquadxx += ((${w} * ${p[16]}) * sin(t.x));
+    qquadyy += ((${w} * ${p[16]}) * sin(t.y));
+  } else if ((min(max(${p[15]}, 0.0), 50.0) == 40)) {
+    var R: f32 = powc(sqrt((sqr(t.x) + sqr(t.y))), ${p[21]});
+    var N: i32 = i32(floor((${p[20]} * rnd(rs))));
+    var alpha: f32 = (atan2j(t.y, t.x) + ((f32(N) * (2.0 * PI)) / floor(${p[20]})));
+    var sina: f32 = sin(alpha);
+    var cosa: f32 = cos(alpha);
+    if ((R > 1.0e-30)) {
+      qquadxx += (((${w} * ${p[16]}) * cosa) / R);
+      qquadyy += (((${w} * ${p[16]}) * sina) / R);
+    }
+  } else if ((min(max(${p[15]}, 0.0), 50.0) == 41)) {
+    qquadxx += ((${w} * ${p[16]}) * (t.x + (${p[20]} * sin((t.y * ${p[21]})))));
+    qquadyy += ((${w} * ${p[16]}) * (t.y + (${p[20]} * sin((t.x * ${p[21]})))));
+  } else if ((min(max(${p[15]}, 0.0), 50.0) == 42)) {
+    var x0: f32 = t.x;
+    var y0: f32 = t.y;
+    var modex: i32 = 0;
+    var modey: i32 = 0;
+    var sinx: f32;
+    var siny: f32;
+    var px: i32 = i32(2.0);
+    var py: i32 = i32(2.0);
+    if ((f32(modex) < 0.5)) {
+      sinx = sin((y0 * ${p[21]}));
+    } else {
+      sinx = (0.5 * (1.0 + sin((y0 * ${p[21]}))));
+    }
+    var offsetx: f32 = (powc(sinx, f32(px)) * ${p[20]});
+    if ((f32(modey) < 0.5)) {
+      siny = sin((x0 * ${p[21]}));
+    } else {
+      siny = (0.5 * (1.0 + sin((x0 * ${p[21]}))));
+    }
+    var offsety: f32 = (powc(siny, f32(py)) * ${p[20]});
+    qquadxx += ((${w} * ${p[16]}) * (x0 + offsetx));
+    qquadyy += ((${w} * ${p[16]}) * (y0 + offsety));
+  } else if ((min(max(${p[15]}, 0.0), 50.0) == 43)) {
+    var x0: f32 = t.x;
+    var y0: f32 = t.y;
+    var mx: f32 = ((y0 * ${p[21]}) * (0.5 / PI));
+    var fx: f32 = (mx - floor(mx));
+    if ((fx > 0.5)) {
+      fx = (0.5 - fx);
+    }
+    var my: f32 = ((x0 * ${p[21]}) * (0.5 / PI));
+    var fy: f32 = (my - floor(my));
+    if ((fy > 0.5)) {
+      fy = (0.5 - fy);
+    }
+    qquadxx += ((${w} * ${p[16]}) * (x0 + (fx * ${p[20]})));
+    qquadyy += ((${w} * ${p[16]}) * (y0 + (fy * ${p[20]})));
+  } else if ((min(max(${p[15]}, 0.0), 50.0) == 44)) {
+    var x0: f32 = t.x;
+    var y0: f32 = t.y;
+    var scalexx: f32 = ((0.5 * ${p[20]}) * (1.0 + sin((y0 * 0.0))));
+    var scaleyy: f32 = ((0.5 * ${p[20]}) * (1.0 + sin((x0 * 2.0))));
+    qquadxx += ((${w} * ${p[16]}) * (x0 + (sin((y0 * ${p[21]})) * scalexx)));
+    qquadyy += ((${w} * ${p[16]}) * (y0 + (sin((x0 * ${p[21]})) * scaleyy)));
+  } else if ((min(max(${p[15]}, 0.0), 50.0) == 45)) {
+    var x0: f32 = t.x;
+    var y0: f32 = t.y;
+    var ax: f32 = floor(((y0 * ${p[21]}) / (2.0 * PI)));
+    ax = (sin(((((ax * 12.9898) + (ax * 78.233)) + 1.0) + ((y0 * 0.001) * 0.1))) * 43758.5453);
+    ax = (ax - f32(i32(ax)));
+    qquadxx += ((${w} * ${p[16]}) * (x0 + (((sin((y0 * ${p[21]})) * ax) * ax) * ${p[20]})));
+    qquadyy += ((${w} * ${p[16]}) * (y0 + (sin((x0 * ${p[21]})) * ${p[20]})));
+  } else if ((min(max(${p[15]}, 0.0), 50.0) == 46)) {
+    var x0: f32 = t.x;
+    var y0: f32 = t.y;
+    var ax: f32 = floor((y0 * ${p[21]}));
+    ax = (sin(((((ax * 12.9898) + (ax * 78.233)) + 1.0) + ((y0 * 0.001) * 0.1))) * 43758.5453);
+    ax = (ax - f32(i32(ax)));
+    qquadxx += ((${w} * ${p[16]}) * (x0 + (((sin((y0 * ${p[21]})) * ax) * ax) * ${p[20]})));
+    qquadyy += ((${w} * ${p[16]}) * (y0 + (sin((x0 * ${p[21]})) * ${p[20]})));
+  } else if ((min(max(${p[15]}, 0.0), 50.0) == 47)) {
+    var a: f32 = (PI / (sqrt((sqr(t.x) + sqr(t.y))) + ${p[20]}));
+    var r_: f32 = (atan2j(t.y, t.x) * (1.0 / PI));
+    if ((r_ > 0.0)) {
+      a = (PI - a);
+    }
+    sina.value = sin(a);
+    cosa.value = cos(a);
+    qquadxx += (((${w} * ${p[16]}) * r_) * cosa.value);
+    qquadyy += (((${w} * ${p[16]}) * r_) * sina.value);
+  } else if ((min(max(${p[15]}, 0.0), 50.0) == 48)) {
+    var r_: f32 = r;
+    var a: f32;
+    if ((r_ < ${w})) {
+      a = (ph + (${p[20]} / (${w} - r_)));
+    } else {
+      a = (ph + (${p[21]} / (${w} - r_)));
+    }
+    var sa: f32 = sin(a);
+    var ca: f32 = cos(a);
+    qquadxx += (((${w} * ${p[16]}) * r_) * ca);
+    qquadyy += (((${w} * ${p[16]}) * r_) * sa);
+  }
+  count += 1;
+}
+if (((t.x < ${p[3]}) && (t.y < ${p[4]}))) {
+  if ((min(max(${p[1]}, 0.0), 50.0) == 0)) {
+    qquadxx += ((${w} * ${p[2]}) * t.x);
+    qquadyy += ((${w} * ${p[2]}) * t.y);
+  } else if ((min(max(${p[1]}, 0.0), 50.0) == 1)) {
+    var r_: f32 = ((${w} * ${p[2]}) / ((((t.x * t.x) * ${p[6]}) + ((t.y * t.y) * ${p[7]})) + 1.0e-30));
+    qquadxx += (t.x * r_);
+    qquadyy += (t.y * r_);
+  } else if ((min(max(${p[1]}, 0.0), 50.0) == 2)) {
+    var z: jcx_ = jcx_make(t.x, t.y);
+    jcx_AcosecH(&(z));
+    jcx_Flip(&(z));
+    jcx_Scale(&(z), ((${w} * ${p[2]}) * (2.0 / PI)));
+    if ((rnd(rs) < 0.5)) {
+      qquadyy += z.im;
+      qquadxx += z.re;
+    } else {
+      qquadyy += -z.im;
+      qquadxx += -z.re;
+    }
+  } else if ((min(max(${p[1]}, 0.0), 50.0) == 3)) {
+    var z: jcx_ = jcx_make(t.x, t.y);
+    jcx_AcosH(&(z));
+    jcx_Scale(&(z), ((${w} * ${p[2]}) * (2.0 / PI)));
+    if ((rnd(rs) < 0.5)) {
+      qquadyy += z.im;
+      qquadxx += z.re;
+    } else {
+      qquadyy += -z.im;
+      qquadxx += -z.re;
+    }
+  } else if ((min(max(${p[1]}, 0.0), 50.0) == 4)) {
+    var z: jcx_ = jcx_make(t.x, t.y);
+    jcx_AcotH(&(z));
+    jcx_Flip(&(z));
+    jcx_Scale(&(z), ((${w} * ${p[2]}) * (2.0 / PI)));
+    qquadyy += z.im;
+    qquadxx += z.re;
+  } else if ((min(max(${p[1]}, 0.0), 50.0) == 5)) {
+    var xxx: f32;
+    var yyy: f32;
+    var a0: f32;
+    var b0: f32;
+    var f1x: f32;
+    var f1y: f32;
+    var r_: f32 = sqrt(3.0);
+    a0 = (((3.0 * ((1.0 + r_) - t.x)) / (powc(((1.0 + r_) - t.x), 2.0) + (t.y * t.y))) - ((1.0 + r_) / (2.0 + r_)));
+    b0 = ((3.0 * t.y) / (powc(((1.0 + r_) - t.x), 2.0) + (t.y * t.y)));
+    f1x = (a0 / ((a0 * a0) + (b0 * b0)));
+    f1y = (-b0 / ((a0 * a0) + (b0 * b0)));
+    var w_: i32 = i32((4.0 * rnd(rs)));
+    if (((w_ % 3) == 0)) {
+      xxx = a0;
+      yyy = b0;
+    } else if (((w_ % 3) == 1)) {
+      xxx = ((-f1x / 2.0) - ((f1y * r_) / 2.0));
+      yyy = (((f1x * r_) / 2.0) - (f1y / 2.0));
+    } else {
+      xxx = ((-f1x / 2.0) + ((f1y * r_) / 2.0));
+      yyy = (((-f1x * r_) / 2.0) - (f1y / 2.0));
+    }
+    qquadxx += ((xxx * ${w}) * ${p[2]});
+    qquadyy += ((yyy * ${w}) * ${p[2]});
+  } else if ((min(max(${p[1]}, 0.0), 50.0) == 6)) {
+    var z: jcx_ = jcx_make(t.x, t.y);
+    jcx_AsinH(&(z));
+    jcx_Scale(&(z), ((${w} * ${p[2]}) * (2.0 / PI)));
+    qquadyy += z.im;
+    qquadxx += z.re;
+  } else if ((min(max(${p[1]}, 0.0), 50.0) == 7)) {
+    var z: jcx_ = jcx_make(t.x, t.y);
+    var z2: jcx_ = jcx_make_ov2(z);
+    jcx_Scale(&(z2), -1.0);
+    jcx_Inc(&(z2));
+    var z3: jcx_ = jcx_make_ov2(z);
+    jcx_Inc(&(z3));
+    jcx_Div(&(z3), z2);
+    jcx_Log(&(z3));
+    jcx_Scale(&(z3), ((${w} * ${p[2]}) * (2.0 / PI)));
+    qquadxx += z3.re;
+    qquadyy += z3.im;
+  } else if ((min(max(${p[1]}, 0.0), 50.0) == 8)) {
+    var norm: f32 = (((1.0 / (PI * 0.5)) * ${w}) * ${p[2]});
+    qquadxx += (norm * atan((${p[6]} * t.x)));
+    qquadyy += (norm * atan((${p[7]} * t.y)));
+  } else if ((min(max(${p[1]}, 0.0), 50.0) == 9)) {
+    var tau: f32;
+    var sigma: f32;
+    var temp: f32;
+    var cosht: f32;
+    var sinht: f32;
+    var sins: f32;
+    var coss: f32;
+    var alt: i32;
+    tau = (0.5 * (log((sqr((t.x + 1.0)) + sqr(t.y))) - log((sqr((t.x - 1.0)) + sqr(t.y)))));
+    sigma = ((PI - atan2j(t.y, (t.x + 1.0))) - atan2j(t.y, (1.0 - t.x)));
+    alt = i32((sigma * ul_bCn_pi));
+    if (((alt % 2) == 0)) {
+      sigma = ((f32(alt) * ul_pi_bCn) + ((sigma + ul_bCa_bCn) % ul_pi_bCn));
+    } else {
+      sigma = ((f32(alt) * ul_pi_bCn) + ((sigma - ul_bCa_bCn) % ul_pi_bCn));
+    }
+    sinht = sinh(tau);
+    cosht = cosh(tau);
+    sins = sin(sigma);
+    coss = cos(sigma);
+    temp = (cosht - coss);
+    qquadxx += (((${w} * ${p[2]}) * sinht) / temp);
+    qquadyy += (((${w} * ${p[2]}) * sins) / temp);
+  } else if ((min(max(${p[1]}, 0.0), 50.0) == 10)) {
+    var tau: f32;
+    var sigma: f32;
+    var temp: f32;
+    var cosht: f32;
+    var sinht: f32;
+    var sins: f32;
+    var coss: f32;
+    tau = (0.5 * (log((sqr((t.x + 1.0)) + sqr(t.y))) - log((sqr((t.x - 1.0)) + sqr(t.y)))));
+    sigma = ((PI - atan2j(t.y, (t.x + 1.0))) - atan2j(t.y, (1.0 - t.x)));
+    if (((tau < ${p[6]}) && (-tau < ${p[6]}))) {
+      tau = ((((tau + ${p[6]}) + (${p[7]} * ${p[6]})) % (2.0 * ${p[6]})) - ${p[6]});
+    }
+    sinht = sinh(tau);
+    cosht = cosh(tau);
+    sins = sin(sigma);
+    coss = cos(sigma);
+    temp = (cosht - coss);
+    if ((temp == 0)) {
+      break;
+    }
+    qquadxx += (((${w} * ${p[2]}) * sinht) / temp);
+    qquadyy += (((${w} * ${p[2]}) * sins) / temp);
+  } else if ((min(max(${p[1]}, 0.0), 50.0) == 11)) {
+    var tau: f32;
+    var sigma: f32;
+    var temp: f32;
+    var cosht: f32;
+    var sinht: f32;
+    var sins: f32;
+    var coss: f32;
+    tau = (0.5 * (log((sqr((t.x + 1.0)) + sqr(t.y))) - log((sqr((t.x - 1.0)) + sqr(t.y)))));
+    sigma = ((PI - atan2j(t.y, (t.x + 1.0))) - atan2j(t.y, (1.0 - t.x)));
+    sigma = ((sigma + (tau * ${p[7]})) + (${p[6]} / tau));
+    sinht = sinh(tau);
+    cosht = cosh(tau);
+    sins = sin(sigma);
+    coss = cos(sigma);
+    temp = (cosht - coss);
+    if ((temp == 0)) {
+      break;
+    }
+    qquadxx += (((${w} * ${p[2]}) * sinht) / temp);
+    qquadyy += (((${w} * ${p[2]}) * sins) / temp);
+  } else if ((min(max(${p[1]}, 0.0), 50.0) == 12)) {
+    var tau: f32;
+    var sigma: f32;
+    var temp: f32;
+    var cosht: f32;
+    var sinht: f32;
+    var sins: f32;
+    var coss: f32;
+    tau = (((0.5 * (log((sqr((t.x + 1.0)) + sqr(t.y))) - log((sqr((t.x - 1.0)) + sqr(t.y))))) / ${p[6]}) + 0);
+    sigma = (((PI - atan2j(t.y, (t.x + 1.0))) - atan2j(t.y, (1.0 - t.x))) + 0);
+    sigma = ((sigma / ${p[6]}) + (((2.0 * PI) / ${p[6]}) * floor((rnd(rs) * ${p[6]}))));
+    if ((t.x >= 0.0)) {
+      tau += ${p[7]};
+    } else {
+      tau -= ${p[7]};
+    }
+    sinht = sinh(tau);
+    cosht = cosh(tau);
+    sins = sin(sigma);
+    coss = cos(sigma);
+    temp = (cosht - coss);
+    qquadxx += (((${w} * ${p[2]}) * sinht) / temp);
+    qquadyy += (((${w} * ${p[2]}) * sins) / temp);
+  } else if ((min(max(${p[1]}, 0.0), 50.0) == 13)) {
+    var nx: f32 = t.x;
+    var ny: f32 = t.y;
+    if ((nx < 0)) {
+      nx = (nx * ${p[6]});
+    }
+    if ((ny < 0)) {
+      ny = (ny * ${p[7]});
+    }
+    qquadxx += ((${w} * ${p[2]}) * nx);
+    qquadyy += ((${w} * ${p[2]}) * ny);
+  } else if ((min(max(${p[1]}, 0.0), 50.0) == 14)) {
+    var x2y2: f32 = ((t.x * t.x) + (t.y * t.y));
+    var t_: f32 = (x2y2 + ${p[7]});
+    var x2: f32 = (2 * t.x);
+    var ps: f32 = (-(PI * 0.5) * ${p[6]});
+    var yb: f32 = ((0.5 * atan2j((2.0 * t.y), (x2y2 - 1.0))) + ps);
+    if ((yb > (PI * 0.5))) {
+      yb = (-(PI * 0.5) + ((yb + (PI * 0.5)) % PI));
+    } else if ((yb < -(PI * 0.5))) {
+      yb = ((PI * 0.5) - (((PI * 0.5) - yb) % PI));
+    }
+    var f: f32 = (t_ + x2);
+    var g: f32 = (t_ - x2);
+    if (((g == 0) || ((f / g) <= 0))) {
+      break;
+    }
+    qquadxx += ((((${w} * ${p[2]}) * 0.25) * (2.0 / PI)) * log(((t_ + x2) / (t_ - x2))));
+    qquadyy += (((${w} * ${p[2]}) * (2.0 / PI)) * yb);
+  } else if ((min(max(${p[1]}, 0.0), 50.0) == 15)) {
+    var a: f32 = atan2j(t.x, t.y);
+    var r_: f32 = sqrt(((t.x * t.x) + (t.y * t.y)));
+    r_ = (r_ * (${p[6]} + ((${p[7]} - ${p[6]}) * (0.5 + (0.5 * sin((6 * a)))))));
+    var nx: f32 = (sin(a) * r_);
+    var ny: f32 = (cos(a) * r_);
+    qquadxx += ((${w} * ${p[2]}) * nx);
+    qquadyy += ((${w} * ${p[2]}) * ny);
+  } else if ((min(max(${p[1]}, 0.0), 50.0) == 16)) {
+    var wx: f32 = ((${w} * ${p[2]}) * ${p[6]});
+    var y2: f32 = (t.y * ${p[7]});
+    var r_: f32 = (wx * sqrt((abs((t.y * t.x)) / ((1.0e-30 + (t.x * t.x)) + (y2 * y2)))));
+    qquadxx += (r_ * t.x);
+    qquadyy += (r_ * y2);
+  } else if ((min(max(${p[1]}, 0.0), 50.0) == 17)) {
+    var aaa: f32 = atan2j(t.y, t.x);
+    var r_: f32 = ((${w} * ${p[2]}) * sqrt((sqr(t.x) + sqr(t.y))));
+    var alt: i32;
+    if ((aaa >= 0.0)) {
+      alt = i32((aaa * ul_kn_pi));
+      if (((alt % 2) == 0)) {
+        aaa = ((f32(alt) * ul_pi_kn) + ((ul_ka_kn + aaa) % ul_pi_kn));
+      } else {
+        aaa = ((f32(alt) * ul_pi_kn) + ((-ul_ka_kn + aaa) % ul_pi_kn));
+      }
+    } else {
+      alt = i32((-aaa * ul_kn_pi));
+      if (((alt % 2) != 0)) {
+        aaa = -((f32(alt) * ul_pi_kn) + ((-ul_ka_kn - aaa) % ul_pi_kn));
+      } else {
+        aaa = -((f32(alt) * ul_pi_kn) + ((ul_ka_kn - aaa) % ul_pi_kn));
+      }
+    }
+    var s: f32 = sin(aaa);
+    var c: f32 = cos(aaa);
+    qquadxx += (r_ * c);
+    qquadyy += (r_ * s);
+  } else if ((min(max(${p[1]}, 0.0), 50.0) == 18)) {
+    var a: f32 = ph;
+    var lnr: f32 = (0.5 * log(r2));
+    var va: f32 = ((2.0 * PI) / 2);
+    var vc: f32 = (${p[6]} / 2);
+    var vd: f32 = (${p[7]} / 2);
+    var ang: f32 = (((vc * a) + (vd * lnr)) + (va * floor((2 * rnd(rs)))));
+    var m: f32 = ((${w} * ${p[2]}) * exp(((vc * lnr) - (vd * a))));
+    var sa: f32 = sin(ang);
+    var ca: f32 = cos(ang);
+    qquadxx += (m * ca);
+    qquadyy += (m * sa);
+  } else if ((min(max(${p[1]}, 0.0), 50.0) == 19)) {
+    var re: f32 = ((1 + (${p[6]} * t.x)) + (${p[7]} * (sqr(t.x) - sqr(t.y))));
+    var im: f32 = ((${p[6]} * t.y) + (((${p[7]} * 2) * t.x) * t.y));
+    var r_: f32 = ((${w} * ${p[2]}) / (sqr(re) + sqr(im)));
+    qquadxx += (((t.x * re) + (t.y * im)) * r_);
+    qquadyy += (((t.y * re) - (t.x * im)) * r_);
+  } else if ((min(max(${p[1]}, 0.0), 50.0) == 20)) {
+    var xx: f32 = t.x;
+    var yy: f32 = t.y;
+    var r2_: f32 = (1.0 / ((xx * xx) + (yy * yy)));
+    var r_: f32 = (powc(((xx * xx) + (((r2_ * 1) * yy) * yy)), ${p[7]}) - powc(((yy * yy) + (((r2_ * 2) * xx) * xx)), ${p[7]}));
+    if ((r_ > 100)) {
+      r_ = 100;
+    } else if ((r_ < -0.24)) {
+      r_ = -0.24;
+    }
+    r_ = (${p[6]} * r_);
+    qquadxx += ((${p[2]} * xx) * (1 + r_));
+    qquadyy += ((${p[2]} * yy) * (1 + r_));
+  } else if ((min(max(${p[1]}, 0.0), 50.0) == 21)) {
+    var rPI: f32 = ((PI * sqrt(((t.x * t.x) + (t.y * t.y)))) * ${p[6]});
+    var sinr: f32 = sin(rPI);
+    var cosr: f32 = cos(rPI);
+    var r_: f32 = (((${w} * ${p[2]}) * th) / PI);
+    qquadxx += (sinr * r_);
+    qquadyy += (cosr * r_);
+  } else if ((min(max(${p[1]}, 0.0), 50.0) == 22)) {
+    var tmp: f32 = (((t.y * t.y) + (t.x * t.x)) + 1.0);
+    var tmp2: f32 = (2.0 * t.x);
+    var xmax: f32 = ((quad_sqrt_safe((tmp + tmp2)) + quad_sqrt_safe((tmp - tmp2))) * 0.5);
+    var sinnu: f32;
+    var cosnu: f32;
+    var alt: i32;
+    if ((xmax < 1.0)) {
+      xmax = 1.0;
+    }
+    var t_: f32 = (t.x / xmax);
+    if ((t_ > 1.0)) {
+      t_ = 1.0;
+    } else if ((t_ < -1.0)) {
+      t_ = -1.0;
+    }
+    var nu: f32 = acos(t_);
+    alt = i32((nu * ul_eCn_pi));
+    if (((alt % 2) == 0)) {
+      nu = ((f32(alt) * ul_pi_eCn) + ((nu + ul_eCa_eCn) % ul_pi_eCn));
+    } else {
+      nu = ((f32(alt) * ul_pi_eCn) + ((nu - ul_eCa_eCn) % ul_pi_eCn));
+    }
+    if ((t.y <= 0.0)) {
+      nu *= -1.0;
+    }
+    sinnu = sin(nu);
+    cosnu = cos(nu);
+    qquadxx += (((${w} * ${p[2]}) * xmax) * cosnu);
+    qquadyy += ((((${w} * ${p[2]}) * sqrt((xmax - 1.0))) * sqrt((xmax + 1.0))) * sinnu);
+  } else if ((min(max(${p[1]}, 0.0), 50.0) == 23)) {
+    var tmp: f32 = (r2 + 1.0);
+    var tmp2: f32 = (2.0 * t.x);
+    var r1: f32 = sqrt((tmp + tmp2));
+    var r2_: f32 = sqrt((tmp - tmp2));
+    var xmax: f32 = ((r1 + r2_) * 0.5);
+    var a1: f32 = log((xmax + sqrt((xmax - 1.0))));
+    var a2: f32 = -(acos((t.x / xmax)));
+    var w_: f32 = ((${w} * ${p[2]}) / 11.57034632);
+    var snv: f32 = sin(a1);
+    var csv: f32 = cos(a1);
+    var snhu: f32 = sinh(a2);
+    var cshu: f32 = cosh(a2);
+    if ((t.y > 0.0)) {
+      snv = -snv;
+    }
+    qquadxx += ((w_ * cshu) * csv);
+    qquadyy += ((w_ * snhu) * snv);
+  } else if ((min(max(${p[1]}, 0.0), 50.0) == 24)) {
+    var r2_: f32 = ((t.y * t.y) + (t.x * t.x));
+    var tmp2: f32;
+    var x: f32;
+    if ((ul_sign == 1)) {
+      x = t.x;
+    } else {
+      r2_ = (1.0 / r2_);
+      x = (t.x * r2_);
+    }
+    var tmp: f32 = (r2_ + 1.0);
+    tmp2 = (2.0 * x);
+    var xmax: f32 = ((quad_sqrt_safe((tmp + tmp2)) + quad_sqrt_safe((tmp - tmp2))) * 0.5);
+    if ((xmax < 1.0)) {
+      xmax = 1.0;
+    }
+    var sinhmu: f32;
+    var coshmu: f32;
+    var sinnu: f32;
+    var cosnu: f32;
+    var mu: f32 = acosh(xmax);
+    var t_: f32 = (x / xmax);
+    if ((t_ > 1.0)) {
+      t_ = 1.0;
+    } else if ((t_ < -1.0)) {
+      t_ = -1.0;
+    }
+    var nu: f32 = acos(t_);
+    if ((t.y < 0)) {
+      nu *= -1.0;
+    }
+    nu = ((nu / ${p[6]}) + (((2.0 * PI) / ${p[6]}) * floor((rnd(rs) * ${p[6]}))));
+    mu /= ${p[6]};
+    sinhmu = sinh(mu);
+    coshmu = cosh(mu);
+    sinnu = sin(nu);
+    cosnu = cos(nu);
+    qquadxx += (((${w} * ${p[2]}) * coshmu) * cosnu);
+    qquadyy += (((${w} * ${p[2]}) * sinhmu) * sinnu);
+  } else if ((min(max(${p[1]}, 0.0), 50.0) == 25)) {
+    var tmp: f32 = (((t.y * t.y) + (t.x * t.x)) + 1.0);
+    var tmp2: f32 = (2.0 * t.x);
+    var xmax: f32 = ((quad_sqrt_safe((tmp + tmp2)) + quad_sqrt_safe((tmp - tmp2))) * 0.5);
+    if ((xmax < 1.0)) {
+      xmax = 1.0;
+    }
+    var sinhmu: f32;
+    var coshmu: f32;
+    var mu: f32 = acosh(xmax);
+    var t_: f32 = (t.x / xmax);
+    if ((t_ > 1.0)) {
+      t_ = 1.0;
+    } else if ((t_ < -1.0)) {
+      t_ = -1.0;
+    }
+    var nu: f32 = acos(t_);
+    if ((t.y < 0)) {
+      nu *= -1.0;
+    }
+    if (((mu < ${p[20]}) && (-mu < ${p[20]}))) {
+      if ((nu > 0.0)) {
+        mu = ((((mu + ${p[6]}) + (${p[7]} * ${p[6]})) % (2.0 * ${p[6]})) - ${p[6]});
+      } else {
+        mu = ((((mu - ${p[6]}) - (${p[7]} * ${p[6]})) % (2.0 * ${p[6]})) + ${p[6]});
+      }
+    }
+    sinhmu = sinh(mu);
+    coshmu = cosh(mu);
+    qquadxx += (((${w} * ${p[2]}) * coshmu) * cos(nu));
+    qquadyy += (((${w} * ${p[2]}) * sinhmu) * sin(nu));
+  } else if ((min(max(${p[1]}, 0.0), 50.0) == 26)) {
+    if ((abs(t.y) <= ${w})) {
+      var c_2: f32 = sqrt((sqr(${w}) - sqr(t.y)));
+      if ((abs(t.x) <= c_2)) {
+        var x: f32 = (t.x + ((${p[6]} * ${w}) * ${p[2]}));
+        if ((abs(x) >= c_2)) {
+          qquadxx -= ((${w} * ${p[2]}) * t.x);
+        } else {
+          qquadxx += ((${w} * ${p[2]}) * x);
+        }
+      } else {
+        qquadxx += ((${w} * ${p[2]}) * t.x);
+      }
+      qquadyy += ((${w} * ${p[2]}) * t.y);
+    } else {
+      qquadxx += ((${w} * ${p[2]}) * t.x);
+      qquadyy += ((${w} * ${p[2]}) * t.y);
+    }
+  } else if ((min(max(${p[1]}, 0.0), 50.0) == 27)) {
+    var tmp: f32 = (((t.y * t.y) + (t.x * t.x)) + ${p[6]});
+    var x2: f32 = (2.0 * t.x);
+    var xmax: f32 = (0.5 * (sqrt((tmp + x2)) + sqrt((tmp - x2))));
+    var a: f32 = (t.x / xmax);
+    var b: f32 = quad_sqrt_safe_e((${p[7]} - (a * a)));
+    qquadxx += (ul_v * atan2j(a, b));
+    if ((rnd(rs) < 0.5)) {
+      qquadyy += (ul_v * log((xmax + quad_sqrt_safe_e((xmax - 1.0)))));
+    } else {
+      qquadyy -= (ul_v * log((xmax + quad_sqrt_safe_e((xmax - 1.0)))));
+    }
+  } else if ((min(max(${p[1]}, 0.0), 50.0) == 28)) {
+    var r_: f32 = sqrt(((t.x * t.x) + (t.y * t.y)));
+    var angle: f32;
+    if (((((t.x < -1.0e-30) || (t.x > 1.0e-30)) || (t.y < -1.0e-30)) || (t.y > 1.0e-30))) {
+      angle = atan2j(t.x, t.y);
+    } else {
+      angle = 0.0;
+    }
+    var dy: f32 = ${p[7]};
+    var dx: f32 = ((PI * (${p[6]} * ${p[6]})) + 1.0e-30);
+    var dx2: f32 = (dx * 0.5);
+    var t_: f32 = ((angle + dy) - (f32(i32(((angle + dy) / dx))) * dx));
+    var a: f32;
+    if ((t_ > dx2)) {
+      a = (angle - dx2);
+    } else {
+      a = (angle + dx2);
+    }
+    qquadxx += (((${w} * ${p[2]}) * r_) * sin(a));
+    qquadyy += (((${w} * ${p[2]}) * r_) * cos(a));
+  } else if ((min(max(${p[1]}, 0.0), 50.0) == 29)) {
+    var expx: f32 = (exp(t.x) * 0.5);
+    var expnx: f32 = (0.25 / expx);
+    if (((expx <= 1.0e-30) || (expnx <= 1.0e-30))) {
+      break;
+    }
+    var siny: f32 = sin(t.y);
+    var cosy: f32 = cos(t.y);
+    var tmp: f32 = ((expx + expnx) - cosy);
+    if ((tmp == 0)) {
+      break;
+    }
+    tmp = ((${w} * ${p[2]}) / tmp);
+    qquadxx += ((expx - expnx) * tmp);
+    qquadyy += (siny * tmp);
+  } else if ((min(max(${p[1]}, 0.0), 50.0) == 30)) {
+    var r_: f32 = sqrt((sqr(t.x) + sqr(t.y)));
+    var d: f32;
+    if ((r_ >= 1.0)) {
+      if ((rnd(rs) > 0.5)) {
+        d = sqrt((r_ + t.x));
+        if ((d == 0)) {
+          break;
+        }
+        qquadxx += (ul_vvar2 * d);
+        qquadyy -= ((ul_vvar2 / d) * t.y);
+      } else {
+        d = (r_ + t.x);
+        var dx: f32 = sqrt((r_ * (sqr(t.y) + sqr(d))));
+        if ((dx == 0)) {
+          break;
+        }
+        r_ = ((${w} * ${p[2]}) / dx);
+        qquadxx += (r_ * d);
+        qquadyy += (r_ * t.y);
+      }
+    } else {
+      if ((rnd(rs) > 0.5)) {
+        d = sqrt((r_ + t.x));
+        if ((d == 0)) {
+          break;
+        }
+        qquadxx -= (ul_vvar2 * d);
+        qquadyy -= ((ul_vvar2 / d) * t.y);
+      } else {
+        d = (r_ + t.x);
+        var dx: f32 = sqrt((r_ * (sqr(t.y) + sqr(d))));
+        if ((dx == 0)) {
+          break;
+        }
+        r_ = ((${w} * ${p[2]}) / dx);
+        qquadxx -= (r_ * d);
+        qquadyy += (r_ * t.y);
+      }
+    }
+  } else if ((min(max(${p[1]}, 0.0), 50.0) == 31)) {
+    var alpha: f32 = atan2j(t.y, t.x);
+    var delta: f32 = powc(((alpha / PI) + 1.0), ${p[6]});
+    var r_: f32;
+    if ((${p[7]} != 0)) {
+      r_ = (((${w} * ${p[2]}) * delta) / (((t.x * t.x) + (t.y * t.y)) + delta));
+    } else {
+      r_ = ((${w} * ${p[2]}) * sqrt((((t.x * t.x) + (t.y * t.y)) + delta)));
+    }
+    var s: f32 = sin(alpha);
+    var c: f32 = cos(alpha);
+    qquadxx += (r_ * c);
+    qquadyy += (r_ * s);
+  } else if ((min(max(${p[1]}, 0.0), 50.0) == 32)) {
+    var a: f32 = (PI / (sqrt((sqr(t.x) + sqr(t.y))) + 1.0));
+    var r_: f32 = (atan2j(t.y, t.x) * ul_v_idisc);
+    sina.value = sin(a);
+    cosa.value = cos(a);
+    qquadxx += (r_ * cosa.value);
+    qquadyy += (r_ * sina.value);
+  } else if ((min(max(${p[1]}, 0.0), 50.0) == 33)) {
+    var a: f32 = ((atan2j(t.y, t.x) + ((2 * PI) * f32(i32((rnd(rs) * f32(ul_absPower_julian)))))) / ${p[6]});
+    var sina: f32 = sin(a);
+    var cosa: f32 = cos(a);
+    var r_: f32 = ((${w} * ${p[2]}) * powc((sqr(t.x) + sqr(t.y)), ul_cPower_julian));
+    qquadxx = (qquadxx + (r_ * cosa));
+    qquadyy = (qquadyy + (r_ * sina));
+  } else if ((min(max(${p[1]}, 0.0), 50.0) == 34)) {
+    if ((${p[6]} != 0.0)) {
+      var nr: f32 = f32(i32(floor((t.x * ${p[6]}))));
+      if ((nr >= 0)) {
+        if (((nr % 2) == 1)) {
+          t.x = -t.x;
+        }
+      } else {
+        if (((nr % 2) == 0)) {
+          t.x = -t.x;
+        }
+      }
+    }
+    if ((${p[7]} != 0.0)) {
+      var nr: f32 = f32(i32(floor((t.y * ${p[7]}))));
+      if ((nr >= 0)) {
+        if (((nr % 2) == 1)) {
+          t.y = -t.y;
+        }
+      } else {
+        if (((nr % 2) == 0)) {
+          t.y = -t.y;
+        }
+      }
+    }
+    qquadxx += ((${w} * ${p[2]}) * t.x);
+    qquadyy += ((${w} * ${p[2]}) * t.y);
+  } else if ((min(max(${p[1]}, 0.0), 50.0) == 35)) {
+    var x: f32 = 0.0;
+    var y: f32 = 0.0;
+    var xx: f32 = (t.x - x);
+    var yy: f32 = (t.y + y);
+    var rr: f32 = sqrt(((xx * xx) + (yy * yy)));
+    if ((rr < ${w})) {
+      var a: f32 = ((atan2j(yy, xx) + ${p[7]}) + (${p[6]} * ((${w} * ${p[2]}) - rr)));
+      var sina: f32 = sin(a);
+      var cosa: f32 = cos(a);
+      rr = ((${w} * ${p[2]}) * rr);
+      qquadxx += ((rr * cosa) + x);
+      qquadyy += ((rr * sina) - y);
+    } else {
+      rr = ((${w} * ${p[2]}) * (1.0 + (0.0 / rr)));
+      qquadxx += ((rr * xx) + x);
+      qquadyy += ((rr * yy) - y);
+    }
+  } else if ((min(max(${p[1]}, 0.0), 50.0) == 36)) {
+    var _p2: f32;
+    var _invp: f32;
+    var _vp: f32;
+    var _sina: f32;
+    var _cosa: f32;
+    var _a: f32;
+    var _r: f32;
+    var _re: f32;
+    var _im: f32;
+    var _rl: f32;
+    _p2 = (${p[7]} / 2.0);
+    if ((${p[7]} != 0)) {
+      _invp = (1.0 / ${p[7]});
+      if ((${p[6]} == -1)) {
+        _vp = 0;
+      } else {
+        _vp = ((${w} * ${p[2]}) * powc((${p[6]} + 1), (2.0 / ${p[7]})));
+      }
+    } else {
+      _invp = 100000000000.0;
+      _vp = ((${w} * ${p[2]}) * powc((${p[6]} + 1), 4));
+    }
+    _a = (atan2j(t.y, t.x) * ${p[7]});
+    _sina = sin(_a);
+    _cosa = cos(_a);
+    _r = (${p[6]} * powc((sqr(t.x) + sqr(t.y)), _p2));
+    _re = ((_r * _cosa) + 1);
+    _im = (_r * _sina);
+    _r = powc((sqr(_re) + sqr(_im)), _invp);
+    _a = ((atan2j(_im, _re) * 2.0) * _invp);
+    _re = (_r * cos(_a));
+    _im = (_r * sin(_a));
+    _rl = (_vp / sqr(_r));
+    qquadxx += (_rl * ((t.x * _re) + (t.y * _im)));
+    qquadyy += (_rl * ((t.y * _re) - (t.x * _im)));
+  } else if ((min(max(${p[1]}, 0.0), 50.0) == 37)) {
+    var r_: f32;
+    var a: f32;
+    var ta: f32;
+    var xo: f32;
+    var ro: f32;
+    var c: f32;
+    var s: f32;
+    var x: f32;
+    var y: f32;
+    var tc: f32;
+    var ts: f32;
+    var theta: f32;
+    r_ = (sqr(t.x) + sqr(t.y));
+    if ((r_ < 1.0)) {
+      if ((t.x >= 0.0)) {
+        xo = ((r_ + 1.0) / (2.0 * t.x));
+        ro = sqrt((sqr((t.x - xo)) + sqr(t.y)));
+        theta = atan2j(1.0, ro);
+        a = (((((${p[6]} * theta) + atan2j(t.y, (xo - t.x))) + theta) % (2.0 * theta)) - theta);
+        s = sin(a);
+        c = cos(a);
+        qquadxx += ((${w} * ${p[2]}) * (xo - (c * ro)));
+        qquadyy += (((${w} * ${p[2]}) * s) * ro);
+      } else {
+        xo = (-(r_ + 1.0) / (2.0 * t.x));
+        ro = sqrt((sqr((-t.x - xo)) + sqr(t.y)));
+        theta = atan2j(1.0, ro);
+        a = (((((${p[6]} * theta) + atan2j(t.y, (xo + t.x))) + theta) % (2.0 * theta)) - theta);
+        s = sin(a);
+        c = cos(a);
+        qquadxx -= ((${w} * ${p[2]}) * (xo - (c * ro)));
+        qquadyy += (((${w} * ${p[2]}) * s) * ro);
+      }
+    } else {
+      r_ = (1.0 / sqrt(r_));
+      ta = atan2j(t.y, t.x);
+      ts = sin(ta);
+      tc = cos(ta);
+      x = (r_ * tc);
+      y = (r_ * ts);
+      if ((x >= 0.0)) {
+        xo = (((sqr(x) + sqr(y)) + 1.0) / (2.0 * x));
+        ro = sqrt((sqr((x - xo)) + sqr(y)));
+        theta = atan2j(1.0, ro);
+        a = (((((${p[7]} * theta) + atan2j(y, (xo - x))) + theta) % (2.0 * theta)) - theta);
+        s = sin(a);
+        c = cos(a);
+        x = (xo - (c * ro));
+        y = (s * ro);
+        ta = atan2j(y, x);
+        ts = sin(ta);
+        tc = cos(ta);
+        r_ = (1.0 / sqrt((sqr(x) + sqr(y))));
+        qquadxx += (((${w} * ${p[2]}) * r_) * tc);
+        qquadyy += (((${w} * ${p[2]}) * r_) * ts);
+      } else {
+        xo = (-((sqr(x) + sqr(y)) + 1.0) / (2.0 * x));
+        ro = sqrt((sqr((-x - xo)) + sqr(y)));
+        theta = atan2j(1.0, ro);
+        a = (((((${p[7]} * theta) + atan2j(y, (xo + x))) + theta) % (2.0 * theta)) - theta);
+        s = sin(a);
+        c = cos(a);
+        x = (xo - (c * ro));
+        y = (s * ro);
+        ta = atan2j(y, x);
+        ts = sin(ta);
+        tc = cos(ta);
+        r_ = (1.0 / sqrt((sqr(x) + sqr(y))));
+        qquadxx -= (((${w} * ${p[2]}) * r_) * tc);
+        qquadyy += (((${w} * ${p[2]}) * r_) * ts);
+      }
+    }
+  } else if ((min(max(${p[1]}, 0.0), 50.0) == 38)) {
+    if ((abs(${p[6]}) < 1.0e-9)) {
+      qquadxx += ((${w} * ${p[2]}) * t.x);
+    } else {
+      qquadxx += ((${w} * ${p[2]}) * ((((2 * floor((t.x / ${p[6]}))) + 1) * ${p[6]}) - t.x));
+    }
+    if ((abs(${p[7]}) < 1.0e-9)) {
+      qquadyy += ((${w} * ${p[2]}) * t.y);
+    } else {
+      qquadyy += ((${w} * ${p[2]}) * ((((2 * floor((t.y / ${p[7]}))) + 1) * ${p[7]}) - t.y));
+    }
+  } else if ((min(max(${p[1]}, 0.0), 50.0) == 39)) {
+    qquadxx += ((${w} * ${p[2]}) * sin(t.x));
+    qquadyy += ((${w} * ${p[2]}) * sin(t.y));
+  } else if ((min(max(${p[1]}, 0.0), 50.0) == 40)) {
+    var R: f32 = powc(sqrt((sqr(t.x) + sqr(t.y))), ${p[7]});
+    var N: i32 = i32(floor((${p[6]} * rnd(rs))));
+    var alpha: f32 = (atan2j(t.y, t.x) + ((f32(N) * (2.0 * PI)) / floor(${p[6]})));
+    var sina: f32 = sin(alpha);
+    var cosa: f32 = cos(alpha);
+    if ((R > 1.0e-30)) {
+      qquadxx += (((${w} * ${p[2]}) * cosa) / R);
+      qquadyy += (((${w} * ${p[2]}) * sina) / R);
+    }
+  } else if ((min(max(${p[1]}, 0.0), 50.0) == 41)) {
+    qquadxx += ((${w} * ${p[2]}) * (t.x + (${p[6]} * sin((t.y * ${p[7]})))));
+    qquadyy += ((${w} * ${p[2]}) * (t.y + (${p[6]} * sin((t.x * ${p[7]})))));
+  } else if ((min(max(${p[1]}, 0.0), 50.0) == 42)) {
+    var x0: f32 = t.x;
+    var y0: f32 = t.y;
+    var sinx: f32;
+    var siny: f32;
+    var px: i32 = i32(2.0);
+    var py: i32 = i32(2.0);
+    var modex: i32 = 0;
+    var modey: i32 = 0;
+    if ((f32(modex) < 0.5)) {
+      sinx = sin((y0 * ${p[7]}));
+    } else {
+      sinx = (0.5 * (1.0 + sin((y0 * ${p[7]}))));
+    }
+    var offsetx: f32 = (powc(sinx, f32(px)) * ${p[6]});
+    if ((f32(modey) < 0.5)) {
+      siny = sin((x0 * ${p[7]}));
+    } else {
+      siny = (0.5 * (1.0 + sin((x0 * ${p[7]}))));
+    }
+    var offsety: f32 = (powc(siny, f32(py)) * ${p[6]});
+    qquadxx += ((${w} * ${p[2]}) * (x0 + offsetx));
+    qquadyy += ((${w} * ${p[2]}) * (y0 + offsety));
+  } else if ((min(max(${p[1]}, 0.0), 50.0) == 43)) {
+    var x0: f32 = t.x;
+    var y0: f32 = t.y;
+    var mx: f32 = ((y0 * ${p[7]}) * (0.5 / PI));
+    var fx: f32 = (mx - floor(mx));
+    if ((fx > 0.5)) {
+      fx = (0.5 - fx);
+    }
+    var my: f32 = ((x0 * ${p[7]}) * (0.5 / PI));
+    var fy: f32 = (my - floor(my));
+    if ((fy > 0.5)) {
+      fy = (0.5 - fy);
+    }
+    qquadxx += ((${w} * ${p[2]}) * (x0 + (fx * ${p[6]})));
+    qquadyy += ((${w} * ${p[2]}) * (y0 + (fy * ${p[6]})));
+  } else if ((min(max(${p[1]}, 0.0), 50.0) == 44)) {
+    var x0: f32 = t.x;
+    var y0: f32 = t.y;
+    var scalexx: f32 = ((0.5 * ${p[6]}) * (1.0 + sin((y0 * 0.0))));
+    var scaleyy: f32 = ((0.5 * ${p[6]}) * (1.0 + sin((x0 * 2.0))));
+    qquadxx += ((${w} * ${p[2]}) * (x0 + (sin((y0 * ${p[7]})) * scalexx)));
+    qquadyy += ((${w} * ${p[2]}) * (y0 + (sin((x0 * ${p[7]})) * scaleyy)));
+  } else if ((min(max(${p[1]}, 0.0), 50.0) == 45)) {
+    var x0: f32 = t.x;
+    var y0: f32 = t.y;
+    var ax: f32 = floor(((y0 * ${p[7]}) / (2.0 * PI)));
+    ax = (sin(((((ax * 12.9898) + (ax * 78.233)) + 1.0) + ((y0 * 0.001) * 0.1))) * 43758.5453);
+    ax = (ax - f32(i32(ax)));
+    qquadxx += ((${w} * ${p[2]}) * (x0 + (((sin((y0 * ${p[7]})) * ax) * ax) * ${p[6]})));
+    qquadyy += ((${w} * ${p[2]}) * (y0 + (sin((x0 * ${p[7]})) * ${p[6]})));
+  } else if ((min(max(${p[1]}, 0.0), 50.0) == 46)) {
+    var x0: f32 = t.x;
+    var y0: f32 = t.y;
+    var ax: f32 = floor((y0 * ${p[7]}));
+    ax = (sin(((((ax * 12.9898) + (ax * 78.233)) + 1.0) + ((y0 * 0.001) * 0.1))) * 43758.5453);
+    ax = (ax - f32(i32(ax)));
+    qquadxx += ((${w} * ${p[2]}) * (x0 + (((sin((y0 * ${p[7]})) * ax) * ax) * ${p[6]})));
+    qquadyy += ((${w} * ${p[2]}) * (y0 + (sin((x0 * ${p[7]})) * ${p[6]})));
+  } else if ((min(max(${p[1]}, 0.0), 50.0) == 47)) {
+    var a: f32 = (PI / (sqrt((sqr(t.x) + sqr(t.y))) + ${p[6]}));
+    var r_: f32 = (atan2j(t.y, t.x) * (1.0 / PI));
+    if ((r_ > 0.0)) {
+      a = (PI - a);
+    }
+    sina.value = sin(a);
+    cosa.value = cos(a);
+    qquadxx += (((${w} * ${p[2]}) * r_) * cosa.value);
+    qquadyy += (((${w} * ${p[2]}) * r_) * sina.value);
+  } else if ((min(max(${p[1]}, 0.0), 50.0) == 48)) {
+    var r_: f32 = r;
+    var a: f32;
+    if ((r_ < ${w})) {
+      a = (ph + (${p[6]} / (${w} - r_)));
+    } else {
+      a = (ph + (${p[7]} / (${w} - r_)));
+    }
+    var sa: f32 = sin(a);
+    var ca: f32 = cos(a);
+    qquadxx += (((${w} * ${p[2]}) * r_) * ca);
+    qquadyy += (((${w} * ${p[2]}) * r_) * sa);
+  }
+  count += 1;
+}
+if ((min(max(${p[0]}, 0.0), 1.0) != 0)) {
+  if ((count == 0)) {
+    v.x += (${w} / t.y);
+    v.y += (${w} / t.x);
+  } else {
+    v.x += ((${w} / qquadyy) / f32(count));
+    v.y += ((${w} / qquadxx) / f32(count));
+  }
+} else {
+  if ((count == 0)) {
+    v.x += (${w} * t.x);
+    v.y += (${w} * t.y);
+  } else {
+    v.x += ((${w} * qquadxx) / f32(count));
+    v.y += ((${w} * qquadyy) / f32(count));
+  }
+}
+if (false) {
+  pz_ += (${w} * z_);
+}
+break;
+}
+}`,
+  },
+  "ringtile": {
+    params: [{ name: "power", def: 5 }, { name: "tilesize", def: 0.5 }, { name: "width1", def: 0.5 }, { name: "width2", def: 0.3 }, { name: "outline", def: 0.000001 }],
+    verified: true, priority: 2, flags: ["3d","z"], types: ["3D"],
+    funcNames: ["jcx_","atan2j","jcx__zero","jcx_make","jcx_UnP","jcx_Copy","jcx_Exp","roundc"],
+    funcs: `struct jcx_ {
+  re: f32,
+  im: f32,
+  save_re: f32,
+  save_im: f32,
+  per_fix: f32,
+}
+
+fn atan2j(y: f32, x: f32) -> f32 { if (x == 0.0 && y == 0.0) { return select(0.0, PI, (bitcast<u32>(x) >> 31u) == 1u) * select(1.0, -1.0, (bitcast<u32>(y) >> 31u) == 1u); } return atan2(y, x); }
+
+fn jcx__zero() -> jcx_ {
+  var z: jcx_;
+  z.re = 0.0;
+  z.im = 0.0;
+  z.save_re = 0.0;
+  z.save_im = 0.0;
+  z.per_fix = 0.0;
+  return z;
+}
+
+fn jcx_make(re: f32, im: f32) -> jcx_ {
+  var z: jcx_ = jcx__zero();
+  z.re = re;
+  z.im = im;
+  return z;
+}
+
+fn jcx_UnP(z: ptr<function, jcx_>) -> jcx_ {
+  return jcx_make(((*z).re * cos((*z).im)), ((*z).re * sin((*z).im)));
+}
+
+fn jcx_Copy(z: ptr<function, jcx_>, zz: jcx_) {
+  (*z).re = zz.re;
+  (*z).im = zz.im;
+}
+
+fn jcx_Exp(z: ptr<function, jcx_>) {
+  (*z).re = exp((*z).re);
+  jcx_Copy(z, jcx_UnP(z));
+}
+
+fn roundc(x: f32) -> f32 { return sign(x) * floor(abs(x) + 0.5); }`,
+    code: (w, _p) => `{
+var xr: f32 = v.x;
+var yr: f32 = v.y;
+var z: jcx_ = jcx_make(xr, yr);
+jcx_Exp(&(z));
+v.x = (${w} * z.re);
+v.y = (${w} * z.im);
+if (false) {
+  pz_ += (${w} * z_);
+}
+}`,
+    preCode: (_w, p) => `{
+var rinv_: f32 = 1.0 / r;
+var _yr1: f32 = (${p[4]} * ${p[3]});
+var yh: f32 = -(${p[0]});
+if ((rnd(rs) < 0.5)) {
+  yh = ${p[0]};
+}
+v.y += (${p[1]} * (t.y + roundc((yh * log(rnd(rs))))));
+if ((t.x > ${p[3]})) {
+  v.x += (${p[2]} * (-(${p[3]}) + ((t.x + ${p[3]}) % _yr1)));
+} else if ((t.x < -(${p[3]}))) {
+  v.x += (${p[2]} * (${p[3]} - ((${p[3]} - t.x) % _yr1)));
+} else {
+  v.x += (${p[2]} * t.x);
+}
+r2 = ((t.x * t.x) + (t.y * t.y));
+r = sqrt(r2);
+rinv_ = (1.0 / r);
+th = atan2j(t.x, t.y);
+ph = ((0.5 * PI) - th);
+if ((ph > PI)) {
+  ph -= (2.0 * PI);
+}
+}`,
+  },
   "whirligig": {
     params: [{ name: "Mode", def: 0, int: true }],
     verified: true, priority: 0, flags: ["3d","z"], types: ["3D"],
@@ -44436,6 +49542,428 @@ if ((i32(${p[22]}) == 0)) {
 }
 }`,
   },
+  "drunken_tiles": {
+    params: [{ name: "seed", def: 1, int: true }, { name: "cellsize", def: 0.5 }, { name: "radius_factor", def: 1 }, { name: "offset_strength", def: 0.25 }, { name: "shape_boundary_type", def: 0, int: true }, { name: "aspect_ratio", def: 1 }, { name: "inner_radius_factor", def: 0.5 }, { name: "arm_width_factor", def: 0.3 }, { name: "spacing", def: 0.1 }, { name: "inner_twist", def: 0 }, { name: "outer_twist", def: 3.141592653589793 }, { name: "flowerPetals", def: 5, int: true }, { name: "starPoints", def: 5, int: true }, { name: "cloudAmplitude", def: 0.2 }, { name: "cloudFrequency", def: 5 }],
+    verified: true, priority: 0, flags: ["state","z"], types: ["2D"],
+    funcNames: ["jwx_drunken_tiles_cellsize_c","jwx_drunken_tiles_radius_factor_c","jwx_drunken_tiles_inited_","jwx_drunken_tiles_needsReinitCalcs","jwx_drunken_tiles_radius","jwx_drunken_tiles__r2","jrand_","atan2j","rndi","drunken_tiles_initializeIfNeeded","jhashcode","jrand_make","jrand_setSeed","jrand_next","jrand_nextDouble","drunken_tiles_pointSign"],
+    funcs: `struct jrand_ {
+  s0: i32,
+  s1: i32,
+  s2: i32,
+}
+
+fn atan2j(y: f32, x: f32) -> f32 { if (x == 0.0 && y == 0.0) { return select(0.0, PI, (bitcast<u32>(x) >> 31u) == 1u) * select(1.0, -1.0, (bitcast<u32>(y) >> 31u) == 1u); } return atan2(y, x); }
+
+fn rndi(state: ptr<function, u32>) -> u32 { var x = *state; x ^= x << 13u; x ^= x >> 17u; x ^= x << 5u; *state = x; return x; }
+
+fn drunken_tiles_initializeIfNeeded() {
+  if ((jwx_drunken_tiles_needsReinitCalcs != 0.0)) {
+    if ((jwx_drunken_tiles_cellsize_c <= 1.0e-9)) {
+      jwx_drunken_tiles_cellsize_c = 1.0e-9;
+    }
+    jwx_drunken_tiles_radius = abs(((jwx_drunken_tiles_cellsize_c * 0.5) * jwx_drunken_tiles_radius_factor_c));
+    if ((jwx_drunken_tiles_radius <= 1.0e-9)) {
+      jwx_drunken_tiles_radius = 1.0e-9;
+    }
+    jwx_drunken_tiles__r2 = (jwx_drunken_tiles_radius * jwx_drunken_tiles_radius);
+    jwx_drunken_tiles_needsReinitCalcs = select(0.0, 1.0, false);
+  }
+  if (((jwx_drunken_tiles__r2 <= 0) && (jwx_drunken_tiles_radius > 1.0e-9))) {
+    jwx_drunken_tiles__r2 = (jwx_drunken_tiles_radius * jwx_drunken_tiles_radius);
+  }
+  if ((((jwx_drunken_tiles_radius <= 0) && (jwx_drunken_tiles_cellsize_c > 1.0e-9)) && (jwx_drunken_tiles_radius_factor_c > 1.0e-9))) {
+    jwx_drunken_tiles_radius = abs(((jwx_drunken_tiles_cellsize_c * 0.5) * jwx_drunken_tiles_radius_factor_c));
+    jwx_drunken_tiles__r2 = (jwx_drunken_tiles_radius * jwx_drunken_tiles_radius);
+  }
+}
+
+fn jhashcode(a: i32) -> i32 {
+  return a;
+}
+
+fn jrand_make(seed: i32) -> jrand_ {
+  var r_: jrand_;
+  r_.s0 = ((seed & 65535) ^ 58989);
+  r_.s1 = (((seed >> 16) & 65535) ^ 57068);
+  r_.s2 = (select(0, 65535, (seed < 0)) ^ 5);
+  return r_;
+}
+
+fn jrand_setSeed(r_: ptr<function, jrand_>, seed: i32) {
+  var n: jrand_ = jrand_make(seed);
+  (*r_).s0 = n.s0;
+  (*r_).s1 = n.s1;
+  (*r_).s2 = n.s2;
+}
+
+fn jrand_next(r_: ptr<function, jrand_>, bits: i32) -> i32 {
+  var a0: u32 = u32((*r_).s0);
+  var a1: u32 = u32((*r_).s1);
+  var a2: u32 = u32((*r_).s2);
+  var t0: u32 = ((a0 * 58989) + 11);
+  var r0: u32 = (t0 & 65535);
+  var c0: u32 = (t0 >> 16);
+  var t1a: u32 = ((a0 * 57068) + c0);
+  var c1a: u32 = (t1a >> 16);
+  var t1b: u32 = ((a1 * 58989) + (t1a & 65535));
+  var r1: u32 = (t1b & 65535);
+  var c1: u32 = (c1a + (t1b >> 16));
+  var r2_: u32 = (((((a0 * 5) + (a1 * 57068)) + (a2 * 58989)) + c1) & 65535);
+  (*r_).s0 = i32(r0);
+  (*r_).s1 = i32(r1);
+  (*r_).s2 = i32(r2_);
+  var hi: u32 = ((r2_ << 16) | r1);
+  return i32((hi >> u32((32 - bits))));
+}
+
+fn jrand_nextDouble(r_: ptr<function, jrand_>) -> f32 {
+  return ((f32(jrand_next(r_, 26)) * (1.0 / 67108864.0)) + (f32(jrand_next(r_, 27)) * (1.0 / 9007199254740992.0)));
+}
+
+fn drunken_tiles_pointSign(p1x: f32, p1y: f32, p2x: f32, p2y: f32, p3x: f32, p3y: f32) -> f32 {
+  return (((p1x - p3x) * (p2y - p3y)) - ((p2x - p3x) * (p1y - p3y)));
+}
+
+var<private> jwx_drunken_tiles_cellsize_c: f32 = 0.0;
+
+var<private> jwx_drunken_tiles_radius_factor_c: f32 = 0.0;
+
+var<private> jwx_drunken_tiles_inited_: f32 = 0.0;
+
+var<private> jwx_drunken_tiles_needsReinitCalcs: f32 = 0.0;
+
+var<private> jwx_drunken_tiles_radius: f32 = 0.0;
+
+var<private> jwx_drunken_tiles__r2: f32 = 0.0;`,
+    code: (w, p) => `{
+loop {
+jwx_drunken_tiles_cellsize_c = ${p[1]};
+jwx_drunken_tiles_radius_factor_c = ${p[2]};
+var random: jrand_;
+if ((jwx_drunken_tiles_inited_ == 0.0)) {
+  jwx_drunken_tiles_inited_ = 1.0;
+  jwx_drunken_tiles_needsReinitCalcs = select(0.0, 1.0, true);
+  jwx_drunken_tiles_radius = 0;
+  jwx_drunken_tiles__r2 = 0;
+}
+drunken_tiles_initializeIfNeeded();
+if (((${p[1]} <= 1.0e-9) || (jwx_drunken_tiles_radius <= 1.0e-9))) {
+  v.x += (${w} * t.x);
+  v.y += (${w} * t.y);
+  if (false) {
+    pz_ += (${w} * z_);
+  }
+  break;
+}
+var inputX: f32 = t.x;
+var inputY: f32 = t.y;
+var finalX: f32 = inputX;
+var finalY: f32 = inputY;
+var invCellSize: f32 = (1.0 / ${p[1]});
+var ix: i32 = i32(floor((inputX * invCellSize)));
+var iy: i32 = i32(floor((inputY * invCellSize)));
+var Cx_reg: f32 = ((f32(ix) + 0.5) * ${p[1]});
+var Cy_reg: f32 = ((f32(iy) + 0.5) * ${p[1]});
+var cellSeed: i32 = ((i32(${p[0]}) ^ (jhashcode(ix) * 31)) ^ jhashcode(iy));
+jrand_setSeed(&(random), cellSeed);
+var Ox: f32 = ((((jrand_nextDouble(&(random)) * 2.0) - 1.0) * ${p[3]}) * ${p[1]});
+var Oy: f32 = ((((jrand_nextDouble(&(random)) * 2.0) - 1.0) * ${p[3]}) * ${p[1]});
+var Cx_pert: f32 = (Cx_reg + Ox);
+var Cy_pert: f32 = (Cy_reg + Oy);
+var Lx: f32 = (inputX - Cx_pert);
+var Ly: f32 = (inputY - Cy_pert);
+var localDistSq: f32 = -1.0;
+var apply_effect: bool = false;
+var currentBoundaryType: i32 = i32(${p[4]});
+switch currentBoundaryType {
+  case 0: {
+    localDistSq = ((Lx * Lx) + (Ly * Ly));
+    if ((localDistSq <= jwx_drunken_tiles__r2)) {
+      apply_effect = true;
+    }
+  }
+  case 1: {
+    if (((abs(Lx) <= jwx_drunken_tiles_radius) && (abs(Ly) <= jwx_drunken_tiles_radius))) {
+      apply_effect = true;
+      localDistSq = ((Lx * Lx) + (Ly * Ly));
+    }
+  }
+  case 2: {
+    {
+      var ar: f32 = max(1.0e-9, abs(${p[5]}));
+      var rx: f32 = jwx_drunken_tiles_radius;
+      var ry: f32 = (jwx_drunken_tiles_radius / ar);
+      var rx_sq: f32 = (rx * rx);
+      var ry_sq: f32 = (ry * ry);
+      if (((rx_sq > 1.0e-12) && (ry_sq > 1.0e-12))) {
+        if (((((Lx * Lx) / rx_sq) + ((Ly * Ly) / ry_sq)) <= 1.0)) {
+          apply_effect = true;
+          localDistSq = ((Lx * Lx) + (Ly * Ly));
+        }
+      }
+      break;
+    }
+  }
+  case 3: {
+    {
+      var r_: f32 = jwx_drunken_tiles_radius;
+      var s32: f32 = (sqrt(3.0) / 2.0);
+      var v1x: f32 = 0;
+      var v1y: f32 = r_;
+      var v2x: f32 = (r_ * s32);
+      var v2y: f32 = (-r_ / 2.0);
+      var v3x: f32 = (-r_ * s32);
+      var v3y: f32 = (-r_ / 2.0);
+      var d1: f32 = drunken_tiles_pointSign(Lx, Ly, v1x, v1y, v2x, v2y);
+      var d2: f32 = drunken_tiles_pointSign(Lx, Ly, v2x, v2y, v3x, v3y);
+      var d3: f32 = drunken_tiles_pointSign(Lx, Ly, v3x, v3y, v1x, v1y);
+      var hn: bool = (((d1 < 0) || (d2 < 0)) || (d3 < 0));
+      var hp: bool = (((d1 > 0) || (d2 > 0)) || (d3 > 0));
+      if (!(hn && hp)) {
+        apply_effect = true;
+        localDistSq = ((Lx * Lx) + (Ly * Ly));
+      }
+      break;
+    }
+  }
+  case 4: {
+    {
+      var a: f32 = (-PI / 4.0);
+      var c: f32 = cos(a);
+      var s: f32 = sin(a);
+      var rLx: f32 = ((c * Lx) - (s * Ly));
+      var rLy: f32 = ((s * Lx) + (c * Ly));
+      if (((abs(rLx) <= jwx_drunken_tiles_radius) && (abs(rLy) <= jwx_drunken_tiles_radius))) {
+        apply_effect = true;
+        localDistSq = ((Lx * Lx) + (Ly * Ly));
+      }
+      break;
+    }
+  }
+  case 5: {
+    {
+      var r_: f32 = jwx_drunken_tiles_radius;
+      var angleStep: f32 = (PI / 3.0);
+      var inside: bool = true;
+      var px: f32 = Lx;
+      var py: f32 = Ly;
+      var v1x: f32 = 0;
+      var v1y: f32 = 0;
+      var v2x: f32 = 0;
+      var v2y: f32 = 0;
+      v2x = 0;
+      v2y = r_;
+      for (var i: i32 = 0; (i < 6); i++) {
+        v1x = v2x;
+        v1y = v2y;
+        var currentAngle: f32 = ((PI / 2.0) + (f32((i + 1)) * angleStep));
+        v2x = (r_ * cos(currentAngle));
+        v2y = (r_ * sin(currentAngle));
+        if (((((v2x - v1x) * (py - v1y)) - ((v2y - v1y) * (px - v1x))) < 0)) {
+          inside = false;
+          break;
+        }
+      }
+      if (inside) {
+        apply_effect = true;
+        localDistSq = ((Lx * Lx) + (Ly * Ly));
+      }
+      break;
+    }
+  }
+  case 6: {
+    {
+      var rO: f32 = jwx_drunken_tiles_radius;
+      var rI: f32 = (jwx_drunken_tiles_radius * max(0.01, min(1.0, ${p[6]})));
+      var angleStep: f32 = (PI / 5.0);
+      var inside: bool = true;
+      var px: f32 = Lx;
+      var py: f32 = Ly;
+      var v1x: f32 = 0;
+      var v1y: f32 = 0;
+      var v2x: f32 = 0;
+      var v2y: f32 = 0;
+      v2x = 0;
+      v2y = rO;
+      for (var i: i32 = 0; (i < 10); i++) {
+        v1x = v2x;
+        v1y = v2y;
+        var currentAngle: f32 = ((PI / 2.0) + (f32((i + 1)) * angleStep));
+        var cR: f32 = select(rI, rO, (((i + 1) % 2) == 0));
+        v2x = (cR * cos(currentAngle));
+        v2y = (cR * sin(currentAngle));
+        if (((((v2x - v1x) * (py - v1y)) - ((v2y - v1y) * (px - v1x))) < 0)) {
+          inside = false;
+          break;
+        }
+      }
+      if (inside) {
+        apply_effect = true;
+        localDistSq = ((Lx * Lx) + (Ly * Ly));
+      }
+      break;
+    }
+  }
+  case 7: {
+    {
+      var arm: f32 = (jwx_drunken_tiles_radius * max(0.01, min(1.0, ${p[7]})));
+      if ((((abs(Lx) <= arm) && (abs(Ly) <= jwx_drunken_tiles_radius)) || ((abs(Lx) <= jwx_drunken_tiles_radius) && (abs(Ly) <= arm)))) {
+        apply_effect = true;
+        localDistSq = ((Lx * Lx) + (Ly * Ly));
+      }
+      break;
+    }
+  }
+  case 8: {
+    {
+      var rI: f32 = (jwx_drunken_tiles_radius * max(0.0, min(0.99, ${p[6]})));
+      var inner_r2: f32 = (rI * rI);
+      localDistSq = ((Lx * Lx) + (Ly * Ly));
+      if (((localDistSq >= inner_r2) && (localDistSq <= jwx_drunken_tiles__r2))) {
+        apply_effect = true;
+      }
+      break;
+    }
+  }
+  case 9: {
+    {
+      var currentRadius: f32 = sqrt(((Lx * Lx) + (Ly * Ly)));
+      if ((currentRadius <= jwx_drunken_tiles_radius)) {
+        if ((currentRadius < 1.0e-9)) {
+          apply_effect = true;
+          localDistSq = 0.0;
+        } else {
+          var angle: f32 = atan2j(Ly, Lx);
+          var k: f32 = max(2, ${p[11]});
+          var flowerBoundaryR: f32 = (jwx_drunken_tiles_radius * abs(cos((k * angle))));
+          if ((currentRadius <= (flowerBoundaryR + 1.0e-9))) {
+            apply_effect = true;
+            localDistSq = (currentRadius * currentRadius);
+          }
+        }
+      }
+      break;
+    }
+  }
+  case 10: {
+    {
+      var currentRadius: f32 = sqrt(((Lx * Lx) + (Ly * Ly)));
+      if ((currentRadius <= jwx_drunken_tiles_radius)) {
+        if ((currentRadius < 1.0e-9)) {
+          apply_effect = true;
+          localDistSq = 0.0;
+        } else {
+          var angle: f32 = atan2j(Ly, Lx);
+          while ((angle < 0)) {
+            angle += (2.0 * PI);
+          }
+          var k: f32 = max(3, ${p[12]});
+          var depth: f32 = max(0.0, min(1.0, ${p[6]}));
+          var R_outer: f32 = jwx_drunken_tiles_radius;
+          var R_inner: f32 = (jwx_drunken_tiles_radius * depth);
+          var anglePerVertex: f32 = (PI / k);
+          var sectorIndex: i32 = i32(floor((angle / anglePerVertex)));
+          var angleInSector: f32 = (angle - (f32(sectorIndex) * anglePerVertex));
+          var t_: f32 = (angleInSector / anglePerVertex);
+          var t_norm: f32 = (2.0 * abs((t_ - 0.5)));
+          var starBoundaryR: f32;
+          if (((sectorIndex % 2) == 0)) {
+            starBoundaryR = (R_inner + ((R_outer - R_inner) * (1.0 - t_norm)));
+          } else {
+            starBoundaryR = (R_inner + ((R_outer - R_inner) * t_norm));
+          }
+          if ((currentRadius <= (starBoundaryR + 1.0e-9))) {
+            apply_effect = true;
+            localDistSq = (currentRadius * currentRadius);
+          }
+        }
+      }
+      break;
+    }
+  }
+  case 11: {
+    {
+      var currentRadius: f32 = sqrt(((Lx * Lx) + (Ly * Ly)));
+      var maxPossibleR: f32 = (jwx_drunken_tiles_radius * (1.0 + abs(${p[13]})));
+      if ((currentRadius <= maxPossibleR)) {
+        if ((currentRadius < 1.0e-9)) {
+          apply_effect = true;
+          localDistSq = 0.0;
+        } else {
+          var angle: f32 = atan2j(Ly, Lx);
+          var amp: f32 = max(0.0, ${p[13]});
+          var freq: f32 = max(0.000001, ${p[14]});
+          var noise: f32 = (((0.6 * sin((freq * angle))) + (0.3 * sin((((2.1 * freq) * angle) + 1.23)))) + (0.1 * sin((((4.3 * freq) * angle) + 4.56))));
+          var cloudBoundaryR: f32 = (jwx_drunken_tiles_radius * (1.0 + (amp * noise)));
+          if ((currentRadius <= (cloudBoundaryR + 1.0e-9))) {
+            apply_effect = true;
+            localDistSq = (currentRadius * currentRadius);
+          }
+        }
+      }
+      break;
+    }
+  }
+  case default: {
+    localDistSq = ((Lx * Lx) + (Ly * Ly));
+    if ((localDistSq <= jwx_drunken_tiles__r2)) {
+      apply_effect = true;
+    }
+  }
+}
+if (apply_effect) {
+  var scaleFactor: f32 = select((1.0 / jwx_drunken_tiles_radius), 1.0, (jwx_drunken_tiles_radius < 1.0e-9));
+  var scaledLx: f32 = (Lx * scaleFactor);
+  var scaledLy: f32 = (Ly * scaleFactor);
+  if ((scaledLx > 1.0)) {
+    scaledLx -= 2.0;
+  }
+  if ((scaledLx < -1.0)) {
+    scaledLx += 2.0;
+  }
+  if ((scaledLy > 1.0)) {
+    scaledLy -= 2.0;
+  }
+  if ((scaledLy < -1.0)) {
+    scaledLy += 2.0;
+  }
+  var k: f32 = (1.0 + ${p[8]});
+  var ljLx: f32 = ((scaledLx * k) * jwx_drunken_tiles_radius);
+  var ljLy: f32 = ((scaledLy * k) * jwx_drunken_tiles_radius);
+  var twist_norm: f32;
+  if (((currentBoundaryType == 1) || (currentBoundaryType == 4))) {
+    twist_norm = select(min(1.0, (max(abs(Lx), abs(Ly)) / jwx_drunken_tiles_radius)), 0.0, (jwx_drunken_tiles_radius < 1.0e-9));
+    if ((currentBoundaryType == 4)) {
+      var a: f32 = (-PI / 4.0);
+      var c: f32 = cos(a);
+      var s: f32 = sin(a);
+      var rLx: f32 = ((c * Lx) - (s * Ly));
+      var rLy: f32 = ((s * Lx) + (c * Ly));
+      twist_norm = select(min(1.0, (max(abs(rLx), abs(rLy)) / jwx_drunken_tiles_radius)), 0.0, (jwx_drunken_tiles_radius < 1.0e-9));
+    }
+  } else {
+    if ((localDistSq < 0)) {
+      localDistSq = ((Lx * Lx) + (Ly * Ly));
+    }
+    twist_norm = select(min(1.0, (sqrt(localDistSq) / jwx_drunken_tiles_radius)), 0.0, ((jwx_drunken_tiles_radius < 1.0e-9) || (localDistSq < 0)));
+  }
+  var theta: f32 = ((${p[9]} * (1.0 - twist_norm)) + (${p[10]} * twist_norm));
+  var s: f32 = sin(theta);
+  var c: f32 = cos(theta);
+  var twistedLx: f32 = ((c * ljLx) - (s * ljLy));
+  var twistedLy: f32 = ((s * ljLx) + (c * ljLy));
+  finalX = (Cx_pert + twistedLx);
+  finalY = (Cy_pert + twistedLy);
+}
+v.x += (${w} * finalX);
+v.y += (${w} * finalY);
+if (false) {
+  pz_ += (${w} * z_);
+}
+break;
+}
+}`,
+  },
   "conicalSpiral": {
     params: [{ name: "turns", def: 8 }, { name: "radius", def: 1.2 }, { name: "height", def: 1 }, { name: "mode", def: 0, int: true }, { name: "z_wave_freq", def: 0 }, { name: "z_wave_amp", def: 0 }, { name: "twist", def: 0 }, { name: "thickness", def: 0 }, { name: "solid", def: 0, int: true }, { name: "colorize", def: 0, int: true }, { name: "colorMode", def: 0, int: true }, { name: "colorSpeed", def: 1 }, { name: "colorOffset", def: 0 }],
     verified: true, priority: 0, flags: ["3d","dc","z"], types: ["3D","BASE_SHAPE","DC"],
@@ -44494,6 +50022,116 @@ if ((min(max(${p[9]}, 0.0), 1.0) > 0)) {
   }
   (*cp) = (abs(((colorDriver * ${p[11]}) + ${p[12]})) % 1.0);
 }
+}`,
+  },
+  "boxfold": {
+    params: [{ name: "foldLimit", def: 1 }, { name: "rotateX", def: 0 }, { name: "rotateY", def: 0 }, { name: "rotateZ", def: 0 }],
+    verified: true, priority: 0, flags: ["3d","z"], types: ["3D"],
+    funcNames: ["jxyz_","atan2j","jxyz__zero","boxfold__negate","boxfold_rotatePoint"],
+    funcs: `struct jxyz_ {
+  x: f32,
+  y: f32,
+  z: f32,
+  color: f32,
+}
+
+fn atan2j(y: f32, x: f32) -> f32 { if (x == 0.0 && y == 0.0) { return select(0.0, PI, (bitcast<u32>(x) >> 31u) == 1u) * select(1.0, -1.0, (bitcast<u32>(y) >> 31u) == 1u); } return atan2(y, x); }
+
+fn jxyz__zero() -> jxyz_ {
+  var r_: jxyz_;
+  return r_;
+}
+
+fn boxfold__negate(p_: jxyz_) -> jxyz_ {
+  var result: jxyz_ = jxyz__zero();
+  {
+    result.x = -p_.x;
+    result.y = -p_.y;
+    result.z = -p_.z;
+  }
+  return result;
+}
+
+fn boxfold_rotatePoint(pInput: jxyz_, anglesRad: jxyz_) -> jxyz_ {
+  var p_: jxyz_ = jxyz__zero();
+  p_.x = pInput.x;
+  p_.y = pInput.y;
+  p_.z = pInput.z;
+  var rotZ: f32 = anglesRad.z;
+  var rotY: f32 = anglesRad.y;
+  var rotX: f32 = anglesRad.x;
+  var cosVal: f32;
+  var sinVal: f32;
+  var tempX: f32;
+  var tempY: f32;
+  var tempZ: f32;
+  if ((rotZ != 0)) {
+    cosVal = cos(rotZ);
+    sinVal = sin(rotZ);
+    tempX = ((p_.x * cosVal) - (p_.y * sinVal));
+    tempY = ((p_.x * sinVal) + (p_.y * cosVal));
+    p_.x = tempX;
+    p_.y = tempY;
+  }
+  if ((rotY != 0)) {
+    cosVal = cos(rotY);
+    sinVal = sin(rotY);
+    tempX = ((p_.x * cosVal) + (p_.z * sinVal));
+    tempZ = ((-p_.x * sinVal) + (p_.z * cosVal));
+    p_.x = tempX;
+    p_.z = tempZ;
+  }
+  if ((rotX != 0)) {
+    cosVal = cos(rotX);
+    sinVal = sin(rotX);
+    tempY = ((p_.y * cosVal) - (p_.z * sinVal));
+    tempZ = ((p_.y * sinVal) + (p_.z * cosVal));
+    p_.y = tempY;
+    p_.z = tempZ;
+  }
+  return p_;
+}`,
+    code: (w, p) => `{
+var F: f32 = ${p[0]};
+var anglesRad: jxyz_ = jxyz__zero();
+anglesRad.x = radians(${p[1]});
+anglesRad.y = radians(${p[2]});
+anglesRad.z = radians(${p[3]});
+var negatedAnglesRad: jxyz_ = boxfold__negate(anglesRad);
+var pIn: jxyz_ = jxyz__zero();
+pIn.x = t.x;
+pIn.y = t.y;
+pIn.z = z_;
+var pLocal: jxyz_ = boxfold_rotatePoint(pIn, negatedAnglesRad);
+var localX: f32 = pLocal.x;
+var localY: f32 = pLocal.y;
+var localZ: f32 = pLocal.z;
+var foldedLocalX: f32 = localX;
+if ((localX > F)) {
+  foldedLocalX = ((2.0 * F) - localX);
+} else if ((localX < -F)) {
+  foldedLocalX = ((-2.0 * F) - localX);
+}
+var foldedLocalY: f32 = localY;
+if ((localY > F)) {
+  foldedLocalY = ((2.0 * F) - localY);
+} else if ((localY < -F)) {
+  foldedLocalY = ((-2.0 * F) - localY);
+}
+var foldedLocalZ: f32 = localZ;
+if ((localZ > F)) {
+  foldedLocalZ = ((2.0 * F) - localZ);
+} else if ((localZ < -F)) {
+  foldedLocalZ = ((-2.0 * F) - localZ);
+}
+var pLocalFolded: jxyz_ = jxyz__zero();
+pLocalFolded.x = foldedLocalX;
+pLocalFolded.y = foldedLocalY;
+pLocalFolded.z = foldedLocalZ;
+var pWorldFolded: jxyz_ = boxfold_rotatePoint(pLocalFolded, anglesRad);
+v.x += (pWorldFolded.x * ${w});
+v.y += (pWorldFolded.y * ${w});
+pz_ += (pWorldFolded.z * ${w});
 }`,
   },
   "cell3D": {
@@ -44725,6 +50363,218 @@ v.y += ${p[60]};
 pz_ += ${p[61]};
 break;
 }
+}`,
+  },
+  "cactusGlobe": {
+    params: [{ name: "pattern_mode", def: 0, int: true }, { name: "generator_mode", def: 1, int: true }, { name: "size", def: 1 }, { name: "ribs_1", def: 12 }, { name: "ribDepth_1", def: 0.1 }, { name: "spiral_1", def: 0.5 }, { name: "ribs_2", def: 0 }, { name: "ribDepth_2", def: 0 }, { name: "spiral_2", def: 0 }, { name: "areoles_per_rib", def: 10 }, { name: "areole_density", def: 1 }, { name: "areole_focus", def: 16 }, { name: "areole_size", def: 0.05 }, { name: "spike_length", def: 0.1 }, { name: "spike_angle_rand", def: 0 }, { name: "spike_droop", def: 0 }, { name: "recursion_depth", def: 3, int: true }, { name: "pup_chance", def: 0.3 }, { name: "pups_count", def: 3, int: true }, { name: "pup_size", def: 0.5 }, { name: "pups_spread", def: 1 }, { name: "pups_vertical_offset", def: -0.5 }, { name: "feature_color", def: 1 }],
+    verified: true, priority: 0, flags: ["3d","dc","state","z"], types: ["3D","BASE_SHAPE"],
+    funcNames: ["jwx_cactusGlobe_generator_mode_c","jwx_cactusGlobe_size_c","jwx_cactusGlobe_pattern_mode_c","jwx_cactusGlobe_ribs_1_c","jwx_cactusGlobe_ribDepth_1_c","jwx_cactusGlobe_spiral_1_c","jwx_cactusGlobe_areoles_per_rib_c","jwx_cactusGlobe_areole_size_c","jwx_cactusGlobe_spiral_2_c","jwx_cactusGlobe_ribs_2_c","jwx_cactusGlobe_ribDepth_2_c","jwx_cactusGlobe_areole_density_c","jwx_cactusGlobe_areole_focus_c","jwx_cactusGlobe_spike_length_c","jwx_cactusGlobe_spike_droop_c","jwx_cactusGlobe_spike_angle_rand_c","jxyz_","atan2j","powc","roundc","jxyz_make","jxyz__zero","cactusGlobe_applySpikeRealism","cactusGlobe_calculateCactusPoint"],
+    funcs: `struct jxyz_ {
+  x: f32,
+  y: f32,
+  z: f32,
+  color: f32,
+}
+
+fn atan2j(y: f32, x: f32) -> f32 { if (x == 0.0 && y == 0.0) { return select(0.0, PI, (bitcast<u32>(x) >> 31u) == 1u) * select(1.0, -1.0, (bitcast<u32>(y) >> 31u) == 1u); } return atan2(y, x); }
+
+fn powc(x: f32, y: f32) -> f32 {
+  if (x >= 0.0) { return pow(x, y); }
+  let yi = round(y);
+  if (abs(y - yi) > 1e-6) { return pow(x, y); }
+  let m = pow(-x, y);
+  return select(m, -m, (i32(yi) & 1) != 0);
+}
+
+fn roundc(x: f32) -> f32 { return sign(x) * floor(abs(x) + 0.5); }
+
+fn jxyz_make(x: f32, y: f32, z: f32, color: f32) -> jxyz_ {
+  var r_: jxyz_;
+  r_.x = x;
+  r_.y = y;
+  r_.z = z;
+  r_.color = color;
+  return r_;
+}
+
+fn jxyz__zero() -> jxyz_ {
+  var r_: jxyz_;
+  return r_;
+}
+
+fn cactusGlobe_applySpikeRealism(x: f32, y: f32, z: f32, rs: ptr<function, u32>) -> vec3f {
+  var current_spike_length: f32 = (jwx_cactusGlobe_spike_length_c * rnd(rs));
+  var body_len: f32 = sqrt((((x * x) + (y * y)) + (z * z)));
+  if ((body_len < 0.000001)) {
+    return vec3f(0, 0, 0);
+  }
+  var nx: f32 = (x / body_len);
+  var ny: f32 = (y / body_len);
+  var nz: f32 = (z / body_len);
+  var spike_vec: vec3f = vec3f((nx * current_spike_length), (ny * current_spike_length), (nz * current_spike_length));
+  spike_vec.z -= (jwx_cactusGlobe_spike_droop_c * current_spike_length);
+  if ((jwx_cactusGlobe_spike_angle_rand_c > 0)) {
+    var r_x: f32 = (rnd(rs) - 0.5);
+    var r_y: f32 = (rnd(rs) - 0.5);
+    var r_z: f32 = (rnd(rs) - 0.5);
+    var r_len: f32 = sqrt((((r_x * r_x) + (r_y * r_y)) + (r_z * r_z)));
+    if ((r_len > 0.000001)) {
+      var splay_magnitude: f32 = ((jwx_cactusGlobe_spike_angle_rand_c * current_spike_length) * rnd(rs));
+      spike_vec.x += ((r_x / r_len) * splay_magnitude);
+      spike_vec.y += ((r_y / r_len) * splay_magnitude);
+      spike_vec.z += ((r_z / r_len) * splay_magnitude);
+    }
+  }
+  return spike_vec;
+}
+
+fn cactusGlobe_calculateCactusPoint(pAffineTP_: jxyz_, current_size: f32, rs: ptr<function, u32>) -> vec4f {
+  var base_rho: f32;
+  var theta: f32;
+  var phi: f32;
+  if ((jwx_cactusGlobe_generator_mode_c == 1)) {
+    base_rho = (current_size * powc(rnd(rs), (1.0 / 3.0)));
+    theta = ((rnd(rs) * 2.0) * PI);
+    phi = acos(((2.0 * rnd(rs)) - 1.0));
+  } else {
+    var p_scale: f32 = select(current_size, (current_size / jwx_cactusGlobe_size_c), (jwx_cactusGlobe_size_c > 0));
+    var scaledAffineTP: jxyz_ = jxyz__zero();
+    scaledAffineTP.x = (pAffineTP_.x * p_scale);
+    scaledAffineTP.y = (pAffineTP_.y * p_scale);
+    scaledAffineTP.z = (pAffineTP_.z * p_scale);
+    base_rho = sqrt((((scaledAffineTP.x * scaledAffineTP.x) + (scaledAffineTP.y * scaledAffineTP.y)) + (scaledAffineTP.z * scaledAffineTP.z)));
+    if ((base_rho == 0.0)) {
+      return vec4f(0, 0, 0, -1.0);
+    }
+    theta = atan2j(scaledAffineTP.y, scaledAffineTP.x);
+    phi = acos((scaledAffineTP.z / base_rho));
+  }
+  var sinPhi: f32 = sin(phi);
+  var cosPhi: f32 = cos(phi);
+  var final_x: f32;
+  var final_y: f32;
+  var final_z: f32;
+  var hasFeature: bool = false;
+  if ((jwx_cactusGlobe_pattern_mode_c == 0)) {
+    var rib_cos: f32 = cos((theta * jwx_cactusGlobe_ribs_1_c));
+    var effective_ribDepth: f32 = (jwx_cactusGlobe_ribDepth_1_c * sinPhi);
+    var cactus_rho: f32 = (base_rho + (effective_ribDepth * rib_cos));
+    var cactus_theta: f32 = (theta + (phi * jwx_cactusGlobe_spiral_1_c));
+    final_x = ((cactus_rho * sinPhi) * cos(cactus_theta));
+    final_y = ((cactus_rho * sinPhi) * sin(cactus_theta));
+    final_z = (cactus_rho * cosPhi);
+    if ((jwx_cactusGlobe_areoles_per_rib_c > 0)) {
+      var rib_width: f32 = ((2.0 * PI) / jwx_cactusGlobe_ribs_1_c);
+      var rib_center_theta: f32 = (roundc((theta / rib_width)) * rib_width);
+      var areole_cell_height: f32 = (PI / jwx_cactusGlobe_areoles_per_rib_c);
+      var areole_center_phi: f32 = ((floor((phi / areole_cell_height)) * areole_cell_height) + (areole_cell_height * 0.5));
+      var dist_to_areole_center: f32 = acos((((sin(phi) * sin(areole_center_phi)) * cos((theta - rib_center_theta))) + (cos(phi) * cos(areole_center_phi))));
+      if ((dist_to_areole_center < jwx_cactusGlobe_areole_size_c)) {
+        hasFeature = true;
+        var spike_vec: vec3f = cactusGlobe_applySpikeRealism(final_x, final_y, final_z, rs);
+        final_x += spike_vec.x;
+        final_y += spike_vec.y;
+        final_z += spike_vec.z;
+      }
+    }
+  } else {
+    var theta_1: f32 = (theta + (phi * jwx_cactusGlobe_spiral_1_c));
+    var rib_cos_1: f32 = cos((theta_1 * jwx_cactusGlobe_ribs_1_c));
+    var theta_2: f32 = (theta + (phi * jwx_cactusGlobe_spiral_2_c));
+    var rib_cos_2: f32 = cos((theta_2 * jwx_cactusGlobe_ribs_2_c));
+    var effective_ribDepth_1: f32 = (jwx_cactusGlobe_ribDepth_1_c * sinPhi);
+    var effective_ribDepth_2: f32 = (jwx_cactusGlobe_ribDepth_2_c * sinPhi);
+    var cactus_rho: f32 = ((base_rho + (effective_ribDepth_1 * rib_cos_1)) + (effective_ribDepth_2 * rib_cos_2));
+    final_x = ((cactus_rho * sinPhi) * cos(theta));
+    final_y = ((cactus_rho * sinPhi) * sin(theta));
+    final_z = (cactus_rho * cosPhi);
+    if (((jwx_cactusGlobe_areole_density_c > 0) && (rnd(rs) < jwx_cactusGlobe_areole_density_c))) {
+      var intersection_factor: f32 = powc((((rib_cos_1 + 1.0) / 2.0) * ((rib_cos_2 + 1.0) / 2.0)), jwx_cactusGlobe_areole_focus_c);
+      if ((rnd(rs) < intersection_factor)) {
+        hasFeature = true;
+        var spike_vec: vec3f = cactusGlobe_applySpikeRealism(final_x, final_y, final_z, rs);
+        final_x += spike_vec.x;
+        final_y += spike_vec.y;
+        final_z += spike_vec.z;
+      }
+    }
+  }
+  return vec4f(final_x, final_y, final_z, select(-1.0, 1.0, hasFeature));
+}
+
+var<private> jwx_cactusGlobe_generator_mode_c: f32 = 0.0;
+
+var<private> jwx_cactusGlobe_size_c: f32 = 0.0;
+
+var<private> jwx_cactusGlobe_pattern_mode_c: f32 = 0.0;
+
+var<private> jwx_cactusGlobe_ribs_1_c: f32 = 0.0;
+
+var<private> jwx_cactusGlobe_ribDepth_1_c: f32 = 0.0;
+
+var<private> jwx_cactusGlobe_spiral_1_c: f32 = 0.0;
+
+var<private> jwx_cactusGlobe_areoles_per_rib_c: f32 = 0.0;
+
+var<private> jwx_cactusGlobe_areole_size_c: f32 = 0.0;
+
+var<private> jwx_cactusGlobe_spiral_2_c: f32 = 0.0;
+
+var<private> jwx_cactusGlobe_ribs_2_c: f32 = 0.0;
+
+var<private> jwx_cactusGlobe_ribDepth_2_c: f32 = 0.0;
+
+var<private> jwx_cactusGlobe_areole_density_c: f32 = 0.0;
+
+var<private> jwx_cactusGlobe_areole_focus_c: f32 = 0.0;
+
+var<private> jwx_cactusGlobe_spike_length_c: f32 = 0.0;
+
+var<private> jwx_cactusGlobe_spike_droop_c: f32 = 0.0;
+
+var<private> jwx_cactusGlobe_spike_angle_rand_c: f32 = 0.0;`,
+    code: (w, p) => `{
+jwx_cactusGlobe_generator_mode_c = min(max(${p[1]}, 0.0), 1.0);
+jwx_cactusGlobe_size_c = ${p[2]};
+jwx_cactusGlobe_pattern_mode_c = min(max(${p[0]}, 0.0), 1.0);
+jwx_cactusGlobe_ribs_1_c = ${p[3]};
+jwx_cactusGlobe_ribDepth_1_c = ${p[4]};
+jwx_cactusGlobe_spiral_1_c = ${p[5]};
+jwx_cactusGlobe_areoles_per_rib_c = ${p[9]};
+jwx_cactusGlobe_areole_size_c = ${p[12]};
+jwx_cactusGlobe_spiral_2_c = ${p[8]};
+jwx_cactusGlobe_ribs_2_c = ${p[6]};
+jwx_cactusGlobe_ribDepth_2_c = ${p[7]};
+jwx_cactusGlobe_areole_density_c = min(max(${p[10]}, 0.0), 1.0);
+jwx_cactusGlobe_areole_focus_c = ${p[11]};
+jwx_cactusGlobe_spike_length_c = ${p[13]};
+jwx_cactusGlobe_spike_droop_c = ${p[15]};
+jwx_cactusGlobe_spike_angle_rand_c = ${p[14]};
+var current_size: f32 = ${p[2]};
+var total_offset_x: f32 = 0;
+var total_offset_y: f32 = 0;
+var total_offset_z: f32 = 0;
+for (var i: i32 = 0; (f32(i) < min(max(${p[16]}, 0.0), 8.0)); i++) {
+  if ((rnd(rs) < min(max(${p[17]}, 0.0), 1.0))) {
+    var pup_idx: i32 = i32((rnd(rs) * f32(i32(${p[18]}))));
+    var angle: f32 = (((f32(pup_idx) / f32(i32(${p[18]}))) * 2.0) * PI);
+    var spread: f32 = (current_size * ${p[20]});
+    var vertical_offset: f32 = (current_size * ${p[21]});
+    total_offset_x += (spread * cos(angle));
+    total_offset_y += (spread * sin(angle));
+    total_offset_z += vertical_offset;
+    current_size *= ${p[19]};
+  } else {
+    break;
+  }
+}
+var finalCoords: vec4f = cactusGlobe_calculateCactusPoint(jxyz_make(t.x, t.y, z_, (*cp)), current_size, rs);
+if ((finalCoords.w > 0)) {
+  (*cp) = min(max(${p[22]}, 0.0), 1.0);
+}
+v.x += ((finalCoords.x + total_offset_x) * ${w});
+v.y += ((finalCoords.y + total_offset_y) * ${w});
+pz_ += ((finalCoords.z + total_offset_z) * ${w});
 }`,
   },
   "juliascopePlus": {

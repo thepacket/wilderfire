@@ -87,7 +87,8 @@ fn snip_(pin: vec4f, rs: ptr<function, u32>) -> vec4f {
   var v = ${priority === 1 || priority === 2 ? 't' : 'vec2f(0.0, 0.0)'}; // post (and the forward half of a prepost pair) mutate the output point
   ${snippet}
   // color + hide packed: c in [0,1], +10 when hidden
-  return vec4f(${priority === -1 ? 't' : 'v'}, ${priority === -1 ? 'z_' : 'pz_'}, c + select(0.0, 10.0, hide));
+  // pre-priority: input + accumulator (JWildfire keeps what a pre step adds into pVarT for the main sum)
+  return vec4f(${priority === -1 ? '(t + v)' : 'v'}, ${priority === -1 ? '(z_ + pz_)' : 'pz_'}, c + select(0.0, 10.0, hide));
 }
 
 @compute @workgroup_size(64)

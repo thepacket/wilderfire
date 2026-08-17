@@ -95,6 +95,26 @@ describe('java2cu: prepost pairs', () => {
   });
 });
 
+describe('java2cu: Complex, pointer propagation, null guards, setParameter locals', () => {
+  const d: DumpVar = { name: 'reg_complex', params: [{ name: 're', def: 1, int: false }, { name: 'im', def: 0.5, int: false }], priority: 0 };
+
+  it('maps JWildfire\'s Complex to the jcx_ struct library (copy ctor, mutating methods), makes a relayed object param a pointer, drops null-only guards, and finds the field behind a `double v = …; re = v;` branch', () => {
+    const { p, wgsl } = port('RegComplexFunc.java', d);
+    expect(p.gpuCode).toContain('jcx_ z = jcx_make(__x, __y);');
+    expect(p.gpuCode).toContain('jcx_ w = jcx_make(z);');
+    for (const m of ['jcx_Exp(&z)', 'jcx_Div(&z, c)', 'jcx_Sqr(&z)', 'jcx_Mul(&z, c)', 'jcx_Add(&z, w)', 'jcx_Log(&z)', 'jcx_Scale(&z, __amount_)']) expect(p.gpuCode).toContain(m);
+    expect(p.gpuFunctions).toContain('struct jcx_ {');
+    expect(p.gpuFunctions).toContain('void reg_complex_fill(reg_complex_Pair *out, float v)');
+    expect(p.gpuFunctions).toContain('void reg_complex_relay(reg_complex_Pair *q, float v)'); // relayed → pointer too
+    expect(p.gpuCode).not.toContain('null');
+    expect(p.gpuCode).toContain('__reg_complex_re'); // the param was recognised through the local `v`
+    expect(wgsl.functions).toContain('fn jcx_Exp(');
+    expect(wgsl.functions).toContain('fn reg_complex_relay(q: ptr<function, reg_complex_Pair>, v_: f32)');
+    expect(p.gpuCode).toMatchSnapshot('cuda');
+    expect(wgsl.code).toMatchSnapshot('wgsl');
+  });
+});
+
 describe('java2cu: parse errors are reported, not silently ported', () => {
   it('rejects a class without transform()', async () => {
     const src = fixture('RegDemoFunc.java').replace('public void transform(', 'public void transformX(');

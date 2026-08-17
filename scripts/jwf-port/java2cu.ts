@@ -96,6 +96,8 @@ const BUILTIN_PODS: Pod[] = [
   { name: 'MarsagliaRandomGenerator', fields: [{ type: 'int', name: 'u' }, { type: 'int', name: 'v' }], ctor: null, setters: [], builtin: { cuda: 'jmrg_', lib: 'jmrg', methods: { randomize: 'jmrg_randomize', random: 'jmrg_random' } } },
   { name: 'XYZPoint', fields: [{ type: 'float', name: 'x' }, { type: 'float', name: 'y' }, { type: 'float', name: 'z' }, { type: 'float', name: 'color' }], ctor: null, setters: [], builtin: { cuda: 'jxyz_', lib: 'jxyz', methods: { assign: 'jxyz_assign' } } },
   { name: 'DoubleWrapperWF', fields: [{ type: 'float', name: 'value' }], ctor: null, setters: [], builtin: { cuda: 'jdw_', lib: 'jdw', methods: {} } },
+  // JWildfire's org.jwildfire.base.mathlib.Complex (mutating methods; per_fix/save_* carried): jcx_ (LIB, line-by-line port)
+  { name: 'Complex', fields: [{ type: 'float', name: 're' }, { type: 'float', name: 'im' }, { type: 'float', name: 'save_re' }, { type: 'float', name: 'save_im' }, { type: 'float', name: 'per_fix' }], ctor: { params: ['float re', 'float im'], assigns: [] }, setters: [], builtin: { cuda: 'jcx_', lib: 'jcx', ctorFn: 'jcx_make', methods: Object.fromEntries(['One', 'ImOne', 'Zero', 'Copy', 'Flip', 'Conj', 'Neg', 'Sig', 'Sig2', 'Mag2', 'Mag2eps', 'MagInv', 'Save', 'Restore', 'Switch', 'Keep', 'Recall', 'NextPow', 'Sqr', 'Recip', 'Scale', 'Mul', 'Div', 'DivR', 'Add', 'AMean', 'RootMeanS', 'GMean', 'Heronian', 'HMean', 'Sub', 'SubR', 'Inc', 'Dec', 'PerFix', 'Pow', 'Radius', 'Arg', 'ToP', 'UnP', 'Norm', 'Exp', 'SinH', 'Sin', 'CosH', 'Cos', 'Sqrt', 'Log', 'LMean', 'AtanH', 'AsinH', 'AcosH', 'AcotH', 'AsecH', 'AcosecH', 'Atan', 'Asin', 'Acos', 'CPow'].map((m) => [m, 'jcx_' + m])) } },
   { name: 'Random', fields: [{ type: 'int', name: 's0' }, { type: 'int', name: 's1' }, { type: 'int', name: 's2' }], ctor: { params: ['int seed'], assigns: [] }, setters: [], builtin: { cuda: 'jrand_', lib: 'jrand', methods: { nextDouble: 'jrand_nextDouble', nextInt: 'jrand_nextInt', setSeed: 'jrand_setSeed', nextFloat: 'jrand_nextDouble' }, ctorFn: 'jrand_make' } },
 ];
 const POD_TYPE: Record<string, string> = { double: 'float', float: 'float', long: 'int', int: 'int', short: 'int', boolean: 'bool' };
@@ -224,7 +226,7 @@ const MATH_MAP: Record<string, string> = {
   'Math.sin': 'sinf', 'Math.cos': 'cosf', 'Math.tan': 'tanf', 'Math.sqrt': 'sqrtf', 'Math.abs': 'fabsf', 'Math.atan2': 'atan2f', 'Math.atan': 'atanf',
   'Math.asin': 'asinf', 'Math.acos': 'acosf', 'Math.pow': 'powf', 'Math.exp': 'expf', 'Math.log': 'logf', 'Math.log10': 'log10f', 'Math.floor': 'floorf', 'Math.ceil': 'ceilf',
   'Math.round': 'roundf', 'Math.sinh': 'sinhf', 'Math.cosh': 'coshf', 'Math.tanh': 'tanhf', 'Math.max': 'fmaxf', 'Math.min': 'fminf', 'Math.hypot': 'hypotf',
-  'Math.cbrt': 'cbrtf', 'Math.signum': 'sign', 'Math.random': 'RANDFLOAT', 'Math.rint': 'rintf', 'Math.toRadians': 'radians', 'Math.expm1': 'expm1f', 'Math.log1p': 'log1pf',
+  'Double.isNaN': 'isnan', 'Double.isInfinite': 'isinf', 'Integer.hashCode': 'jhashcode', 'Math.cbrt': 'cbrtf', 'Math.signum': 'sign', 'Math.random': 'RANDFLOAT', 'Math.rint': 'rintf', 'Math.toRadians': 'radians', 'Math.expm1': 'expm1f', 'Math.log1p': 'log1pf',
   'MathLib.sin': 'sinf', 'MathLib.cos': 'cosf', 'MathLib.sqrt': 'sqrtf', 'MathLib.fabs': 'fabsf', 'MathLib.atan2': 'atan2f', 'MathLib.pow': 'powf', 'MathLib.exp': 'expf',
   'MathLib.log': 'logf', 'MathLib.floor': 'floorf', 'MathLib.sqr': 'sqr', 'MathLib.M_PI': 'M_PI', 'MathLib.M_2PI': 'M_2PI',
   'Tools.FTOI': 'lroundf', 'Tools.limitValue': 'limitValue', 'Tools.limitVal': 'limitValue', 'Tools.limitIntVal': 'limitValue',
@@ -241,6 +243,71 @@ const RESERVED_LOCALS = new Set(['x', 'y', 'z']);
 interface Ctx { name: string; params: Set<string>; fieldMap: Map<string, string>; state: Set<string>; /** state field → varpar slot name (a field that shares its name with a param gets `_s`, or `varpar->x` would read as the param `__x`) */ stateName: (id: string) => string; helperNames: Set<string>; usedHelperParams: Set<string>; inHelper: boolean; consts: Map<string, string>; usedLib: Set<string>; pods: Map<string, string>; podMethods: Map<string, string>; podFields: Map<string, Set<string>>; podValue: boolean }
 // small device helpers some conversions need (appended to gpuFunctions when used)
 const LIB: Record<string, string> = {
+  jcx: `struct jcx_ { float re; float im; float save_re; float save_im; float per_fix; };
+__device__ jcx_ jcx__zero() { jcx_ z; z.re = 0.f; z.im = 0.f; z.save_re = 0.f; z.save_im = 0.f; z.per_fix = 0.f; return z; }
+__device__ jcx_ jcx_make(float re, float im) { jcx_ z = jcx__zero(); z.re = re; z.im = im; return z; }
+__device__ jcx_ jcx_make(float re) { return jcx_make(re, 0.f); }
+__device__ jcx_ jcx_make(jcx_ zz) { return jcx_make(zz.re, zz.im); }
+__device__ void jcx_One(jcx_ *z) { z->re = 1.f; z->im = 0.f; }
+__device__ void jcx_ImOne(jcx_ *z) { z->re = 0.f; z->im = 1.f; }
+__device__ void jcx_Zero(jcx_ *z) { z->re = 0.f; z->im = 0.f; }
+__device__ void jcx_Copy(jcx_ *z, jcx_ zz) { z->re = zz.re; z->im = zz.im; }
+__device__ void jcx_Flip(jcx_ *z) { float r2 = z->im; float i2 = z->re; z->re = r2; z->im = i2; }
+__device__ void jcx_Conj(jcx_ *z) { z->im = -z->im; }
+__device__ void jcx_Neg(jcx_ *z) { z->re = -z->re; z->im = -z->im; }
+__device__ float jcx_Sig(jcx_ *z) { if (z->re == 0.f) return 0.f; if (z->re > 0.f) return 1.f; return -1.f; }
+__device__ float jcx_Sig2(jcx_ *z) { if (z->re >= 0.f) return 1.f; return -1.f; }
+__device__ float jcx_Mag2(jcx_ *z) { return z->re * z->re + z->im * z->im; }
+__device__ float jcx_Mag2eps(jcx_ *z) { return z->re * z->re + z->im * z->im + 1e-20f; }
+__device__ float jcx_MagInv(jcx_ *z) { float M2 = jcx_Mag2(z); return (M2 < 1e-100f ? 1.f : 1.f / M2); }
+__device__ void jcx_Save(jcx_ *z) { z->save_re = z->re; z->save_im = z->im; }
+__device__ void jcx_Restore(jcx_ *z) { z->re = z->save_re; z->im = z->save_im; }
+__device__ void jcx_Switch(jcx_ *z) { float r2 = z->save_re; float i2 = z->save_im; z->save_re = z->re; z->save_im = z->im; z->re = r2; z->im = i2; }
+__device__ void jcx_Keep(jcx_ *z, jcx_ zz) { z->save_re = zz.re; z->save_im = zz.im; }
+__device__ jcx_ jcx_Recall(jcx_ *z) { return jcx_make(z->save_re, z->save_im); }
+__device__ void jcx_Sqr(jcx_ *z) { float r2 = z->re * z->re - z->im * z->im; float i2 = 2.f * z->re * z->im; z->re = r2; z->im = i2; }
+__device__ void jcx_Recip(jcx_ *z) { float mi = jcx_MagInv(z); z->re = z->re * mi; z->im = -z->im * mi; }
+__device__ void jcx_Scale(jcx_ *z, float mul) { z->re = z->re * mul; z->im = z->im * mul; }
+__device__ void jcx_Mul(jcx_ *z, jcx_ zz) { if (zz.im == 0.f) { jcx_Scale(z, zz.re); return; } float r2 = z->re * zz.re - z->im * zz.im; float i2 = z->re * zz.im + z->im * zz.re; z->re = r2; z->im = i2; }
+__device__ void jcx_NextPow(jcx_ *z) { jcx_Mul(z, jcx_Recall(z)); }
+__device__ void jcx_Div(jcx_ *z, jcx_ zz) { float r2 = z->im * zz.im + z->re * zz.re; float i2 = z->im * zz.re - z->re * zz.im; float M2 = jcx_MagInv(&zz); z->re = r2 * M2; z->im = i2 * M2; }
+__device__ void jcx_DivR(jcx_ *z, jcx_ zz) { float r2 = zz.im * z->im + zz.re * z->re; float i2 = zz.im * z->re - zz.re * z->im; float M2 = jcx_MagInv(z); z->re = r2 * M2; z->im = i2 * M2; }
+__device__ void jcx_Add(jcx_ *z, jcx_ zz) { z->re += zz.re; z->im += zz.im; }
+__device__ void jcx_Sub(jcx_ *z, jcx_ zz) { z->re -= zz.re; z->im -= zz.im; }
+__device__ void jcx_SubR(jcx_ *z, jcx_ zz) { z->re = zz.re - z->re; z->im = zz.im - z->im; }
+__device__ void jcx_Inc(jcx_ *z) { z->re += 1.f; }
+__device__ void jcx_Dec(jcx_ *z) { z->re -= 1.f; }
+__device__ void jcx_PerFix(jcx_ *z, float v) { z->per_fix = PI * v; }
+__device__ float jcx_Radius(jcx_ *z) { return hypotf(z->re, z->im); }
+__device__ float jcx_Arg(jcx_ *z) { return z->per_fix + atan2f(z->im, z->re); }
+__device__ jcx_ jcx_ToP(jcx_ *z) { return jcx_make(jcx_Radius(z), jcx_Arg(z)); }
+__device__ jcx_ jcx_UnP(jcx_ *z) { return jcx_make(z->re * cosf(z->im), z->re * sinf(z->im)); }
+__device__ void jcx_Norm(jcx_ *z) { jcx_Scale(z, sqrtf(jcx_MagInv(z))); }
+__device__ void jcx_Exp(jcx_ *z) { z->re = expf(z->re); jcx_Copy(z, jcx_UnP(z)); }
+__device__ void jcx_Sqrt(jcx_ *z) { float Rad = jcx_Radius(z); float sb = (z->im < 0.f) ? -1.f : 1.f; z->im = sb * sqrtf(0.5f * (Rad - z->re)); z->re = sqrtf(0.5f * (Rad + z->re)); if (z->per_fix < 0.f) jcx_Neg(z); }
+__device__ void jcx_Pow(jcx_ *z, float ex0) { if (ex0 == 0.f) { jcx_One(z); return; } float ex = fabsf(ex0); if (ex0 < 0.f) jcx_Recip(z); if (ex == 0.5f) { jcx_Sqrt(z); return; } if (ex == 1.f) return; if (ex == 2.f) { jcx_Sqr(z); return; } jcx_ PF = jcx_ToP(z); PF.re = powf(PF.re, ex); PF.im = PF.im * ex; jcx_Copy(z, jcx_UnP(&PF)); }
+__device__ void jcx_AMean(jcx_ *z, jcx_ zz) { jcx_Add(z, zz); jcx_Scale(z, 0.5f); }
+__device__ void jcx_RootMeanS(jcx_ *z, jcx_ zz) { jcx_ PF = jcx_make(zz); jcx_Sqr(&PF); jcx_Sqr(z); jcx_Add(z, PF); jcx_Scale(z, 0.5f); jcx_Pow(z, 0.5f); }
+__device__ void jcx_GMean(jcx_ *z, jcx_ zz) { jcx_Mul(z, zz); jcx_Pow(z, 0.5f); }
+__device__ void jcx_Heronian(jcx_ *z, jcx_ zz) { jcx_ HM = jcx_make(*z); jcx_GMean(&HM, zz); jcx_Add(z, zz); jcx_Add(z, HM); jcx_Scale(z, 0.333333333333333333f); }
+__device__ void jcx_HMean(jcx_ *z, jcx_ zz) { float p2 = (zz.re + z->re); float q2 = (zz.im + z->im); float D = 0.5f * (p2 * p2 + q2 * q2); if (D == 0.f) { jcx_Zero(z); return; } D = 1.f / D; p2 = jcx_Mag2(z); q2 = jcx_Mag2(&zz); if (p2 * q2 == 0.f) { jcx_Zero(z); return; } z->re = D * (z->re * q2 + zz.re * p2); z->im = D * (z->im * q2 + zz.im * p2); }
+__device__ void jcx_SinH(jcx_ *z) { float er = 1.f; z->re = expf(z->re); er /= z->re; float rr = 0.5f * (z->re - er); float ri = rr + er; z->re = cosf(z->im) * rr; z->im = sinf(z->im) * ri; }
+__device__ void jcx_Sin(jcx_ *z) { jcx_Flip(z); jcx_SinH(z); jcx_Flip(z); }
+__device__ void jcx_CosH(jcx_ *z) { float er = 1.f; z->re = expf(z->re); er /= z->re; float rr = 0.5f * (z->re - er); float ri = rr + er; z->re = cosf(z->im) * ri; z->im = sinf(z->im) * rr; }
+__device__ void jcx_Cos(jcx_ *z) { jcx_Flip(z); jcx_CosH(z); jcx_Flip(z); }
+__device__ void jcx_Log(jcx_ *z) { jcx_ L = jcx_make(0.5f * logf(jcx_Mag2eps(z)), jcx_Arg(z)); jcx_Copy(z, L); }
+__device__ void jcx_LMean(jcx_ *z, jcx_ zz) { jcx_ dab = jcx_make(*z); jcx_ lab = jcx_make(*z); jcx_Sub(&dab, zz); jcx_Div(&lab, zz); jcx_Log(&lab); jcx_Div(&dab, lab); jcx_Copy(z, dab); }
+__device__ void jcx_AtanH(jcx_ *z) { jcx_ D = jcx_make(*z); jcx_Dec(&D); jcx_Neg(&D); jcx_Inc(z); jcx_Div(z, D); jcx_Log(z); jcx_Scale(z, 0.5f); }
+__device__ void jcx_AsinH(jcx_ *z) { jcx_ D = jcx_make(*z); jcx_Sqr(&D); jcx_Inc(&D); jcx_Pow(&D, 0.5f); jcx_Add(z, D); jcx_Log(z); }
+__device__ void jcx_AcosH(jcx_ *z) { jcx_ D = jcx_make(*z); jcx_Sqr(&D); jcx_Dec(&D); jcx_Pow(&D, 0.5f); jcx_Add(z, D); jcx_Log(z); }
+__device__ void jcx_AcotH(jcx_ *z) { jcx_Recip(z); jcx_AtanH(z); }
+__device__ void jcx_AsecH(jcx_ *z) { jcx_Recip(z); jcx_AsinH(z); }
+__device__ void jcx_AcosecH(jcx_ *z) { jcx_Recip(z); jcx_AcosH(z); }
+__device__ void jcx_Atan(jcx_ *z) { jcx_Flip(z); jcx_AtanH(z); jcx_Flip(z); }
+__device__ void jcx_Asin(jcx_ *z) { jcx_Flip(z); jcx_AsinH(z); jcx_Flip(z); }
+__device__ void jcx_Acos(jcx_ *z) { jcx_Flip(z); jcx_AsinH(z); jcx_Flip(z); z->re = (PI / 2.f) - z->re; z->im = -z->im; }
+__device__ void jcx_CPow(jcx_ *z, jcx_ ex) { if (ex.im == 0.f) { jcx_Pow(z, ex.re); return; } jcx_Log(z); jcx_Mul(z, ex); jcx_Exp(z); }`,
+  jhashcode: '__device__ int jhashcode(int a) { return a; }', // Integer.hashCode(int) is the int itself
   jgcd: '__device__ int jgcd(int a, int b) { a = abs(a); b = abs(b); while (b != 0) { int t = a % b; a = b; b = t; } return a; }',
   G_Kscope: '__device__ float2 G_Kscope(float2 uv, float k) { float angle = fabsf(mod(atan2f(uv.y, uv.x), 2.0f * k) - k); return make_float2(length(uv) * cosf(angle), length(uv) * sinf(angle)); }',
   G_rot: '__device__ mat3_ G_rot(float3 s) { float sa = sinf(s.x), ca = cosf(s.x), sb = sinf(s.y), cb = cosf(s.y), sc = sinf(s.z), cc = cosf(s.z); return mat3_make(cb*cc, -cb*sc, sb, sa*sb*cc+ca*sc, -sa*sb*sc+ca*cc, -sa*cb, -ca*sb*cc+sa*sc, ca*sb*sc+sa*cc, ca*cb); }',
@@ -252,13 +319,14 @@ const LIB: Record<string, string> = {
     + '__device__ int jrand_next(jrand_ *r, int bits) { unsigned int a0 = (unsigned int)r->s0, a1 = (unsigned int)r->s1, a2 = (unsigned int)r->s2; unsigned int t0 = a0 * 58989u + 11u; unsigned int r0 = t0 & 65535u; unsigned int c0 = t0 >> 16; unsigned int t1a = a0 * 57068u + c0; unsigned int c1a = t1a >> 16; unsigned int t1b = a1 * 58989u + (t1a & 65535u); unsigned int r1 = t1b & 65535u; unsigned int c1 = c1a + (t1b >> 16); unsigned int r2 = (a0 * 5u + a1 * 57068u + a2 * 58989u + c1) & 65535u; r->s0 = (int)r0; r->s1 = (int)r1; r->s2 = (int)r2; unsigned int hi = (r2 << 16) | r1; return (int)(hi >> (32 - bits)); }\n'
     + '__device__ float jrand_nextDouble(jrand_ *r) { return (float)jrand_next(r, 26) * (1.0f / 67108864.0f) + (float)jrand_next(r, 27) * (1.0f / 9007199254740992.0f); }\n'
     + '__device__ int jrand_nextInt(jrand_ *r, int n) { if (n <= 0) return 0; if ((n & -n) == n) { int k = 0; int m = n; while (m > 1) { m = m >> 1; k = k + 1; } return jrand_next(r, 31) >> (31 - k); } int bits; int val; do { bits = jrand_next(r, 31); val = bits % n; } while (bits - val + (n - 1) < 0); return val; }',
-  jxyz: 'struct jxyz_ { float x; float y; float z; float color; };\n__device__ jxyz_ jxyz__zero() { jxyz_ r_; return r_; }\n__device__ void jxyz_assign(jxyz_ *a, jxyz_ b) { a->x = b.x; a->y = b.y; a->z = b.z; a->color = b.color; }',
+  jxyz: 'struct jxyz_ { float x; float y; float z; float color; };\n__device__ jxyz_ jxyz__zero() { jxyz_ r_; return r_; }\n__device__ void jxyz_assign(jxyz_ *a, jxyz_ b) { a->x = b.x; a->y = b.y; a->z = b.z; a->color = b.color; }\n__device__ jxyz_ jxyz_make(float x, float y, float z, float color) { jxyz_ r_; r_.x = x; r_.y = y; r_.z = z; r_.color = color; return r_; }',
   jdw: 'struct jdw_ { float value; };\n__device__ jdw_ jdw__zero() { jdw_ r_; return r_; }',
   mat3: 'struct mat3_ { float a00; float a10; float a20; float a01; float a11; float a21; float a02; float a12; float a22; };\n__device__ mat3_ mat3_make(float a00, float a10, float a20, float a01, float a11, float a21, float a02, float a12, float a22) { mat3_ m; m.a00 = a00; m.a10 = a10; m.a20 = a20; m.a01 = a01; m.a11 = a11; m.a21 = a21; m.a02 = a02; m.a12 = a12; m.a22 = a22; return m; }\n__device__ mat3_ mat3_scale(mat3_ m, float f) { return mat3_make(m.a00 * f, m.a10 * f, m.a20 * f, m.a01 * f, m.a11 * f, m.a21 * f, m.a02 * f, m.a12 * f, m.a22 * f); }',
 };
 
 function convertJava(code: string, ctx: Ctx, extraLocals: Iterable<string> = []): string {
   let s = code;
+  s = s.replace(/if\s*\(\s*\w+\s*==\s*null\s*\)\s*\w+\s*=\s*new\s+\w+\s*\([^;]*\)\s*;/g, ''); // lazy creation of a value object (before pod rewriting renames the ctor)
   if (/\b(vec[234]|G\.|mat[23])\b/.test(s) || /\.(multiply|plus|minus|division|add|times|dot|length)\s*\(/.test(s)) s = convertGlsl(s).replace(/\bMAT2_\(/g, 'make_float4(');
   if (/\bmat3_/.test(s)) ctx.usedLib.add('mat3');
   if (/\bG_Kscope\(/.test(s)) ctx.usedLib.add('G_Kscope');
@@ -330,11 +398,16 @@ function convertJava(code: string, ctx: Ctx, extraLocals: Iterable<string> = [])
   s = s.replace(/\bsuper\.init\s*\([^;]*\)\s*;/g, ''); // VariationFunc.init is a no-op
   s = s.replace(/(?<![\w.])\w+\.invalidate\(\)\s*;/g, ''); // XYZPoint precalc cache: no equivalent
   s = s.replace(/if\s*\(\s*\w+\s*==\s*null\s*\)\s*\w+\s*=\s*new\s+\w+\s*\([^;]*\)\s*;/g, '') // lazy creation of a value object
-    .replace(/if\s*\(\s*\w+\s*==\s*null\s*\)\s*\{[^{}]*\}\s*(?:else\s*)?/g, '').replace(/(?<![\w.])\w+\s*==\s*null\s*\|\|\s*/g, '').replace(/\|\|\s*\w+\s*==\s*null\b/g, ''); // null guards on value objects
+    .replace(/if\s*\(\s*\w+\s*==\s*null\s*(?:\|\|\s*\w+\s*==\s*null\s*)*\)\s*\{[^{}]*\}\s*(?:else\s*)?/g, '') // a block guarded only by null checks never runs
+    .replace(/(?<![\w.])\w+\s*==\s*null\s*\|\|\s*/g, '').replace(/\|\|\s*\w+\s*==\s*null\b/g, ''); // null guards on value objects
   s = s.replace(/\bthrow\s+new\s+\w+\s*\((?:[^()]*|\([^()]*\))*\)\s*;/g, ''); // unreachable-parameter guards
+  // the affine/output point handed to a helper as a plain argument (`f(pContext, pAffineTP, s)`): pass a value copy of the point
+  s = s.replace(/([(,]\s*)pAffineTP(\s*[,)])/g, '$1jxyz_make(__x, __y, __z, __pal)$2').replace(/([(,]\s*)pVarTP(\s*[,)])/g, '$1jxyz_make(__px, __py, __pz, __pal)$2');
+  if (/jxyz_make\(/.test(s)) ctx.usedLib.add('jxyz');
   // Math.* / Tools.* / Integer.*
   s = s.replace(/\bFastMath\./g, 'Math.');
   s = s.replace(/\b(Math|MathLib|Tools|Integer|Double|Float)\.(\w+)/g, (m0) => (Object.hasOwn(MATH_MAP, m0) ? MATH_MAP[m0] : m0));
+  if (/\bjhashcode\(/.test(s)) ctx.usedLib.add('jhashcode');
   // qualified statics not mapped → leave (transpiler will report)
   // bare MathLib names
   s = s.replace(/\b([a-z]\w*)\s*\(/g, (m0, fn: string) => (Object.hasOwn(BARE_MAP, fn) && !ctx.helperNames.has(fn) ? BARE_MAP[fn] + '(' : m0));
@@ -378,6 +451,42 @@ function convertJava(code: string, ctx: Ctx, extraLocals: Iterable<string> = [])
 // Hand patches on the converted text (Java idioms that do not survive f32 literally).
 // Patches on the Java text before conversion (constructs the GLSL parser cannot express)
 const PRE_PATCHES: Record<string, [string | RegExp, string][]> = {
+  // VecMathLib.VectorD used once, for a normalised direction (normalize() divides by length + 1e-16)
+  // the affine point is passed to a helper as an object: copy it into a local first
+  boxfold: [['XYZPoint pLocal = rotatePoint(pAffineTP, negatedAnglesRad);', 'XYZPoint pIn = new XYZPoint(); pIn.x = pAffineTP.x; pIn.y = pAffineTP.y; pIn.z = pAffineTP.z;\n    XYZPoint pLocal = rotatePoint(pIn, negatedAnglesRad);']],
+  // helpers returning small double[] vectors → vec3/vec4 (GLSL types java2cu already maps to float3/float4)
+  cactusGlobe: [
+    ['private double[] calculateCactusPoint(', 'private vec4 calculateCactusPoint('],
+    ['private double[] applySpikeRealism(', 'private vec3 applySpikeRealism('],
+    ['double[] finalCoords = calculateCactusPoint(pContext, pAffineTP, current_size);', 'vec4 finalCoords = calculateCactusPoint(pContext, pAffineTP, current_size);'],
+    [/finalCoords\[0\]/g, 'finalCoords.x'], [/finalCoords\[1\]/g, 'finalCoords.y'], [/finalCoords\[2\]/g, 'finalCoords.z'], [/finalCoords\[3\]/g, 'finalCoords.w'],
+    [/double\[\] spike_vec = applySpikeRealism\(/g, 'vec3 spike_vec = applySpikeRealism('],
+    ['double[] spike_vec = {nx * current_spike_length, ny * current_spike_length, nz * current_spike_length};', 'vec3 spike_vec = new vec3(nx * current_spike_length, ny * current_spike_length, nz * current_spike_length);'],
+    [/spike_vec\[0\]/g, 'spike_vec.x'], [/spike_vec\[1\]/g, 'spike_vec.y'], [/spike_vec\[2\]/g, 'spike_vec.z'],
+    ['return new double[]{0,0,0,-1.0};', 'return new vec4(0,0,0,-1.0);'],
+    ['return new double[]{0,0,0};', 'return new vec3(0,0,0);'],
+    ['return new double[]{final_x, final_y, final_z, hasFeature ? 1.0 : -1.0};', 'return new vec4(final_x, final_y, final_z, hasFeature ? 1.0 : -1.0);'],
+  ],
+  // the `triangle` inner class carries a blur() method → hoist it to the outer class (self param), assign() → struct copy,
+  // t1/t2/p become per-call locals, the JWildfire random generator field → pContext.random()
+  dc_triTile: [
+    [/\btriangle\b/g, 'Triangle'], // field types must be capitalised for the field parser
+    [/  private class Triangle implements Serializable \{\n    private static final long serialVersionUID = 1L;\n    int type;\n    double x1, y1, x2, y2, x3, y3;\n    double col;\n\n    public void assign\(Triangle t\) \{[\s\S]*?\n    \}\n\n    private void blur\(XYZPoint p\) \{/,
+      '  private static class Triangle implements Serializable {\n    int type;\n    double x1, y1, x2, y2, x3, y3;\n    double col;\n  }\n\n    private void blur(Triangle self, XYZPoint p) {'],
+    [/this\.(x[123]|y[123])\b/g, 'self.$1'],
+    ['      p.z = 0;\n    }\n  }\n\n  private Triangle orig, t1, t2;', '      p.z = 0;\n    }\n\n  private Triangle orig;'],
+    ['  private XYZPoint p;\n', ''],
+    ['XYZPoint pVarTP, double pAmount) {\n    /* extension of FiveFold', 'XYZPoint pVarTP, double pAmount) {\n    Triangle t1 = new Triangle(); Triangle t2 = new Triangle(); XYZPoint p = new XYZPoint();\n    /* extension of FiveFold'],
+    ['  AbstractRandomGenerator genRand;\n', ''],
+    [/genRand\.random\(\)/g, 'pContext.random()'],
+    ['    genRand = pContext.getRandGen();\n    t1 = new Triangle();\n    t2 = new Triangle();\n    p = new XYZPoint();\n', ''],
+    [/(\w+)\.assign\((\w+)\);/g, '$1 = $2;'],
+    ['t2.blur(p);', 'blur(t2, p);'],
+  ],
+  pre_wave3D_wf: [['VectorD d = new VectorD(pAffineTP.x - centre_x, pAffineTP.y - centre_y, pAffineTP.z - centre_z);\n        d.normalize();',
+    'double d_l = sqrt(sqr(pAffineTP.x - centre_x) + sqr(pAffineTP.y - centre_y) + sqr(pAffineTP.z - centre_z)) + 1.0e-16; double d_x = (pAffineTP.x - centre_x) / d_l, d_y = (pAffineTP.y - centre_y) / d_l, d_z = (pAffineTP.z - centre_z) / d_l;'],
+    ['pAffineTP.x += d.x * amp;\n        pAffineTP.y += d.y * amp;\n        pAffineTP.z += d.z * amp;', 'pAffineTP.x += d_x * amp;\n        pAffineTP.y += d_y * amp;\n        pAffineTP.z += d_z * amp;'],
+    ['fabs(damping) > SMALL_EPSILON', 'fabs(damping) > 1.0e-30']],
   glsl_mandelbox2D: [['double b = (O.a = G.length(I)) < .5 ? 4. : O.a < 1. ? 1. / O.a : 1.;', 'O.a = G.length(I); double b = O.a < .5 ? 4. : O.a < 1. ? 1. / O.a : 1.;']],
 };
 const JAVA_PATCHES: Record<string, [string | RegExp, string][]> = {
@@ -446,8 +555,14 @@ export function convertVariation(d: DumpVar, src0: string, javaFile: string, par
       if (!cond) continue;
       const key = cond[3] ?? (cls.consts.get(cond[2]) ?? cls.consts.get(cond[1]));
       if (!key || !paramNames.has(key)) continue;
-      const asg = /\{?\s*(?:this\.)?(\w+)\s*=/.exec(br.slice(cond.index + cond[0].length));
-      if (asg && asg[1] !== 'pValue') fieldMap.set(asg[1], key);
+      // the first assignment to a *field* (a local `double v = max(…, pValue)` in front of it is skipped)
+      const fieldNames0 = new Set(cls.fields.map((f) => f.name));
+      const rest = br.slice(cond.index + cond[0].length);
+      for (const asg of rest.matchAll(/(?:^|[{;\s])(?:this\.)?(\w+)\s*=(?!=)/g)) {
+        if (asg[1] === 'pValue' || !fieldNames0.has(asg[1])) continue;
+        fieldMap.set(asg[1], key);
+        break;
+      }
     }
   }
   const fieldNames = new Set(cls.fields.map((f) => f.name));
@@ -578,12 +693,39 @@ export function convertVariation(d: DumpVar, src0: string, javaFile: string, par
     }
   }
   // --- helpers
+  // Which object params are references in effect (mutated → pointer): a helper that assigns `p.x = …` (or takes `&p`)
+  // mutates the caller's object; and a helper that merely hands its param on to such a pointer parameter of another
+  // helper must pass a pointer too — propagated to a fixed point (dc_triTile: devis(t1, t2) → fiveFoldDevis(in, *out)).
+  const objParams = (h: Method) => (h.params.trim() ? h.params.split(',').map((x) => x.trim()) : []).filter((x) => !/^(FlameTransformationContext|XForm|Layer)\b/.test(x)).map((x) => x.split(/\s+/).pop()!.replace(/\[\]/g, ''));
+  const ptrParams = new Map<string, Set<string>>();
+  for (const h of helpers) {
+    const set = new Set<string>();
+    for (const pn of objParams(h)) if (new RegExp(`(?<![\\w.])${pn}\\.\\w+\\s*(?:=(?!=)|[-+*\\/]=)`).test(h.body) || new RegExp(`\\(&${pn}\\b`).test(h.body)) set.add(pn);
+    ptrParams.set(h.name, set);
+  }
+  for (let changed = true; changed;) {
+    changed = false;
+    for (const h of helpers) {
+      for (const g of helpers) {
+        const gp = objParams(g), gptr = ptrParams.get(g.name)!;
+        if (!gptr.size) continue;
+        for (const cm of h.body.matchAll(new RegExp(`(?<![\\w.])${g.name}\\s*\\(([^;]*)\\)\\s*;`, 'g'))) {
+          const args = splitTop(cm[1]).filter((a) => !/^pContext\b|^pXForm\b|^pLayer\b/.test(a));
+          args.forEach((a, i) => { if (/^\w+$/.test(a) && gptr.has(gp[i]) && objParams(h).includes(a) && !ptrParams.get(h.name)!.has(a)) { ptrParams.get(h.name)!.add(a); changed = true; } });
+        }
+      }
+    }
+  }
   for (const h of helpers) {
     ctx.inHelper = true;
-    const hparams = h.params.trim() ? h.params.split(',').map((p) => p.trim()).filter((p) => !/^(FlameTransformationContext|XForm|Layer)\b/.test(p)) : [];
+    // a non-void helper taking `XYZPoint pAffineTP/pVarTP` (a value copy at the call site): rename the parameter so its
+    // fields are not rewritten as the snippet's magic point
+    let hbody = h.body, hps = h.params;
+    for (const pn of ['pAffineTP', 'pVarTP']) if (new RegExp(`\\bXYZPoint\\s+${pn}\\b`).test(hps)) { const re = new RegExp(`\\b${pn}\\b`, 'g'); hps = hps.replace(re, pn + '_'); hbody = hbody.replace(re, pn + '_'); }
+    const hparams = hps.trim() ? hps.split(',').map((p) => p.trim()).filter((p) => !/^(FlameTransformationContext|XForm|Layer)\b/.test(p)) : [];
     const pnames = hparams.map((p) => p.split(/\s+/).pop()!.replace(/\[\]/g, ''));
     for (const p of hparams) { const pm = /^(mat2|mat3|vec[234])\s+(\w+)$/.exec(p); if (pm) glslKinds.set(pm[2], pm[1] === 'mat2' ? 'mat2' : pm[1] === 'mat3' ? 'mat3' : 'vec'); }
-    let body = convertJava(h.body, ctx, pnames);
+    let body = convertJava(hbody, ctx, pnames);
     for (const sn of podScratch.get(h.name) ?? []) { const sf = cls.fields.find((x) => x.name === sn)!; body = `${ctx.pods.get(sf.type)} ${sn};\n` + body; }
     const params = hparams.map((p, i) => {
       let q = convertJava(p, ctx, pnames).replace(/\bfloat\s+/, 'float ');
@@ -593,7 +735,7 @@ export function convertVariation(d: DumpVar, src0: string, javaFile: string, par
       // vec/struct objects are references too: a helper that assigns `p.x = …` mutates the caller's object → pointer param
       const vm = /^(float[234]|\w+)\s+(\w+)$/.exec(q);
       if (vm && !/^(float[234])$/.test(vm[1]) && ![...ctx.pods.values()].includes(vm[1])) return q;
-      if (vm && (new RegExp(`(?<![\\w.])${vm[2]}\\.\\w+\\s*(?:=(?!=)|[-+*\\/]=)`).test(body) || new RegExp(`\\(&${vm[2]}\\b`).test(body))) {
+      if (vm && (new RegExp(`(?<![\\w.])${vm[2]}\\.\\w+\\s*(?:=(?!=)|[-+*\\/]=)`).test(body) || new RegExp(`\\(&${vm[2]}\\b`).test(body) || ptrParams.get(h.name)?.has(vm[2]))) {
         body = body.replace(new RegExp(`(?<![\\w.])${vm[2]}\\.`, 'g'), `${vm[2]}->`);
         return `${vm[1]} *${vm[2]}`;
       }

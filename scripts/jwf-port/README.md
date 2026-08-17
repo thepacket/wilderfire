@@ -80,23 +80,23 @@ node scripts/jwf-port/gen.ts            # re-emit with the new verdicts
 
 Of JWildfire's 1026 variations, 800 carry a usable GPU snippet (14 more than
 before: `REFERENCE` ressources — links to the author's page — no longer count
-as resources) and 132 more are ported straight from their Java `transform()`
-by `java2cu.ts` (932 transpile); **913 verify numerically against the Java
-oracle in 3D**, 17 more are verified by inspection where the per-point oracle
+as resources) and 140 more are ported straight from their Java `transform()`
+by `java2cu.ts` (940 transpile); **920 verify numerically against the Java
+oracle in 3D**, 18 more are verified by inspection where the per-point oracle
 cannot compare (`FORCE_VERIFIED` in `gen.ts`, each with its reason:
 `arch`/`rays`/`starfractal` heavy-tailed statistics, the chaotic attractors
 `hopalong`/`macmillan`/`threeply`/`gumowski_mira`/`gingerbread_man`, the
 `curliecue2` walk, `post_point_crop` and `recurrenceplot` order-dependent
 state, `minkQM` f32 boundary artefact of the test grid, `circular`/`circular2`
 hash of the continuous input point, `iconattractor_js` presetId table,
-`pre_blur3D` `& 5` ring buffer, `pre_flatten`), so 930 ship in
+`pre_blur`/`pre_blur3D` `& 5` ring buffers, `pre_flatten`), so 938 ship in
 `variations.jwf.ts`; 2 stay in `variations.jwf.unverified.ts` because the Java
 itself is order-dependent (`dc_circuits` accumulates a member `S` across
 points, `dc_gnarly` updates only 2 of its 6 gaussian summands — `& 5` — so its
 blur depends on the render's init randoms). Together with the 70 hand-written
-flam3 entries the app registry has 932 variations.
+flam3 entries the app registry has 940 variations.
 
-### What is not ported (94)
+### What is not ported (86)
 
 `data/unportable.json` is the definitive list — every JWildfire variation is
 either in the registry or in that file with a category, and `gen.ts` writes it
@@ -107,10 +107,11 @@ variation was skipped. Categories:
 |---|---|---|
 | user-code | 21 | compiles user-supplied code or a formula at run time (`custom_wf`, `dc_code`, `glsl_code`, `c_var`, `ducks`, `fract_formula_*`, the `yplot2d_wf`… plot family, `colordomain`); the WebGPU kernel has no run-time compiler |
 | external-content | 29 | renders external content that would have to be uploaded to the GPU: sub-flames (`subflame_wf`, `ringsubflame`, `glynns3subfl`), images (`post_bumpmap_wf`, `displacemap_wf`, `colormap_wf`, `kaleidoimg`, `plane_wf`, `wangtiles`), meshes (`obj_mesh_wf`, `terrain3D`, `metaballs3d_wf`, `knots3D`, `sattractor3D`), `svg_wf`, `text_wf`, L-systems, brushes |
-| point-set | 32 | builds a point/segment list on the CPU at init and samples it per point: the `DrawFunc` family (`gpattern`, `mandala`, `nsudoku`, `sunflower`, `szubieta`, `triantruchet`, `curliecue`, `taprats`, `sunvoroni`), turtle/`DynamicArray` `_js` fractals (`dragon_js`, `koch_js`, `hilbert_js`, `tree_js`, …), `dla_wf`/`snowflake_wf` simulations, `inversion`, `maurer_lines`, `klein_group`, `natural_foam`, … |
+| point-set | 33 | builds a point/segment list on the CPU at init and samples it per point: the `DrawFunc` family (`gpattern`, `mandala`, `nsudoku`, `sunflower`, `szubieta`, `triantruchet`, `curliecue`, `taprats`, `sunvoroni`), turtle/`DynamicArray` `_js` fractals (`dragon_js`, `koch_js`, `hilbert_js`, `tree_js`, …), `dla_wf`/`snowflake_wf` simulations, `inversion`, `maurer_lines`, `klein_group`, `natural_foam`, …; `neuron3D` builds a seed-shuffled 512-entry Perlin permutation table per instance (no per-flame table storage in the kernel) |
 | engine | 2 | needs an engine feature WilderFire lacks: a variation instantiating another (`sphtiling3v2`), `post_dcztransl` (no Java class) |
 | resource-params | 1 | `dc_triantess` keeps its colours as byte-array ressources |
-| not-yet | 9 | plain numeric Java the converter does not handle yet: JWildfire's `Complex` class (`exp_multi`, `quad`, `ringtile`), `VectorD` (`pre_wave3D_wf`), a `triangle` class (`dc_triTile`), arrays returned from helpers (`cactusGlobe`), `boxfold`, per-instance random objects in helpers (`neuron3D`, `drunken_tiles`) |
+
+The last `not-yet` batch (2026-08-17: `exp_multi`, `quad`, `ringtile`, `pre_wave3D_wf`, `boxfold`, `drunken_tiles`, `cactusGlobe`, `dc_triTile`) went through `java2cu`: JWildfire's `Complex` class is a built-in struct library (`jcx_`, a line-by-line port of `org.jwildfire.base.mathlib.Complex` incl. `per_fix`/save state), helpers returning small `double[]` become `vec3`/`vec4` (pre-patch), an object parameter that is only handed on to another helper's pointer parameter becomes a pointer too, null-only guards are dropped, `Integer.hashCode`/`Double.isNaN`/`isInfinite` map, the affine point passed to a helper travels as a value copy (`jxyz_make`), and `setParameter` branches with a local (`double v = …; field = v;`) resolve to the field. The oracle/harness now report *input + accumulator* for pre-priority rows (JWildfire keeps what a pre step adds into `pVarT` for the main sum — `ringtile`'s inverse writes it).
 
 Systematic GPU≠CPU families fixed at generator level: the 17 `*3D` solid
 samplers (CPU rejection-samples up to 50 times before hiding — `retry`

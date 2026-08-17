@@ -58,6 +58,10 @@ float cm_s = cm_r < __chainmail_ring_ratio ? __chainmail_ring_ratio / (cm_r + 1e
 __px += __chainmail * (cm_lx * cm_s) / __chainmail_scale;
 __py += __chainmail * (cm_ly * cm_s) / __chainmail_scale;`,
   },
+  pre_blur: {
+    note: 'CPU: 6-entry gaussian ring buffer advanced with `& 5` (only entries 0,1 refresh; 2..5 are per-instance constants from init()) → r = w·(u0+u1+c−3), c ≈ 2; JWildfire\'s GPU snippet draws six fresh uniforms (a wider blur). Ported like pre_blur3D: two fresh uniforms plus the constants\' mean.',
+    patch: [['(RANDFLOAT()+RANDFLOAT()+RANDFLOAT()+RANDFLOAT()+RANDFLOAT()+RANDFLOAT()-3.f)', '(RANDFLOAT()+RANDFLOAT()-1.f)']],
+  },
   ouroboros: {
     note: 'CPU wraps the radius r; GPU wrapped x.',
     gpuCode: `float or_radius = fmaxf(fabsf(__ouroboros_radius), 0.01f);

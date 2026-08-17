@@ -1,5 +1,46 @@
 // Vitest Snapshot v1, https://vitest.dev/guide/snapshot.html
 
+exports[`java2cu: Complex, pointer propagation, null guards, setParameter locals > maps JWildfire's Complex to the jcx_ struct library (copy ctor, mutating methods), makes a relayed object param a pointer, drops null-only guards, and finds the field behind a \`double v = …; re = v;\` branch > cuda 1`] = `
+"
+    jcx_ z = jcx_make(__x, __y);
+    jcx_ c = jcx_make(__reg_complex_re, __reg_complex_im);
+    jcx_ w = jcx_make(z);
+    jcx_Exp(&z);
+    jcx_Div(&z, c);
+    if (__reg_complex_im != 0) {
+      jcx_Sqr(&z);
+      jcx_Mul(&z, c);
+    }
+    jcx_Add(&z, w);
+    jcx_Log(&z);
+    jcx_Scale(&z, __amount_);
+    reg_complex_Pair p = reg_complex_Pair_zero();
+    reg_complex_relay(p, z.re);
+    __px += z.re + p.a * 0.0;
+    __py += z.im + p.q * 0.0;
+  "
+`;
+
+exports[`java2cu: Complex, pointer propagation, null guards, setParameter locals > maps JWildfire's Complex to the jcx_ struct library (copy ctor, mutating methods), makes a relayed object param a pointer, drops null-only guards, and finds the field behind a \`double v = …; re = v;\` branch > wgsl 1`] = `
+"  var z: jcx_ = jcx_make(t.x, t.y);
+  var c: jcx_ = jcx_make(\${p[0]}, \${p[1]});
+  var w_: jcx_ = jcx_make_ov2(z);
+  jcx_Exp(&(z));
+  jcx_Div(&(z), c);
+  if ((\${p[1]} != 0)) {
+    jcx_Sqr(&(z));
+    jcx_Mul(&(z), c);
+  }
+  jcx_Add(&(z), w_);
+  jcx_Log(&(z));
+  jcx_Scale(&(z), \${w});
+  var p_: reg_complex_Pair = reg_complex_Pair_zero();
+  reg_complex_relay(&(p_), z.re);
+  v.x += (z.re + (p_.a * 0.0));
+  v.y += (z.im + (p_.q * 0.0));
+"
+`;
+
 exports[`java2cu: params, constants, helpers, state > replays init(), inlines static-final constants, ports long→int, threads params into helpers, keeps written fields as state > cuda 1`] = `
 "varpar->reg_demo_dist_c = __reg_demo_dist;
 float invPower = 0;
@@ -79,6 +120,7 @@ exports[`java2cu: plain-data classes, tables, pointer params > inner class → s
 "struct jxyz_ { float x; float y; float z; float color; };
 __device__ jxyz_ jxyz__zero() { jxyz_ r_; return r_; }
 __device__ void jxyz_assign(jxyz_ *a, jxyz_ b) { a->x = b.x; a->y = b.y; a->z = b.z; a->color = b.color; }
+__device__ jxyz_ jxyz_make(float x, float y, float z, float color) { jxyz_ r_; r_.x = x; r_.y = y; r_.z = z; r_.color = color; return r_; }
 float reg_pod_OFFSETS[4] = {0.0, 0.25, 0.5, 0.75};
 struct reg_pod_Pt { float x; float y; };
 __device__ reg_pod_Pt reg_pod_Pt_zero() { reg_pod_Pt r_; return r_; }

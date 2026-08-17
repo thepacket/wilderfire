@@ -54,6 +54,7 @@ const FORCE_VERIFIED: Record<string, string> = {
   circular2: 'see circular',
   iconattractor_js: 'JWildfire GPU snippet; the Java re-applies the presetId table (a/b/g/o/l) at init, so only oracle sets whose explicit params contradict their presetId differ — a flame file always carries the preset values',
   recurrenceplot: 'stateful (a rejected sample re-emits the previous accepted point): JWildfire\'s GPU snippet had dropped that state (and never set ldcs); restored as per-thread state — the sequence-dependent per-point means do not compare, the spread and colouring do',
+  pre_blur: 'the CPU\'s 6-entry gaussian ring buffer is advanced with `& 5` (entries 2..5 are per-instance constants from init()); ported as two fresh uniforms plus the constants\' mean (overrides.ts) — same distribution up to the per-instance offset, which the oracle instance carries and the port cannot',
   pre_blur3D: 'gaussian pre-blur whose 6-entry ring buffer is advanced with `& 5` in the Java (entries 2,3 never refresh: per-instance constants); ported as four fresh uniforms plus the constants\' mean — same distribution up to the per-instance offset',
   minkQM: 'Minkowski ?-function: at e near 1 the sum is dominated by late Stern–Brocot branches, which flip when a grid coordinate is (nearly) a small rational — an f32 boundary artefact of the test grid, not a port difference (f32 CPU model matches the Java)',
 };
