@@ -237,7 +237,22 @@ export class FlameRenderer {
   /** Tone-only changes (brightness/gamma/vibrancy/background) need no reset. */
   touchTone() { /* uniforms are rewritten every frame */ }
 
-  private reseedPoints() {
+  /** Re-seed every walker at a random point. `fuse` = iterations to run before plotting.
+   *  flam3/JWildfire use 20/42, but they run few walkers for millions of steps each, so
+   *  the transient is negligible; we run 65k walkers for a few hundred steps each per
+   *  export, and a slowly contracting flame (e.g. an affine shrinking y by 0.9/step)
+   *  is still visibly off the attractor after 20 — the strays became a speckle haze
+   *  around dark regions. 200 steps cost ~one frame of work per re-seed. */
+  /** unplotted (fuse) iterations still owed after a re-seed; excluded from the sample count */
+  private fuseDebt = 0;
+  /** account `iters` dispatched iterations: returns how many of them plot (the rest pay the fuse debt) */
+  private countIters(iters: number): number {
+    const paid = Math.min(this.fuseDebt, iters);
+    this.fuseDebt -= paid;
+    return iters - paid;
+  }
+  private reseedPoints(fuse = 200) {
+    this.fuseDebt = fuse * this.nPoints;
     const pts = new Float32Array(this.nPoints * 4);
     const rng = new Uint32Array(this.nPoints * 2); // [state, prev xform]
     for (let i = 0; i < this.nPoints; i++) {
@@ -246,7 +261,7 @@ export class FlameRenderer {
       pts[i * 4 + 2] = 0;                      // z
       pts[i * 4 + 3] = Math.random();          // color
       rng[i * 2] = (Math.random() * 0xffffffff) >>> 0 || 1;
-      rng[i * 2 + 1] = 20 << 8; // prev xform (low 8 bits) | fuse (high bits)
+      rng[i * 2 + 1] = fuse << 8; // prev xform (low 8 bits) | fuse (high bits)
     }
     this.device.queue.writeBuffer(this.ptsBuf, 0, pts);
     this.device.queue.writeBuffer(this.rngBuf, 0, rng);
@@ -261,7 +276,7 @@ export class FlameRenderer {
     this.samples = 0;
     this.emaSps = 0;
     this.needsPresent = true;
-    this.reseedPoints();
+    this.reseedPoints(100); // live: a shorter fuse keeps drags snappy (exports use the full 200)
     const enc = this.device.createCommandEncoder();
     enc.clearBuffer(this.histBuf);
     this.device.queue.submit([enc.finish()]);
@@ -413,7 +428,7 @@ export class FlameRenderer {
     let done = 0;
     while (done < passes) {
       const nowPasses = Math.min(CHUNK, passes - done);
-      this.samples += this.nPoints * this.itersPerPass * nowPasses;
+      this.samples += this.countIters(this.nPoints * this.itersPerPass * nowPasses);
       this.writeUniforms(this.samples / Math.max(this.width * this.height, 1));
       const enc = this.device.createCommandEncoder();
       const pass = enc.beginComputePass();
@@ -494,14 +509,15 @@ export class FlameRenderer {
     this.reseedPoints();
     const tile = { tileX: o.tileX, tileY: o.tileY, fullW: o.fullW, fullH: o.fullH, tileW: o.tileW, tileH: o.tileH };
     const perPass = this.nPoints * this.itersPerPass;
-    let passes = Math.max(2, Math.min(Math.ceil((o.spp * o.fullW * o.fullH) / perPass), 40000));
+    // enough passes for spp plotted samples per pixel on top of the fuse iterations
+    let passes = Math.max(2, Math.min(Math.ceil((o.spp * o.fullW * o.fullH + this.fuseDebt) / perPass), 40000));
     let done = 0;
     const CHUNK = 32;
     let first = true;
     while (passes > 0) {
       const nowP = Math.min(CHUNK, passes);
       passes -= nowP;
-      done += nowP * perPass;
+      done += this.countIters(nowP * perPass);
       this.writeUniforms(done / (o.fullW * o.fullH), tile, o.transparent);
       const enc = d.createCommandEncoder();
       if (first) { enc.clearBuffer(this.offHist); first = false; }
@@ -585,7 +601,7 @@ export class FlameRenderer {
       const need = Math.ceil((this.minDisplaySpp * w * h - this.samples) / perPass);
       if (need > passes) passes = Math.min(need, this.passesPerFrame * 4);
     }
-    if (accumulate) this.samples += perPass * passes;
+    if (accumulate) this.samples += this.countIters(perPass * passes);
     this.writeUniforms(this.samples / Math.max(w * h, 1)); // tonemap spp is per output pixel
 
     const enc = this.device.createCommandEncoder();

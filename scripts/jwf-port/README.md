@@ -36,6 +36,7 @@ JWildfire source ──Oracle.java─▶ oracle-out.jsonl ◀── oracle-spec.
 | `testflames/` | JWildfire random-generator flames (`GenFlames` via JWildfire's own generators) + `yflip.flame` (orientation check). Loaded by `window.wilderfire.flameTest()`. |
 | `../../src/dev/varTest.ts` | Browser harness: compiles each variation's WGSL, evaluates the spec grid on the GPU, diffs against the oracle, POSTs `verified.json` via the dev-server sink in `vite.config.ts`. |
 | `../../src/dev/flameTest.ts` | Browser harness: imports every fixture flame, reports unsupported variations, compiles the kernel. |
+| `../../src/dev/flameCompare.ts`, `RenderOne.java`, `Compare.java` | Whole-image comparison against headless JWildfire: `await window.wilderfire.flameCompare()` renders the fixtures, the bundled JWildfire samples and the authored presets offscreen (512 px wide, quality 100) into `compare-out/` (PNG + the exact .flame XML, gitignored); `java … Compare <repo>/compare-out` renders the same XML with JWildfire (cached as `<id>.jwf.png`) and prints per-flame metrics — mean luma of both, ratio, coverage, 16×16-block MAE, luma-histogram intersection, block correlation — with flags. Numbers only; no pixels are judged by eye. `RenderOne.java` renders one .flame to PNG. |
 
 ## Regenerating
 
@@ -161,6 +162,28 @@ rare-event Bernoulli tail — a `tile_hlp` column that shifts with p = 0.007 —
 makes that noise far larger than the Gaussian 1/√2n), so a std difference within
 that noise passes. Heavy-tailed variations (1/cos, tan) still cannot be judged
 per point and are the `FORCE_VERIFIED` cases above.
+
+## Image comparison (2026-08-17)
+
+Whole-image metrics vs headless JWildfire at 512 px / quality 100 (see the
+`flameCompare` row above): all **16 bundled JWildfire samples** and **8 of the
+10 authored presets** match to a luma ratio of 0.98–1.02, block MAE < 3 and
+block correlation ≥ 0.98. The two others differ by design: *Golden Nautilus*
+uses WilderFire's own `dc_radial` (not a JWildfire variation) and *Clockwork*
+relies on flam3's weighted `rings` (`PREFER_HAND`; JWildfire's ignores the
+weight). Two engine bugs this surfaced and fixed: (1) **DE rounding** — JWildfire's
+`DeCalculator` stores the estimated density as an int (`(int)(sumA + 0.5)`),
+so an isolated stray sample spread over the DE kernel rounds to *nothing*;
+we kept the float, and every dark region grew a speckle haze around stray
+hits (coverage 0.94 vs 0.44 on Phoenix_0) — now rounded the same way; (2)
+**fuse** — 65k GPU walkers × a few hundred steps each per export made the
+20-step transient visible on slowly contracting flames; re-seeds now fuse
+200 (100 live) and those iterations are excluded from the sample count.
+Of the 44 random-generator fixtures, 6 reference variations we do not have
+(`barycentroid`, `colordomain`, `glsl_apollonian`, `glynns3subfl`,
+`post_brush_stroke_wf`, `cut_triskel`) and 7 still differ (`Bokeh_1`,
+`Cross_1`, `EDisc_1`, `Galaxies_0`, `Julians_0` — hopalong's single long
+trajectory vs our 65k short ones — `Orchids_0/1`, `Rays_0`); the rest match.
 
 ## Semantics worth knowing
 

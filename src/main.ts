@@ -301,6 +301,11 @@ async function boot() {
       await saveVerified(results);
       return results;
     },
+    // Render fixtures/samples/presets offscreen into compare-out/ for scripts/jwf-port/compare.py
+    flameCompare: async (opts?: { only?: string[]; width?: number; quality?: number; sets?: ("fixtures" | "samples" | "presets")[]; files?: string[] }) => {
+      const { runFlameCompare } = await import('./dev/flameCompare');
+      return runFlameCompare(app, opts);
+    },
     // Import + compile every JWildfire fixture flame (scripts/jwf-port/testflames)
     flameTest: async (opts?: { files?: string[]; verbose?: boolean }) => {
       const { runFlameTest } = await import('./dev/flameTest');

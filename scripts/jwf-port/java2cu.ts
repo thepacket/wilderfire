@@ -386,6 +386,13 @@ function convertVariation(d: DumpVar, src: string, javaFile: string): Port {
       code += `  varpar->${d.name}_${f.name} = ${initExpr};\n`;
     }
     if (initTouchesState && init) code += '  {\n' + convertJava(init.body, ctx) + '\n  }\n';
+    // trajectory state (attractor coordinates: float state written by transform()): Java runs a
+    // handful of long identical trajectories; our 65k walkers would all trace the same short
+    // one, so each thread starts a hair off — chaotic maps decorrelate within the fuse
+    for (const f of cls.fields) {
+      if (!state.has(f.name) || !tAssigned.has(f.name) || f.array !== null || f.type === 'int' || f.type === 'boolean' || f.type in VEC_TYPES) continue;
+      code += `  varpar->${d.name}_${f.name} += (RANDFLOAT() - 0.5f) * 1.0e-4f;\n`;
+    }
     code += '}\n';
   }
   // state fields that are only read by helpers (never written per point) are plain derived values:

@@ -1,5 +1,5 @@
 import { defineConfig, type Plugin } from 'vite';
-import { writeFileSync } from 'node:fs';
+import { writeFileSync, mkdirSync } from 'node:fs';
 import { resolve } from 'node:path';
 
 /** Dev-only: lets the in-browser variation oracle harness (src/dev/varTest.ts)
@@ -30,8 +30,35 @@ function jwfReportSink(): Plugin {
   };
 }
 
+/** Dev-only: file sink for the flame comparison harness (src/dev/flameCompare.ts) —
+ *  writes PNG/XML into compare-out/<name> (gitignored; the name is sanitised). */
+function compareSink(): Plugin {
+  return {
+    name: 'wilderfire-compare-sink',
+    apply: 'serve',
+    configureServer(server) {
+      server.middlewares.use('/__jwf/save', (req, res) => {
+        if (req.method !== 'POST') { res.statusCode = 405; res.end(); return; }
+        const url = new URL(req.url ?? '', 'http://x');
+        const name = (url.searchParams.get('name') ?? '').replace(/[^A-Za-z0-9_.-]/g, '_');
+        if (!name || name.startsWith('.')) { res.statusCode = 400; res.end('bad name'); return; }
+        const chunks: Buffer[] = [];
+        req.on('data', (c) => chunks.push(Buffer.from(c)));
+        req.on('end', () => {
+          const dir = resolve(import.meta.dirname, 'compare-out');
+          mkdirSync(dir, { recursive: true });
+          const file = resolve(dir, name);
+          writeFileSync(file, Buffer.concat(chunks));
+          res.setHeader('content-type', 'application/json');
+          res.end(JSON.stringify({ ok: true, file, bytes: chunks.reduce((a, b) => a + b.length, 0) }));
+        });
+      });
+    },
+  };
+}
+
 export default defineConfig({
-  plugins: [jwfReportSink()],
+  plugins: [jwfReportSink(), compareSink()],
   server: {
     port: Number(process.env.PORT) || 5173,
     strictPort: false,

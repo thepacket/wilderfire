@@ -11,7 +11,7 @@ import type { RGB } from '../core/flame';
 
 export interface FlameTestResult { file: string; unknown: string[]; wgslError?: string; variations: string[] }
 
-const FIXTURES = [
+export const FIXTURES = [
   'Bokeh_0', 'Bokeh_1', 'Brokat_0', 'Brokat_1', 'Bubbles_0', 'Bubbles_1', 'Cross_0', 'Cross_1', 'Duality_0', 'Duality_1',
   'Duckies_0', 'Duckies_1', 'EDisc_0', 'EDisc_1', 'Galaxies_0', 'Galaxies_1', 'Ghosts_0', 'Ghosts_1', 'Gnarl_0', 'Gnarl_1',
   'Julians_0', 'Julians_1', 'Layers_0', 'Layers_1', 'Machine_0', 'Machine_1', 'Orchids_0', 'Orchids_1', 'Outlines_0', 'Outlines_1',

@@ -14486,6 +14486,10 @@ if ((jwx_truchet_ae_inited_ == 0.0)) {
   jwx_truchet_ae_y = 0.0;
   jwx_truchet_ae_z1 = 0.0;
   jwx_truchet_ae_z2 = 0.0;
+  jwx_truchet_ae_x += ((rnd(rs) - 0.5) * 0.0001);
+  jwx_truchet_ae_y += ((rnd(rs) - 0.5) * 0.0001);
+  jwx_truchet_ae_z1 += ((rnd(rs) - 0.5) * 0.0001);
+  jwx_truchet_ae_z2 += ((rnd(rs) - 0.5) * 0.0001);
 }
 jwx_truchet_ae_AM = (1.0 / 2147483647);
 {
@@ -16052,6 +16056,8 @@ if ((jwx_dc_dmodulus_inited_ == 0.0)) {
     jwx_dc_dmodulus_c22 = ((${p[7]} * (1 - ${p[8]})) / 2);
     jwx_dc_dmodulus_oldColor = 0.5;
   }
+  jwx_dc_dmodulus_oldColor += ((rnd(rs) - 0.5) * 0.0001);
+  jwx_dc_dmodulus_newColor += ((rnd(rs) - 0.5) * 0.0001);
 }
 {
   p2_ = p2_;
@@ -16282,6 +16288,9 @@ if ((jwx_macmillan_inited_ == 0.0)) {
     jwx_macmillan_xa = ${p[2]};
     jwx_macmillan_y = ${p[3]};
   }
+  jwx_macmillan_xa += ((rnd(rs) - 0.5) * 0.0001);
+  jwx_macmillan_x += ((rnd(rs) - 0.5) * 0.0001);
+  jwx_macmillan_y += ((rnd(rs) - 0.5) * 0.0001);
 }
 jwx_macmillan_x = jwx_macmillan_y;
 jwx_macmillan_y = ((-jwx_macmillan_xa + ((2.0 * ${p[0]}) * (jwx_macmillan_y / (1 + (jwx_macmillan_y * jwx_macmillan_y))))) + (${p[1]} * jwx_macmillan_y));
@@ -26700,6 +26709,8 @@ if ((jwx_truchetflow_inited_ == 0.0)) {
   jwx_truchetflow_inited_ = 1.0;
   jwx_truchetflow_uvx = 0.0;
   jwx_truchetflow_uvy = 0.0;
+  jwx_truchetflow_uvx += ((rnd(rs) - 0.5) * 0.0001);
+  jwx_truchetflow_uvy += ((rnd(rs) - 0.5) * 0.0001);
 }
 var x: f32;
 var y: f32;
@@ -30840,6 +30851,8 @@ if ((jwx_gumowski_mira_inited_ == 0.0)) {
   jwx_gumowski_mira_x0 = 5.0;
   jwx_gumowski_mira_y0 = 5.0;
   jwx_gumowski_mira_m = -0.08;
+  jwx_gumowski_mira_x0 += ((rnd(rs) - 0.5) * 0.0001);
+  jwx_gumowski_mira_y0 += ((rnd(rs) - 0.5) * 0.0001);
 }
 jwx_gumowski_mira_m = -0.08;
 {
@@ -30884,6 +30897,8 @@ if ((jwx_hopalong_inited_ == 0.0)) {
   jwx_hopalong_inited_ = 1.0;
   jwx_hopalong_x0 = ${p[4]};
   jwx_hopalong_y0 = ${p[5]};
+  jwx_hopalong_x0 += ((rnd(rs) - 0.5) * 0.0001);
+  jwx_hopalong_y0 += ((rnd(rs) - 0.5) * 0.0001);
 }
 var x1: f32 = (jwx_hopalong_y0 - (sign(jwx_hopalong_x0) * sqrt(abs(((min(max(${p[2]}, -1.0), 1.0) * jwx_hopalong_x0) - min(max(${p[3]}, -1.0), 1.0))))));
 var y1: f32 = (min(max(${p[1]}, -1.0), 1.0) - jwx_hopalong_x0);
@@ -30909,6 +30924,8 @@ if ((jwx_gingerbread_man_inited_ == 0.0)) {
   jwx_gingerbread_man_inited_ = 1.0;
   jwx_gingerbread_man_x0 = -0.1;
   jwx_gingerbread_man_y0 = 0.0;
+  jwx_gingerbread_man_x0 += ((rnd(rs) - 0.5) * 0.0001);
+  jwx_gingerbread_man_y0 += ((rnd(rs) - 0.5) * 0.0001);
 }
 var xn: f32 = ((1 - jwx_gingerbread_man_y0) + abs(jwx_gingerbread_man_x0));
 var yn: f32 = jwx_gingerbread_man_x0;
@@ -30937,6 +30954,8 @@ if ((jwx_threeply_inited_ == 0.0)) {
   jwx_threeply_inited_ = 1.0;
   jwx_threeply_x0 = 0.0;
   jwx_threeply_y0 = 0.0;
+  jwx_threeply_x0 += ((rnd(rs) - 0.5) * 0.0001);
+  jwx_threeply_y0 += ((rnd(rs) - 0.5) * 0.0001);
 }
 var sgn: i32 = select(select(0, -1, (jwx_threeply_x0 < 0)), 1, (jwx_threeply_x0 > 0));
 var xn: f32 = (jwx_threeply_y0 - (f32(sgn) * abs((((sin(jwx_threeply_x0) * cos(${p[1]})) + ${p[2]}) - (jwx_threeply_x0 * sin(((${p[0]} + ${p[1]}) + ${p[2]})))))));

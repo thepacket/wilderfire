@@ -242,7 +242,7 @@ ${cases}
     if (p.x != p.x || p.y != p.y || p.z != p.z || abs(p.x) > 1e10 || abs(p.y) > 1e10 || abs(p.z) > 1e10) {
       p = vec3f(rnd(&rs) * 2.0 - 1.0, rnd(&rs) * 2.0 - 1.0, 0.0);
       c = rnd(&rs);
-      fuse = 20.0;
+      fuse = 100.0;
       continue;
     }
     if (fuse > 0.0) {
@@ -576,7 +576,10 @@ fn logScaled(x: i32, y: i32) -> vec4f {
     }
     if (wsum > 1e-9) {
       rgb = sumRGB / wsum;
-      cnt = sumA / wsum;
+      // JWildfire stores the estimated density as an int: deCount = (int)(sumA + 0.5).
+      // Below half a hit the pixel is empty — that is what keeps isolated stray samples
+      // from spreading into a visible speckle haze; the colour sums stay unrounded.
+      cnt = floor(sumA / wsum * os2 + 0.5) / os2;
     }
   }
 

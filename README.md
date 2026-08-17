@@ -61,8 +61,9 @@ in the stack.
   the same **density estimation** (`de_radius` / `de_curve` similar-density
   gather; the live preview caps its radius, exports use it in full),
   **spatial filter** (Mitchell / Gaussian) and antialias jitter, verified
-  pixel-for-pixel against headless JWildfire on synthetic flames; two-pass
-  tonemap so filtering is free; plus **2× oversampling**. Presets and the
+  pixel-for-pixel against headless JWildfire on synthetic flames and by
+  whole-image metrics on the bundled samples and presets (`scripts/jwf-port`
+  compare harness); two-pass tonemap so filtering is free; plus **2× oversampling**. Presets and the
   randomizer use JWildfire's brightness 4 / gamma 4 baseline
 - **Undo/redo** with slider-gesture coalescing (Ctrl/Cmd+Z, Shift+Ctrl/Cmd+Z)
 - **Animation** — capture keyframes, morph between them (structure-merging
