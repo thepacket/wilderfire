@@ -347,3 +347,7 @@ a { color: var(--accent2); }
 .mc-points { display: flex; flex-wrap: wrap; gap: 4px; }
 .mc-points .vp { display: inline-flex; align-items: center; gap: 2px; }
 .mc-points input[type="number"] { width: 58px; font-size: 11px; padding: 2px 4px; }
+
+/* About dialog */
+.modal-body p { margin: 0 0 10px; line-height: 1.45; max-width: 52ch; }
+.modal-body a { color: var(--accent, #e8a33c); }

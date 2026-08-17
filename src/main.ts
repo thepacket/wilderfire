@@ -2,7 +2,7 @@
 // Copyright © 2026 Andre Paquette. SPDX-License-Identifier: LGPL-2.1-or-later
 // See LICENSE and NOTICE.md (third-party material, notably JWildfire-derived code).
 import './style.css';
-import { App, el } from './ui/common';
+import { App, el, openModal } from './ui/common';
 import { FlameRenderer } from './gpu/renderer';
 import { PRESETS } from './core/presets';
 import { randomFlame } from './core/random';
@@ -134,8 +134,27 @@ async function boot() {
     themeBtn.textContent = next === 'dark' ? '☀' : '🌙';
   };
 
+  const aboutBtn = el('button', 'icon', 'ⓘ');
+  aboutBtn.title = 'About WilderFire';
+  aboutBtn.onclick = () => {
+    const { body } = openModal('About WilderFire');
+    body.innerHTML = `
+      <p><b>WilderFire</b> — a GPU-native fractal flame editor for the browser.<br>
+      Copyright © 2026 Andre Paquette. Free software under the
+      <a href="https://www.gnu.org/licenses/old-licenses/lgpl-2.1.html" target="_blank" rel="noopener">GNU LGPL v2.1 or later</a>;
+      source at <a href="https://github.com/thepacket/wilderfire" target="_blank" rel="noopener">github.com/thepacket/wilderfire</a>.</p>
+      <p>WilderFire is an original work — the WebGPU renderer, the per-flame shader compiler, the editor,
+      the animation system, the importer and the AI assistant were written for it from scratch.
+      Specific, clearly delimited parts derive from
+      <a href="https://github.com/thargor6/JWildfire" target="_blank" rel="noopener">JWildfire</a>
+      (© Andreas Maschke and contributors, LGPL 2.1+): the mathematical formulas of the ported variations,
+      the GPU helper library they use, the tone-mapping formulas, and the sample flames in the Tests menu.
+      That is why the whole project carries the LGPL. The full list of third-party material is in
+      <a href="https://github.com/thepacket/wilderfire/blob/main/NOTICE.md" target="_blank" rel="noopener">NOTICE.md</a>.</p>`;
+  };
+
   const spacer = el('div', 'spacer');
-  header.append(logo, presetSel, randBtn, mutBtn, undoBtn, redoBtn, spacer, saveBtn, libBtn, triBtn, themeBtn);
+  header.append(logo, presetSel, randBtn, mutBtn, undoBtn, redoBtn, spacer, saveBtn, libBtn, triBtn, themeBtn, aboutBtn);
 
   // ---------- Layout ----------
   const main = el('div', 'main');
