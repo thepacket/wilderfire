@@ -7,8 +7,15 @@ import { normalizeFlame, type Flame } from '../core/flame';
 import { listLibrary } from './library';
 import { pickDirectory, hasDirDialog, type DirTarget } from './saveFile';
 import { renderHiRes, resolveSize, safeFileName, SIZE_OPTIONS, QUALITY_OPTIONS } from './hiresExport';
+import { renderVideo, videoFileExt, VIDEO_SIZE_OPTIONS, VIDEO_QUALITY_OPTIONS, type VideoFormat } from './videoExport';
 
-interface Job { name: string; file: string; flame: Flame; size: string; w: number; h: number; status: HTMLElement; done: boolean }
+interface Job {
+  name: string; file: string; status: HTMLElement; done: boolean;
+  /** still: flame + size */
+  flame?: Flame; size?: string; w: number; h: number;
+  /** animation job (the current timeline) */
+  video?: { format: VideoFormat; fps: number; passes: number; size?: { w: number; h: number } };
+}
 
 export async function openBatchExport(app: App) {
   const { body, close } = openModal('Batch export');
@@ -75,6 +82,43 @@ export async function openBatchExport(app: App) {
   optRow.append(el('span', 'hint', 'Quality '), qSel, alphaLab);
   sizeSec.append(sizeRow, optRow);
 
+  // ---- animation (the Anim tab's timeline, when there is one) ----
+  const tl = app.timeline();
+  const animSec = el('div', 'batch-sec');
+  const animChk = el('input') as HTMLInputElement;
+  animChk.type = 'checkbox';
+  const animSizeChecks: { chk: HTMLInputElement; value: string }[] = [];
+  const animFmt = el('select') as HTMLSelectElement;
+  const animFps = el('select') as HTMLSelectElement;
+  const animQ = el('select') as HTMLSelectElement;
+  if (tl) {
+    const h = el('h4', '');
+    const lab = el('label', 'batch-item');
+    lab.append(animChk, el('span', 'batch-name', `Animation (${tl.total.toFixed(1)} s timeline of the current flame)`));
+    h.append('Animation');
+    animSec.append(h, lab);
+    const sizes = el('div', 'batch-sizes');
+    for (const so of VIDEO_SIZE_OPTIONS) {
+      const l = el('label', 'batch-size');
+      const chk = el('input') as HTMLInputElement;
+      chk.type = 'checkbox';
+      chk.checked = so.value === '';
+      const dim = so.value ? so.value.replace('x', '×') : `${r.width & ~1}×${r.height & ~1}`;
+      l.append(chk, el('span', '', ` ${so.label}`), el('span', 'hint', ` ${dim}`));
+      sizes.append(l);
+      animSizeChecks.push({ chk, value: so.value });
+      chk.onchange = refresh;
+    }
+    const opt = el('div', 'btn-row');
+    for (const [label, v] of [['WebM (VP9)', 'webm'], ['MP4 (H.264)', 'mp4']] as const) { const o = el('option', '', label) as HTMLOptionElement; o.value = v; animFmt.append(o); }
+    for (const v of ['24', '30', '60']) { const o = el('option', '', v + ' fps') as HTMLOptionElement; o.value = v; if (v === '30') o.selected = true; animFps.append(o); }
+    for (const q of VIDEO_QUALITY_OPTIONS) { const o = el('option', '', q.label) as HTMLOptionElement; o.value = q.value; if (q.value === '72') o.selected = true; animQ.append(o); }
+    animQ.title = 'Accumulation passes per frame';
+    opt.append(animFmt, animFps, el('span', 'hint', 'Quality '), animQ);
+    animSec.append(sizes, opt);
+    for (const c of [animChk, animFmt, animFps, animQ]) c.addEventListener('change', refresh);
+  }
+
   // ---- queue ----
   const queueSec = el('div', 'batch-sec');
   queueSec.append(el('h4', '', 'Queue'));
@@ -86,7 +130,7 @@ export async function openBatchExport(app: App) {
   cancelBtn.disabled = true;
   foot.append(startBtn, cancelBtn);
   queueSec.append(queue, summary, foot);
-  body.append(flamesSec, sizeSec, queueSec);
+  body.append(flamesSec, sizeSec, ...(tl ? [animSec] : []), queueSec);
 
   let jobs: Job[] = [];
   let running = false;
@@ -102,13 +146,22 @@ export async function openBatchExport(app: App) {
         out.push({ name: f.name(), file: '', flame: (flame ??= f.get()), size, w, h, status: el('span', 'batch-status', 'queued'), done: false });
       }
     }
-    // file names: <name>-<WxH>.png, numbered when two selected flames share a name
+    // animation jobs: the current timeline at each chosen video size
+    if (tl && animChk.checked) {
+      const format = animFmt.value as VideoFormat, fps = parseInt(animFps.value), passes = parseInt(animQ.value);
+      for (const sc of animSizeChecks.filter((x) => x.chk.checked)) {
+        const fixed = /^(\d+)x(\d+)$/.exec(sc.value);
+        const size = fixed ? { w: Number(fixed[1]), h: Number(fixed[2]) } : undefined;
+        out.push({ name: `${app.flame.name || 'untitled'}-anim`, file: '', w: size?.w ?? (r.width & ~1), h: size?.h ?? (r.height & ~1), video: { format, fps, passes, size }, status: el('span', 'batch-status', 'queued'), done: false });
+      }
+    }
+    // file names: <name>-<WxH>.png / .webm|.mp4, numbered when two selected flames share a name
     const seen = new Map<string, number>();
     for (const j of out) {
       const base = `${safeFileName(j.name)}-${j.w}x${j.h}`;
       const n = (seen.get(base) ?? 0) + 1;
       seen.set(base, n);
-      j.file = `${base}${n > 1 ? `-${n}` : ''}.png`;
+      j.file = `${base}${n > 1 ? `-${n}` : ''}${j.video ? videoFileExt(j.video.format) : '.png'}`;
     }
     return out;
   };
@@ -122,8 +175,12 @@ export async function openBatchExport(app: App) {
       line.append(el('span', 'batch-file', fileNameOf(j)), j.status);
       queue.append(line);
     }
-    const mp = jobs.reduce((a, j) => a + j.w * j.h, 0) / 1e6;
-    summary.textContent = jobs.length ? `${jobs.length} image${jobs.length > 1 ? 's' : ''}, ${mp.toFixed(0)} Mpixel in total.` : 'Pick at least one flame and one size.';
+    const stills = jobs.filter((j) => !j.video), vids = jobs.filter((j) => j.video);
+    const mp = stills.reduce((a, j) => a + j.w * j.h, 0) / 1e6;
+    const frames = tl ? Math.round(tl.total * parseInt(animFps.value || '30')) + 1 : 0;
+    summary.textContent = jobs.length
+      ? [stills.length ? `${stills.length} image${stills.length > 1 ? 's' : ''} (${mp.toFixed(0)} Mpixel)` : '', vids.length ? `${vids.length} video${vids.length > 1 ? 's' : ''} (${frames} frames each)` : ''].filter(Boolean).join(', ') + '.'
+      : 'Pick at least one flame and one size (or the animation).';
     startBtn.disabled = !jobs.length;
   }
   refresh();
@@ -137,7 +194,7 @@ export async function openBatchExport(app: App) {
     abort = new AbortController();
     startBtn.disabled = true;
     cancelBtn.disabled = false;
-    for (const c of [...flameChecks.map((f) => f.chk), ...sizeChecks.map((s) => s.chk), qSel, alphaChk, allBtn, noneBtn]) c.disabled = true;
+    for (const c of [...flameChecks.map((f) => f.chk), ...sizeChecks.map((s) => s.chk), ...animSizeChecks.map((s) => s.chk), qSel, alphaChk, allBtn, noneBtn, animChk, animFmt, animFps, animQ]) c.disabled = true;
     const spp = parseInt(qSel.value);
     const transparent = alphaChk.checked;
     if (app.solo) app.setSolo(false); // exports always render the whole flame
@@ -150,10 +207,16 @@ export async function openBatchExport(app: App) {
         j.status.textContent = 'rendering…';
         j.status.classList.add('busy');
         try {
-          const blob = await renderHiRes(r, j.flame, {
-            w: j.w, h: j.h, spp, transparent, signal: abort.signal,
-            onTile: (d, n) => { j.status.textContent = n > 1 ? `tile ${d}/${n}` : 'rendering…'; },
-          });
+          const blob = j.video
+            ? await renderVideo(r, tl!, {
+              ...j.video, signal: abort.signal,
+              onFrame: (i, n) => { j.status.textContent = `frame ${i}/${n}`; },
+              onStatus: (t) => { j.status.textContent = t; },
+            })
+            : await renderHiRes(r, j.flame!, {
+              w: j.w, h: j.h, spp, transparent, signal: abort.signal,
+              onTile: (d, n) => { j.status.textContent = n > 1 ? `tile ${d}/${n}` : 'rendering…'; },
+            });
           j.status.textContent = 'saving…';
           await target.write(fileNameOf(j), blob);
           j.status.textContent = `✓ ${(blob.size / 1e6).toFixed(1)} MB`;
@@ -172,7 +235,7 @@ export async function openBatchExport(app: App) {
       running = false;
       abort = null;
       cancelBtn.disabled = true;
-      for (const c of [...flameChecks.map((f) => f.chk), ...sizeChecks.map((s) => s.chk), qSel, alphaChk, allBtn, noneBtn]) c.disabled = false;
+      for (const c of [...flameChecks.map((f) => f.chk), ...sizeChecks.map((s) => s.chk), ...animSizeChecks.map((s) => s.chk), qSel, alphaChk, allBtn, noneBtn, animChk, animFmt, animFps, animQ]) c.disabled = false;
       startBtn.disabled = false;
       startBtn.textContent = '⬇ Run again';
     }

@@ -79,7 +79,9 @@ in the stack.
   **rotation-aware affine morphing** so spins rotate instead of collapsing),
   live looping playback with scrubbing, per-keyframe easing
   (linear/smooth/in/out), timeline save/load, and **WebM (VP9) or MP4 (H.264)
-  export** rendered client-side via WebCodecs
+  export** rendered client-side via WebCodecs — at canvas size or a fixed
+  720p / 1080p / 1440p / 4K frame (offscreen, tiled); the batch export
+  queue can render the animation at several sizes/formats alongside stills
 - **Motion curves** — animate any numeric parameter (camera, DOF, tone,
   transform weight/color/affine, any variation weight or parameter) with
   (time, value) keys and Catmull-Rom / linear / smooth / step interpolation,

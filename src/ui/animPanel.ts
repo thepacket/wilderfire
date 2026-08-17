@@ -1,9 +1,8 @@
 // Right panel — Anim tab: keyframe timeline, morphing playback/scrub, and
 // offline WebM export via WebCodecs (VideoEncoder) + webm-muxer. Everything
 // stays client-side.
-import { Muxer as WebMMuxer, ArrayBufferTarget as WebMTarget } from 'webm-muxer';
-import { Muxer as Mp4Muxer, ArrayBufferTarget as Mp4Target } from 'mp4-muxer';
 import { App, el, slider } from './common';
+import { renderVideo, videoFileExt, videoMime, VIDEO_SIZE_OPTIONS, VIDEO_QUALITY_OPTIONS, type VideoFormat } from './videoExport';
 import { cloneFlame, normalizeFlame } from '../core/flame';
 import { flameAt, sortKeys, type Keyframe, type Easing } from '../core/animate';
 import { pickSave, saveText, type SaveTarget } from './saveFile';
@@ -327,13 +326,20 @@ export function buildAnimPanel(app: App, root: HTMLElement, overlay: OverlayHand
     exFpsSel.append(o);
   }
   const qSel = el('select') as HTMLSelectElement;
-  for (const [label, v] of [['Draft', '24'], ['Good', '72'], ['High', '160']] as const) {
-    const o = el('option', '', label) as HTMLOptionElement;
-    o.value = v;
-    if (v === '72') o.selected = true;
+  for (const q of VIDEO_QUALITY_OPTIONS) {
+    const o = el('option', '', q.label) as HTMLOptionElement;
+    o.value = q.value;
+    if (q.value === '72') o.selected = true;
     qSel.append(o);
   }
-  qSel.title = 'Accumulation passes per frame';
+  qSel.title = 'Accumulation passes per frame (fixed sizes render the same samples per pixel)';
+  const sizeSel = el('select') as HTMLSelectElement;
+  for (const so of VIDEO_SIZE_OPTIONS) {
+    const o = el('option', '', so.label) as HTMLOptionElement;
+    o.value = so.value;
+    sizeSel.append(o);
+  }
+  sizeSel.title = 'Video size: the canvas as shown, or a fixed 16:9 frame rendered offscreen (slower)';
   const fmtSel = el('select') as HTMLSelectElement;
   for (const [label, v] of [['WebM (VP9)', 'webm'], ['MP4 (H.264)', 'mp4']] as const) {
     const o = el('option', '', label) as HTMLOptionElement;
@@ -342,7 +348,7 @@ export function buildAnimPanel(app: App, root: HTMLElement, overlay: OverlayHand
   }
   const exBtn = el('button', 'primary', '⬇ Export video');
   const exRow = el('div', 'btn-row');
-  exRow.append(exBtn, fmtSel, exFpsSel, qSel);
+  exRow.append(exBtn, fmtSel, sizeSel, exFpsSel, qSel);
   exSec.append(exRow);
   const exStatus = el('div', 'hint', 'Rendered fully in your browser via WebCodecs.');
   exSec.append(exStatus);
@@ -460,105 +466,39 @@ export function buildAnimPanel(app: App, root: HTMLElement, overlay: OverlayHand
 
   playBtn.onclick = play;
 
-  // ---------- WebM export ----------
-  async function exportWebM(opts?: { fps?: number; passes?: number; download?: boolean; format?: 'webm' | 'mp4' }): Promise<Blob> {
+  // ---------- Video export (src/ui/videoExport.ts) ----------
+  async function exportWebM(opts?: { fps?: number; passes?: number; download?: boolean; format?: VideoFormat }): Promise<Blob> {
     if (!isReady()) throw new Error('Need at least 2 keyframes or a motion curve.');
-    if (!('VideoEncoder' in window)) {
-      throw new Error('WebCodecs (VideoEncoder) is not available in this browser.');
-    }
     const fps = opts?.fps ?? parseInt(exFpsSel.value);
     const passes = opts?.passes ?? parseInt(qSel.value);
     const download = opts?.download ?? true;
-    const format = opts?.format ?? (fmtSel.value as 'webm' | 'mp4');
+    const format = opts?.format ?? (fmtSel.value as VideoFormat);
+    const fixed = /^(\d+)x(\d+)$/.exec(sizeSel.value);
+    const size = fixed ? { w: Number(fixed[1]), h: Number(fixed[2]) } : undefined;
     // Pick the destination now (needs the click's user gesture); write after encoding.
     let target: SaveTarget | null = null;
     if (download) {
       const name = (app.flame.name || 'wilderfire').replace(/[\\/:*?"<>|]+/g, '_');
       target = await pickSave({
-        suggestedName: `${name}-anim.${format}`, description: format === 'mp4' ? 'MP4 video' : 'WebM video',
-        mime: format === 'mp4' ? 'video/mp4' : 'video/webm', ext: `.${format}`,
+        suggestedName: `${name}-anim${size ? `-${size.w}x${size.h}` : ''}${videoFileExt(format)}`, description: format === 'mp4' ? 'MP4 video' : 'WebM video',
+        mime: videoMime(format), ext: videoFileExt(format),
       });
       if (!target) throw new Error('Export cancelled.');
     }
-    const [t0, t1] = timeRange();
-    const total = Math.max(t1 - t0, 0.01);
-    const nFrames = Math.max(2, Math.round(total * fps) + 1);
-
     const renderer = app.renderer;
-    const width = renderer.width & ~1;
-    const height = renderer.height & ~1;
-
     const savedFlame = app.flame;
     if (playing) stop();
     exporting = true;
     renderer.exporting = true;
     exBtn.disabled = true;
     playBtn.disabled = true;
-
     try {
-      let addChunk: (chunk: EncodedVideoChunk, meta?: EncodedVideoChunkMetadata) => void;
-      let finalize: () => ArrayBuffer;
-      let mime: string;
-      const encCfg: VideoEncoderConfig = { codec: '', width, height, bitrate: 12_000_000, framerate: fps };
-
-      if (format === 'mp4') {
-        let codec = '';
-        for (const c of ['avc1.640028', 'avc1.4D0028', 'avc1.420028']) {
-          const s = await VideoEncoder.isConfigSupported({ ...encCfg, codec: c });
-          if (s.supported) { codec = c; break; }
-        }
-        if (!codec) throw new Error('H.264 encoding not supported here — use WebM.');
-        encCfg.codec = codec;
-        (encCfg as VideoEncoderConfig & { avc?: { format: string } }).avc = { format: 'avc' };
-        const muxer = new Mp4Muxer({
-          target: new Mp4Target(),
-          video: { codec: 'avc', width, height, frameRate: fps },
-          fastStart: 'in-memory',
-        });
-        addChunk = (c, m) => muxer.addVideoChunk(c, m);
-        finalize = () => { muxer.finalize(); return muxer.target.buffer; };
-        mime = 'video/mp4';
-      } else {
-        let codec = 'vp09.00.10.08';
-        let muxCodec = 'V_VP9';
-        const support = await VideoEncoder.isConfigSupported({ ...encCfg, codec });
-        if (!support.supported) { codec = 'vp8'; muxCodec = 'V_VP8'; }
-        encCfg.codec = codec;
-        const muxer = new WebMMuxer({
-          target: new WebMTarget(),
-          video: { codec: muxCodec, width, height, frameRate: fps },
-        });
-        addChunk = (c, m) => muxer.addVideoChunk(c, m!);
-        finalize = () => { muxer.finalize(); return muxer.target.buffer; };
-        mime = 'video/webm';
-      }
-
-      const encoder = new VideoEncoder({
-        output: (chunk, meta) => addChunk(chunk, meta),
-        error: (e) => console.error('VideoEncoder:', e),
+      const blob = await renderVideo(renderer, timeline()!, {
+        fps, passes, format, size,
+        onFrame: (i, n) => { exStatus.textContent = `Rendering frame ${i}/${n}…`; },
+        onStatus: (t) => { exStatus.textContent = t; },
       });
-      encoder.configure(encCfg);
-
-      for (let i = 0; i < nFrames; i++) {
-        const t = t0 + (i / fps);
-        renderer.setFlame(evalAt(Math.min(t, t0 + total)));
-        await renderer.stepExport(passes);
-        // Capture must stay in the same task as the tonemap submit.
-        const frame = renderer.captureSync((cv) => new VideoFrame(cv, {
-          timestamp: Math.round((i * 1e6) / fps),
-          duration: Math.round(1e6 / fps),
-        }));
-        encoder.encode(frame, { keyFrame: i % (fps * 2) === 0 });
-        frame.close();
-        while (encoder.encodeQueueSize > 4) {
-          await new Promise((r) => setTimeout(r, 4));
-        }
-        exStatus.textContent = `Rendering frame ${i + 1}/${nFrames}…`;
-      }
-      exStatus.textContent = 'Encoding…';
-      await encoder.flush();
-      const blob = new Blob([finalize()], { type: mime });
-      exStatus.textContent = `Done — ${(blob.size / 1e6).toFixed(1)} MB, ${nFrames} frames @ ${fps} fps.`;
+      exStatus.textContent = `Done — ${(blob.size / 1e6).toFixed(1)} MB${size ? `, ${size.w}×${size.h}` : ''} @ ${fps} fps.`;
       if (target) await target.write(blob);
       return blob;
     } finally {
@@ -569,6 +509,13 @@ export function buildAnimPanel(app: App, root: HTMLElement, overlay: OverlayHand
       rebuildList();
     }
   }
+  /** The timeline for offscreen renderers (batch export), or null when there is nothing to animate. */
+  const timeline = () => {
+    if (!isReady()) return null;
+    const [t0, t1] = timeRange();
+    return { t0, total: Math.max(t1 - t0, 0.01), evalAt };
+  };
+  app.timeline = timeline;
 
   exBtn.onclick = () => {
     exportWebM().catch((e) => {

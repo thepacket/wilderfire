@@ -77,6 +77,8 @@ export class App {
   /** Motion-curve bridge, registered by the Anim panel (used by .flame export/import). */
   getCurves: () => MotionCurve[] = () => [];
   setCurves: (curves: MotionCurve[]) => void = () => {};
+  /** The animation timeline (registered by the Anim panel) for offscreen video renders — null when nothing is animated. */
+  timeline: () => { t0: number; total: number; evalAt: (t: number) => Flame } | null = () => null;
   private listeners: { ev: AppEvent; fn: (source: string) => void }[] = [];
 
   // Undo/redo: JSON snapshots with slider-gesture coalescing.
