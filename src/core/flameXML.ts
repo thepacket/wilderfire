@@ -369,7 +369,7 @@ export function parseFlameXML(text: string, fallbackPalette: RGB[]): Flame[] {
     f.camPitch = (numAttr('cam_pitch') * 180) / Math.PI;
     f.camYaw = (numAttr('cam_yaw') * 180) / Math.PI;
     f.camBank = (numAttr('cam_roll') * 180) / Math.PI;
-    f.camPersp = numAttr('cam_persp');
+    f.camPersp = fe.hasAttribute('cam_persp') ? numAttr('cam_persp') : numAttr('cam_perspective'); // JWildfire also reads the old cam_perspective
     f.camPosX = numAttr('cam_pos_x');
     f.camPosY = numAttr('cam_pos_y');
     f.camPosZ = numAttr('cam_pos_z');
