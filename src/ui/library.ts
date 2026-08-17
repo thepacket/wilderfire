@@ -1,38 +1,15 @@
-// Flame library + session autosave, both in localStorage.
+// Flame library (IndexedDB, see ../core/libraryStore.ts) + session autosave (localStorage).
 import { App, el, openModal } from './common';
 import { normalizeFlame, type Flame } from '../core/flame';
+import { libAll, libPut, libDelete, type LibEntry } from '../core/libraryStore';
+import { saveText } from './saveFile';
 import type { AnimAPI } from './animPanel';
 
-const LS_LIB = 'wilderfire.library';
+export type { LibEntry };
 const LS_AUTOSAVE = 'wilderfire.autosave';
-const MAX_ENTRIES = 48;
-
-export interface LibEntry {
-  id: string;
-  name: string;
-  date: number;
-  flame: unknown;
-  thumb: string; // jpeg data URL
-}
 
 /** The saved flames, newest first (for the batch export queue). */
-export const listLibrary = (): LibEntry[] => loadLib();
-
-function loadLib(): LibEntry[] {
-  try {
-    const raw = localStorage.getItem(LS_LIB);
-    const arr = raw ? JSON.parse(raw) : [];
-    return Array.isArray(arr) ? arr : [];
-  } catch { return []; }
-}
-
-function storeLib(entries: LibEntry[]) {
-  try {
-    localStorage.setItem(LS_LIB, JSON.stringify(entries));
-  } catch {
-    alert('Library storage is full — delete some entries.');
-  }
-}
+export const listLibrary = (): Promise<LibEntry[]> => libAll();
 
 export function buildLibrary(app: App, anim: AnimAPI) {
   function thumbnail(size = 144): string {
@@ -49,23 +26,44 @@ export function buildLibrary(app: App, anim: AnimAPI) {
   }
 
   function save() {
-    const entries = loadLib();
-    entries.unshift({
+    const entry: LibEntry = {
       id: Math.random().toString(36).slice(2),
       name: app.flame.name || 'untitled',
       date: Date.now(),
       flame: JSON.parse(JSON.stringify(app.flame)),
       thumb: thumbnail(),
-    });
-    while (entries.length > MAX_ENTRIES) entries.pop();
-    storeLib(entries);
+    };
+    libPut(entry).catch((e) => alert('Could not save to the library: ' + (e as Error).message));
   }
 
-  function open() {
+  async function open() {
     const { body, close } = openModal('Flame library');
-    const entries = loadLib();
+    let entries: LibEntry[] = [];
+    try { entries = await libAll(); } catch (e) { body.append(el('div', 'hint', '⚠ Library unavailable: ' + (e as Error).message)); return; }
+    const tools = el('div', 'btn-row');
+    const expBtn = el('button', '', '⬇ Export library');
+    expBtn.title = 'Save every entry (flames + thumbnails) as one JSON file — a backup, or to move the library to another browser';
+    expBtn.onclick = () => saveText(JSON.stringify({ wilderfireLibrary: 1, entries }), { suggestedName: 'wilderfire-library.json', description: 'WilderFire library', mime: 'application/json', ext: '.json' });
+    const impBtn = el('button', '', '⬆ Import library');
+    impBtn.title = 'Merge entries from an exported library JSON (existing entries are kept)';
+    const impFile = el('input') as HTMLInputElement;
+    impFile.type = 'file'; impFile.accept = '.json,application/json'; impFile.style.display = 'none';
+    impBtn.onclick = () => impFile.click();
+    impFile.onchange = async () => {
+      const f = impFile.files?.[0]; impFile.value = '';
+      if (!f) return;
+      try {
+        const j = JSON.parse(await f.text());
+        const list: LibEntry[] = Array.isArray(j?.entries) ? j.entries : Array.isArray(j) ? j : [];
+        const ok = list.filter((e) => e && typeof e.id === 'string' && e.flame);
+        if (!ok.length) throw new Error('no library entries in this file');
+        await libPut(ok);
+        close(); open();
+      } catch (e) { alert('Import failed: ' + (e as Error).message); }
+    };
+    tools.append(expBtn, impBtn, impFile);
     if (!entries.length) {
-      body.append(el('div', 'hint', 'Empty — use 💾 Save to keep the current flame here. Stored in your browser (localStorage).'));
+      body.append(el('div', 'hint', 'Empty — use 💾 Save to keep the current flame here. Stored in your browser (IndexedDB).'), tools);
       return;
     }
     const grid = el('div', 'lib-grid');
@@ -81,8 +79,7 @@ export function buildLibrary(app: App, anim: AnimAPI) {
       const del = el('button', 'lib-del danger', '✕');
       del.onclick = (ev) => {
         ev.stopPropagation();
-        storeLib(loadLib().filter((x) => x.id !== e.id));
-        item.remove();
+        libDelete(e.id).then(() => item.remove()).catch((err) => alert('Delete failed: ' + (err as Error).message));
       };
       item.append(img, meta, del);
       item.onclick = () => {
@@ -91,7 +88,7 @@ export function buildLibrary(app: App, anim: AnimAPI) {
       };
       grid.append(item);
     }
-    body.append(grid);
+    body.append(el('div', 'hint', `${entries.length} flame${entries.length > 1 ? 's' : ''}`), grid, tools);
   }
 
   // ---------- Autosave ----------

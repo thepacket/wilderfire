@@ -95,8 +95,9 @@ in the stack.
   transforms across layers and flames, rotational/mirror **symmetry
   generators**, arrow-key nudging, **collapsible side panes** (`[` / `]`)
 - **Session autosave + flame library** — the working flame and animation
-  timeline persist across reloads; a thumbnail library (localStorage) stores
-  up to 48 flames
+  timeline persist across reloads; a thumbnail library on IndexedDB (no
+  practical size limit; an older localStorage library migrates itself) with
+  whole-library JSON export/import for backups and moving between browsers
 - **Mutation grid** (MutaGen-style) — 3×3 explorer of random mutations
   rendered offscreen; click to adopt and keep exploring
 - Progressive refinement with quality cap, speed presets, pause/re-render,

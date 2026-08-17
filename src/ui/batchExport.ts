@@ -10,10 +10,11 @@ import { renderHiRes, resolveSize, safeFileName, SIZE_OPTIONS, QUALITY_OPTIONS }
 
 interface Job { name: string; file: string; flame: Flame; size: string; w: number; h: number; status: HTMLElement; done: boolean }
 
-export function openBatchExport(app: App) {
+export async function openBatchExport(app: App) {
   const { body, close } = openModal('Batch export');
   body.classList.add('batch-body');
-  const lib = listLibrary();
+  let lib: Awaited<ReturnType<typeof listLibrary>> = [];
+  try { lib = await listLibrary(); } catch { /* no library: current flame only */ }
 
   // ---- flames ----
   const flamesSec = el('div', 'batch-sec');
