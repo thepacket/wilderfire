@@ -4,7 +4,17 @@
 // divergent ones and these overrides bring the WGSL back to CPU semantics.
 // Snippets stay in the CUDA dialect so they go through the same transpiler.
 
-export interface Override { gpuCode?: string; gpuFunctions?: string; note: string; /** text appended to the original snippet */ append?: string }
+export interface Override {
+  gpuCode?: string; gpuFunctions?: string; note: string;
+  /** text appended to the original snippet */
+  append?: string;
+  /** JWildfire CPU rejection-samples up to N times before hiding the point; the GPU
+   *  snippet samples once. Wrap the snippet in a retry loop that breaks on success. */
+  retry?: number;
+  /** Java setParameter() clamps these params (Tools.limitValue); the GPU snippet reads
+   *  them raw. Reads of `__<var>_<param>` are wrapped in the same clamp. */
+  clampParams?: Record<string, [number, number]>;
+}
 
 export const OVERRIDES: Record<string, Override> = {
   ovoid3d: {
@@ -100,4 +110,11 @@ if (_d != 0.f) {
     note: 'GPU snippet dropped the z output (CPU: pVarTP.z += z1 + pAffineTP.z).',
     append: '\n__pz += z1 + __z;',
   },
+  // 3D solid samplers: CPU tries up to 50 random points inside the SDF before
+  // hiding; the GPU snippet tries once (mostly hidden, wrong density).
+  ...Object.fromEntries([
+    'bbox3D', 'cappedcone3D', 'cappedtorus3D', 'capsule3D', 'cone3D', 'cylinder3D', 'ellipsoid3D', 'hexprism3D',
+    'octahedron3D', 'ocappedcone3D', 'ocylinder3D', 'octogonprism3D', 'oroundcone3D', 'pyramid3D', 'rhombus3D',
+    'solidangle3D', 'triprism3D',
+  ].map((n) => [n, { note: 'CPU rejection-samples up to 50 times before hiding; GPU sampled once.', retry: 50 } satisfies Override])),
 };

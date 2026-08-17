@@ -26,7 +26,7 @@ in the stack.
 
 ## Features
 
-- **672 variations** — 70 hand-written flam3 classics plus **668 JWildfire
+- **694 variations** — 70 hand-written flam3 classics plus **690 JWildfire
   variations ported mechanically** from JWildfire's own GPU snippets by a
   CUDA→WGSL transpiler and **numerically verified in 3D against headless
   JWildfire** (see [`scripts/jwf-port/README.md`](scripts/jwf-port/README.md)).

@@ -11,6 +11,8 @@ import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { transpileSnippet, TranspileError, type Binding, type Env } from './cwgsl.ts';
 import { OVERRIDES } from './overrides.ts';
+import clampsJson from './data/param-clamps.json' with { type: 'json' };
+const PARAM_CLAMPS = clampsJson as Record<string, Record<string, [number, number]>>;
 
 const here = dirname(fileURLToPath(import.meta.url));
 const dataDir = join(here, 'data');
@@ -33,6 +35,7 @@ try { verified = new Set<string>(JSON.parse(readFileSync(join(here, 'verified.js
 /** Ports the oracle cannot confirm because JWildfire's CPU code is itself broken, but whose GPU intent is right. */
 const FORCE_VERIFIED: Record<string, string> = {
   pre_flatten: 'CPU writes pVarTP.z inside a pre-variation (a no-op); the GPU flattens the affine z, which is the intent',
+  cut_bricks: 'matches at default seed; the seed param drives java.util.Random on the CPU and nothing on the GPU (same as JWildfire GPU)',
 };
 for (const n of Object.keys(FORCE_VERIFIED)) verified.add(n);
 
@@ -123,7 +126,26 @@ function bindingsFor(v: DumpVar): Env {
 
 for (const v0 of dump) {
   const ov = OVERRIDES[v0.name];
-  const v: DumpVar = ov ? { ...v0, gpuCode: (ov.gpuCode ?? v0.gpuCode ?? '') + (ov.append ?? ''), gpuFunctions: ov.gpuFunctions ?? v0.gpuFunctions } : v0;
+  let ovCode = ov ? (ov.gpuCode ?? v0.gpuCode ?? '') + (ov.append ?? '') : undefined;
+  if (ov?.retry && ovCode) {
+    // wrap in `for (_try < N) { … break-on-success }`: the snippet sets __doHide=true
+    // then `if (distance < 0) { __doHide=false; __px=…; }` — add a break inside that block.
+    const close = ovCode.lastIndexOf('}');
+    if (close < 0) throw new Error(`retry override: no if-block in ${v0.name}`);
+    ovCode = `for (int _try = 0; _try < ${ov.retry}; _try++) {\n${ovCode.slice(0, close)} break; }\n}`;
+  }
+  // Java setParameter() clamps (data/param-clamps.json, extracted by extract-clamps.py)
+  // plus any per-override clamps: wrap every read of the param in the same clamp.
+  const clamps = { ...(PARAM_CLAMPS[v0.name] ?? {}), ...(ov?.clampParams ?? {}) };
+  if (Object.keys(clamps).length && (ovCode ?? v0.gpuCode)) {
+    ovCode = (ovCode ?? v0.gpuCode ?? '').replace(/varpar->/g, '__');
+    for (const [pn, [lo, hi]] of Object.entries(clamps)) {
+      // reads only: skip assignments to the param (some snippets write to it)
+      const re = new RegExp(`(?<![A-Za-z0-9_])__${v0.name}_${pn}(?![A-Za-z0-9_])(?!\\s*(?:[-+*/]?=)(?!=))`, 'g');
+      ovCode = ovCode.replace(re, `(fminf(fmaxf(__${v0.name}_${pn}, ${lo.toFixed(4)}f), ${hi.toFixed(4)}f))`);
+    }
+  }
+  const v: DumpVar = ov || ovCode !== undefined ? { ...v0, gpuCode: ovCode ?? v0.gpuCode, gpuFunctions: ov?.gpuFunctions ?? v0.gpuFunctions } : v0;
   if (v.error) { report.push({ name: v.name, status: 'error', reason: 'instantiation: ' + v.error }); continue; }
   if (EXCLUDE[v.name]) { report.push({ name: v.name, status: 'skip', reason: EXCLUDE[v.name] }); continue; }
   if (!v.gpu || !v.gpuCode) { report.push({ name: v.name, status: 'skip', reason: 'no GPU code in JWildfire' }); continue; }

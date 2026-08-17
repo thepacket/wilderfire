@@ -1,0 +1,4186 @@
+{
+"arctruchet": {
+"TilesPerColumn": [
+1.0,
+100.0
+],
+"TilesPerRow": [
+1.0,
+100.0
+],
+"seed": [
+0.0,
+100000.0
+],
+"thickness": [
+0.0,
+1.0
+]
+},
+"atan": {
+"Mode": [
+0.0,
+2.0
+]
+},
+"bCollide": {
+"a": [
+0.0,
+1.0
+]
+},
+"bMod": {
+"distance": [
+0.0,
+2.0
+]
+},
+"bbox3D": {
+"dx": [
+0.0,
+0.5
+],
+"dy": [
+0.0,
+0.5
+],
+"dz": [
+0.0,
+0.5
+],
+"r": [
+0.0,
+0.25
+]
+},
+"brownian_js": {
+"level": [
+1.0,
+15.0
+]
+},
+"bubbleT3D": {
+"ratio_of_stripes": [
+0.0,
+2.0
+]
+},
+"bwrands": {
+"loonie_chance": [
+0.0,
+1.0
+],
+"maxpetals": [
+1.0,
+1000.0
+],
+"minpetals": [
+1.0,
+1000.0
+],
+"petals_chance": [
+0.0,
+1.0
+],
+"rmin": [
+0.0,
+1.0
+],
+"rrot": [
+0.0,
+1.0
+]
+},
+"c_var": {
+"mode": [
+0.0,
+1.0
+]
+},
+"cactusGlobe": {
+"areole_density": [
+0.0,
+1.0
+],
+"feature_color": [
+0.0,
+1.0
+],
+"generator_mode": [
+0.0,
+1.0
+],
+"pattern_mode": [
+0.0,
+1.0
+],
+"pup_chance": [
+0.0,
+1.0
+],
+"recursion_depth": [
+0.0,
+8.0
+]
+},
+"cappedcone3D": {
+"h": [
+-1.0,
+1.0
+],
+"r1": [
+-1.0,
+1.0
+],
+"r2": [
+-1.0,
+1.0
+]
+},
+"cappedtorus3D": {
+"R1": [
+0.0,
+0.5
+],
+"R2": [
+0.0,
+0.5
+],
+"dx": [
+0.0,
+1.0
+],
+"dy": [
+-5.0,
+5.0
+]
+},
+"capsule3D": {
+"R": [
+-1.0,
+1.0
+],
+"dx": [
+-1.0,
+1.0
+],
+"dy": [
+-1.0,
+1.0
+],
+"dz": [
+-1.0,
+1.0
+],
+"tx": [
+-1.0,
+1.0
+],
+"ty": [
+-1.0,
+1.0
+],
+"tz": [
+-1.0,
+1.0
+]
+},
+"cell3D": {
+"checker_invert": [
+0.0,
+1.0
+],
+"checker_mode": [
+0.0,
+1.0
+],
+"color_mode": [
+0.0,
+1.0
+],
+"dxdydz_mode": [
+0.0,
+1.0
+],
+"invert_y": [
+0.0,
+1.0
+],
+"invert_z": [
+0.0,
+1.0
+],
+"mirror_x": [
+0.0,
+1.0
+],
+"mirror_y": [
+0.0,
+1.0
+],
+"mirror_z": [
+0.0,
+1.0
+]
+},
+"checkerboard_wf": {
+"checker_color1": [
+0.0,
+1.0
+],
+"checker_color2": [
+0.0,
+1.0
+],
+"side_color": [
+0.0,
+1.0
+],
+"with_sides": [
+0.0,
+1.0
+]
+},
+"chunk": {
+"mode": [
+0.0,
+1.0
+]
+},
+"collideoscope": {
+"a": [
+0.0,
+1.0
+]
+},
+"colordomain": {
+"nIters": [
+1.0,
+20.0
+],
+"size": [
+100.0,
+10000.0
+],
+"zoomIn": [
+1.0,
+1.0
+],
+"zoomOut": [
+1.0,
+1.0
+]
+},
+"cone3D": {
+"Ty": [
+-1.0,
+1.0
+],
+"h": [
+0.0,
+1.0
+],
+"w": [
+0.0,
+1.0
+]
+},
+"conicalSpiral": {
+"colorMode": [
+0.0,
+4.0
+],
+"colorize": [
+0.0,
+1.0
+],
+"mode": [
+0.0,
+3.0
+],
+"solid": [
+0.0,
+1.0
+]
+},
+"crop": {
+"scatter_area": [
+-1.0,
+1.0
+],
+"zero": [
+0.0,
+1.0
+]
+},
+"crop3D": {
+"scatter_area": [
+-1.0,
+1.0
+],
+"zero": [
+0.0,
+1.0
+]
+},
+"crop_box": {
+"invert": [
+0.0,
+1.0
+]
+},
+"crop_cross": {
+"invert": [
+0.0,
+1.0
+]
+},
+"crop_polygon": {
+"invert": [
+0.0,
+1.0
+],
+"type": [
+0.0,
+4.0
+]
+},
+"crop_rhombus": {
+"invert": [
+0.0,
+1.0
+]
+},
+"crop_stars": {
+"invert": [
+0.0,
+1.0
+],
+"n": [
+3.0,
+9.0
+],
+"r2": [
+0.0,
+1.0
+]
+},
+"crop_trapezoid": {
+"invert": [
+0.0,
+1.0
+]
+},
+"crop_vesica": {
+"invert": [
+0.0,
+1.0
+]
+},
+"crop_x": {
+"invert": [
+0.0,
+1.0
+],
+"w": [
+0.0,
+1.0
+]
+},
+"curliecue": {
+"Points": [
+1.0,
+10000.0
+],
+"eccentricity": [
+0.0,
+1.0
+],
+"scale": [
+0.0,
+1.0
+],
+"showlines": [
+0.0,
+1.0
+],
+"sides": [
+3.0,
+20.0
+],
+"symmetry": [
+1.0,
+4.0
+],
+"type": [
+0.0,
+1.0
+]
+},
+"cut_2ewangtile": {
+"invert": [
+0.0,
+1.0
+],
+"mode": [
+0.0,
+1.0
+]
+},
+"cut_alientext": {
+"invert": [
+0.0,
+1.0
+],
+"mode": [
+0.0,
+1.0
+],
+"subdivisions": [
+0.0,
+4.0
+]
+},
+"cut_apollonian": {
+"invert": [
+0.0,
+1.0
+],
+"levels": [
+1.0,
+10.0
+],
+"mode": [
+0.0,
+1.0
+],
+"zoom": [
+0.1,
+50.0
+]
+},
+"cut_booleans": {
+"invert": [
+0.0,
+1.0
+],
+"mode": [
+0.0,
+1.0
+],
+"type": [
+0.0,
+2.0
+]
+},
+"cut_bricks": {
+"invert": [
+0.0,
+1.0
+],
+"mode": [
+0.0,
+1.0
+],
+"size": [
+0.1,
+0.9999
+]
+},
+"cut_btree": {
+"invert": [
+0.0,
+1.0
+],
+"mode": [
+0.0,
+1.0
+],
+"thickness": [
+1.0,
+10.0
+]
+},
+"cut_btruchet": {
+"invert": [
+0.0,
+1.0
+],
+"mode": [
+0.0,
+1.0
+],
+"width": [
+0.5,
+5.0
+]
+},
+"cut_c": {
+"invert": [
+0.0,
+1.0
+],
+"mode": [
+0.0,
+1.0
+]
+},
+"cut_celtic": {
+"invert": [
+0.0,
+1.0
+],
+"mode": [
+0.0,
+1.0
+]
+},
+"cut_chains": {
+"invert": [
+0.0,
+1.0
+],
+"mode": [
+0.0,
+1.0
+]
+},
+"cut_circdes": {
+"invert": [
+0.0,
+1.0
+],
+"mode": [
+0.0,
+1.0
+]
+},
+"cut_fingerprint": {
+"invert": [
+0.0,
+1.0
+],
+"mode": [
+0.0,
+1.0
+],
+"width": [
+0.02,
+1.0
+],
+"zoom": [
+1.0,
+100.0
+]
+},
+"cut_fractal": {
+"invert": [
+0.0,
+1.0
+],
+"iters": [
+1.0,
+100.0
+],
+"mode": [
+0.0,
+1.0
+]
+},
+"cut_fun": {
+"invert": [
+0.0,
+1.0
+],
+"mode": [
+0.0,
+1.0
+]
+},
+"cut_glypho": {
+"invert": [
+0.0,
+1.0
+],
+"mode": [
+0.0,
+1.0
+],
+"zoom": [
+0.1,
+50.0
+]
+},
+"cut_hexdots": {
+"invert": [
+0.0,
+1.0
+],
+"mode": [
+0.0,
+1.0
+],
+"size": [
+0.01,
+1.0
+],
+"zoom": [
+0.1,
+50.0
+]
+},
+"cut_hextruchetflow": {
+"grid": [
+0.0,
+1.0
+],
+"invert": [
+0.0,
+1.0
+],
+"mode": [
+0.0,
+1.0
+],
+"zoom": [
+0.1,
+50.0
+]
+},
+"cut_jigsaw": {
+"invert": [
+0.0,
+1.0
+],
+"mode": [
+0.0,
+1.0
+]
+},
+"cut_kaleido": {
+"invert": [
+0.0,
+1.0
+],
+"mode": [
+0.0,
+1.0
+],
+"n": [
+2.0,
+20.0
+]
+},
+"cut_kleinian": {
+"NIters": [
+0.0,
+150.0
+],
+"invert": [
+0.0,
+1.0
+],
+"mode": [
+0.0,
+1.0
+],
+"time": [
+0.0,
+1.0
+]
+},
+"cut_magfield": {
+"density": [
+1.0,
+10.0
+],
+"invert": [
+0.0,
+1.0
+],
+"mode": [
+0.0,
+1.0
+]
+},
+"cut_mandala": {
+"invert": [
+0.0,
+1.0
+],
+"mode": [
+0.0,
+1.0
+]
+},
+"cut_metaballs": {
+"invert": [
+0.0,
+1.0
+],
+"mode": [
+0.0,
+1.0
+],
+"zoom": [
+0.1,
+50.0
+]
+},
+"cut_pattern": {
+"invert": [
+0.0,
+1.0
+],
+"mode": [
+0.0,
+1.0
+]
+},
+"cut_randomtile": {
+"invert": [
+0.0,
+1.0
+],
+"mode": [
+0.0,
+1.0
+]
+},
+"cut_rgrid": {
+"angle": [
+0.0,
+90.0
+],
+"invert": [
+0.0,
+1.0
+],
+"mode": [
+0.0,
+1.0
+],
+"zoom": [
+0.1,
+50.0
+]
+},
+"cut_shapes": {
+"contour": [
+0.0,
+1.0
+],
+"invert": [
+0.0,
+1.0
+],
+"mode": [
+0.0,
+1.0
+],
+"n": [
+3.0,
+9.0
+],
+"type": [
+0.0,
+12.0
+],
+"zoom": [
+0.1,
+50.0
+]
+},
+"cut_sincos": {
+"invert": [
+0.0,
+1.0
+],
+"mode": [
+0.0,
+1.0
+]
+},
+"cut_snowflake": {
+"invert": [
+0.0,
+1.0
+],
+"level": [
+1.0,
+15.0
+],
+"mode": [
+0.0,
+1.0
+]
+},
+"cut_spiral": {
+"invert": [
+0.0,
+1.0
+],
+"mode": [
+0.0,
+1.0
+]
+},
+"cut_spiralcb": {
+"invert": [
+0.0,
+1.0
+],
+"mode": [
+0.0,
+1.0
+]
+},
+"cut_spots": {
+"invert": [
+0.0,
+1.0
+],
+"mode": [
+0.0,
+1.0
+]
+},
+"cut_sqcir": {
+"invert": [
+0.0,
+1.0
+],
+"mode": [
+0.0,
+1.0
+],
+"power": [
+0.0,
+2.0
+],
+"zoom": [
+0.1,
+50.0
+]
+},
+"cut_sqsplits": {
+"invert": [
+0.0,
+1.0
+],
+"mode": [
+0.0,
+1.0
+]
+},
+"cut_swarp": {
+"invert": [
+0.0,
+1.0
+],
+"mode": [
+0.0,
+1.0
+],
+"type": [
+0.0,
+3.0
+]
+},
+"cut_tileillusion": {
+"invert": [
+0.0,
+1.0
+],
+"mode": [
+0.0,
+1.0
+],
+"zoom": [
+0.1,
+50.0
+]
+},
+"cut_triantess": {
+"Iters": [
+0.0,
+20.0
+],
+"SRadius": [
+0.001,
+0.1
+],
+"invert": [
+0.0,
+1.0
+],
+"mode": [
+0.0,
+1.0
+],
+"pParam": [
+1.0,
+12.0
+],
+"qParam": [
+1.0,
+12.0
+],
+"rParam": [
+1.0,
+12.0
+],
+"uBaryc": [
+0.0,
+1.0
+],
+"vBaryc": [
+0.0,
+1.0
+],
+"wBaryc": [
+0.0,
+1.0
+]
+},
+"cut_triskel": {
+"invert": [
+0.0,
+1.0
+],
+"mode": [
+0.0,
+1.0
+]
+},
+"cut_truchet": {
+"invert": [
+0.0,
+1.0
+],
+"mode": [
+0.0,
+1.0
+],
+"type": [
+0.0,
+2.0
+]
+},
+"cut_truchetweaving": {
+"invert": [
+0.0,
+1.0
+],
+"mode": [
+0.0,
+1.0
+],
+"type": [
+0.0,
+1.0
+],
+"width": [
+0.0,
+0.25
+],
+"zoom": [
+0.1,
+50.0
+]
+},
+"cut_tstruchet": {
+"arcs": [
+0.0,
+1.0
+],
+"invert": [
+0.0,
+1.0
+],
+"levels": [
+0.0,
+1.0
+],
+"mode": [
+0.0,
+1.0
+],
+"shape": [
+0.0,
+3.0
+]
+},
+"cut_vasarely": {
+"invert": [
+0.0,
+1.0
+],
+"mode": [
+0.0,
+1.0
+]
+},
+"cut_web": {
+"invert": [
+0.0,
+1.0
+],
+"mode": [
+0.0,
+1.0
+],
+"thick": [
+0.0,
+0.9
+]
+},
+"cut_wood": {
+"LineCount": [
+1.0,
+50.0
+],
+"LineWidth": [
+0.1,
+0.5
+],
+"freq": [
+0.1,
+2.0
+],
+"invert": [
+0.0,
+1.0
+],
+"mode": [
+0.0,
+1.0
+],
+"smooth": [
+0.0,
+1.0
+]
+},
+"cut_x": {
+"invert": [
+0.0,
+1.0
+],
+"mode": [
+0.0,
+1.0
+]
+},
+"cut_yuebing": {
+"invert": [
+0.0,
+1.0
+],
+"mode": [
+0.0,
+1.0
+]
+},
+"cut_zigzag": {
+"invert": [
+0.0,
+1.0
+],
+"mode": [
+0.0,
+1.0
+]
+},
+"cylinder3D": {
+"H": [
+0.0,
+0.5
+],
+"d": [
+0.0,
+0.5
+]
+},
+"dc_acrilic": {
+"bluef": [
+0.0,
+5.0
+],
+"greenf": [
+0.0,
+5.0
+],
+"p1": [
+1.0,
+100.0
+],
+"p2": [
+1.0,
+100.0
+],
+"p3": [
+1.0,
+100.0
+],
+"p4": [
+1.0,
+100.0
+],
+"p5": [
+1.0,
+100.0
+],
+"p6": [
+1.0,
+100.0
+],
+"redf": [
+0.0,
+5.0
+],
+"steps": [
+3.0,
+100.0
+]
+},
+"dc_booleans": {
+"type": [
+0.0,
+2.0
+]
+},
+"dc_butterflies": {
+"ColorOnly": [
+0.0,
+1.0
+],
+"Gradient": [
+0.0,
+2.0
+],
+"blue": [
+-1.0,
+1.0
+],
+"green": [
+-1.0,
+1.0
+],
+"red": [
+-1.0,
+1.0
+],
+"reset_z": [
+0.0,
+1.0
+]
+},
+"dc_cairotiles": {
+"seed": [
+0.0,
+10000.0
+],
+"zoom": [
+0.1,
+50.0
+]
+},
+"dc_circlesblue": {
+"bubles": [
+1.0,
+100.0
+],
+"radius": [
+0.0,
+1.0
+],
+"time": [
+1.0,
+1000.0
+],
+"zoom": [
+0.01,
+100.0
+]
+},
+"dc_code": {
+"PanX": [
+-2.0,
+2.0
+],
+"PanY": [
+-2.0,
+2.0
+],
+"randomize": [
+0.0,
+10000000.0
+],
+"zoom": [
+0.0,
+100.0
+]
+},
+"dc_cube": {
+"c1": [
+0.0,
+1.0
+],
+"c2": [
+0.0,
+1.0
+],
+"c3": [
+0.0,
+1.0
+],
+"c4": [
+0.0,
+1.0
+],
+"c5": [
+0.0,
+1.0
+],
+"c6": [
+0.0,
+1.0
+]
+},
+"dc_dmodulus": {
+"square": [
+0.0,
+1.0
+]
+},
+"dc_fingerprint": {
+"seed": [
+0.0,
+10000.0
+],
+"width": [
+0.0,
+1.0
+],
+"zoom": [
+1.0,
+100.0
+]
+},
+"dc_fractaldots": {
+"iterations": [
+1.0,
+100.0
+]
+},
+"dc_fractcolor": {
+"xpar": [
+0.0,
+1.0
+],
+"ypar": [
+0.0,
+1.0
+]
+},
+"dc_gabornoise": {
+"seed": [
+0.0,
+10000.0
+],
+"zoom": [
+1.0,
+100.0
+]
+},
+"dc_glypho": {
+"seed": [
+0.0,
+10000.0
+],
+"zoom": [
+0.1,
+50.0
+]
+},
+"dc_gmandelbroot": {
+"burnigship": [
+0.0,
+1.0
+],
+"colormode": [
+0.0,
+5.0
+],
+"conjugate": [
+0.0,
+1.0
+],
+"iters": [
+1.0,
+255.0
+],
+"julia": [
+0.0,
+1.0
+],
+"panX": [
+-2.0,
+2.0
+],
+"panY": [
+-2.0,
+2.0
+],
+"randomize": [
+0.0,
+10000000.0
+],
+"zoom": [
+0.0,
+100.0
+]
+},
+"dc_gnarly": {
+"dc": [
+0.0,
+1.0
+],
+"fmag": [
+0.05,
+1.0
+],
+"mode": [
+0.0,
+8.0
+],
+"reset_z": [
+0.0,
+1.0
+]
+},
+"dc_grid3D": {
+"time": [
+1.0,
+1000.0
+],
+"zoom": [
+0.01,
+1000.0
+]
+},
+"dc_hexagons": {
+"shape": [
+0.0,
+1.0
+]
+},
+"dc_hoshi": {
+"scale": [
+1.0,
+5.0
+],
+"steps": [
+1.0,
+60.0
+],
+"translate": [
+0.0,
+5.0
+]
+},
+"dc_hyperbolictile": {
+"zoom": [
+0.01,
+50.0
+]
+},
+"dc_inversion": {
+"iterations": [
+0.0,
+100.0
+],
+"scaleX": [
+1.1,
+3.0
+],
+"scaleY": [
+1.1,
+3.0
+]
+},
+"dc_kaleidocomplex": {
+"blueF": [
+0.0,
+5.0
+],
+"greenF": [
+0.0,
+5.0
+],
+"iMax": [
+1.0,
+50.0
+],
+"redF": [
+0.0,
+5.0
+]
+},
+"dc_kaleidoscopic": {
+"p1": [
+0.0,
+1.0
+],
+"radial": [
+0.0,
+1.0
+],
+"sides": [
+2.0,
+20.0
+],
+"zoom": [
+0.0,
+1.0
+]
+},
+"dc_kaliset": {
+"N": [
+1.0,
+100.0
+],
+"shiftX": [
+-5.0,
+5.0
+],
+"shiftY": [
+-5.0,
+5.0
+],
+"time": [
+1.0,
+1000.0
+],
+"zoom": [
+0.01,
+1000.0
+]
+},
+"dc_kaliset2": {
+"N": [
+1.0,
+100.0
+],
+"blueF": [
+0.0,
+5.0
+],
+"greenF": [
+0.0,
+5.0
+],
+"radio": [
+0.1,
+10.0
+],
+"redF": [
+0.0,
+5.0
+],
+"shiftX": [
+-1.0,
+1.0
+],
+"shiftY": [
+-1.0,
+1.0
+],
+"time": [
+1.0,
+1000.0
+],
+"zoom": [
+1.0,
+1000.0
+]
+},
+"dc_layers": {
+"Amplitude": [
+0.0,
+10.0
+],
+"N": [
+1.0,
+10.0
+]
+},
+"dc_mandala": {
+"iB": [
+0.0,
+1.0
+],
+"iG": [
+0.0,
+1.0
+],
+"iR": [
+0.0,
+1.0
+]
+},
+"dc_mandbrot": {
+"Complexity": [
+0.0,
+1.0
+],
+"N": [
+2.0,
+10.0
+],
+"blue": [
+0.0,
+1.0
+],
+"green": [
+0.0,
+1.0
+],
+"nIters": [
+10.0,
+1000.0
+],
+"red": [
+0.0,
+1.0
+]
+},
+"dc_mandelbox2D": {
+"seed": [
+0.0,
+10000.0
+],
+"zoom": [
+0.1,
+50.0
+]
+},
+"dc_menger": {
+"level": [
+1.0,
+5.0
+]
+},
+"dc_moebiuslog": {
+"Log": [
+0.0,
+1.0
+],
+"Moebius": [
+0.0,
+1.0
+],
+"angle": [
+1.0,
+10.0
+],
+"scale": [
+1.0,
+10.0
+],
+"seed": [
+0.0,
+10000.0
+],
+"zoom": [
+0.1,
+50.0
+]
+},
+"dc_pentatiles": {
+"border": [
+0.0,
+1.0
+],
+"width": [
+0.01,
+0.25
+],
+"zoom": [
+1.0,
+100.0
+]
+},
+"dc_perlin": {
+"color_only": [
+0.0,
+1.0
+],
+"map": [
+0.0,
+5.0
+],
+"octaves": [
+1.0,
+5.0
+],
+"select_bailout": [
+2.0,
+1000.0
+],
+"select_centre": [
+-1.0,
+1.0
+],
+"select_range": [
+0.1,
+2.0
+],
+"shape": [
+0.0,
+2.0
+]
+},
+"dc_poincaredisc": {
+"MaxIter": [
+0.0,
+20.0
+],
+"N": [
+3.0,
+20.0
+],
+"P": [
+3.0,
+20.0
+],
+"checkers0": [
+0.0,
+1.0
+],
+"checkers1": [
+0.0,
+1.0
+],
+"checkers2": [
+0.0,
+1.0
+]
+},
+"dc_quadtree": {
+"levels": [
+1.0,
+50.0
+],
+"seed": [
+0.0,
+10000.0
+],
+"width": [
+100.0,
+1000.0
+],
+"zoom": [
+0.1,
+50.0
+]
+},
+"dc_randomoctree": {
+"bBorders": [
+0.0,
+1.0
+],
+"borders": [
+0.0,
+1.0
+],
+"grid": [
+0.0,
+1.0
+],
+"steps": [
+3.0,
+100.0
+]
+},
+"dc_rotations": {
+"levels": [
+1.0,
+50.0
+]
+},
+"dc_spacefold": {
+"randomize": [
+0.0,
+10000.0
+]
+},
+"dc_squares": {
+"N": [
+1.0,
+20.0
+],
+"blueF": [
+0.0,
+5.0
+],
+"direction": [
+0.0,
+1.0
+],
+"greenF": [
+0.0,
+5.0
+],
+"redF": [
+0.0,
+5.0
+],
+"time": [
+0.0,
+1000.0
+]
+},
+"dc_starsfield": {
+"glow": [
+0.0,
+1.0
+],
+"zdistance": [
+2.0,
+150.0
+]
+},
+"dc_sunflower": {
+"Dots": [
+0.0,
+1.0
+],
+"GridX": [
+0.0,
+1.0
+],
+"GridY": [
+0.0,
+1.0
+],
+"Polar": [
+0.0,
+1.0
+],
+"step": [
+-1.0,
+1.0
+],
+"zoom": [
+0.1,
+50.0
+]
+},
+"dc_tesla": {
+"levels": [
+1.0,
+25.0
+],
+"style": [
+5.0,
+100.0
+]
+},
+"dc_tree": {
+"levels": [
+1.0,
+25.0
+],
+"shift": [
+-100.0,
+100.0
+],
+"style": [
+1.0,
+100.0
+],
+"thicknes": [
+-1500.0,
+1500.0
+]
+},
+"dc_triangle": {
+"zero_edges": [
+0.0,
+1.0
+]
+},
+"dc_triantess": {
+"Faces": [
+0.0,
+1.0
+],
+"Iterations": [
+0.0,
+20.0
+],
+"RotAngle": [
+-3.0,
+3.0
+],
+"SRadius": [
+0.0,
+0.05
+],
+"Segments": [
+0.0,
+1.0
+],
+"U": [
+0.0,
+1.0
+],
+"V": [
+0.0,
+1.0
+],
+"VRadius": [
+0.0,
+0.25
+],
+"Vertex": [
+0.0,
+1.0
+],
+"W": [
+0.0,
+1.0
+],
+"pParam": [
+2.0,
+20.0
+],
+"qParam": [
+2.0,
+20.0
+],
+"rParam": [
+2.0,
+20.0
+]
+},
+"dc_truchet": {
+"type": [
+0.0,
+2.0
+]
+},
+"dc_turbulence": {
+"level": [
+1.0,
+5.0
+],
+"time": [
+1.0,
+1000.0
+]
+},
+"dc_voronoise": {
+"deltaX": [
+0.0,
+1.0
+],
+"deltaY": [
+0.0,
+1.0
+]
+},
+"dc_vortex": {
+"Blending": [
+1.0,
+5.0
+],
+"flowStrength": [
+1.0,
+15.0
+]
+},
+"dc_worley": {
+"distort": [
+0.0,
+1.0
+],
+"pattern": [
+0.1,
+100.0
+],
+"zoom": [
+0.1,
+50.0
+]
+},
+"dc_ztransl": {
+"clamp": [
+0.0,
+1.0
+],
+"overwrite": [
+0.0,
+1.0
+],
+"x0": [
+0.0,
+1.0
+],
+"x1": [
+0.0,
+1.0
+]
+},
+"dla3d_wf": {
+"junct_blend_colormap": [
+0.0,
+1.0
+],
+"junct_sdiv_level": [
+0.0,
+6.0
+],
+"junct_sdiv_smooth_passes": [
+0.0,
+24.0
+],
+"node_blend_colormap": [
+0.0,
+1.0
+],
+"node_sdiv_level": [
+0.0,
+6.0
+],
+"node_sdiv_smooth_passes": [
+0.0,
+24.0
+]
+},
+"dragon_js": {
+"level": [
+1.0,
+21.0
+]
+},
+"ducks": {
+"ColorFactor": [
+0.0,
+1.0
+],
+"ColorType": [
+0.0,
+4.0
+],
+"Contrast": [
+0.0,
+2.0
+],
+"Gradient": [
+0.0,
+1.0
+],
+"MaxIters": [
+1.0,
+50.0
+],
+"MinIters": [
+1.0,
+50.0
+],
+"Pan +Im": [
+1.0,
+1.0
+],
+"Pan +Re": [
+1.0,
+1.0
+],
+"Pan -Im": [
+1.0,
+1.0
+],
+"Pan -Re": [
+1.0,
+1.0
+],
+"ScapeSize": [
+0.0,
+11.0
+],
+"c_im": [
+-15.0,
+8.0
+],
+"c_re": [
+-15.0,
+8.0
+],
+"colorCycle": [
+1.0,
+10.0
+],
+"colorMirror": [
+0.0,
+1.0
+],
+"colorOffset": [
+-10.0,
+10.0
+],
+"colorRainbow": [
+0.0,
+1.0
+],
+"colorScale": [
+0.0,
+10.0
+],
+"julia Mode": [
+0.0,
+1.0
+],
+"size": [
+100.0,
+10000.0
+],
+"zoomIn": [
+0.0,
+1.0
+],
+"zoomOut": [
+1.0,
+1.0
+]
+},
+"eCollide": {
+"a": [
+0.0,
+1.0
+]
+},
+"eMod": {
+"distance": [
+0.0,
+2.0
+]
+},
+"eclipse": {
+"shift": [
+-2.0,
+2.0
+]
+},
+"ellipsoid3D": {
+"dx": [
+0.0,
+0.5
+],
+"dy": [
+0.0,
+0.5
+],
+"dz": [
+0.0,
+0.5
+]
+},
+"elliptic": {
+"mode": [
+0.0,
+2.0
+]
+},
+"f_complex": {
+"ColorOnly": [
+0.0,
+1.0
+],
+"ColorType": [
+0.0,
+5.0
+],
+"Iters": [
+1.0,
+250.0
+],
+"Julia mode": [
+0.0,
+1.0
+],
+"contrast": [
+0.0,
+1.0
+],
+"randomize": [
+1.0,
+10000000.0
+]
+},
+"falloff2": {
+"invert": [
+0.0,
+1.0
+],
+"mul_c": [
+0.0,
+1.0
+],
+"mul_x": [
+0.0,
+1.0
+],
+"mul_y": [
+0.0,
+1.0
+],
+"mul_z": [
+0.0,
+1.0
+],
+"type": [
+0.0,
+2.0
+]
+},
+"flame_bulb": {
+"color mode 1-4": [
+0.0,
+6.0
+]
+},
+"flora": {
+"filled": [
+0.0,
+1.0
+],
+"leafType": [
+0.0,
+24.0
+]
+},
+"geometricPrimitives": {
+"connection_mode": [
+0.0,
+1.0
+],
+"hollow": [
+0.0,
+1.0
+],
+"line_vs_shape_mix": [
+0.0,
+1.0
+],
+"recursion_depth": [
+0.0,
+50.0
+],
+"recursion_shape_mix": [
+0.0,
+1.0
+],
+"shape_mix_enable": [
+0.0,
+1.0
+],
+"shape_type": [
+0.0,
+3.0
+]
+},
+"glitchy1": {
+"n_x": [
+1.0,
+100.0
+],
+"n_y": [
+1.0,
+100.0
+],
+"n_z": [
+1.0,
+100.0
+]
+},
+"glitchy2": {
+"mode": [
+0.0,
+1.0
+]
+},
+"glsl_acrilic": {
+"Blue Fac.": [
+0.0,
+5.0
+],
+"Density Pixels": [
+100.0,
+10000000.0
+],
+"Gradient": [
+0.0,
+1.0
+],
+"Green Fac.": [
+0.0,
+5.0
+],
+"Red Fac.": [
+0.0,
+5.0
+],
+"Steps": [
+3.0,
+100.0
+],
+"p1": [
+1.0,
+100.0
+],
+"p2": [
+1.0,
+100.0
+],
+"p3": [
+1.0,
+100.0
+],
+"p4": [
+1.0,
+100.0
+],
+"p5": [
+1.0,
+100.0
+],
+"p6": [
+1.0,
+100.0
+]
+},
+"glsl_apollonian": {
+"Density Pixels": [
+100.0,
+10000000.0
+],
+"Gradient": [
+0.0,
+1.0
+]
+},
+"glsl_circlesblue": {
+"Bubles": [
+1.0,
+100.0
+],
+"Density Pixels": [
+100.0,
+10000000.0
+],
+"Gradient": [
+0.0,
+1.0
+],
+"Radiusy": [
+0.0,
+1.0
+],
+"time": [
+1.0,
+1000.0
+]
+},
+"glsl_circuits": {
+"Density Pixels": [
+100.0,
+10000000.0
+],
+"Gradient": [
+0.0,
+1.0
+]
+},
+"glsl_code": {
+"Gradient": [
+0.0,
+1.0
+],
+"ResolutionX": [
+100.0,
+1000000.0
+],
+"ResolutionY": [
+100.0,
+1000000.0
+],
+"zoom": [
+0.0,
+100.0
+]
+},
+"glsl_fractaldots": {
+"Density Pixels": [
+100.0,
+10000000.0
+],
+"Gradient": [
+0.0,
+1.0
+],
+"iterations": [
+1.0,
+100.0
+]
+},
+"glsl_grid3D": {
+"Density Pixels": [
+100.0,
+10000000.0
+],
+"time": [
+1.0,
+1000.0
+]
+},
+"glsl_hoshi": {
+"Density Pixels": [
+100.0,
+10000000.0
+],
+"Gradient": [
+0.0,
+1.0
+],
+"Scale": [
+1.0,
+5.0
+],
+"Seed": [
+0.0,
+10000.0
+],
+"Steps": [
+1.0,
+60.0
+],
+"Translate": [
+0.0,
+5.0
+]
+},
+"glsl_hyperbolictile": {
+"Density Pixels": [
+100.0,
+10000000.0
+],
+"Gradient": [
+0.0,
+1.0
+]
+},
+"glsl_kaleidocomplex": {
+"Blue Fac.": [
+0.0,
+5.0
+],
+"Density Pixels": [
+100.0,
+10000000.0
+],
+"Gradient": [
+0.0,
+1.0
+],
+"Green Fac.": [
+0.0,
+5.0
+],
+"Red Fac.": [
+0.0,
+5.0
+],
+"Seed": [
+0.0,
+10000.0
+],
+"iMax": [
+1.0,
+50.0
+]
+},
+"glsl_kaleidoscopic": {
+"Density Pixels": [
+100.0,
+10000000.0
+],
+"Gradient": [
+0.0,
+1.0
+],
+"P1": [
+0.0,
+1.0
+],
+"Radial": [
+0.0,
+1.0
+],
+"Sides": [
+2.0,
+20.0
+],
+"zoom": [
+0.0,
+1.0
+]
+},
+"glsl_kaliset": {
+"Density Pixels": [
+100.0,
+10000000.0
+],
+"Gradient": [
+0.0,
+1.0
+],
+"N": [
+1.0,
+100.0
+],
+"ShiftX": [
+-5.0,
+5.0
+],
+"ShiftY": [
+-5.0,
+5.0
+],
+"time": [
+1.0,
+1000.0
+]
+},
+"glsl_kaliset2": {
+"Blue Fac.": [
+0.0,
+5.0
+],
+"Density Pixels": [
+100.0,
+10000000.0
+],
+"Gradient": [
+0.0,
+1.0
+],
+"Green Fac.": [
+0.0,
+5.0
+],
+"N": [
+1.0,
+100.0
+],
+"Red Fac.": [
+0.0,
+5.0
+],
+"ShiftX": [
+-1.0,
+1.0
+],
+"ShiftY": [
+-1.0,
+1.0
+],
+"radio": [
+0.1,
+10.0
+],
+"time": [
+1.0,
+1000.0
+]
+},
+"glsl_mandala": {
+"Density Pixels": [
+100.0,
+10000000.0
+],
+"Gradient": [
+0.0,
+1.0
+],
+"iB": [
+0.0,
+1.0
+],
+"iG": [
+0.0,
+1.0
+],
+"iR": [
+0.0,
+1.0
+]
+},
+"glsl_mandelbox2D": {
+"Density Pixels": [
+100.0,
+10000000.0
+],
+"Gradient": [
+0.0,
+1.0
+],
+"seed": [
+0.0,
+10000.0
+]
+},
+"glsl_randomoctree": {
+"Black Borders": [
+0.0,
+1.0
+],
+"Borders": [
+0.0,
+1.0
+],
+"Density Pixels": [
+100.0,
+10000000.0
+],
+"Gradient": [
+0.0,
+1.0
+],
+"Grid": [
+0.0,
+1.0
+],
+"Rot. L-R": [
+0.0,
+1.0
+],
+"Rot. U-D": [
+0.0,
+1.0
+],
+"Steps": [
+3.0,
+100.0
+]
+},
+"glsl_squares": {
+"Blue Fac.": [
+0.0,
+5.0
+],
+"Density Pixels": [
+100.0,
+10000000.0
+],
+"Direction": [
+0.0,
+1.0
+],
+"Gradient": [
+0.0,
+1.0
+],
+"Green Fac.": [
+0.0,
+5.0
+],
+"N": [
+1.0,
+20.0
+],
+"Red Fac.": [
+0.0,
+5.0
+],
+"time": [
+0.0,
+1000.0
+]
+},
+"glsl_starsfield": {
+"Density Pixels": [
+100.0,
+10000000.0
+],
+"Glow": [
+0.0,
+1.0
+],
+"Gradient": [
+0.0,
+1.0
+],
+"Z distance": [
+2.0,
+150.0
+]
+},
+"glynnSShape": {
+"contrast": [
+0.0,
+1.0
+]
+},
+"glynnSim1": {
+"contrast": [
+0.0,
+1.0
+],
+"thickness": [
+0.0,
+1.0
+]
+},
+"glynnSim2": {
+"contrast": [
+0.0,
+1.0
+],
+"thickness": [
+0.0,
+1.0
+]
+},
+"glynnSim2B": {
+"contrast": [
+0.0,
+1.0
+],
+"fixedHue": [
+0.0,
+1.0
+],
+"randomHueAmount": [
+0.0,
+1.0
+],
+"thickness": [
+0.0,
+1.0
+]
+},
+"glynnSim3": {
+"thickness2": [
+0.0,
+1.0
+]
+},
+"glynnlissa": {
+"contrast": [
+0.0,
+1.0
+]
+},
+"glynns3subfl": {
+"contrast": [
+0.0,
+1.0
+],
+"show/hide(1/0)": [
+0.0,
+1.0
+],
+"thickness": [
+0.0,
+1.0
+],
+"weight": [
+0.0,
+1.0
+]
+},
+"glynnspiro": {
+"contrast": [
+0.0,
+1.0
+],
+"mode": [
+0.0,
+4.0
+]
+},
+"gosperisland_js": {
+"level": [
+1.0,
+10.0
+]
+},
+"gpattern": {
+"fill": [
+0.0,
+1.0
+],
+"fill color": [
+0.0,
+1.0
+],
+"fill color speed": [
+0.0,
+1.0
+],
+"height": [
+0.0,
+10.0
+],
+"lineheight": [
+0.01,
+1.5
+],
+"ouline": [
+0.0,
+1.0
+],
+"outline color": [
+0.0,
+1.0
+],
+"randSize": [
+-1.0,
+1.0
+],
+"width": [
+0.0,
+10.0
+]
+},
+"grid3d_wf": {
+"c1": [
+0.0,
+1.0
+],
+"c2": [
+0.0,
+1.0
+],
+"c3": [
+0.0,
+1.0
+],
+"c4": [
+0.0,
+1.0
+],
+"c5": [
+0.0,
+1.0
+],
+"c6": [
+0.0,
+1.0
+]
+},
+"gumowski_mira": {
+"random": [
+0.0,
+10000000.0
+],
+"step": [
+0.0,
+1.0
+]
+},
+"hexprism3D": {
+"H": [
+0.0,
+0.5
+],
+"d": [
+0.0,
+0.5
+]
+},
+"hilbert_js": {
+"level": [
+1.0,
+10.0
+]
+},
+"hole": {
+"inside": [
+0.0,
+1.0
+]
+},
+"hole2": {
+"inside": [
+0.0,
+1.0
+],
+"shape": [
+0.0,
+9.0
+]
+},
+"hopalong": {
+"a": [
+-1.0,
+1.0
+],
+"b": [
+-1.0,
+1.0
+],
+"c": [
+-1.0,
+1.0
+],
+"random": [
+0.0,
+10000000.0
+]
+},
+"htree_js": {
+"level": [
+1.0,
+10.0
+]
+},
+"iconattractor_js": {
+"a": [
+-3.0,
+3.0
+],
+"b": [
+-3.0,
+3.0
+],
+"g": [
+-3.0,
+3.0
+],
+"l": [
+-3.0,
+3.0
+],
+"o": [
+-3.0,
+3.0
+]
+},
+"jac_asn": {
+"type": [
+0.0,
+7.0
+]
+},
+"jac_cn": {
+"k": [
+-1.0,
+1.0
+]
+},
+"jac_dn": {
+"k": [
+-1.0,
+1.0
+]
+},
+"jac_elk": {
+"k": [
+-1.0,
+1.0
+]
+},
+"jac_sn": {
+"k": [
+-1.0,
+1.0
+]
+},
+"joukowski": {
+"inverse": [
+0.0,
+1.0
+]
+},
+"jubiQ": {
+"zmode": [
+0.0,
+2.0
+]
+},
+"julia_outside": {
+"mode": [
+0.0,
+2.0
+]
+},
+"juliascope3Db": {
+"mode": [
+0.0,
+1.0
+],
+"type": [
+0.0,
+1.0
+]
+},
+"juliascopePlus": {
+"colorMode": [
+0.0,
+5.0
+],
+"mandelbrotLike": [
+0.0,
+1.0
+],
+"rndTermMode": [
+0.0,
+3.0
+],
+"thetaSignMode": [
+0.0,
+3.0
+]
+},
+"kaleidoimg": {
+"blendcolor": [
+0.0,
+1.0
+],
+"dc_color": [
+0.0,
+1.0
+],
+"nr": [
+1.0,
+50.0
+],
+"reset_z": [
+0.0,
+1.0
+],
+"tile_x": [
+0.0,
+1.0
+],
+"tile_y": [
+0.0,
+1.0
+],
+"type": [
+-1.0,
+13.0
+]
+},
+"kaplan": {
+"N": [
+50.0,
+1500.0
+],
+"invert": [
+0.0,
+1.0
+]
+},
+"kifs3d": {
+"color_mode": [
+0.0,
+5.0
+],
+"fold_type": [
+0.0,
+4.0
+],
+"mirror_fold": [
+0.0,
+1.0
+],
+"post_symmetry": [
+0.0,
+7.0
+],
+"rot_order": [
+0.0,
+1.0
+],
+"rot_pivot": [
+0.0,
+2.0
+],
+"scale_pivot": [
+0.0,
+1.0
+],
+"transform_order": [
+0.0,
+2.0
+]
+},
+"koch_js": {
+"level": [
+1.0,
+7.0
+]
+},
+"loonie2": {
+"circle": [
+-1.0,
+1.0
+],
+"sides": [
+1.0,
+50.0
+],
+"star": [
+-1.0,
+1.0
+]
+},
+"lsystem_js": {
+"color_mode": [
+0.0,
+1.0
+]
+},
+"mandala": {
+"color id": [
+0.0,
+1.0
+],
+"minsky": [
+0.0,
+1.0
+],
+"size": [
+0.0,
+1.0
+],
+"width": [
+100.0,
+1000.0
+]
+},
+"mandala2": {
+"color id": [
+0.0,
+3.0
+],
+"minsky": [
+0.0,
+1.0
+],
+"width": [
+100.0,
+2000.0
+]
+},
+"mandelbox2D": {
+"coloringMode": [
+0.0,
+2.0
+],
+"juliaMode": [
+0.0,
+1.0
+],
+"mandelboxMode": [
+0.0,
+2.0
+]
+},
+"meeple": {
+"filled": [
+0.0,
+1.0
+]
+},
+"minkQM": {
+"f": [
+1.0,
+50.0
+]
+},
+"mobius_dragon_3D": {
+"iterations": [
+0.0,
+24.0
+],
+"line_enable": [
+0.0,
+1.0
+],
+"mag_color": [
+0.0,
+1.0
+]
+},
+"msTruchet": {
+"complexity": [
+1.0,
+100.0
+]
+},
+"multi_ifs": {
+"coloring_mode": [
+0.0,
+1.0
+],
+"ifs_type": [
+0.0,
+73.0
+]
+},
+"nBlur": {
+"adjustToLinear": [
+0.0,
+1.0
+],
+"circumCircle": [
+0.0,
+1.0
+],
+"equalBlur": [
+0.0,
+1.0
+],
+"exactCalc": [
+0.0,
+1.0
+],
+"ratioHole": [
+0.0,
+1.0
+],
+"ratioStripes": [
+0.0,
+2.0
+]
+},
+"natural_foam": {
+"color_data": [
+0.0,
+3.0
+]
+},
+"nsudoku": {
+"Level": [
+1.0,
+9.0
+],
+"size": [
+0.3,
+1.0
+],
+"thickness": [
+0.0,
+1.0
+],
+"type": [
+3.0,
+6.0
+]
+},
+"ocappedcone3D": {
+"dx": [
+-1.0,
+1.0
+],
+"dy": [
+-1.0,
+1.0
+],
+"dz": [
+-1.0,
+1.0
+],
+"r1": [
+0.0,
+1.0
+],
+"r2": [
+0.0,
+1.0
+],
+"tx": [
+-1.0,
+1.0
+],
+"ty": [
+-1.0,
+1.0
+],
+"tz": [
+-1.0,
+1.0
+]
+},
+"octagon": {
+"mode": [
+0.0,
+6.0
+]
+},
+"octahedron3D": {
+"h": [
+0.0,
+0.5
+]
+},
+"octogonprism3D": {
+"H": [
+0.0,
+0.5
+],
+"R": [
+0.0,
+0.5
+]
+},
+"ocylinder3D": {
+"dx": [
+-1.0,
+1.0
+],
+"dy": [
+-1.0,
+1.0
+],
+"dz": [
+-1.0,
+1.0
+],
+"r": [
+0.0,
+0.5
+],
+"tx": [
+-0.5,
+0.5
+],
+"ty": [
+-0.5,
+0.5
+],
+"tz": [
+-0.5,
+0.5
+]
+},
+"oroundcone3D": {
+"dx": [
+-1.0,
+1.0
+],
+"dy": [
+-1.0,
+1.0
+],
+"dz": [
+-1.0,
+1.0
+],
+"r1": [
+0.0,
+0.5
+],
+"r2": [
+0.0,
+0.5
+],
+"tx": [
+-0.5,
+0.5
+],
+"ty": [
+-0.5,
+0.5
+],
+"tz": [
+-0.5,
+0.5
+]
+},
+"pTransform": {
+"use_log": [
+0.0,
+1.0
+]
+},
+"petal3D": {
+"mode": [
+0.0,
+4.0
+]
+},
+"pixel_flow": {
+"enable_dc": [
+0.0,
+1.0
+]
+},
+"plane_wf": {
+"blend_colormap": [
+0.0,
+1.0
+],
+"blend_displ_map": [
+0.0,
+1.0
+],
+"calc_color_idx": [
+0.0,
+1.0
+],
+"direct_color": [
+0.0,
+1.0
+],
+"receive_only_shadows": [
+0.0,
+1.0
+]
+},
+"point_mirror_symmetry": {
+"buffer_size": [
+1.0,
+1000.0
+],
+"collidoscopic": [
+0.0,
+1.0
+],
+"color_preserve": [
+0.0,
+1.0
+],
+"crop end enable": [
+0.0,
+1.0
+],
+"side crop enable": [
+0.0,
+1.0
+],
+"symmetry": [
+1.0,
+99.0
+]
+},
+"polySurf": {
+"colorMode": [
+0.0,
+2.0
+],
+"enableFold": [
+0.0,
+1.0
+],
+"enableInvert": [
+0.0,
+1.0
+],
+"enableOffset": [
+0.0,
+1.0
+],
+"julia": [
+0.0,
+1.0
+],
+"mirrorX": [
+0.0,
+1.0
+],
+"mirrorY": [
+0.0,
+1.0
+],
+"mirrorZ": [
+0.0,
+1.0
+]
+},
+"post_aexion_crop": {
+"Iters": [
+1.0,
+250.0
+],
+"color": [
+0.0,
+1.0
+]
+},
+"post_asurf_crop": {
+"color": [
+0.0,
+1.0
+],
+"iterations": [
+0.0,
+250.0
+],
+"mode": [
+0.0,
+1.0
+]
+},
+"post_benesi_crop": {
+"color": [
+0.0,
+1.0
+],
+"iterations": [
+0.0,
+250.0
+]
+},
+"post_bristorbrot_crop": {
+"color": [
+0.0,
+1.0
+],
+"iterations": [
+0.0,
+250.0
+]
+},
+"post_bulbtorus_crop": {
+"iterations": [
+0.0,
+250.0
+]
+},
+"post_c_var": {
+"mode": [
+0.0,
+1.0
+]
+},
+"post_coastalbrot_crop": {
+"color": [
+0.0,
+1.0
+],
+"iterations": [
+0.0,
+250.0
+]
+},
+"post_crop": {
+"scatter_area": [
+-1.0,
+1.0
+],
+"zero": [
+0.0,
+1.0
+]
+},
+"post_crop_box": {
+"invert": [
+0.0,
+1.0
+]
+},
+"post_crop_cross": {
+"invert": [
+0.0,
+1.0
+]
+},
+"post_crop_polygon": {
+"invert": [
+0.0,
+1.0
+],
+"type": [
+0.0,
+4.0
+]
+},
+"post_crop_rhombus": {
+"invert": [
+0.0,
+1.0
+]
+},
+"post_crop_stars": {
+"invert": [
+0.0,
+1.0
+],
+"n": [
+3.0,
+9.0
+],
+"r2": [
+0.0,
+1.0
+]
+},
+"post_crop_trapezoid": {
+"invert": [
+0.0,
+1.0
+]
+},
+"post_crop_vesica": {
+"invert": [
+0.0,
+1.0
+]
+},
+"post_crop_x": {
+"invert": [
+0.0,
+1.0
+],
+"width": [
+0.0,
+1.0
+]
+},
+"post_crosscrop": {
+"reverse": [
+0.0,
+1.0
+]
+},
+"post_mandelbox3d_crop": {
+"iterations": [
+0.0,
+250.0
+]
+},
+"post_mandelbulb3d_crop": {
+"filled": [
+0.0,
+1.0
+],
+"iterations": [
+0.0,
+250.0
+]
+},
+"post_point_crop": {
+"point_crop_enable": [
+0.0,
+1.0
+],
+"point_hide_enable": [
+0.0,
+1.0
+]
+},
+"post_smartcrop": {
+"cropmode": [
+0.0,
+2.0
+],
+"static": [
+-1.0,
+2.0
+]
+},
+"pre_c_var": {
+"mode": [
+0.0,
+1.0
+]
+},
+"pre_crop": {
+"scatter_area": [
+-1.0,
+1.0
+],
+"zero": [
+0.0,
+1.0
+]
+},
+"pre_dcztransl": {
+"clamp": [
+0.0,
+1.0
+],
+"overwrite": [
+0.0,
+1.0
+],
+"x0": [
+0.0,
+1.0
+],
+"x1": [
+0.0,
+1.0
+]
+},
+"pre_stabilize": {
+"dc": [
+0.0,
+1.0
+]
+},
+"prepost_circlize": {
+"n": [
+3.0,
+50.0
+],
+"reverse": [
+0.0,
+1.0
+]
+},
+"primitives_wf": {
+"filled": [
+0.0,
+1.0
+]
+},
+"pyramid3D": {
+"h": [
+0.0,
+0.5
+]
+},
+"quad": {
+"ll_quad": [
+0.0,
+50.0
+],
+"lr_quad": [
+0.0,
+50.0
+],
+"mode": [
+0.0,
+1.0
+],
+"ul_quad": [
+0.0,
+50.0
+],
+"ur_quad": [
+0.0,
+50.0
+]
+},
+"rbox3D": {
+"dx": [
+0.0,
+0.5
+],
+"dy": [
+0.0,
+0.5
+],
+"dz": [
+0.0,
+0.5
+],
+"r": [
+0.0,
+0.25
+]
+},
+"rhombus3D": {
+"h": [
+0.0,
+0.5
+],
+"la": [
+0.0,
+0.5
+],
+"lb": [
+0.0,
+0.5
+],
+"r": [
+0.0,
+0.25
+]
+},
+"ringer": {
+"contrast": [
+0.0,
+1.0
+],
+"hide_inner": [
+0.0,
+1.0
+],
+"hide_outer": [
+0.0,
+1.0
+],
+"thickness": [
+0.0,
+1.0
+]
+},
+"ringsubflame": {
+"contrast": [
+0.0,
+1.0
+],
+"hide_inner": [
+0.0,
+1.0
+],
+"hide_outer": [
+0.0,
+1.0
+],
+"thickness": [
+0.0,
+1.0
+]
+},
+"romanesco": {
+"color_mode": [
+0.0,
+3.0
+],
+"floret_shape": [
+0.0,
+3.0
+]
+},
+"rosoni": {
+"maxiter": [
+1.0,
+1024.0
+],
+"sweetiter": [
+0.0,
+1023.0
+]
+},
+"rsquares_js": {
+"level": [
+1.0,
+9.0
+]
+},
+"scry2": {
+"circle": [
+-1.0,
+1.0
+],
+"sides": [
+1.0,
+50.0
+],
+"star": [
+-1.0,
+1.0
+]
+},
+"shredded": {
+"blur": [
+0.0,
+1.0
+],
+"type": [
+0.0,
+2.0
+]
+},
+"shredlin": {
+"xwidth": [
+-1.0,
+1.0
+],
+"ywidth": [
+-1.0,
+1.0
+]
+},
+"shredrad": {
+"width": [
+-1.0,
+1.0
+]
+},
+"solidangle3D": {
+"p1": [
+0.0,
+0.5
+],
+"p2": [
+0.0,
+0.5
+],
+"p3": [
+0.0,
+0.5
+]
+},
+"sphtiling3v2": {
+"dc": [
+0.0,
+1.0
+]
+},
+"spirograph3D": {
+"direct_color": [
+0.0,
+1.0
+],
+"mode": [
+0.0,
+4.0
+]
+},
+"starfractal": {
+"m": [
+3.0,
+10.0
+]
+},
+"sunflower": {
+"F. filling": [
+0.0,
+1.0
+],
+"angle": [
+0.0,
+360.0
+],
+"color": [
+0.0,
+1.0
+],
+"invert": [
+0.0,
+1.0
+],
+"nPoints": [
+10.0,
+1000.0
+],
+"scale": [
+0.0,
+100.0
+],
+"shape": [
+3.0,
+20.0
+]
+},
+"sunvoroni": {
+"Iters": [
+2.0,
+4.0
+],
+"angle": [
+0.0,
+360.0
+],
+"color mode": [
+0.0,
+2.0
+],
+"fill": [
+0.0,
+1.0
+],
+"nPoints": [
+10.0,
+1000.0
+],
+"outline": [
+0.0,
+1.0
+],
+"outline color": [
+0.0,
+1.0
+]
+},
+"szubieta": {
+"height": [
+32.0,
+256.0
+],
+"scale": [
+0.0,
+1.0
+],
+"type": [
+0.0,
+1.0
+],
+"width": [
+32.0,
+256.0
+]
+},
+"taprats": {
+"Infer(1/0)": [
+0.0,
+1.0
+],
+"Rosett  S": [
+1.0,
+2.0
+],
+"Rosette Q": [
+-1.0,
+0.9
+],
+"Rosette(1/0)": [
+0.0,
+1.0
+],
+"Star D": [
+1.0,
+3.5
+],
+"Star S": [
+1.0,
+3.0
+],
+"fill": [
+0.0,
+1.0
+],
+"style": [
+0.0,
+5.0
+]
+},
+"tess_shape": {
+"lrRadialProfileType": [
+0.0,
+4.0
+],
+"operationMode": [
+0.0,
+1.0
+],
+"shapeType": [
+0.0,
+7.0
+],
+"tbProfileType": [
+0.0,
+4.0
+]
+},
+"torus3D": {
+"r1": [
+0.0,
+0.5
+],
+"r2": [
+0.0,
+0.5
+]
+},
+"tqmirror": {
+"mode": [
+0.0,
+2.0
+],
+"type": [
+0.0,
+1.0
+]
+},
+"tree_js": {
+"level": [
+1.0,
+10.0
+]
+},
+"triantruchet": {
+"Size": [
+0.0,
+10.0
+],
+"TilesPerColumn": [
+2.0,
+600.0
+],
+"TilesPerRow": [
+2.0,
+600.0
+]
+},
+"triprism3D": {
+"d": [
+0.0,
+0.5
+],
+"h": [
+0.0,
+0.5
+]
+},
+"truchet": {
+"direct_color": [
+0.0,
+1.0
+],
+"extended": [
+0.0,
+1.0
+]
+},
+"truchet2": {
+"exponent1": [
+-1.0,
+3.0
+],
+"exponent2": [
+-1.0,
+3.0
+],
+"inverse": [
+0.0,
+1.0
+],
+"width1": [
+-1.0,
+2.0
+],
+"width2": [
+-1.0,
+2.0
+]
+},
+"truchet_ae": {
+"layout": [
+0.0,
+4.0
+],
+"style": [
+0.0,
+5.0
+]
+},
+"truchet_hex_crop": {
+"inv": [
+0.0,
+1.0
+],
+"mode": [
+0.0,
+2.0
+],
+"wd": [
+0.0,
+5.0
+]
+},
+"truchet_hex_fill": {
+"flipx": [
+0.0,
+1.0
+],
+"flipy": [
+0.0,
+1.0
+]
+},
+"truchetflow": {
+"invert": [
+0.0,
+1.0
+],
+"zoom": [
+0.1,
+50.0
+]
+},
+"voron": {
+"num": [
+1.0,
+25.0
+]
+},
+"vortex": {
+"flowVel": [
+1.0,
+50.0
+],
+"zoom": [
+0.0,
+9.0
+]
+},
+"wangtiles": {
+"square": [
+0.0,
+1.0
+]
+},
+"waveblur_wf": {
+"direct_color": [
+0.0,
+1.0
+]
+},
+"waves22": {
+"modex": [
+0.0,
+1.0
+],
+"modey": [
+0.0,
+1.0
+]
+},
+"waves2b": {
+"jacok": [
+-1.0,
+1.0
+],
+"pwx": [
+-10.0,
+10.0
+],
+"pwy": [
+-10.0,
+10.0
+]
+},
+"waves4": {
+"cont": [
+0.0,
+1.0
+]
+},
+"waves42": {
+"cont": [
+0.0,
+1.0
+]
+},
+"whirligig": {
+"Mode": [
+0.0,
+15.0
+]
+},
+"yin_yang": {
+"dual_t": [
+0.0,
+1.0
+],
+"outside": [
+0.0,
+1.0
+],
+"radius": [
+0.0,
+1.0
+]
+}
+}

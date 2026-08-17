@@ -18,8 +18,11 @@ public class Oracle {
   static final int SAMPLES = 256;
 
   /** RNG wrapper that counts how many random numbers a transform consumed. */
+  // Mersenne Twister rather than JWildfire's Marsaglia MWC: Marsaglia's randomize()
+  // shifts the seed by 16 bits and some seeds start it in a degenerate state (e.g.
+  // solidangle3D's name hash never sampled a point inside its solid).
   static class CountingRandom extends AbstractRandomGenerator {
-    final MarsagliaRandomGenerator inner = new MarsagliaRandomGenerator();
+    final MersenneTwisterRandomGenerator inner = new MersenneTwisterRandomGenerator();
     long count = 0;
     CountingRandom(long seed) { inner.randomize(seed); }
     @Override public double random() { count++; return inner.random(); }

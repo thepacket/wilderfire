@@ -23,7 +23,8 @@ JWildfire source ──Oracle.java─▶ oracle-out.jsonl ◀── oracle-spec.
 |---|---|
 | `cwgsl.ts` | CUDA-C → WGSL transpiler (tokenizer, C-subset parser, typed emitter: int/float coercions, pointers/arrays/structs, overloads, macros, `switch`, helper library). |
 | `gen.ts` | Reads the dump + kernel helpers, transpiles every variation, applies `overrides.ts`, writes the two registry files and prints a summary. `--report` also writes `report.json`. |
-| `overrides.ts` | Hand corrections (in CUDA dialect) for variations whose JWildfire GPU code diverges from its CPU code (`perspective`, `brick`, `chainmail`, `ouroboros`, `rays3`, `waves22`, …). |
+| `overrides.ts` | Hand corrections (in CUDA dialect) for variations whose JWildfire GPU code diverges from its CPU code (`perspective`, `brick`, `chainmail`, `ouroboros`, `rays3`, `waves22`, …), plus the `retry` (rejection-sampling) and `clampParams` mechanisms. |
+| `data/param-clamps.json`, `extract-clamps.py` | Per-parameter clamps from JWildfire's Java `setParameter()` (`Tools.limitValue` & co.), applied by `gen.ts` to every param read so out-of-range values behave like the CPU. Regenerate with `python3 extract-clamps.py <jwf>/src/org/jwildfire/create/tina/variation`. |
 | `data/jwf-variations.jsonl` | Metadata + GPU code for all 1026 JWildfire variations (name, params/defaults/int-ness, priority, types, GPU code, helper functions). Produced by `Dump.java`; checked in so regeneration does not need Java. |
 | `data/kernel-lib.cu` | Helper library extracted from JWildfire's `Flam4_3dKernal_TemplateJWF.cu` (Complex/Mat2/Jacobi/noise/misc); transpiled on demand. |
 | `Dump.java` | Dumps the catalogue by reflection against a compiled JWildfire tree. |
@@ -69,12 +70,18 @@ node scripts/jwf-port/gen.ts            # re-emit with the new verdicts
 
 ## Status
 
-Of JWildfire's 1026 variations, 726 transpile; **668 verify against the Java
-oracle in 3D** and ship in `variations.jwf.ts` (`pre_flatten` is force-verified
-in `gen.ts` since it only zeroes z), 58 transpile but diverge (f32 hashes,
-solids, missing helpers) and stay in `variations.jwf.unverified.ts`, and the
-rest have no GPU snippet or need resources/custom code. Together with the 70
-hand-written flam3 entries the app registry has 672 variations. Run
+Of JWildfire's 1026 variations, 726 transpile; **690 verify against the Java
+oracle in 3D** and ship in `variations.jwf.ts` (`pre_flatten` and `cut_bricks`
+are force-verified in `gen.ts` — see the notes there), 36 transpile but diverge
+(f32 hash noise, a few GPU≠CPU snippets, missing helpers) and stay in
+`variations.jwf.unverified.ts`, and the rest have no GPU snippet or need
+resources/custom code. Together with the 70 hand-written flam3 entries the app
+registry has 694 variations. Two systematic GPU≠CPU families were fixed with
+generator-level overrides: the 17 `*3D` solid samplers (CPU rejection-samples up
+to 50 times before hiding — `retry` override) and Java `setParameter()` clamps
+(`data/param-clamps.json`, extracted from the Java by `extract-clamps.py`,
+applied to every param read). The oracle uses a Mersenne-Twister RNG because
+JWildfire's Marsaglia generator degenerates for some seeds. Run
 `await window.wilderfire.varTest()` in the dev console for the current verdicts
 and `await window.wilderfire.flameTest()` to import + compile every fixture flame.
 
