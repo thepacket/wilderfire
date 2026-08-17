@@ -98,11 +98,11 @@ in the stack.
   dragging a triangle never shows the sparse first frames
 - Gradient presets, IQ-cosine **random palettes**, hue rotation, a
   **draggable stop editor**, and **.ugr / .map gradient import**
-- **26 presets**: 10 authored WilderFire presets (showcasing xaos, layers,
-  pre-stages, direct color, symmetry) plus 16 sample flames bundled from the
+- **33 presets** — the sample flames bundled with the
   [JWildfire repository](https://github.com/thargor6/JWildfire)
-  (`resources/flames/`, © Andreas Maschke, LGPL 2.1+, loaded through the
-  `.flame` importer), and a curated **randomizer**
+  (`resources/flames/`, © Andreas Maschke, LGPL 2.1+), loaded through the
+  `.flame` importer and verified against headless JWildfire renders — plus a
+  curated **randomizer**
 - PNG export, **hi-res tiled export** (2-4× screen resolution, optional
   transparent background), flame **JSON save/load**, and **.flame XML
   import/export** compatible with flam3 / Apophysis / JWildfire (coefs, chaos,

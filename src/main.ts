@@ -52,40 +52,27 @@ async function boot() {
     o.value = '';
     presetSel.append(o);
   }
-  const ogWf = document.createElement('optgroup');
-  ogWf.label = 'WilderFire';
-  PRESETS.forEach((p, i) => {
-    const o = el('option', '', p.name) as HTMLOptionElement;
-    o.value = 'p:' + i;
-    ogWf.append(o);
-  });
-  const ogJwf = document.createElement('optgroup');
-  ogJwf.label = 'Sample flames';
+  // one list: the JWildfire sample flames (src/core/samples.ts)
   const { JWF_SAMPLES } = await import('./core/samples');
   JWF_SAMPLES.forEach((s, i) => {
     const o = el('option', '', s.name) as HTMLOptionElement;
     o.value = 'j:' + i;
-    ogJwf.append(o);
+    presetSel.append(o);
   });
-  presetSel.append(ogWf, ogJwf);
+  const loadSample = async (s: { file: string; name: string }) => {
+    const { importFlameText } = await import('./core/flameXML');
+    const text = await (await fetch('/flames/' + s.file)).text();
+    const { flame } = importFlameText(text, app.activeLayer.palette);
+    flame.name = s.name;
+    app.setFlame(flame);
+  };
   presetSel.onchange = async () => {
     const v = presetSel.value;
     presetSel.value = '';
-    if (v.startsWith('p:')) {
-      const p = PRESETS[parseInt(v.slice(2))];
-      if (p) app.setFlame(p.make());
-    } else if (v.startsWith('j:')) {
+    if (v.startsWith('j:')) {
       const s = JWF_SAMPLES[parseInt(v.slice(2))];
       if (!s) return;
-      try {
-        const { importFlameText } = await import('./core/flameXML');
-        const text = await (await fetch('/flames/' + s.file)).text();
-        const { flame } = importFlameText(text, app.activeLayer.palette);
-        flame.name = s.name;
-        app.setFlame(flame);
-      } catch (e) {
-        console.error('Sample load failed:', e);
-      }
+      try { await loadSample(s); } catch (e) { console.error('Sample load failed:', e); }
     }
   };
 
@@ -223,6 +210,8 @@ async function boot() {
     fatal((e as Error).message);
     return;
   }
+  // first visit (no autosave): start on the first sample flame; the built-in fallback stays if the fetch fails
+  if (!saved) loadSample(JWF_SAMPLES[0]).catch((e) => console.warn('Sample load failed:', e));
 
   // Size canvas to container
   const fit = () => {
