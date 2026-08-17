@@ -53,7 +53,12 @@ async function boot() {
     presetSel.append(o);
     presetSel.title = 'Test flames: the sample flames bundled with JWildfire';
   }
-  // one list: the JWildfire sample flames (src/core/samples.ts)
+  // one list: the authored flames first, then the JWildfire sample flames (src/core/samples.ts)
+  PRESETS.forEach((p, i) => {
+    const o = el('option', '', p.name) as HTMLOptionElement;
+    o.value = 'p:' + i;
+    presetSel.append(o);
+  });
   const { JWF_SAMPLES } = await import('./core/samples');
   JWF_SAMPLES.forEach((s, i) => {
     const o = el('option', '', s.name) as HTMLOptionElement;
@@ -69,7 +74,10 @@ async function boot() {
   };
   presetSel.onchange = async () => {
     const v = presetSel.value;
-    if (v.startsWith('j:')) {
+    if (v.startsWith('p:')) {
+      const p = PRESETS[parseInt(v.slice(2))];
+      if (p) app.setFlame(p.make());
+    } else if (v.startsWith('j:')) {
       const s = JWF_SAMPLES[parseInt(v.slice(2))];
       if (!s) return;
       // the selected test's name stays displayed (the select keeps its value)
