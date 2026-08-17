@@ -63,8 +63,8 @@ in the stack.
   **spatial filter** (Mitchell / Gaussian) and antialias jitter, verified
   pixel-for-pixel against headless JWildfire on synthetic flames and by
   whole-image metrics on the bundled samples and presets (`scripts/jwf-port`
-  compare harness); two-pass tonemap so filtering is free; plus **2× oversampling**. Presets and the
-  randomizer use JWildfire's brightness 4 / gamma 4 baseline
+  compare harness); two-pass tonemap so filtering is free; plus **2× oversampling**. The
+  randomizer uses JWildfire's brightness 4 / gamma 4 baseline
 - **Undo/redo** with slider-gesture coalescing (Ctrl/Cmd+Z, Shift+Ctrl/Cmd+Z)
 - **Animation** — capture keyframes, morph between them (structure-merging
   interpolation that keeps the GPU kernel hot within each segment;
@@ -98,11 +98,11 @@ in the stack.
   dragging a triangle never shows the sparse first frames
 - Gradient presets, IQ-cosine **random palettes**, hue rotation, a
   **draggable stop editor**, and **.ugr / .map gradient import**
-- **33 presets** — the sample flames bundled with the
-  [JWildfire repository](https://github.com/thargor6/JWildfire)
-  (`resources/flames/`, © Andreas Maschke, LGPL 2.1+), loaded through the
-  `.flame` importer and verified against headless JWildfire renders — plus a
-  curated **randomizer**
+- **Tests menu: the 33 sample flames bundled with the
+  [JWildfire repository](https://github.com/thargor6/JWildfire)**
+  (`resources/flames/TINA0001–TINA0033`, © Andreas Maschke, LGPL 2.1+),
+  shipped with the app, loaded through the `.flame` importer and verified
+  against headless JWildfire renders — plus a curated **randomizer**
 - PNG export, **hi-res tiled export** (2-4× screen resolution, optional
   transparent background), flame **JSON save/load**, and **.flame XML
   import/export** compatible with flam3 / Apophysis / JWildfire (coefs, chaos,

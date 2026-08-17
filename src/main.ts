@@ -48,9 +48,10 @@ async function boot() {
 
   const presetSel = el('select') as HTMLSelectElement;
   {
-    const o = el('option', '', 'Presets…') as HTMLOptionElement;
+    const o = el('option', '', 'Tests') as HTMLOptionElement;
     o.value = '';
     presetSel.append(o);
+    presetSel.title = 'Test flames: the sample flames bundled with JWildfire';
   }
   // one list: the JWildfire sample flames (src/core/samples.ts)
   const { JWF_SAMPLES } = await import('./core/samples');
@@ -68,11 +69,11 @@ async function boot() {
   };
   presetSel.onchange = async () => {
     const v = presetSel.value;
-    presetSel.value = '';
     if (v.startsWith('j:')) {
       const s = JWF_SAMPLES[parseInt(v.slice(2))];
       if (!s) return;
-      try { await loadSample(s); } catch (e) { console.error('Sample load failed:', e); }
+      // the selected test's name stays displayed (the select keeps its value)
+      try { await loadSample(s); } catch (e) { console.error('Sample load failed:', e); presetSel.value = ''; }
     }
   };
 
@@ -211,7 +212,7 @@ async function boot() {
     return;
   }
   // first visit (no autosave): start on the first sample flame; the built-in fallback stays if the fetch fails
-  if (!saved) loadSample(JWF_SAMPLES[0]).catch((e) => console.warn('Sample load failed:', e));
+  if (!saved) loadSample(JWF_SAMPLES[0]).then(() => { presetSel.value = 'j:0'; }).catch((e) => console.warn('Sample load failed:', e));
 
   // Size canvas to container
   const fit = () => {
