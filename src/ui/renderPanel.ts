@@ -325,6 +325,7 @@ export function buildRenderPanel(app: App, root: HTMLElement) {
     const target = await pickSave({ suggestedName: `${baseName()}-${fullW}x${fullH}.png`, description: 'PNG image', mime: 'image/png', ext: '.png' });
     if (!target) return;
     hiBtn.disabled = true;
+    if (app.solo) app.setSolo(false); // exports always render the whole flame
     r.exporting = true;
     try {
       const out = document.createElement('canvas');

@@ -194,6 +194,7 @@ input[type="range"]::-moz-range-thumb {
   border-bottom: 2px solid transparent;
 }
 .tabs button.active { color: var(--fg); border-bottom-color: var(--accent); }
+.btn-row button.active { color: var(--accent); border-color: var(--accent); }
 .tab-body { flex: 1; overflow-y: auto; display: none; }
 .tab-body.active { display: block; }
 

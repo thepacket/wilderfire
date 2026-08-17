@@ -62,7 +62,7 @@ export function formatNum(v: number): string {
   return String(Math.round(v * 10000) / 10000);
 }
 
-export type AppEvent = 'flame' | 'select' | 'tone' | 'history' | 'preview';
+export type AppEvent = 'flame' | 'select' | 'tone' | 'history' | 'preview' | 'solo';
 
 const HISTORY_MAX = 100;
 const COALESCE_MS = 700;
@@ -147,11 +147,21 @@ export class App {
     this.emit('select', source);
   }
 
+  /** Solo preview: only the selected transform's points are plotted (its dynamics still run through all
+   *  transforms — every other transform gets opacity 0 in the render copy). Not part of the flame/history. */
+  solo = false;
+  private renderFlame(): Flame {
+    if (!this.solo || this.selected < 0) return this.flame;
+    const f: Flame = { ...this.flame, layers: this.flame.layers.map((ly, li) => li !== this.layerIdx ? ly : { ...ly, xforms: ly.xforms.map((x, i) => (i === this.selected ? x : { ...x, opacity: 0 })) }) };
+    return f;
+  }
+  setSolo(on: boolean) { this.solo = on; this.renderer.setFlame(this.renderFlame()); this.emit('solo'); }
+
   private restore() {
     this.flame = JSON.parse(this.hist[this.hp]);
     this.clampSelection();
     this.lastSnapSrc = '';
-    this.renderer.setFlame(this.flame);
+    this.renderer.setFlame(this.renderFlame());
     this.emit('flame');
     this.emit('select');
     this.emit('history');
@@ -159,7 +169,7 @@ export class App {
 
   /** Structural or numeric flame change — restarts accumulation. */
   commit(source = '') {
-    this.renderer.setFlame(this.flame);
+    this.renderer.setFlame(this.renderFlame());
     this.emit('flame', source);
     this.snapshot(source);
   }
@@ -176,7 +186,7 @@ export class App {
     this.flame = f;
     this.layerIdx = 0;
     this.selected = 0;
-    this.renderer.setFlame(f);
+    this.renderer.setFlame(this.renderFlame());
     this.emit('flame', source);
     this.emit('select', source);
     this.snapshot(''); // never coalesce whole-flame replacements
@@ -184,6 +194,7 @@ export class App {
 
   select(i: number, source = '') {
     this.selected = i;
+    if (this.solo) this.renderer.setFlame(this.renderFlame()); // solo follows the selection
     this.emit('select', source);
   }
 

@@ -41,7 +41,13 @@ export function buildTransformsPanel(app: App, root: HTMLElement) {
   const dupBtn = el('button', '', 'Duplicate');
   const delBtn = el('button', 'danger', 'Delete');
   const finalBtn = el('button', '', '');
-  btnRow.append(addBtn, dupBtn, delBtn, finalBtn);
+  // Solo: preview only the selected transform's points (dynamics unchanged; the others just do not plot)
+  const soloBtn = el('button', '', 'Solo');
+  soloBtn.title = 'Show only the points plotted by the selected transform (S)';
+  const syncSolo = () => { soloBtn.textContent = app.solo ? 'Solo ✓' : 'Solo'; soloBtn.classList.toggle('active', app.solo); };
+  soloBtn.onclick = () => { app.setSolo(!app.solo); };
+  app.on('solo', syncSolo);
+  btnRow.append(addBtn, dupBtn, delBtn, finalBtn, soloBtn);
   listSec.append(btnRow);
 
   const btnRow2 = el('div', 'btn-row');

@@ -205,6 +205,7 @@ async function boot() {
     if (tag === 'INPUT' || tag === 'TEXTAREA' || tag === 'SELECT' || e.metaKey || e.ctrlKey || e.altKey) return;
     if (e.key === '[') { e.preventDefault(); leftHandle.toggle(); }
     else if (e.key === ']') { e.preventDefault(); rightHandle.toggle(); }
+    else if (e.key === 's' || e.key === 'S') { e.preventDefault(); app.setSolo(!app.solo); }
   });
 
   main.append(left, leftHandle.el, wrap, rightHandle.el, right);
