@@ -134,7 +134,10 @@ in the stack.
   conversation memory) and what comes back (**edit commands** — a few lines
   like `set T2.weight 0.8`, `addvar T1 julian 0.7 power=3` — or complete
   flame JSON, or text only), with a live per-turn token estimate; the
-  defaults are ~1.6k tokens/turn instead of ~19k. The key is stored in
+  defaults are ~1.6k tokens/turn instead of ~19k. An **Explain** button asks
+  the model to walk through the current flame — what each transform,
+  variation, layer, final transform, palette and camera setting contributes,
+  plus a few tweaks to try — in prose, without touching it. The key is stored in
   `localStorage` and requests go straight from your browser to OpenRouter.
 
 ## Keyboard shortcuts

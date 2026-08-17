@@ -154,8 +154,10 @@ export function buildAIPanel(app: App, root: HTMLElement) {
   const sendBtn = el('button', 'primary', 'Send');
   const clearBtn = el('button', '', 'Clear');
   clearBtn.title = 'Forget the conversation so far — the next message starts a fresh context (the flame is untouched)';
+  const explainBtn = el('button', '', 'Explain');
+  explainBtn.title = 'Ask the assistant to describe the current flame — what each transform and variation contributes, how the layers, final transform, palette and camera shape the look — in prose, without changing anything';
   const btnCol = el('div', 'ai-btn-col');
-  btnCol.append(clearBtn, sendBtn);
+  btnCol.append(explainBtn, clearBtn, sendBtn);
   inputRow.append(ta, btnCol);
 
   root.append(cfg, msgs, inputRow);
@@ -172,8 +174,8 @@ export function buildAIPanel(app: App, root: HTMLElement) {
 
   addMsg('system', 'Ask about a transform or variation, or ask for a change — the assistant can edit the flame live.');
 
-  function tryApplyFlameBlocks(text: string): boolean {
-    if (ctx.reply === 'text') return false;
+  function tryApplyFlameBlocks(text: string, c: ContextOpts = ctx): boolean {
+    if (c.reply === 'text') return false;
     // edits block(s) — apply all, in order
     const er = /```edits?\s*\n([\s\S]*?)```/g;
     let em: RegExpExecArray | null;
@@ -210,13 +212,15 @@ export function buildAIPanel(app: App, root: HTMLElement) {
 
   /** Hide big JSON blocks in the visible transcript. */
   const displayText = (text: string) =>
-    text.replace(/```(?:flame|json)\s*\n[\s\S]*?```/g, '⟨flame updated⟩').replace(/```edits?\s*\n([\s\S]*?)```/g, (_m, b: string) => '⟨edits⟩\n' + b.trim()).trim();
+    text.replace(/```(?:flame|json)\s*\n[\s\S]*?```/g, '⟨flame JSON⟩').replace(/```edits?\s*\n([\s\S]*?)```/g, (_m, b: string) => '⟨edits⟩\n' + b.trim()).trim();
 
   const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
 
-  /** One request/response round; returns whether a flame block was applied. */
-  async function runTurn(q: string, shownAs: string): Promise<boolean> {
+  /** One request/response round; returns whether a flame block was applied.
+   *  `over` adjusts the context options for this turn only (Explain: prose reply, flame always described). */
+  async function runTurn(q: string, shownAs: string, over: Partial<ContextOpts> = {}): Promise<boolean> {
     const key = keyInp.value.trim();
+    const c: ContextOpts = { ...ctx, ...over };
     addMsg('user', shownAs);
     history.push({ role: 'user', content: q });
 
@@ -224,9 +228,9 @@ export function buildAIPanel(app: App, root: HTMLElement) {
     let acc = '';
     let applied = false;
     try {
-      const desc = ctx.flame === 'json'
-        ? `Current flame JSON:\n\`\`\`json\n${flameJSONFor(app.flame, ctx.palette)}\n\`\`\`\n\n`
-        : ctx.flame === 'summary' ? `Current flame:\n${flameSummary(app.flame, ctx.palette)}\n\n` : '';
+      const desc = c.flame === 'json'
+        ? `Current flame JSON:\n\`\`\`json\n${flameJSONFor(app.flame, c.palette)}\n\`\`\`\n\n`
+        : c.flame === 'summary' ? `Current flame:\n${flameSummary(app.flame, c.palette)}\n\n` : '';
       const finalText = `${desc}Request: ${q}`;
       let finalContent: string | ChatPart[] = finalText;
       if (visChk.checked) {
@@ -246,7 +250,7 @@ export function buildAIPanel(app: App, root: HTMLElement) {
         } catch { /* capture failed — send text only */ }
       }
       const messages: ChatMessage[] = [
-        { role: 'system', content: systemPrompt(app.flame, ctx) },
+        { role: 'system', content: systemPrompt(app.flame, c) },
         ...(ctx.memory ? history.slice(0, -1) : []),
         { role: 'user', content: finalContent },
       ];
@@ -262,7 +266,7 @@ export function buildAIPanel(app: App, root: HTMLElement) {
       });
       history.push({ role: 'assistant', content: acc });
       bubble.textContent = displayText(acc) || '(empty reply)';
-      if (tryApplyFlameBlocks(acc)) {
+      if (tryApplyFlameBlocks(acc, c)) {
         applied = true;
         const tag = el('span', 'applied', '✦ flame applied');
         bubble.append(tag);
@@ -309,6 +313,25 @@ export function buildAIPanel(app: App, root: HTMLElement) {
   }
 
   sendBtn.onclick = send;
+
+  const EXPLAIN_PROMPT = 'Explain this flame to me as a fractal-flame artist would. Walk through each transform: what its variations do (name the variation and what its weight and parameters contribute), how its affine (scale, rotation, offset) places it, and what its weight, colour and opacity mean for the picture. ' +
+    'Then explain how the transforms interact (xaos if any), what the final transform(s) do, how the layers combine, what mood the palette gives, and how the camera and tone mapping (zoom, rotation, brightness, gamma, vibrancy) shape the look. ' +
+    'Finish with 2–3 concrete tweaks worth exploring (which transform, which knob, which direction) and what to expect from each. Prose only — no JSON, no edit blocks; do not change the flame.';
+  explainBtn.onclick = async () => {
+    if (busy) return;
+    if (!keyInp.value.trim()) { addMsg('system', 'Enter your OpenRouter API key first.'); return; }
+    busy = true;
+    sendBtn.disabled = true;
+    explainBtn.disabled = true;
+    try {
+      // the flame is always described (a summary at least) and the reply is prose, whatever the context settings say
+      await runTurn(EXPLAIN_PROMPT, `✎ Explain "${app.flame.name || 'this flame'}"`, { reply: 'text', flame: ctx.flame === 'none' ? 'summary' : ctx.flame });
+    } catch { /* already surfaced in the bubble */ } finally {
+      busy = false;
+      sendBtn.disabled = false;
+      explainBtn.disabled = false;
+    }
+  };
   clearBtn.onclick = () => {
     if (busy) return;
     history.length = 0;
