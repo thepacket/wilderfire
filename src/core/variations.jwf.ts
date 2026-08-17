@@ -2,7 +2,7 @@
 // Variations ported from JWildfire (https://github.com/thargor6/JWildfire, LGPL-2.1,
 // (c) Andreas Maschke and contributors) by transpiling each variation's CUDA GPU
 // snippet to WGSL and verifying it against JWildfire's Java implementation.
-// 735 verified of 780 transpiled (1026 in JWildfire).
+// 744 verified of 786 transpiled (1026 in JWildfire).
 //
 // Snippet scope: t (input point, var), z_ (input z), r2, r, th = atan2(x,y), ph = atan2(y,x),
 // v (output accumulator), pz_ (output z), rs (rng), cp (palette coord ptr), hd (hide-flag ptr).
@@ -4161,6 +4161,1188 @@ var r_: f32 = (1.0 / (((((r2_ * _c_2) + (_c2x * v.x)) - (_c2y * v.y)) + (_c2z * 
 v.x = (r_ * (v.x + (_cx * r2_)));
 v.y = (r_ * (v.y + (_cy * r2_)));
 pz_ = (r_ * (pz_ + (_cz * r2_)));
+}`,
+  },
+  "fract_dragon_wf": {
+    params: [{ name: "max_iter", def: 100 }, { name: "xmin", def: -0.25 }, { name: "xmax", def: 1.2 }, { name: "ymin", def: -0.75 }, { name: "ymax", def: 0.75 }, { name: "buddhabrot_mode", def: 0 }, { name: "xseed", def: 1.4 }, { name: "yseed", def: 0.85 }, { name: "direct_color", def: 1 }, { name: "scalez", def: 1 }, { name: "clip_iter_min", def: 4 }, { name: "clip_iter_max", def: -5 }, { name: "max_clip_iter", def: 3 }, { name: "buddhabrot_min_iter", def: 7 }, { name: "scale", def: 5 }, { name: "offsetx", def: -0.5 }, { name: "offsety", def: 0 }, { name: "offsetz", def: 0 }, { name: "z_fill", def: 0 }, { name: "z_logscale", def: 0 }, { name: "color_only", def: 0 }],
+    verified: true, priority: 0, flags: ["dc","hide","state","z"], types: ["SIMULATION","DC","BASE_SHAPE","ESCAPE_TIME_FRACTAL"],
+    funcNames: ["jwx_fract_dragon_wf_chooseNewPoint","jwx_fract_dragon_wf_xs","jwx_fract_dragon_wf_ys","jwx_fract_dragon_wf_currIter","jwx_fract_dragon_wf_maxIter","jwx_fract_dragon_wf_startX","jwx_fract_dragon_wf_startY","jwx_fract_dragon_wf_currX","jwx_fract_dragon_wf_currY","jwx_fract_dragon_wf_xseed_c","jwx_fract_dragon_wf_yseed_c","jwx_fract_dragon_wf_buddhabrot_min_iter_c","roundc","fract_dragon_wf_init","fract_dragon_wf_setCurrPoint","fract_dragon_wf_nextIteration","fract_dragon_wf_preBuddhaIterate","fract_dragon_wf_iterate"],
+    funcs: `fn roundc(x: f32) -> f32 { return sign(x) * floor(abs(x) + 0.5); }
+
+fn fract_dragon_wf_init(pX0: f32, pY0: f32) {
+  jwx_fract_dragon_wf_ys = 0;
+  jwx_fract_dragon_wf_xs = jwx_fract_dragon_wf_ys;
+  jwx_fract_dragon_wf_currX = pX0;
+  jwx_fract_dragon_wf_startX = jwx_fract_dragon_wf_currX;
+  jwx_fract_dragon_wf_currY = pY0;
+  jwx_fract_dragon_wf_startY = jwx_fract_dragon_wf_currY;
+  jwx_fract_dragon_wf_currIter = 0;
+}
+
+fn fract_dragon_wf_setCurrPoint(pX: f32, pY: f32) {
+  jwx_fract_dragon_wf_currX = pX;
+  jwx_fract_dragon_wf_currY = pY;
+  jwx_fract_dragon_wf_currIter = (jwx_fract_dragon_wf_currIter + 1);
+}
+
+fn fract_dragon_wf_nextIteration() {
+  var x1: f32 = jwx_fract_dragon_wf_currX;
+  var y1: f32 = jwx_fract_dragon_wf_currY;
+  jwx_fract_dragon_wf_xs = (x1 * x1);
+  jwx_fract_dragon_wf_ys = (y1 * y1);
+  var x2: f32 = ((((x1 - jwx_fract_dragon_wf_xs) + jwx_fract_dragon_wf_ys) * jwx_fract_dragon_wf_xseed_c) - ((y1 - ((2.0 * x1) * y1)) * jwx_fract_dragon_wf_yseed_c));
+  y1 = ((((x1 - jwx_fract_dragon_wf_xs) + jwx_fract_dragon_wf_ys) * jwx_fract_dragon_wf_yseed_c) + ((y1 - ((2.0 * x1) * y1)) * jwx_fract_dragon_wf_xseed_c));
+  x1 = x2;
+  fract_dragon_wf_setCurrPoint(x1, y1);
+}
+
+fn fract_dragon_wf_preBuddhaIterate(pStartX: f32, pStartY: f32, pMaxIter: i32) -> bool {
+  fract_dragon_wf_init(pStartX, pStartY);
+  var currIter: i32 = 0;
+  while (true) {
+    var ci_: i32 = currIter;
+    currIter = (currIter + 1);
+    if (!((ci_ < pMaxIter) && !((jwx_fract_dragon_wf_xs + jwx_fract_dragon_wf_ys) >= 4.0))) {
+      break;
+    }
+    fract_dragon_wf_nextIteration();
+  }
+  if (((jwx_fract_dragon_wf_xs + jwx_fract_dragon_wf_ys) >= 4.0)) {
+    jwx_fract_dragon_wf_maxIter = f32(currIter);
+    return (jwx_fract_dragon_wf_maxIter > jwx_fract_dragon_wf_buddhabrot_min_iter_c);
+  } else {
+    return false;
+  }
+}
+
+fn fract_dragon_wf_iterate(pStartX: f32, pStartY: f32, pMaxIter: f32) -> i32 {
+  fract_dragon_wf_init(pStartX, pStartY);
+  var currIter: i32 = 0;
+  while (true) {
+    var ci_: i32 = currIter;
+    currIter = (currIter + 1);
+    if (!((f32(ci_) < pMaxIter) && !((jwx_fract_dragon_wf_xs + jwx_fract_dragon_wf_ys) >= 4.0))) {
+      break;
+    }
+    fract_dragon_wf_nextIteration();
+  }
+  return currIter;
+}
+
+var<private> jwx_fract_dragon_wf_chooseNewPoint: f32 = 0.0;
+
+var<private> jwx_fract_dragon_wf_xs: f32 = 0.0;
+
+var<private> jwx_fract_dragon_wf_ys: f32 = 0.0;
+
+var<private> jwx_fract_dragon_wf_currIter: f32 = 0.0;
+
+var<private> jwx_fract_dragon_wf_maxIter: f32 = 0.0;
+
+var<private> jwx_fract_dragon_wf_startX: f32 = 0.0;
+
+var<private> jwx_fract_dragon_wf_startY: f32 = 0.0;
+
+var<private> jwx_fract_dragon_wf_currX: f32 = 0.0;
+
+var<private> jwx_fract_dragon_wf_currY: f32 = 0.0;
+
+var<private> jwx_fract_dragon_wf_xseed_c: f32 = 0.0;
+
+var<private> jwx_fract_dragon_wf_yseed_c: f32 = 0.0;
+
+var<private> jwx_fract_dragon_wf_buddhabrot_min_iter_c: f32 = 0.0;`,
+    code: (w, p) => `{
+jwx_fract_dragon_wf_xseed_c = ${p[6]};
+jwx_fract_dragon_wf_yseed_c = ${p[7]};
+jwx_fract_dragon_wf_buddhabrot_min_iter_c = ${p[13]};
+if ((${p[5]} > 0)) {
+  var x0: f32 = 0;
+  var y0: f32 = 0;
+  var bb_max_clip_iter: i32 = 250;
+  if ((jwx_fract_dragon_wf_chooseNewPoint != 0.0)) {
+    for (var i: i32 = 0; (i < bb_max_clip_iter); i++) {
+      x0 = (((${p[2]} - ${p[1]}) * rnd(rs)) + ${p[1]});
+      y0 = (((${p[4]} - ${p[3]}) * rnd(rs)) + ${p[3]});
+      if (fract_dragon_wf_preBuddhaIterate(x0, y0, i32(${p[0]}))) {
+        break;
+      }
+      if ((i == (bb_max_clip_iter - 1))) {
+        (*hd) = true;
+        break;
+      }
+    }
+    if (!(*hd)) {
+      (*&(jwx_fract_dragon_wf_chooseNewPoint)) = select(0.0, 1.0, false);
+      fract_dragon_wf_init(x0, y0);
+      for (var skip: i32 = 0; (f32(skip) < ${p[13]}); skip++) {
+        fract_dragon_wf_nextIteration();
+      }
+    }
+  }
+  if (!(*hd)) {
+    fract_dragon_wf_nextIteration();
+    if ((jwx_fract_dragon_wf_currIter >= jwx_fract_dragon_wf_maxIter)) {
+      (*&(jwx_fract_dragon_wf_chooseNewPoint)) = select(0.0, 1.0, true);
+    }
+    v.x += ((${p[14]} * ${w}) * (jwx_fract_dragon_wf_currX + ${p[15]}));
+    v.y += ((${p[14]} * ${w}) * (jwx_fract_dragon_wf_currY + ${p[16]}));
+    (*cp) += (jwx_fract_dragon_wf_currIter / jwx_fract_dragon_wf_maxIter);
+    if (((*cp) < 0)) {
+      (*cp) = 0;
+    } else if (((*cp) > 1.0)) {
+      (*cp) = 1.0;
+    }
+  }
+} else {
+  (*hd) = false;
+  var x0: f32 = 0.0;
+  var y0: f32 = 0.0;
+  var iterCount: i32 = 0;
+  for (var i: i32 = 0; (f32(i) < ${p[12]}); i++) {
+    x0 = (((${p[2]} - ${p[1]}) * rnd(rs)) + ${p[1]});
+    y0 = (((${p[4]} - ${p[3]}) * rnd(rs)) + ${p[3]});
+    iterCount = fract_dragon_wf_iterate(x0, y0, ${p[0]});
+    if ((((${p[11]} < 0) && (f32(iterCount) >= (${p[0]} + ${p[11]}))) || ((${p[10]} > 0) && (f32(iterCount) <= ${p[10]})))) {
+      if ((f32(i) == (${p[12]} - 1))) {
+        (*hd) = true;
+        break;
+      }
+    } else {
+      break;
+    }
+  }
+  if (!(*hd)) {
+    v.x += ((${p[14]} * ${w}) * (x0 + ${p[15]}));
+    v.y += ((${p[14]} * ${w}) * (y0 + ${p[16]}));
+    var z: f32;
+    if ((i32(roundc(${p[19]})) == 1)) {
+      z = ((${p[14]} * ${w}) * (((${p[9]} / 10) * (log((1.0 + (f32(iterCount) / ${p[0]}))) * 0.4342944819032518)) + ${p[17]}));
+      if (((${p[18]} > 0.000001) && (rnd(rs) < ${p[18]}))) {
+        var prevZ: f32 = ((${p[14]} * ${w}) * (((${p[9]} / 10) * (log((1.0 + (f32((iterCount - 1)) / ${p[0]}))) * 0.4342944819032518)) + ${p[17]}));
+        z = (((prevZ - z) * rnd(rs)) + z);
+      }
+    } else {
+      z = ((${p[14]} * ${w}) * (((${p[9]} / 10) * (f32(iterCount) / ${p[0]})) + ${p[17]}));
+      if (((${p[18]} > 0.000001) && (rnd(rs) < ${p[18]}))) {
+        var prevZ: f32 = ((${p[14]} * ${w}) * (((${p[9]} / 10) * (f32((iterCount - 1)) / ${p[0]})) + ${p[17]}));
+        z = (((prevZ - z) * rnd(rs)) + z);
+      }
+    }
+    pz_ += z;
+    if ((i32(roundc(${p[8]})) != 0)) {
+      (*cp) += (f32(iterCount) / ${p[0]});
+      if (((*cp) > 1.0)) {
+        (*cp) -= 1.0;
+      }
+      if (((*cp) < 0)) {
+        (*cp) = 0;
+      } else if (((*cp) > 1.0)) {
+        (*cp) = 1.0;
+      }
+    }
+  }
+}
+}`,
+  },
+  "fract_mandelbrot_wf": {
+    params: [{ name: "max_iter", def: 100 }, { name: "xmin", def: -2.35 }, { name: "xmax", def: 0.75 }, { name: "ymin", def: -1.2 }, { name: "ymax", def: 1.2 }, { name: "buddhabrot_mode", def: 0 }, { name: "power", def: 2 }, { name: "direct_color", def: 1 }, { name: "scalez", def: 1 }, { name: "clip_iter_min", def: 3 }, { name: "clip_iter_max", def: -5 }, { name: "max_clip_iter", def: 3 }, { name: "buddhabrot_min_iter", def: 7 }, { name: "scale", def: 4 }, { name: "offsetx", def: 0.55 }, { name: "offsety", def: 0 }, { name: "offsetz", def: 0 }, { name: "z_fill", def: 0 }, { name: "z_logscale", def: 0 }, { name: "color_only", def: 0 }],
+    verified: true, priority: 0, flags: ["dc","hide","state","z"], types: ["SIMULATION","DC","BASE_SHAPE","ESCAPE_TIME_FRACTAL"],
+    funcNames: ["jwx_fract_mandelbrot_wf_chooseNewPoint","jwx_fract_mandelbrot_wf_xs","jwx_fract_mandelbrot_wf_ys","jwx_fract_mandelbrot_wf_currIter","jwx_fract_mandelbrot_wf_maxIter","jwx_fract_mandelbrot_wf_startX","jwx_fract_mandelbrot_wf_startY","jwx_fract_mandelbrot_wf_currX","jwx_fract_mandelbrot_wf_currY","jwx_fract_mandelbrot_wf_power_c","jwx_fract_mandelbrot_wf_buddhabrot_min_iter_c","roundc","fract_mandelbrot_wf_init","fract_mandelbrot_wf_setCurrPoint","fract_mandelbrot_wf_nextIteration","fract_mandelbrot_wf_preBuddhaIterate","fract_mandelbrot_wf_iterate"],
+    funcs: `fn roundc(x: f32) -> f32 { return sign(x) * floor(abs(x) + 0.5); }
+
+fn fract_mandelbrot_wf_init(pX0: f32, pY0: f32) {
+  jwx_fract_mandelbrot_wf_ys = 0;
+  jwx_fract_mandelbrot_wf_xs = jwx_fract_mandelbrot_wf_ys;
+  jwx_fract_mandelbrot_wf_currX = pX0;
+  jwx_fract_mandelbrot_wf_startX = jwx_fract_mandelbrot_wf_currX;
+  jwx_fract_mandelbrot_wf_currY = pY0;
+  jwx_fract_mandelbrot_wf_startY = jwx_fract_mandelbrot_wf_currY;
+  jwx_fract_mandelbrot_wf_currIter = 0;
+}
+
+fn fract_mandelbrot_wf_setCurrPoint(pX: f32, pY: f32) {
+  jwx_fract_mandelbrot_wf_currX = pX;
+  jwx_fract_mandelbrot_wf_currY = pY;
+  jwx_fract_mandelbrot_wf_currIter = (jwx_fract_mandelbrot_wf_currIter + 1);
+}
+
+fn fract_mandelbrot_wf_nextIteration() {
+  switch i32(roundc(jwx_fract_mandelbrot_wf_power_c)) {
+    case 2: {
+      {
+        var x1: f32 = jwx_fract_mandelbrot_wf_currX;
+        var y1: f32 = jwx_fract_mandelbrot_wf_currY;
+        jwx_fract_mandelbrot_wf_xs = (x1 * x1);
+        jwx_fract_mandelbrot_wf_ys = (y1 * y1);
+        y1 = (((2.0 * x1) * y1) + jwx_fract_mandelbrot_wf_startY);
+        x1 = ((jwx_fract_mandelbrot_wf_xs - jwx_fract_mandelbrot_wf_ys) + jwx_fract_mandelbrot_wf_startX);
+        fract_mandelbrot_wf_setCurrPoint(x1, y1);
+      }
+    }
+    case 3: {
+      {
+        var x1: f32 = jwx_fract_mandelbrot_wf_currX;
+        var y1: f32 = jwx_fract_mandelbrot_wf_currY;
+        (*&(jwx_fract_mandelbrot_wf_xs)) = (x1 * x1);
+        (*&(jwx_fract_mandelbrot_wf_ys)) = (y1 * y1);
+        var x2: f32 = (((jwx_fract_mandelbrot_wf_xs * x1) - ((3.0 * x1) * jwx_fract_mandelbrot_wf_ys)) + jwx_fract_mandelbrot_wf_startX);
+        y1 = ((((3.0 * jwx_fract_mandelbrot_wf_xs) * y1) - (jwx_fract_mandelbrot_wf_ys * y1)) + jwx_fract_mandelbrot_wf_startY);
+        x1 = x2;
+        fract_mandelbrot_wf_setCurrPoint(x1, y1);
+      }
+    }
+    case 4: {
+      {
+        var x1: f32 = jwx_fract_mandelbrot_wf_currX;
+        var y1: f32 = jwx_fract_mandelbrot_wf_currY;
+        jwx_fract_mandelbrot_wf_xs = (x1 * x1);
+        jwx_fract_mandelbrot_wf_ys = (y1 * y1);
+        var x2: f32 = ((((jwx_fract_mandelbrot_wf_xs * jwx_fract_mandelbrot_wf_xs) + (jwx_fract_mandelbrot_wf_ys * jwx_fract_mandelbrot_wf_ys)) - ((6.0 * jwx_fract_mandelbrot_wf_xs) * jwx_fract_mandelbrot_wf_ys)) + jwx_fract_mandelbrot_wf_startX);
+        y1 = ((((4.0 * x1) * y1) * (jwx_fract_mandelbrot_wf_xs - jwx_fract_mandelbrot_wf_ys)) + jwx_fract_mandelbrot_wf_startY);
+        x1 = x2;
+        fract_mandelbrot_wf_setCurrPoint(x1, y1);
+      }
+    }
+    case default: {
+      {
+        var x1: f32 = jwx_fract_mandelbrot_wf_currX;
+        var y1: f32 = jwx_fract_mandelbrot_wf_currY;
+        jwx_fract_mandelbrot_wf_xs = (x1 * x1);
+        jwx_fract_mandelbrot_wf_ys = (y1 * y1);
+        var x2: f32 = (x1 * (((jwx_fract_mandelbrot_wf_xs * jwx_fract_mandelbrot_wf_xs) - ((10.0 * jwx_fract_mandelbrot_wf_xs) * jwx_fract_mandelbrot_wf_ys)) + ((5.0 * jwx_fract_mandelbrot_wf_ys) * jwx_fract_mandelbrot_wf_ys)));
+        var y2: f32 = (y1 * (((jwx_fract_mandelbrot_wf_ys * jwx_fract_mandelbrot_wf_ys) - ((10.0 * jwx_fract_mandelbrot_wf_xs) * jwx_fract_mandelbrot_wf_ys)) + ((5.0 * jwx_fract_mandelbrot_wf_xs) * jwx_fract_mandelbrot_wf_xs)));
+        for (var k: i32 = 5; (f32(k) < jwx_fract_mandelbrot_wf_power_c); k++) {
+          var xa: f32 = ((x1 * x2) - (y1 * y2));
+          var ya: f32 = ((x1 * y2) + (x2 * y1));
+          x2 = xa;
+          y2 = ya;
+        }
+        x1 = (x2 + jwx_fract_mandelbrot_wf_startX);
+        y1 = (y2 + jwx_fract_mandelbrot_wf_startY);
+        fract_mandelbrot_wf_setCurrPoint(x1, y1);
+      }
+    }
+  }
+}
+
+fn fract_mandelbrot_wf_preBuddhaIterate(pStartX: f32, pStartY: f32, pMaxIter: i32) -> bool {
+  fract_mandelbrot_wf_init(pStartX, pStartY);
+  var currIter: i32 = 0;
+  while (true) {
+    var ci_: i32 = currIter;
+    currIter = (currIter + 1);
+    if (!((ci_ < pMaxIter) && !((jwx_fract_mandelbrot_wf_xs + jwx_fract_mandelbrot_wf_ys) >= 4.0))) {
+      break;
+    }
+    fract_mandelbrot_wf_nextIteration();
+  }
+  if (((jwx_fract_mandelbrot_wf_xs + jwx_fract_mandelbrot_wf_ys) >= 4.0)) {
+    jwx_fract_mandelbrot_wf_maxIter = f32(currIter);
+    return (jwx_fract_mandelbrot_wf_maxIter > jwx_fract_mandelbrot_wf_buddhabrot_min_iter_c);
+  } else {
+    return false;
+  }
+}
+
+fn fract_mandelbrot_wf_iterate(pStartX: f32, pStartY: f32, pMaxIter: f32) -> i32 {
+  fract_mandelbrot_wf_init(pStartX, pStartY);
+  var currIter: i32 = 0;
+  while (true) {
+    var ci_: i32 = currIter;
+    currIter = (currIter + 1);
+    if (!((f32(ci_) < pMaxIter) && !((jwx_fract_mandelbrot_wf_xs + jwx_fract_mandelbrot_wf_ys) >= 4.0))) {
+      break;
+    }
+    fract_mandelbrot_wf_nextIteration();
+  }
+  return currIter;
+}
+
+var<private> jwx_fract_mandelbrot_wf_chooseNewPoint: f32 = 0.0;
+
+var<private> jwx_fract_mandelbrot_wf_xs: f32 = 0.0;
+
+var<private> jwx_fract_mandelbrot_wf_ys: f32 = 0.0;
+
+var<private> jwx_fract_mandelbrot_wf_currIter: f32 = 0.0;
+
+var<private> jwx_fract_mandelbrot_wf_maxIter: f32 = 0.0;
+
+var<private> jwx_fract_mandelbrot_wf_startX: f32 = 0.0;
+
+var<private> jwx_fract_mandelbrot_wf_startY: f32 = 0.0;
+
+var<private> jwx_fract_mandelbrot_wf_currX: f32 = 0.0;
+
+var<private> jwx_fract_mandelbrot_wf_currY: f32 = 0.0;
+
+var<private> jwx_fract_mandelbrot_wf_power_c: f32 = 0.0;
+
+var<private> jwx_fract_mandelbrot_wf_buddhabrot_min_iter_c: f32 = 0.0;`,
+    code: (w, p) => `{
+jwx_fract_mandelbrot_wf_power_c = ${p[6]};
+jwx_fract_mandelbrot_wf_buddhabrot_min_iter_c = ${p[12]};
+if ((${p[5]} > 0)) {
+  var x0: f32 = 0;
+  var y0: f32 = 0;
+  var bb_max_clip_iter: i32 = 250;
+  if ((jwx_fract_mandelbrot_wf_chooseNewPoint != 0.0)) {
+    for (var i: i32 = 0; (i < bb_max_clip_iter); i++) {
+      x0 = (((${p[2]} - ${p[1]}) * rnd(rs)) + ${p[1]});
+      y0 = (((${p[4]} - ${p[3]}) * rnd(rs)) + ${p[3]});
+      if (fract_mandelbrot_wf_preBuddhaIterate(x0, y0, i32(${p[0]}))) {
+        break;
+      }
+      if ((i == (bb_max_clip_iter - 1))) {
+        (*hd) = true;
+        break;
+      }
+    }
+    if (!(*hd)) {
+      (*&(jwx_fract_mandelbrot_wf_chooseNewPoint)) = select(0.0, 1.0, false);
+      fract_mandelbrot_wf_init(x0, y0);
+      for (var skip: i32 = 0; (f32(skip) < ${p[12]}); skip++) {
+        fract_mandelbrot_wf_nextIteration();
+      }
+    }
+  }
+  if (!(*hd)) {
+    fract_mandelbrot_wf_nextIteration();
+    if ((jwx_fract_mandelbrot_wf_currIter >= jwx_fract_mandelbrot_wf_maxIter)) {
+      (*&(jwx_fract_mandelbrot_wf_chooseNewPoint)) = select(0.0, 1.0, true);
+    }
+    v.x += ((${p[13]} * ${w}) * (jwx_fract_mandelbrot_wf_currX + ${p[14]}));
+    v.y += ((${p[13]} * ${w}) * (jwx_fract_mandelbrot_wf_currY + ${p[15]}));
+    (*cp) += (jwx_fract_mandelbrot_wf_currIter / jwx_fract_mandelbrot_wf_maxIter);
+    if (((*cp) < 0)) {
+      (*cp) = 0;
+    } else if (((*cp) > 1.0)) {
+      (*cp) = 1.0;
+    }
+  }
+} else {
+  (*hd) = false;
+  var x0: f32 = 0.0;
+  var y0: f32 = 0.0;
+  var iterCount: i32 = 0;
+  for (var i: i32 = 0; (f32(i) < ${p[11]}); i++) {
+    x0 = (((${p[2]} - ${p[1]}) * rnd(rs)) + ${p[1]});
+    y0 = (((${p[4]} - ${p[3]}) * rnd(rs)) + ${p[3]});
+    iterCount = fract_mandelbrot_wf_iterate(x0, y0, ${p[0]});
+    if ((((${p[10]} < 0) && (f32(iterCount) >= (${p[0]} + ${p[10]}))) || ((${p[9]} > 0) && (f32(iterCount) <= ${p[9]})))) {
+      if ((f32(i) == (${p[11]} - 1))) {
+        (*hd) = true;
+        break;
+      }
+    } else {
+      break;
+    }
+  }
+  if (!(*hd)) {
+    v.x += ((${p[13]} * ${w}) * (x0 + ${p[14]}));
+    v.y += ((${p[13]} * ${w}) * (y0 + ${p[15]}));
+    var z: f32;
+    if ((i32(roundc(${p[18]})) == 1)) {
+      z = ((${p[13]} * ${w}) * (((${p[8]} / 10) * (log((1.0 + (f32(iterCount) / ${p[0]}))) * 0.4342944819032518)) + ${p[16]}));
+      if (((${p[17]} > 0.000001) && (rnd(rs) < ${p[17]}))) {
+        var prevZ: f32 = ((${p[13]} * ${w}) * (((${p[8]} / 10) * (log((1.0 + (f32((iterCount - 1)) / ${p[0]}))) * 0.4342944819032518)) + ${p[16]}));
+        z = (((prevZ - z) * rnd(rs)) + z);
+      }
+    } else {
+      z = ((${p[13]} * ${w}) * (((${p[8]} / 10) * (f32(iterCount) / ${p[0]})) + ${p[16]}));
+      if (((${p[17]} > 0.000001) && (rnd(rs) < ${p[17]}))) {
+        var prevZ: f32 = ((${p[13]} * ${w}) * (((${p[8]} / 10) * (f32((iterCount - 1)) / ${p[0]})) + ${p[16]}));
+        z = (((prevZ - z) * rnd(rs)) + z);
+      }
+    }
+    pz_ += z;
+    if ((i32(roundc(${p[7]})) != 0)) {
+      (*cp) += (f32(iterCount) / ${p[0]});
+      if (((*cp) > 1.0)) {
+        (*cp) -= 1.0;
+      }
+      if (((*cp) < 0)) {
+        (*cp) = 0;
+      } else if (((*cp) > 1.0)) {
+        (*cp) = 1.0;
+      }
+    }
+  }
+}
+}`,
+  },
+  "fract_meteors_wf": {
+    params: [{ name: "max_iter", def: 100 }, { name: "xmin", def: -1.7 }, { name: "xmax", def: 1.7 }, { name: "ymin", def: -1.1 }, { name: "ymax", def: 1.1 }, { name: "buddhabrot_mode", def: 0 }, { name: "direct_color", def: 1 }, { name: "scalez", def: 1 }, { name: "clip_iter_min", def: 3 }, { name: "clip_iter_max", def: -5 }, { name: "max_clip_iter", def: 3 }, { name: "buddhabrot_min_iter", def: 7 }, { name: "scale", def: 5.7 }, { name: "offsetx", def: 0 }, { name: "offsety", def: 0 }, { name: "offsetz", def: 0 }, { name: "z_fill", def: 0 }, { name: "z_logscale", def: 0 }, { name: "color_only", def: 0 }],
+    verified: true, priority: 0, flags: ["dc","hide","state","z"], types: ["SIMULATION","DC","BASE_SHAPE","ESCAPE_TIME_FRACTAL"],
+    funcNames: ["jwx_fract_meteors_wf_chooseNewPoint","jwx_fract_meteors_wf_xs","jwx_fract_meteors_wf_ys","jwx_fract_meteors_wf_currIter","jwx_fract_meteors_wf_maxIter","jwx_fract_meteors_wf_startX","jwx_fract_meteors_wf_startY","jwx_fract_meteors_wf_currX","jwx_fract_meteors_wf_currY","jwx_fract_meteors_wf_buddhabrot_min_iter_c","roundc","fract_meteors_wf_init","fract_meteors_wf_setCurrPoint","fract_meteors_wf_nextIteration","fract_meteors_wf_preBuddhaIterate","fract_meteors_wf_iterate"],
+    funcs: `fn roundc(x: f32) -> f32 { return sign(x) * floor(abs(x) + 0.5); }
+
+fn fract_meteors_wf_init(pX0: f32, pY0: f32) {
+  jwx_fract_meteors_wf_ys = 0;
+  jwx_fract_meteors_wf_xs = jwx_fract_meteors_wf_ys;
+  jwx_fract_meteors_wf_currX = pX0;
+  jwx_fract_meteors_wf_startX = jwx_fract_meteors_wf_currX;
+  jwx_fract_meteors_wf_currY = pY0;
+  jwx_fract_meteors_wf_startY = jwx_fract_meteors_wf_currY;
+  jwx_fract_meteors_wf_currIter = 0;
+}
+
+fn fract_meteors_wf_setCurrPoint(pX: f32, pY: f32) {
+  jwx_fract_meteors_wf_currX = pX;
+  jwx_fract_meteors_wf_currY = pY;
+  jwx_fract_meteors_wf_currIter = (jwx_fract_meteors_wf_currIter + 1);
+}
+
+fn fract_meteors_wf_nextIteration() {
+  var x1: f32 = jwx_fract_meteors_wf_currX;
+  var y1: f32 = jwx_fract_meteors_wf_currY;
+  jwx_fract_meteors_wf_xs = (x1 * x1);
+  jwx_fract_meteors_wf_ys = (y1 * y1);
+  var x2: f32 = (((jwx_fract_meteors_wf_startX * x1) - (jwx_fract_meteors_wf_startY * y1)) - (((jwx_fract_meteors_wf_startX * x1) + (jwx_fract_meteors_wf_startY * y1)) / (jwx_fract_meteors_wf_xs + jwx_fract_meteors_wf_ys)));
+  y1 = (((jwx_fract_meteors_wf_startX * y1) + (jwx_fract_meteors_wf_startY * x1)) + (((jwx_fract_meteors_wf_startX * y1) - (jwx_fract_meteors_wf_startY * x1)) / (jwx_fract_meteors_wf_xs + jwx_fract_meteors_wf_ys)));
+  x1 = x2;
+  fract_meteors_wf_setCurrPoint(x1, y1);
+}
+
+fn fract_meteors_wf_preBuddhaIterate(pStartX: f32, pStartY: f32, pMaxIter: i32) -> bool {
+  fract_meteors_wf_init(pStartX, pStartY);
+  var currIter: i32 = 0;
+  while (true) {
+    var ci_: i32 = currIter;
+    currIter = (currIter + 1);
+    if (!((ci_ < pMaxIter) && !((jwx_fract_meteors_wf_xs + jwx_fract_meteors_wf_ys) >= 4.0))) {
+      break;
+    }
+    fract_meteors_wf_nextIteration();
+  }
+  if (((jwx_fract_meteors_wf_xs + jwx_fract_meteors_wf_ys) >= 4.0)) {
+    jwx_fract_meteors_wf_maxIter = f32(currIter);
+    return (jwx_fract_meteors_wf_maxIter > jwx_fract_meteors_wf_buddhabrot_min_iter_c);
+  } else {
+    return false;
+  }
+}
+
+fn fract_meteors_wf_iterate(pStartX: f32, pStartY: f32, pMaxIter: f32) -> i32 {
+  fract_meteors_wf_init(pStartX, pStartY);
+  var currIter: i32 = 0;
+  while (true) {
+    var ci_: i32 = currIter;
+    currIter = (currIter + 1);
+    if (!((f32(ci_) < pMaxIter) && !((jwx_fract_meteors_wf_xs + jwx_fract_meteors_wf_ys) >= 4.0))) {
+      break;
+    }
+    fract_meteors_wf_nextIteration();
+  }
+  return currIter;
+}
+
+var<private> jwx_fract_meteors_wf_chooseNewPoint: f32 = 0.0;
+
+var<private> jwx_fract_meteors_wf_xs: f32 = 0.0;
+
+var<private> jwx_fract_meteors_wf_ys: f32 = 0.0;
+
+var<private> jwx_fract_meteors_wf_currIter: f32 = 0.0;
+
+var<private> jwx_fract_meteors_wf_maxIter: f32 = 0.0;
+
+var<private> jwx_fract_meteors_wf_startX: f32 = 0.0;
+
+var<private> jwx_fract_meteors_wf_startY: f32 = 0.0;
+
+var<private> jwx_fract_meteors_wf_currX: f32 = 0.0;
+
+var<private> jwx_fract_meteors_wf_currY: f32 = 0.0;
+
+var<private> jwx_fract_meteors_wf_buddhabrot_min_iter_c: f32 = 0.0;`,
+    code: (w, p) => `{
+jwx_fract_meteors_wf_buddhabrot_min_iter_c = ${p[11]};
+if ((${p[5]} > 0)) {
+  var x0: f32 = 0;
+  var y0: f32 = 0;
+  var bb_max_clip_iter: i32 = 250;
+  if ((jwx_fract_meteors_wf_chooseNewPoint != 0.0)) {
+    for (var i: i32 = 0; (i < bb_max_clip_iter); i++) {
+      x0 = (((${p[2]} - ${p[1]}) * rnd(rs)) + ${p[1]});
+      y0 = (((${p[4]} - ${p[3]}) * rnd(rs)) + ${p[3]});
+      if (fract_meteors_wf_preBuddhaIterate(x0, y0, i32(${p[0]}))) {
+        break;
+      }
+      if ((i == (bb_max_clip_iter - 1))) {
+        (*hd) = true;
+        break;
+      }
+    }
+    if (!(*hd)) {
+      (*&(jwx_fract_meteors_wf_chooseNewPoint)) = select(0.0, 1.0, false);
+      fract_meteors_wf_init(x0, y0);
+      for (var skip: i32 = 0; (f32(skip) < ${p[11]}); skip++) {
+        fract_meteors_wf_nextIteration();
+      }
+    }
+  }
+  if (!(*hd)) {
+    fract_meteors_wf_nextIteration();
+    if ((jwx_fract_meteors_wf_currIter >= jwx_fract_meteors_wf_maxIter)) {
+      (*&(jwx_fract_meteors_wf_chooseNewPoint)) = select(0.0, 1.0, true);
+    }
+    v.x += ((${p[12]} * ${w}) * (jwx_fract_meteors_wf_currX + ${p[13]}));
+    v.y += ((${p[12]} * ${w}) * (jwx_fract_meteors_wf_currY + ${p[14]}));
+    (*cp) += (jwx_fract_meteors_wf_currIter / jwx_fract_meteors_wf_maxIter);
+    if (((*cp) < 0)) {
+      (*cp) = 0;
+    } else if (((*cp) > 1.0)) {
+      (*cp) = 1.0;
+    }
+  }
+} else {
+  (*hd) = false;
+  var x0: f32 = 0.0;
+  var y0: f32 = 0.0;
+  var iterCount: i32 = 0;
+  for (var i: i32 = 0; (f32(i) < ${p[10]}); i++) {
+    x0 = (((${p[2]} - ${p[1]}) * rnd(rs)) + ${p[1]});
+    y0 = (((${p[4]} - ${p[3]}) * rnd(rs)) + ${p[3]});
+    iterCount = fract_meteors_wf_iterate(x0, y0, ${p[0]});
+    if ((((${p[9]} < 0) && (f32(iterCount) >= (${p[0]} + ${p[9]}))) || ((${p[8]} > 0) && (f32(iterCount) <= ${p[8]})))) {
+      if ((f32(i) == (${p[10]} - 1))) {
+        (*hd) = true;
+        break;
+      }
+    } else {
+      break;
+    }
+  }
+  if (!(*hd)) {
+    v.x += ((${p[12]} * ${w}) * (x0 + ${p[13]}));
+    v.y += ((${p[12]} * ${w}) * (y0 + ${p[14]}));
+    var z: f32;
+    if ((i32(roundc(${p[17]})) == 1)) {
+      z = ((${p[12]} * ${w}) * (((${p[7]} / 10) * (log((1.0 + (f32(iterCount) / ${p[0]}))) * 0.4342944819032518)) + ${p[15]}));
+      if (((${p[16]} > 0.000001) && (rnd(rs) < ${p[16]}))) {
+        var prevZ: f32 = ((${p[12]} * ${w}) * (((${p[7]} / 10) * (log((1.0 + (f32((iterCount - 1)) / ${p[0]}))) * 0.4342944819032518)) + ${p[15]}));
+        z = (((prevZ - z) * rnd(rs)) + z);
+      }
+    } else {
+      z = ((${p[12]} * ${w}) * (((${p[7]} / 10) * (f32(iterCount) / ${p[0]})) + ${p[15]}));
+      if (((${p[16]} > 0.000001) && (rnd(rs) < ${p[16]}))) {
+        var prevZ: f32 = ((${p[12]} * ${w}) * (((${p[7]} / 10) * (f32((iterCount - 1)) / ${p[0]})) + ${p[15]}));
+        z = (((prevZ - z) * rnd(rs)) + z);
+      }
+    }
+    pz_ += z;
+    if ((i32(roundc(${p[6]})) != 0)) {
+      (*cp) += (f32(iterCount) / ${p[0]});
+      if (((*cp) > 1.0)) {
+        (*cp) -= 1.0;
+      }
+      if (((*cp) < 0)) {
+        (*cp) = 0;
+      } else if (((*cp) > 1.0)) {
+        (*cp) = 1.0;
+      }
+    }
+  }
+}
+}`,
+  },
+  "fract_julia_wf": {
+    params: [{ name: "max_iter", def: 100 }, { name: "xmin", def: -1 }, { name: "xmax", def: 1 }, { name: "ymin", def: -1.2 }, { name: "ymax", def: 1.2 }, { name: "buddhabrot_mode", def: 0 }, { name: "power", def: 2 }, { name: "xseed", def: 0.35 }, { name: "yseed", def: 0.09 }, { name: "direct_color", def: 1 }, { name: "scalez", def: 1 }, { name: "clip_iter_min", def: 4 }, { name: "clip_iter_max", def: -5 }, { name: "max_clip_iter", def: 3 }, { name: "buddhabrot_min_iter", def: 7 }, { name: "scale", def: 3.8 }, { name: "offsetx", def: 0 }, { name: "offsety", def: 0 }, { name: "offsetz", def: 0 }, { name: "z_fill", def: 0 }, { name: "z_logscale", def: 0 }, { name: "color_only", def: 0 }],
+    verified: true, priority: 0, flags: ["dc","hide","state","z"], types: ["SIMULATION","DC","BASE_SHAPE","ESCAPE_TIME_FRACTAL"],
+    funcNames: ["jwx_fract_julia_wf_chooseNewPoint","jwx_fract_julia_wf_xs","jwx_fract_julia_wf_ys","jwx_fract_julia_wf_currIter","jwx_fract_julia_wf_maxIter","jwx_fract_julia_wf_startX","jwx_fract_julia_wf_startY","jwx_fract_julia_wf_currX","jwx_fract_julia_wf_currY","jwx_fract_julia_wf_power_c","jwx_fract_julia_wf_yseed_c","jwx_fract_julia_wf_xseed_c","jwx_fract_julia_wf_buddhabrot_min_iter_c","roundc","fract_julia_wf_init","fract_julia_wf_setCurrPoint","fract_julia_wf_nextIteration","fract_julia_wf_preBuddhaIterate","fract_julia_wf_iterate"],
+    funcs: `fn roundc(x: f32) -> f32 { return sign(x) * floor(abs(x) + 0.5); }
+
+fn fract_julia_wf_init(pX0: f32, pY0: f32) {
+  jwx_fract_julia_wf_ys = 0;
+  jwx_fract_julia_wf_xs = jwx_fract_julia_wf_ys;
+  jwx_fract_julia_wf_currX = pX0;
+  jwx_fract_julia_wf_startX = jwx_fract_julia_wf_currX;
+  jwx_fract_julia_wf_currY = pY0;
+  jwx_fract_julia_wf_startY = jwx_fract_julia_wf_currY;
+  jwx_fract_julia_wf_currIter = 0;
+}
+
+fn fract_julia_wf_setCurrPoint(pX: f32, pY: f32) {
+  jwx_fract_julia_wf_currX = pX;
+  jwx_fract_julia_wf_currY = pY;
+  jwx_fract_julia_wf_currIter = (jwx_fract_julia_wf_currIter + 1);
+}
+
+fn fract_julia_wf_nextIteration() {
+  switch i32(roundc(jwx_fract_julia_wf_power_c)) {
+    case 2: {
+      {
+        var x1: f32 = jwx_fract_julia_wf_currX;
+        var y1: f32 = jwx_fract_julia_wf_currY;
+        jwx_fract_julia_wf_xs = (x1 * x1);
+        jwx_fract_julia_wf_ys = (y1 * y1);
+        y1 = (((2.0 * x1) * y1) + jwx_fract_julia_wf_yseed_c);
+        x1 = ((jwx_fract_julia_wf_xs - jwx_fract_julia_wf_ys) + jwx_fract_julia_wf_xseed_c);
+        fract_julia_wf_setCurrPoint(x1, y1);
+      }
+    }
+    case 3: {
+      {
+        var x1: f32 = jwx_fract_julia_wf_currX;
+        var y1: f32 = jwx_fract_julia_wf_currY;
+        jwx_fract_julia_wf_xs = (x1 * x1);
+        jwx_fract_julia_wf_ys = (y1 * y1);
+        var x2: f32 = (((jwx_fract_julia_wf_xs * x1) - ((3.0 * x1) * jwx_fract_julia_wf_ys)) + jwx_fract_julia_wf_xseed_c);
+        y1 = ((((3.0 * jwx_fract_julia_wf_xs) * y1) - (jwx_fract_julia_wf_ys * y1)) + jwx_fract_julia_wf_yseed_c);
+        x1 = x2;
+        fract_julia_wf_setCurrPoint(x1, y1);
+      }
+    }
+    case 4: {
+      {
+        var x1: f32 = jwx_fract_julia_wf_currX;
+        var y1: f32 = jwx_fract_julia_wf_currY;
+        jwx_fract_julia_wf_xs = (x1 * x1);
+        jwx_fract_julia_wf_ys = (y1 * y1);
+        var x2: f32 = ((((jwx_fract_julia_wf_xs * jwx_fract_julia_wf_xs) + (jwx_fract_julia_wf_ys * jwx_fract_julia_wf_ys)) - ((6.0 * jwx_fract_julia_wf_xs) * jwx_fract_julia_wf_ys)) + jwx_fract_julia_wf_xseed_c);
+        y1 = ((((4.0 * x1) * y1) * (jwx_fract_julia_wf_xs - jwx_fract_julia_wf_ys)) + jwx_fract_julia_wf_yseed_c);
+        x1 = x2;
+        fract_julia_wf_setCurrPoint(x1, y1);
+      }
+    }
+    case default: {
+      {
+        var x1: f32 = jwx_fract_julia_wf_currX;
+        var y1: f32 = jwx_fract_julia_wf_currY;
+        jwx_fract_julia_wf_xs = (x1 * x1);
+        jwx_fract_julia_wf_ys = (y1 * y1);
+        var x2: f32 = (x1 * (((jwx_fract_julia_wf_xs * jwx_fract_julia_wf_xs) - ((10.0 * jwx_fract_julia_wf_xs) * jwx_fract_julia_wf_ys)) + ((5.0 * jwx_fract_julia_wf_ys) * jwx_fract_julia_wf_ys)));
+        var y2: f32 = (y1 * (((jwx_fract_julia_wf_ys * jwx_fract_julia_wf_ys) - ((10.0 * jwx_fract_julia_wf_xs) * jwx_fract_julia_wf_ys)) + ((5.0 * jwx_fract_julia_wf_xs) * jwx_fract_julia_wf_xs)));
+        for (var k: i32 = 5; (f32(k) < jwx_fract_julia_wf_power_c); k++) {
+          var xa: f32 = ((x1 * x2) - (y1 * y2));
+          var ya: f32 = ((x1 * y2) + (x2 * y1));
+          x2 = xa;
+          y2 = ya;
+        }
+        x1 = (x2 + jwx_fract_julia_wf_xseed_c);
+        y1 = (y2 + jwx_fract_julia_wf_yseed_c);
+        fract_julia_wf_setCurrPoint(x1, y1);
+      }
+    }
+  }
+}
+
+fn fract_julia_wf_preBuddhaIterate(pStartX: f32, pStartY: f32, pMaxIter: i32) -> bool {
+  fract_julia_wf_init(pStartX, pStartY);
+  var currIter: i32 = 0;
+  while (true) {
+    var ci_: i32 = currIter;
+    currIter = (currIter + 1);
+    if (!((ci_ < pMaxIter) && !((jwx_fract_julia_wf_xs + jwx_fract_julia_wf_ys) >= 4.0))) {
+      break;
+    }
+    fract_julia_wf_nextIteration();
+  }
+  if (((jwx_fract_julia_wf_xs + jwx_fract_julia_wf_ys) >= 4.0)) {
+    jwx_fract_julia_wf_maxIter = f32(currIter);
+    return (jwx_fract_julia_wf_maxIter > jwx_fract_julia_wf_buddhabrot_min_iter_c);
+  } else {
+    return false;
+  }
+}
+
+fn fract_julia_wf_iterate(pStartX: f32, pStartY: f32, pMaxIter: f32) -> i32 {
+  fract_julia_wf_init(pStartX, pStartY);
+  var currIter: i32 = 0;
+  while (true) {
+    var ci_: i32 = currIter;
+    currIter = (currIter + 1);
+    if (!((f32(ci_) < pMaxIter) && !((jwx_fract_julia_wf_xs + jwx_fract_julia_wf_ys) >= 4.0))) {
+      break;
+    }
+    fract_julia_wf_nextIteration();
+  }
+  return currIter;
+}
+
+var<private> jwx_fract_julia_wf_chooseNewPoint: f32 = 0.0;
+
+var<private> jwx_fract_julia_wf_xs: f32 = 0.0;
+
+var<private> jwx_fract_julia_wf_ys: f32 = 0.0;
+
+var<private> jwx_fract_julia_wf_currIter: f32 = 0.0;
+
+var<private> jwx_fract_julia_wf_maxIter: f32 = 0.0;
+
+var<private> jwx_fract_julia_wf_startX: f32 = 0.0;
+
+var<private> jwx_fract_julia_wf_startY: f32 = 0.0;
+
+var<private> jwx_fract_julia_wf_currX: f32 = 0.0;
+
+var<private> jwx_fract_julia_wf_currY: f32 = 0.0;
+
+var<private> jwx_fract_julia_wf_power_c: f32 = 0.0;
+
+var<private> jwx_fract_julia_wf_yseed_c: f32 = 0.0;
+
+var<private> jwx_fract_julia_wf_xseed_c: f32 = 0.0;
+
+var<private> jwx_fract_julia_wf_buddhabrot_min_iter_c: f32 = 0.0;`,
+    code: (w, p) => `{
+jwx_fract_julia_wf_power_c = ${p[6]};
+jwx_fract_julia_wf_yseed_c = ${p[8]};
+jwx_fract_julia_wf_xseed_c = ${p[7]};
+jwx_fract_julia_wf_buddhabrot_min_iter_c = ${p[14]};
+if ((${p[5]} > 0)) {
+  var x0: f32 = 0;
+  var y0: f32 = 0;
+  var bb_max_clip_iter: i32 = 250;
+  if ((jwx_fract_julia_wf_chooseNewPoint != 0.0)) {
+    for (var i: i32 = 0; (i < bb_max_clip_iter); i++) {
+      x0 = (((${p[2]} - ${p[1]}) * rnd(rs)) + ${p[1]});
+      y0 = (((${p[4]} - ${p[3]}) * rnd(rs)) + ${p[3]});
+      if (fract_julia_wf_preBuddhaIterate(x0, y0, i32(${p[0]}))) {
+        break;
+      }
+      if ((i == (bb_max_clip_iter - 1))) {
+        (*hd) = true;
+        break;
+      }
+    }
+    if (!(*hd)) {
+      (*&(jwx_fract_julia_wf_chooseNewPoint)) = select(0.0, 1.0, false);
+      fract_julia_wf_init(x0, y0);
+      for (var skip: i32 = 0; (f32(skip) < ${p[14]}); skip++) {
+        fract_julia_wf_nextIteration();
+      }
+    }
+  }
+  if (!(*hd)) {
+    fract_julia_wf_nextIteration();
+    if ((jwx_fract_julia_wf_currIter >= jwx_fract_julia_wf_maxIter)) {
+      (*&(jwx_fract_julia_wf_chooseNewPoint)) = select(0.0, 1.0, true);
+    }
+    v.x += ((${p[15]} * ${w}) * (jwx_fract_julia_wf_currX + ${p[16]}));
+    v.y += ((${p[15]} * ${w}) * (jwx_fract_julia_wf_currY + ${p[17]}));
+    (*cp) += (jwx_fract_julia_wf_currIter / jwx_fract_julia_wf_maxIter);
+    if (((*cp) < 0)) {
+      (*cp) = 0;
+    } else if (((*cp) > 1.0)) {
+      (*cp) = 1.0;
+    }
+  }
+} else {
+  (*hd) = false;
+  var x0: f32 = 0.0;
+  var y0: f32 = 0.0;
+  var iterCount: i32 = 0;
+  for (var i: i32 = 0; (f32(i) < ${p[13]}); i++) {
+    x0 = (((${p[2]} - ${p[1]}) * rnd(rs)) + ${p[1]});
+    y0 = (((${p[4]} - ${p[3]}) * rnd(rs)) + ${p[3]});
+    iterCount = fract_julia_wf_iterate(x0, y0, ${p[0]});
+    if ((((${p[12]} < 0) && (f32(iterCount) >= (${p[0]} + ${p[12]}))) || ((${p[11]} > 0) && (f32(iterCount) <= ${p[11]})))) {
+      if ((f32(i) == (${p[13]} - 1))) {
+        (*hd) = true;
+        break;
+      }
+    } else {
+      break;
+    }
+  }
+  if (!(*hd)) {
+    v.x += ((${p[15]} * ${w}) * (x0 + ${p[16]}));
+    v.y += ((${p[15]} * ${w}) * (y0 + ${p[17]}));
+    var z: f32;
+    if ((i32(roundc(${p[20]})) == 1)) {
+      z = ((${p[15]} * ${w}) * (((${p[10]} / 10) * (log((1.0 + (f32(iterCount) / ${p[0]}))) * 0.4342944819032518)) + ${p[18]}));
+      if (((${p[19]} > 0.000001) && (rnd(rs) < ${p[19]}))) {
+        var prevZ: f32 = ((${p[15]} * ${w}) * (((${p[10]} / 10) * (log((1.0 + (f32((iterCount - 1)) / ${p[0]}))) * 0.4342944819032518)) + ${p[18]}));
+        z = (((prevZ - z) * rnd(rs)) + z);
+      }
+    } else {
+      z = ((${p[15]} * ${w}) * (((${p[10]} / 10) * (f32(iterCount) / ${p[0]})) + ${p[18]}));
+      if (((${p[19]} > 0.000001) && (rnd(rs) < ${p[19]}))) {
+        var prevZ: f32 = ((${p[15]} * ${w}) * (((${p[10]} / 10) * (f32((iterCount - 1)) / ${p[0]})) + ${p[18]}));
+        z = (((prevZ - z) * rnd(rs)) + z);
+      }
+    }
+    pz_ += z;
+    if ((i32(roundc(${p[9]})) != 0)) {
+      (*cp) += (f32(iterCount) / ${p[0]});
+      if (((*cp) > 1.0)) {
+        (*cp) -= 1.0;
+      }
+      if (((*cp) < 0)) {
+        (*cp) = 0;
+      } else if (((*cp) > 1.0)) {
+        (*cp) = 1.0;
+      }
+    }
+  }
+}
+}`,
+  },
+  "fract_pearls_wf": {
+    params: [{ name: "max_iter", def: 100 }, { name: "xmin", def: -2 }, { name: "xmax", def: 2 }, { name: "ymin", def: -2 }, { name: "ymax", def: 2 }, { name: "buddhabrot_mode", def: 0 }, { name: "xseed", def: 0 }, { name: "yseed", def: -0.31 }, { name: "direct_color", def: 1 }, { name: "scalez", def: 1 }, { name: "clip_iter_min", def: 1 }, { name: "clip_iter_max", def: -5 }, { name: "max_clip_iter", def: 3 }, { name: "buddhabrot_min_iter", def: 7 }, { name: "scale", def: 2.45 }, { name: "offsetx", def: 0 }, { name: "offsety", def: 0 }, { name: "offsetz", def: 0 }, { name: "z_fill", def: 0 }, { name: "z_logscale", def: 0 }, { name: "color_only", def: 0 }],
+    verified: true, priority: 0, flags: ["dc","hide","state","z"], types: ["SIMULATION","DC","BASE_SHAPE","ESCAPE_TIME_FRACTAL"],
+    funcNames: ["jwx_fract_pearls_wf_chooseNewPoint","jwx_fract_pearls_wf_xs","jwx_fract_pearls_wf_ys","jwx_fract_pearls_wf_currIter","jwx_fract_pearls_wf_maxIter","jwx_fract_pearls_wf_startX","jwx_fract_pearls_wf_startY","jwx_fract_pearls_wf_currX","jwx_fract_pearls_wf_currY","jwx_fract_pearls_wf_xseed_c","jwx_fract_pearls_wf_yseed_c","jwx_fract_pearls_wf_buddhabrot_min_iter_c","roundc","fract_pearls_wf_init","fract_pearls_wf_setCurrPoint","fract_pearls_wf_nextIteration","fract_pearls_wf_preBuddhaIterate","fract_pearls_wf_iterate"],
+    funcs: `fn roundc(x: f32) -> f32 { return sign(x) * floor(abs(x) + 0.5); }
+
+fn fract_pearls_wf_init(pX0: f32, pY0: f32) {
+  jwx_fract_pearls_wf_ys = 0;
+  jwx_fract_pearls_wf_xs = jwx_fract_pearls_wf_ys;
+  jwx_fract_pearls_wf_currX = pX0;
+  jwx_fract_pearls_wf_startX = jwx_fract_pearls_wf_currX;
+  jwx_fract_pearls_wf_currY = pY0;
+  jwx_fract_pearls_wf_startY = jwx_fract_pearls_wf_currY;
+  jwx_fract_pearls_wf_currIter = 0;
+}
+
+fn fract_pearls_wf_setCurrPoint(pX: f32, pY: f32) {
+  jwx_fract_pearls_wf_currX = pX;
+  jwx_fract_pearls_wf_currY = pY;
+  jwx_fract_pearls_wf_currIter = (jwx_fract_pearls_wf_currIter + 1);
+}
+
+fn fract_pearls_wf_nextIteration() {
+  var x1: f32 = jwx_fract_pearls_wf_currX;
+  var y1: f32 = jwx_fract_pearls_wf_currY;
+  jwx_fract_pearls_wf_xs = (x1 * x1);
+  jwx_fract_pearls_wf_ys = (y1 * y1);
+  var x2: f32 = (((jwx_fract_pearls_wf_xseed_c * x1) - (jwx_fract_pearls_wf_yseed_c * y1)) - (((jwx_fract_pearls_wf_xseed_c * x1) + (jwx_fract_pearls_wf_yseed_c * y1)) / (jwx_fract_pearls_wf_xs + jwx_fract_pearls_wf_ys)));
+  y1 = (((jwx_fract_pearls_wf_xseed_c * y1) + (jwx_fract_pearls_wf_yseed_c * x1)) + (((jwx_fract_pearls_wf_xseed_c * y1) - (jwx_fract_pearls_wf_yseed_c * x1)) / (jwx_fract_pearls_wf_xs + jwx_fract_pearls_wf_ys)));
+  x1 = x2;
+  fract_pearls_wf_setCurrPoint(x1, y1);
+}
+
+fn fract_pearls_wf_preBuddhaIterate(pStartX: f32, pStartY: f32, pMaxIter: i32) -> bool {
+  fract_pearls_wf_init(pStartX, pStartY);
+  var currIter: i32 = 0;
+  while (true) {
+    var ci_: i32 = currIter;
+    currIter = (currIter + 1);
+    if (!((ci_ < pMaxIter) && !((jwx_fract_pearls_wf_xs + jwx_fract_pearls_wf_ys) >= 4.0))) {
+      break;
+    }
+    fract_pearls_wf_nextIteration();
+  }
+  if (((jwx_fract_pearls_wf_xs + jwx_fract_pearls_wf_ys) >= 4.0)) {
+    jwx_fract_pearls_wf_maxIter = f32(currIter);
+    return (jwx_fract_pearls_wf_maxIter > jwx_fract_pearls_wf_buddhabrot_min_iter_c);
+  } else {
+    return false;
+  }
+}
+
+fn fract_pearls_wf_iterate(pStartX: f32, pStartY: f32, pMaxIter: f32) -> i32 {
+  fract_pearls_wf_init(pStartX, pStartY);
+  var currIter: i32 = 0;
+  while (true) {
+    var ci_: i32 = currIter;
+    currIter = (currIter + 1);
+    if (!((f32(ci_) < pMaxIter) && !((jwx_fract_pearls_wf_xs + jwx_fract_pearls_wf_ys) >= 4.0))) {
+      break;
+    }
+    fract_pearls_wf_nextIteration();
+  }
+  return currIter;
+}
+
+var<private> jwx_fract_pearls_wf_chooseNewPoint: f32 = 0.0;
+
+var<private> jwx_fract_pearls_wf_xs: f32 = 0.0;
+
+var<private> jwx_fract_pearls_wf_ys: f32 = 0.0;
+
+var<private> jwx_fract_pearls_wf_currIter: f32 = 0.0;
+
+var<private> jwx_fract_pearls_wf_maxIter: f32 = 0.0;
+
+var<private> jwx_fract_pearls_wf_startX: f32 = 0.0;
+
+var<private> jwx_fract_pearls_wf_startY: f32 = 0.0;
+
+var<private> jwx_fract_pearls_wf_currX: f32 = 0.0;
+
+var<private> jwx_fract_pearls_wf_currY: f32 = 0.0;
+
+var<private> jwx_fract_pearls_wf_xseed_c: f32 = 0.0;
+
+var<private> jwx_fract_pearls_wf_yseed_c: f32 = 0.0;
+
+var<private> jwx_fract_pearls_wf_buddhabrot_min_iter_c: f32 = 0.0;`,
+    code: (w, p) => `{
+jwx_fract_pearls_wf_xseed_c = ${p[6]};
+jwx_fract_pearls_wf_yseed_c = ${p[7]};
+jwx_fract_pearls_wf_buddhabrot_min_iter_c = ${p[13]};
+if ((${p[5]} > 0)) {
+  var x0: f32 = 0;
+  var y0: f32 = 0;
+  var bb_max_clip_iter: i32 = 250;
+  if ((jwx_fract_pearls_wf_chooseNewPoint != 0.0)) {
+    for (var i: i32 = 0; (i < bb_max_clip_iter); i++) {
+      x0 = (((${p[2]} - ${p[1]}) * rnd(rs)) + ${p[1]});
+      y0 = (((${p[4]} - ${p[3]}) * rnd(rs)) + ${p[3]});
+      if (fract_pearls_wf_preBuddhaIterate(x0, y0, i32(${p[0]}))) {
+        break;
+      }
+      if ((i == (bb_max_clip_iter - 1))) {
+        (*hd) = true;
+        break;
+      }
+    }
+    if (!(*hd)) {
+      (*&(jwx_fract_pearls_wf_chooseNewPoint)) = select(0.0, 1.0, false);
+      fract_pearls_wf_init(x0, y0);
+      for (var skip: i32 = 0; (f32(skip) < ${p[13]}); skip++) {
+        fract_pearls_wf_nextIteration();
+      }
+    }
+  }
+  if (!(*hd)) {
+    fract_pearls_wf_nextIteration();
+    if ((jwx_fract_pearls_wf_currIter >= jwx_fract_pearls_wf_maxIter)) {
+      (*&(jwx_fract_pearls_wf_chooseNewPoint)) = select(0.0, 1.0, true);
+    }
+    v.x += ((${p[14]} * ${w}) * (jwx_fract_pearls_wf_currX + ${p[15]}));
+    v.y += ((${p[14]} * ${w}) * (jwx_fract_pearls_wf_currY + ${p[16]}));
+    (*cp) += (jwx_fract_pearls_wf_currIter / jwx_fract_pearls_wf_maxIter);
+    if (((*cp) < 0)) {
+      (*cp) = 0;
+    } else if (((*cp) > 1.0)) {
+      (*cp) = 1.0;
+    }
+  }
+} else {
+  (*hd) = false;
+  var x0: f32 = 0.0;
+  var y0: f32 = 0.0;
+  var iterCount: i32 = 0;
+  for (var i: i32 = 0; (f32(i) < ${p[12]}); i++) {
+    x0 = (((${p[2]} - ${p[1]}) * rnd(rs)) + ${p[1]});
+    y0 = (((${p[4]} - ${p[3]}) * rnd(rs)) + ${p[3]});
+    iterCount = fract_pearls_wf_iterate(x0, y0, ${p[0]});
+    if ((((${p[11]} < 0) && (f32(iterCount) >= (${p[0]} + ${p[11]}))) || ((${p[10]} > 0) && (f32(iterCount) <= ${p[10]})))) {
+      if ((f32(i) == (${p[12]} - 1))) {
+        (*hd) = true;
+        break;
+      }
+    } else {
+      break;
+    }
+  }
+  if (!(*hd)) {
+    v.x += ((${p[14]} * ${w}) * (x0 + ${p[15]}));
+    v.y += ((${p[14]} * ${w}) * (y0 + ${p[16]}));
+    var z: f32;
+    if ((i32(roundc(${p[19]})) == 1)) {
+      z = ((${p[14]} * ${w}) * (((${p[9]} / 10) * (log((1.0 + (f32(iterCount) / ${p[0]}))) * 0.4342944819032518)) + ${p[17]}));
+      if (((${p[18]} > 0.000001) && (rnd(rs) < ${p[18]}))) {
+        var prevZ: f32 = ((${p[14]} * ${w}) * (((${p[9]} / 10) * (log((1.0 + (f32((iterCount - 1)) / ${p[0]}))) * 0.4342944819032518)) + ${p[17]}));
+        z = (((prevZ - z) * rnd(rs)) + z);
+      }
+    } else {
+      z = ((${p[14]} * ${w}) * (((${p[9]} / 10) * (f32(iterCount) / ${p[0]})) + ${p[17]}));
+      if (((${p[18]} > 0.000001) && (rnd(rs) < ${p[18]}))) {
+        var prevZ: f32 = ((${p[14]} * ${w}) * (((${p[9]} / 10) * (f32((iterCount - 1)) / ${p[0]})) + ${p[17]}));
+        z = (((prevZ - z) * rnd(rs)) + z);
+      }
+    }
+    pz_ += z;
+    if ((i32(roundc(${p[8]})) != 0)) {
+      (*cp) += (f32(iterCount) / ${p[0]});
+      if (((*cp) > 1.0)) {
+        (*cp) -= 1.0;
+      }
+      if (((*cp) < 0)) {
+        (*cp) = 0;
+      } else if (((*cp) > 1.0)) {
+        (*cp) = 1.0;
+      }
+    }
+  }
+}
+}`,
+  },
+  "fract_salamander_wf": {
+    params: [{ name: "max_iter", def: 100 }, { name: "xmin", def: -2 }, { name: "xmax", def: 2 }, { name: "ymin", def: -2 }, { name: "ymax", def: 2 }, { name: "buddhabrot_mode", def: 0 }, { name: "xseed", def: 0.8 }, { name: "yseed", def: -0.15 }, { name: "direct_color", def: 1 }, { name: "scalez", def: 1 }, { name: "clip_iter_min", def: 1 }, { name: "clip_iter_max", def: -5 }, { name: "max_clip_iter", def: 3 }, { name: "buddhabrot_min_iter", def: 7 }, { name: "scale", def: 2.45 }, { name: "offsetx", def: 0 }, { name: "offsety", def: 0 }, { name: "offsetz", def: 0 }, { name: "z_fill", def: 0 }, { name: "z_logscale", def: 0 }, { name: "color_only", def: 0 }],
+    verified: true, priority: 0, flags: ["3d","dc","hide","state","z"], types: ["3D","SIMULATION","DC","BASE_SHAPE","ESCAPE_TIME_FRACTAL"],
+    funcNames: ["jwx_fract_salamander_wf_chooseNewPoint","jwx_fract_salamander_wf_xs","jwx_fract_salamander_wf_ys","jwx_fract_salamander_wf_currIter","jwx_fract_salamander_wf_maxIter","jwx_fract_salamander_wf_startX","jwx_fract_salamander_wf_startY","jwx_fract_salamander_wf_currX","jwx_fract_salamander_wf_currY","jwx_fract_salamander_wf_xseed_c","jwx_fract_salamander_wf_yseed_c","jwx_fract_salamander_wf_buddhabrot_min_iter_c","roundc","fract_salamander_wf_init","fract_salamander_wf_setCurrPoint","fract_salamander_wf_nextIteration","fract_salamander_wf_preBuddhaIterate","fract_salamander_wf_iterate"],
+    funcs: `fn roundc(x: f32) -> f32 { return sign(x) * floor(abs(x) + 0.5); }
+
+fn fract_salamander_wf_init(pX0: f32, pY0: f32) {
+  jwx_fract_salamander_wf_ys = 0;
+  jwx_fract_salamander_wf_xs = jwx_fract_salamander_wf_ys;
+  jwx_fract_salamander_wf_currX = pX0;
+  jwx_fract_salamander_wf_startX = jwx_fract_salamander_wf_currX;
+  jwx_fract_salamander_wf_currY = pY0;
+  jwx_fract_salamander_wf_startY = jwx_fract_salamander_wf_currY;
+  jwx_fract_salamander_wf_currIter = 0;
+}
+
+fn fract_salamander_wf_setCurrPoint(pX: f32, pY: f32) {
+  jwx_fract_salamander_wf_currX = pX;
+  jwx_fract_salamander_wf_currY = pY;
+  jwx_fract_salamander_wf_currIter = (jwx_fract_salamander_wf_currIter + 1);
+}
+
+fn fract_salamander_wf_nextIteration() {
+  var x1: f32 = jwx_fract_salamander_wf_currX;
+  var y1: f32 = jwx_fract_salamander_wf_currY;
+  jwx_fract_salamander_wf_xs = (x1 * x1);
+  jwx_fract_salamander_wf_ys = (y1 * y1);
+  var x2: f32 = ((((jwx_fract_salamander_wf_xs - jwx_fract_salamander_wf_ys) * jwx_fract_salamander_wf_xseed_c) - (((2.0 * x1) * y1) * jwx_fract_salamander_wf_yseed_c)) - 1.0);
+  y1 = (((jwx_fract_salamander_wf_xs - jwx_fract_salamander_wf_ys) * jwx_fract_salamander_wf_yseed_c) + (((2.0 * x1) * y1) * jwx_fract_salamander_wf_xseed_c));
+  x1 = x2;
+  fract_salamander_wf_setCurrPoint(x1, y1);
+}
+
+fn fract_salamander_wf_preBuddhaIterate(pStartX: f32, pStartY: f32, pMaxIter: i32) -> bool {
+  fract_salamander_wf_init(pStartX, pStartY);
+  var currIter: i32 = 0;
+  while (true) {
+    var ci_: i32 = currIter;
+    currIter = (currIter + 1);
+    if (!((ci_ < pMaxIter) && !((jwx_fract_salamander_wf_xs + jwx_fract_salamander_wf_ys) >= 4.0))) {
+      break;
+    }
+    fract_salamander_wf_nextIteration();
+  }
+  if (((jwx_fract_salamander_wf_xs + jwx_fract_salamander_wf_ys) >= 4.0)) {
+    jwx_fract_salamander_wf_maxIter = f32(currIter);
+    return (jwx_fract_salamander_wf_maxIter > jwx_fract_salamander_wf_buddhabrot_min_iter_c);
+  } else {
+    return false;
+  }
+}
+
+fn fract_salamander_wf_iterate(pStartX: f32, pStartY: f32, pMaxIter: f32) -> i32 {
+  fract_salamander_wf_init(pStartX, pStartY);
+  var currIter: i32 = 0;
+  while (true) {
+    var ci_: i32 = currIter;
+    currIter = (currIter + 1);
+    if (!((f32(ci_) < pMaxIter) && !((jwx_fract_salamander_wf_xs + jwx_fract_salamander_wf_ys) >= 4.0))) {
+      break;
+    }
+    fract_salamander_wf_nextIteration();
+  }
+  return currIter;
+}
+
+var<private> jwx_fract_salamander_wf_chooseNewPoint: f32 = 0.0;
+
+var<private> jwx_fract_salamander_wf_xs: f32 = 0.0;
+
+var<private> jwx_fract_salamander_wf_ys: f32 = 0.0;
+
+var<private> jwx_fract_salamander_wf_currIter: f32 = 0.0;
+
+var<private> jwx_fract_salamander_wf_maxIter: f32 = 0.0;
+
+var<private> jwx_fract_salamander_wf_startX: f32 = 0.0;
+
+var<private> jwx_fract_salamander_wf_startY: f32 = 0.0;
+
+var<private> jwx_fract_salamander_wf_currX: f32 = 0.0;
+
+var<private> jwx_fract_salamander_wf_currY: f32 = 0.0;
+
+var<private> jwx_fract_salamander_wf_xseed_c: f32 = 0.0;
+
+var<private> jwx_fract_salamander_wf_yseed_c: f32 = 0.0;
+
+var<private> jwx_fract_salamander_wf_buddhabrot_min_iter_c: f32 = 0.0;`,
+    code: (w, p) => `{
+jwx_fract_salamander_wf_xseed_c = ${p[6]};
+jwx_fract_salamander_wf_yseed_c = ${p[7]};
+jwx_fract_salamander_wf_buddhabrot_min_iter_c = ${p[13]};
+if ((${p[5]} > 0)) {
+  var x0: f32 = 0;
+  var y0: f32 = 0;
+  var bb_max_clip_iter: i32 = 250;
+  if ((jwx_fract_salamander_wf_chooseNewPoint != 0.0)) {
+    for (var i: i32 = 0; (i < bb_max_clip_iter); i++) {
+      x0 = (((${p[2]} - ${p[1]}) * rnd(rs)) + ${p[1]});
+      y0 = (((${p[4]} - ${p[3]}) * rnd(rs)) + ${p[3]});
+      if (fract_salamander_wf_preBuddhaIterate(x0, y0, i32(${p[0]}))) {
+        break;
+      }
+      if ((i == (bb_max_clip_iter - 1))) {
+        (*hd) = true;
+        break;
+      }
+    }
+    if (!(*hd)) {
+      (*&(jwx_fract_salamander_wf_chooseNewPoint)) = select(0.0, 1.0, false);
+      fract_salamander_wf_init(x0, y0);
+      for (var skip: i32 = 0; (f32(skip) < ${p[13]}); skip++) {
+        fract_salamander_wf_nextIteration();
+      }
+    }
+  }
+  if (!(*hd)) {
+    fract_salamander_wf_nextIteration();
+    if ((jwx_fract_salamander_wf_currIter >= jwx_fract_salamander_wf_maxIter)) {
+      (*&(jwx_fract_salamander_wf_chooseNewPoint)) = select(0.0, 1.0, true);
+    }
+    v.x += ((${p[14]} * ${w}) * (jwx_fract_salamander_wf_currX + ${p[15]}));
+    v.y += ((${p[14]} * ${w}) * (jwx_fract_salamander_wf_currY + ${p[16]}));
+    (*cp) += (jwx_fract_salamander_wf_currIter / jwx_fract_salamander_wf_maxIter);
+    if (((*cp) < 0)) {
+      (*cp) = 0;
+    } else if (((*cp) > 1.0)) {
+      (*cp) = 1.0;
+    }
+  }
+} else {
+  (*hd) = false;
+  var x0: f32 = 0.0;
+  var y0: f32 = 0.0;
+  var iterCount: i32 = 0;
+  for (var i: i32 = 0; (f32(i) < ${p[12]}); i++) {
+    x0 = (((${p[2]} - ${p[1]}) * rnd(rs)) + ${p[1]});
+    y0 = (((${p[4]} - ${p[3]}) * rnd(rs)) + ${p[3]});
+    iterCount = fract_salamander_wf_iterate(x0, y0, ${p[0]});
+    if ((((${p[11]} < 0) && (f32(iterCount) >= (${p[0]} + ${p[11]}))) || ((${p[10]} > 0) && (f32(iterCount) <= ${p[10]})))) {
+      if ((f32(i) == (${p[12]} - 1))) {
+        (*hd) = true;
+        break;
+      }
+    } else {
+      break;
+    }
+  }
+  if (!(*hd)) {
+    v.x += ((${p[14]} * ${w}) * (x0 + ${p[15]}));
+    v.y += ((${p[14]} * ${w}) * (y0 + ${p[16]}));
+    var z: f32;
+    if ((i32(roundc(${p[19]})) == 1)) {
+      z = ((${p[14]} * ${w}) * (((${p[9]} / 10) * (log((1.0 + (f32(iterCount) / ${p[0]}))) * 0.4342944819032518)) + ${p[17]}));
+      if (((${p[18]} > 0.000001) && (rnd(rs) < ${p[18]}))) {
+        var prevZ: f32 = ((${p[14]} * ${w}) * (((${p[9]} / 10) * (log((1.0 + (f32((iterCount - 1)) / ${p[0]}))) * 0.4342944819032518)) + ${p[17]}));
+        z = (((prevZ - z) * rnd(rs)) + z);
+      }
+    } else {
+      z = ((${p[14]} * ${w}) * (((${p[9]} / 10) * (f32(iterCount) / ${p[0]})) + ${p[17]}));
+      if (((${p[18]} > 0.000001) && (rnd(rs) < ${p[18]}))) {
+        var prevZ: f32 = ((${p[14]} * ${w}) * (((${p[9]} / 10) * (f32((iterCount - 1)) / ${p[0]})) + ${p[17]}));
+        z = (((prevZ - z) * rnd(rs)) + z);
+      }
+    }
+    pz_ += z;
+    if ((i32(roundc(${p[8]})) != 0)) {
+      (*cp) += (f32(iterCount) / ${p[0]});
+      if (((*cp) > 1.0)) {
+        (*cp) -= 1.0;
+      }
+      if (((*cp) < 0)) {
+        (*cp) = 0;
+      } else if (((*cp) > 1.0)) {
+        (*cp) = 1.0;
+      }
+    }
+  }
+}
 }`,
   },
   "superShape3d": {
@@ -14865,7 +16047,7 @@ if ((${p[11]} == 1)) {
   "dc_starsfield": {
     params: [{ name: "seed", def: 10000 }, { name: "time", def: 0 }, { name: "zdistance", def: 2 }, { name: "glow", def: 1 }, { name: "ColorOnly", def: 0 }, { name: "Gradient", def: 0 }, { name: "scale_z", def: 0 }, { name: "offset_z", def: 0 }, { name: "reset_z", def: 1 }],
     verified: true, priority: 0, flags: ["dc","rgb","z"], types: ["SIMULATION","DC","BASE_SHAPE"],
-    funcNames: ["Mat2","read_imageStepMode","Mat2_Init","dc_starsfield_rotate","times","dc_starsfield_hash11","dc_starsfield_hash22","hash21","dc_starsfield_layer","dc_starsfield_render","dc_starsfield_getRGBColor","dbl2int","greyscale","distance_color"],
+    funcNames: ["Mat2","read_imageStepMode","smoothstepc","Mat2_Init","dc_starsfield_rotate","times","dc_starsfield_hash11","dc_starsfield_hash22","hash21","dc_starsfield_layer","dc_starsfield_render","dc_starsfield_getRGBColor","dbl2int","greyscale","distance_color"],
     funcs: `struct Mat2 {
   a00: f32,
   a01: f32,
@@ -14874,6 +16056,8 @@ if ((${p[11]} == 1)) {
 }
 
 fn read_imageStepMode(base: u32, n: i32, t: f32) -> vec4f { return pal[base + u32(clamp(t, 0.0, 0.99999) * f32(max(n, 1)))]; }
+
+fn smoothstepc(a: f32, b: f32, x: f32) -> f32 { if (a == b) { return step(a, x); } let t = clamp((x - a) / (b - a), 0.0, 1.0); return t * t * (3.0 - 2.0 * t); }
 
 fn Mat2_Init(m: ptr<function, Mat2>, v00: f32, v10: f32, v01: f32, v11: f32) {
   (*m).a00 = v00;
@@ -14924,7 +16108,7 @@ fn dc_starsfield_layer(uv_in: vec2f, zdistance: f32) -> f32 {
   var f: vec2f = ((fract(uv) * vec2f(zdistance)) - vec2f(1.0));
   var p_: vec2f = (dc_starsfield_hash22(i) * vec2f(0.3));
   var d: f32 = length((f - p_));
-  c += smoothstep((0.1 + (0.8 * hash21(i))), 0.01, d);
+  c += smoothstepc((0.1 + (0.8 * hash21(i))), 0.01, d);
   c *= ((1.0 / d) * 0.2);
   return c;
 }
@@ -14939,9 +16123,9 @@ fn dc_starsfield_render(uv_in: vec2f, time: f32, zdistance: f32, glow: f32) -> v
     var mat1: Mat2 = dc_starsfield_rotate((dc_starsfield_hash11(i) * 6.28));
     uv = times(&(mat1), uv);
     var t_: f32 = fract((i - time));
-    var s: f32 = smoothstep(0.0, 1.0, t_);
-    var f: f32 = smoothstep(0.0, 1.0, t_);
-    f *= smoothstep(1.0, 0.0, t_);
+    var s: f32 = smoothstepc(0.0, 1.0, t_);
+    var f: f32 = smoothstepc(0.0, 1.0, t_);
+    f *= smoothstepc(1.0, 0.0, t_);
     var k: vec2f = (dc_starsfield_hash22(vec2f(i, (i * 5.0))) * vec2f(0.1));
     var l: f32 = dc_starsfield_layer(((uv - k) * vec2f(s)), zdistance);
     col = (col + (mix(vec3f(0.0, 0.0, 0), vec3f(1.0, 1.0, 1.0), l) * vec3f(f)));
@@ -15522,7 +16706,7 @@ if ((${p[17]} == 1)) {
   "dc_circlesblue": {
     params: [{ name: "seed", def: 10000 }, { name: "time", def: 1 }, { name: "zoom", def: 1 }, { name: "radius", def: 0.04 }, { name: "bubles", def: 40 }, { name: "ColorOnly", def: 0 }, { name: "Gradient", def: 0 }, { name: "scale_z", def: 0 }, { name: "offset_z", def: 0 }, { name: "reset_z", def: 1 }],
     verified: true, priority: 0, flags: ["dc","rgb","z"], types: ["SIMULATION","DC","BASE_SHAPE"],
-    funcNames: ["read_imageStepMode","powc","dc_circlesblue_getRGBColor","dbl2int","greyscale","distance_color"],
+    funcNames: ["read_imageStepMode","powc","smoothstepc","dc_circlesblue_getRGBColor","dbl2int","greyscale","distance_color"],
     funcs: `fn read_imageStepMode(base: u32, n: i32, t: f32) -> vec4f { return pal[base + u32(clamp(t, 0.0, 0.99999) * f32(max(n, 1)))]; }
 
 fn powc(x: f32, y: f32) -> f32 {
@@ -15532,6 +16716,8 @@ fn powc(x: f32, y: f32) -> f32 {
   let m = pow(-x, y);
   return select(m, -m, (i32(yi) & 1) != 0);
 }
+
+fn smoothstepc(a: f32, b: f32, x: f32) -> f32 { if (a == b) { return step(a, x); } let t = clamp((x - a) / (b - a), 0.0, 1.0); return t * t * (3.0 - 2.0 * t); }
 
 fn dc_circlesblue_getRGBColor(uv: vec2f, time: f32, bubbles: f32, radius: f32) -> vec3f {
   var color: vec3f = vec3f(0.0, 0.0, 0.0);
@@ -15543,7 +16729,7 @@ fn dc_circlesblue_getRGBColor(uv: vec2f, time: f32, bubbles: f32, radius: f32) -
     var pos: vec2f = vec2f((pox + sin((((time / 15.0) + pha) + siz))), ((-1.0 - rad) + ((2.0 + (2.0 * rad)) * mmod((pha + ((0.1 * (time / 5.0)) * (0.2 + (0.8 * siz)))), 1.0))));
     var dis: f32 = length((uv - pos));
     var col: vec3f = mix(vec3f(0.1, 0.2, 0.8), vec3f(0.2, 0.8, 0.6), (0.5 + (0.5 * sin(((i * sin(((time * pox) * 0.03))) + 1.9)))));
-    color = (color + ((col * vec3f((1.0 - smoothstep((rad * (0.65 + (0.2 * sin((pox * time))))), rad, dis)))) * vec3f((1.0 - cos((pox * time))))));
+    color = (color + ((col * vec3f((1.0 - smoothstepc((rad * (0.65 + (0.2 * sin((pox * time))))), rad, dis)))) * vec3f((1.0 - cos((pox * time))))));
   }
   return (color * vec3f(0.3));
 }
@@ -16303,7 +17489,7 @@ if ((${p[11]} == 1)) {
   "dc_layers": {
     params: [{ name: "N", def: 8 }, { name: "Amplitude", def: 0.995 }, { name: "seed", def: 10000 }, { name: "time", def: 0 }, { name: "zoom", def: 8 }, { name: "ColorOnly", def: 0 }, { name: "Gradient", def: 0 }, { name: "scale_z", def: 0 }, { name: "offset_z", def: 0 }, { name: "reset_z", def: 1 }],
     verified: true, priority: 0, flags: ["dc","rgb","z"], types: ["SIMULATION","DC","BASE_SHAPE"],
-    funcNames: ["Mat3","read_imageStepMode","Mat3_Init","times_ov2","dc_layers_rotate","dc_layers_snoise","dc_layers_getRGBColor","dbl2int","greyscale","distance_color"],
+    funcNames: ["Mat3","read_imageStepMode","smoothstepc","Mat3_Init","times_ov2","dc_layers_rotate","dc_layers_snoise","dc_layers_getRGBColor","dbl2int","greyscale","distance_color"],
     funcs: `struct Mat3 {
   a00: f32,
   a10: f32,
@@ -16317,6 +17503,8 @@ if ((${p[11]} == 1)) {
 }
 
 fn read_imageStepMode(base: u32, n: i32, t: f32) -> vec4f { return pal[base + u32(clamp(t, 0.0, 0.99999) * f32(max(n, 1)))]; }
+
+fn smoothstepc(a: f32, b: f32, x: f32) -> f32 { if (a == b) { return step(a, x); } let t = clamp((x - a) / (b - a), 0.0, 1.0); return t * t * (3.0 - 2.0 * t); }
 
 fn Mat3_Init(m: ptr<function, Mat3>, v00: f32, v10: f32, v20: f32, v01: f32, v11: f32, v21: f32, v02: f32, v12: f32, v22: f32) {
   (*m).a00 = v00;
@@ -16356,7 +17544,7 @@ fn dc_layers_getRGBColor(p_: vec2f, time: f32, N: f32, Amplitude: f32) -> vec3f 
   var dist: f32 = 0.0;
   for (var k: i32 = 1; (f32(k) <= N); k++) {
     var shell: f32 = abs(dc_layers_snoise(((pos * vec3f(f32(k))) + (vec3f(time, 0.0, 0.0) * vec3f(0.13)))));
-    shell = smoothstep(0.25, 0.2, shell);
+    shell = smoothstepc(0.25, 0.2, shell);
     dist = max(dist, (shell * (1.0 - (f32(k) / 8.0))));
   }
   color = mix(vec3f(1.0, 1.0, 1.0), vec3f(0.0, 0.0, 0.0), (1.0 - dist));
@@ -16450,8 +17638,10 @@ if ((${p[9]} == 1)) {
   "dc_tree": {
     params: [{ name: "levels", def: 20 }, { name: "thicknes", def: 1000 }, { name: "style", def: 50 }, { name: "shift", def: 1.5 }, { name: "seed", def: 10000 }, { name: "time", def: 0 }, { name: "zoom", def: 4 }, { name: "ColorOnly", def: 0 }, { name: "Gradient", def: 0 }, { name: "scale_z", def: 0 }, { name: "offset_z", def: 0 }, { name: "reset_z", def: 1 }],
     verified: true, priority: 0, flags: ["dc","rgb","z"], types: ["SIMULATION","DC","BASE_SHAPE"],
-    funcNames: ["read_imageStepMode","dc_tree_po","dc_tree_ca","dc_tree_ln","dc_tree_getRGBColor","dbl2int","greyscale","distance_color"],
+    funcNames: ["read_imageStepMode","smoothstepc","dc_tree_po","dc_tree_ca","dc_tree_ln","dc_tree_getRGBColor","dbl2int","greyscale","distance_color"],
     funcs: `fn read_imageStepMode(base: u32, n: i32, t: f32) -> vec4f { return pal[base + u32(clamp(t, 0.0, 0.99999) * f32(max(n, 1)))]; }
+
+fn smoothstepc(a: f32, b: f32, x: f32) -> f32 { if (a == b) { return step(a, x); } let t = clamp((x - a) / (b - a), 0.0, 1.0); return t * t * (3.0 - 2.0 * t); }
 
 fn dc_tree_po(v_: vec2f) -> vec2f {
   return vec2f(length(v_), atan2(v_.y, v_.x));
@@ -16465,7 +17655,7 @@ fn dc_tree_ln(p__in: vec2f, a: vec2f, b: vec2f, time: f32) -> f32 {
   var p_: vec2f = p__in;
   var r_: f32 = (dot((p_ - a), (b - a)) / dot((b - a), (b - a)));
   r_ = clamp(r_, 0.0, 1.0);
-  p_.x += ((((0.7 + (0.5 * sin((0.1 * time)))) * 0.2) * smoothstep(1.0, 0.0, abs(((r_ * 2.0) - 1.0)))) * sin((3.14159 * (r_ - (4.0 * time)))));
+  p_.x += ((((0.7 + (0.5 * sin((0.1 * time)))) * 0.2) * smoothstepc(1.0, 0.0, abs(((r_ * 2.0) - 1.0)))) * sin((3.14159 * (r_ - (4.0 * time)))));
   var t0: vec2f = (p_ - a);
   var t1: vec2f = ((b - a) * vec2f(r_));
   return ((1.0 + (0.5 * r_)) * length((t0 - t1)));
@@ -16855,7 +18045,7 @@ if ((${p[8]} == 1)) {
   "dc_hexagons": {
     params: [{ name: "shape", def: 0 }, { name: "seed", def: 10000 }, { name: "time", def: 0 }, { name: "zoom", def: 4 }, { name: "ColorOnly", def: 0 }, { name: "Gradient", def: 0 }, { name: "scale_z", def: 0 }, { name: "offset_z", def: 0 }, { name: "reset_z", def: 1 }],
     verified: true, priority: 0, flags: ["dc","rgb","z"], types: ["SIMULATION","DC","BASE_SHAPE"],
-    funcNames: ["Mat2","read_imageStepMode","mmod2","powc","Mat2_Init","times","dc_hexagons_hex","dc_hexagons_getRGBColor","dbl2int","greyscale","distance_color"],
+    funcNames: ["Mat2","read_imageStepMode","mmod2","powc","smoothstepc","Mat2_Init","times","dc_hexagons_hex","dc_hexagons_getRGBColor","dbl2int","greyscale","distance_color"],
     funcs: `struct Mat2 {
   a00: f32,
   a01: f32,
@@ -16874,6 +18064,8 @@ fn powc(x: f32, y: f32) -> f32 {
   let m = pow(-x, y);
   return select(m, -m, (i32(yi) & 1) != 0);
 }
+
+fn smoothstepc(a: f32, b: f32, x: f32) -> f32 { if (a == b) { return step(a, x); } let t = clamp((x - a) / (b - a), 0.0, 1.0); return t * t * (3.0 - 2.0 * t); }
 
 fn Mat2_Init(m: ptr<function, Mat2>, v00: f32, v10: f32, v01: f32, v11: f32) {
   (*m).a00 = v00;
@@ -16905,7 +18097,7 @@ fn dc_hexagons_getRGBColor(p__in: vec2f, time: f32) -> vec3f {
   var M: Mat2;
   Mat2_Init(&(M), cos(t_), -(sin(t_)), sin(t_), cos(t_));
   p_ = times(&(M), p_);
-  var tmp: f32 = smoothstep((r_ - 0.1), (r_ + 0.1), dc_hexagons_hex(p_));
+  var tmp: f32 = smoothstepc((r_ - 0.1), (r_ + 0.1), dc_hexagons_hex(p_));
   var color: vec3f = vec3f(tmp, tmp, tmp);
   return color;
 }
@@ -17131,8 +18323,10 @@ if ((${p[6]} == 1)) {
   "dc_truchet": {
     params: [{ name: "type", def: 0 }, { name: "zoom", def: 10 }, { name: "ColorOnly", def: 0 }, { name: "Gradient", def: 0 }, { name: "scale_z", def: 0 }, { name: "offset_z", def: 0 }, { name: "reset_z", def: 1 }],
     verified: true, priority: 0, flags: ["dc","rgb","z"], types: ["SIMULATION","DC","BASE_SHAPE"],
-    funcNames: ["read_imageStepMode","dc_truchet_random","dc_truchet_truchetPattern","dc_truchet_getRGBColor","dbl2int","greyscale","distance_color"],
+    funcNames: ["read_imageStepMode","smoothstepc","dc_truchet_random","dc_truchet_truchetPattern","dc_truchet_getRGBColor","dbl2int","greyscale","distance_color"],
     funcs: `fn read_imageStepMode(base: u32, n: i32, t: f32) -> vec4f { return pal[base + u32(clamp(t, 0.0, 0.99999) * f32(max(n, 1)))]; }
+
+fn smoothstepc(a: f32, b: f32, x: f32) -> f32 { if (a == b) { return step(a, x); } let t = clamp((x - a) / (b - a), 0.0, 1.0); return t * t * (3.0 - 2.0 * t); }
 
 fn dc_truchet_random(st: vec2f) -> f32 {
   return fract((sin(dot(vec2f(st.x, st.y), vec2f(12.9898, 78.233))) * 43758.5453123));
@@ -17159,7 +18353,7 @@ fn dc_truchet_getRGBColor(st: vec2f, type_: f32) -> vec3f {
   var tile: vec2f = dc_truchet_truchetPattern(fpos, index);
   var icolor: f32 = 0.0;
   if ((type_ == 0.0)) {
-    icolor = (smoothstep((tile.x - 0.3), tile.x, tile.y) - smoothstep(tile.x, (tile.x + 0.3), tile.y));
+    icolor = (smoothstepc((tile.x - 0.3), tile.x, tile.y) - smoothstepc(tile.x, (tile.x + 0.3), tile.y));
   } else if ((type_ == 1.0)) {
     icolor = ((step(length(tile), 0.6) - step(length(tile), 0.4)) + (step(length((tile - vec2f(1.0, 1.0))), 0.6) - step(length((tile - vec2f(1.0, 1.0))), 0.4)));
   } else if ((type_ == 2.0)) {
@@ -17255,7 +18449,7 @@ if ((${p[6]} == 1)) {
   "dc_voronoise": {
     params: [{ name: "zoom", def: 8 }, { name: "deltaX", def: 0.5 }, { name: "deltaY", def: 0.5 }, { name: "ColorOnly", def: 0 }, { name: "Gradient", def: 0 }, { name: "scale_z", def: 0 }, { name: "offset_z", def: 0 }, { name: "reset_z", def: 1 }],
     verified: true, priority: 0, flags: ["dc","rgb","z"], types: ["SIMULATION","DC","BASE_SHAPE"],
-    funcNames: ["read_imageStepMode","powc","dc_voronise_hash3","dc_voronise_iqnoise","dc_voronise_getRGBColor","dbl2int","greyscale","distance_color"],
+    funcNames: ["read_imageStepMode","powc","smoothstepc","dc_voronise_hash3","dc_voronise_iqnoise","dc_voronise_getRGBColor","dbl2int","greyscale","distance_color"],
     funcs: `fn read_imageStepMode(base: u32, n: i32, t: f32) -> vec4f { return pal[base + u32(clamp(t, 0.0, 0.99999) * f32(max(n, 1)))]; }
 
 fn powc(x: f32, y: f32) -> f32 {
@@ -17265,6 +18459,8 @@ fn powc(x: f32, y: f32) -> f32 {
   let m = pow(-x, y);
   return select(m, -m, (i32(yi) & 1) != 0);
 }
+
+fn smoothstepc(a: f32, b: f32, x: f32) -> f32 { if (a == b) { return step(a, x); } let t = clamp((x - a) / (b - a), 0.0, 1.0); return t * t * (3.0 - 2.0 * t); }
 
 fn dc_voronise_hash3(p_: vec2f) -> vec3f {
   var q: vec3f = vec3f(dot(p_, vec2f(127.1, 311.7)), dot(p_, vec2f(269.5, 183.3)), dot(p_, vec2f(419.2, 371.9)));
@@ -17283,7 +18479,7 @@ fn dc_voronise_iqnoise(x: vec2f, u: f32, v_: f32) -> f32 {
       var o: vec3f = (dc_voronise_hash3((p_ + g)) * vec3f(u, u, 1.0));
       var r_: vec2f = ((g - f) + vec2f(o.x, o.y));
       var d: f32 = dot(r_, r_);
-      var ww: f32 = powc((1.0 - smoothstep(0.0, 1.414, sqrt(d))), k);
+      var ww: f32 = powc((1.0 - smoothstepc(0.0, 1.414, sqrt(d))), k);
       va += (o.z * ww);
       wt += ww;
     }
@@ -18076,8 +19272,10 @@ if ((${p[7]} == 1)) {
   "dc_glypho": {
     params: [{ name: "zoom", def: 7 }, { name: "seed", def: 10000 }, { name: "time", def: 0 }, { name: "f1", def: 0.115 }, { name: "f2", def: 0.75 }, { name: "f3", def: 1.5 }, { name: "ColorOnly", def: 0 }, { name: "Gradient", def: 0 }, { name: "scale_z", def: 0 }, { name: "offset_z", def: 0 }, { name: "reset_z", def: 1 }],
     verified: true, priority: 0, flags: ["dc","rgb","z"], types: ["SIMULATION","DC","BASE_SHAPE"],
-    funcNames: ["read_imageStepMode","dc_glypho_getRGBColor","dbl2int","greyscale","distance_color"],
+    funcNames: ["read_imageStepMode","smoothstepc","dc_glypho_getRGBColor","dbl2int","greyscale","distance_color"],
     funcs: `fn read_imageStepMode(base: u32, n: i32, t: f32) -> vec4f { return pal[base + u32(clamp(t, 0.0, 0.99999) * f32(max(n, 1)))]; }
+
+fn smoothstepc(a: f32, b: f32, x: f32) -> f32 { if (a == b) { return step(a, x); } let t = clamp((x - a) / (b - a), 0.0, 1.0); return t * t * (3.0 - 2.0 * t); }
 
 fn dc_glypho_getRGBColor(uv: vec2f, time: f32, f1: f32, f2: f32, f3: f32) -> vec3f {
   var color: vec3f = vec3f(0.0, 0.0, 0.0);
@@ -18090,7 +19288,7 @@ fn dc_glypho_getRGBColor(uv: vec2f, time: f32, f1: f32, f2: f32, f3: f32) -> vec
     for (var i: f32 = 0.0001; (i < (2.0 * PI)); i += stp) {
       var uvi: vec2f = ((uv * vec2f(n)) + vec2f((cos(((i + ((n * stp) * 0.5)) + t_)) * 0.4), (sin(((i + ((n * stp) * 0.5)) + t_)) * 0.4)));
       var l: f32 = length(uvi);
-      m += (smoothstep((f1 * n), 0.0, l) * f3);
+      m += (smoothstepc((f1 * n), 0.0, l) * f3);
     }
   }
   m = step(f2, fract((m * f3)));
@@ -18185,8 +19383,10 @@ if ((${p[10]} == 1)) {
   "dc_fingerprint": {
     params: [{ name: "zoom", def: 50 }, { name: "seed", def: 10000 }, { name: "time", def: 0 }, { name: "width", def: 0.8 }, { name: "ColorOnly", def: 0 }, { name: "Gradient", def: 0 }, { name: "scale_z", def: 0 }, { name: "offset_z", def: 0 }, { name: "reset_z", def: 1 }],
     verified: true, priority: 0, flags: ["dc","rgb","z"], types: ["SIMULATION","DC","BASE_SHAPE"],
-    funcNames: ["read_imageStepMode","dc_fingerprint_hash2","dc_fingerprint_getRGBColor","dbl2int","greyscale","distance_color"],
+    funcNames: ["read_imageStepMode","smoothstepc","dc_fingerprint_hash2","dc_fingerprint_getRGBColor","dbl2int","greyscale","distance_color"],
     funcs: `fn read_imageStepMode(base: u32, n: i32, t: f32) -> vec4f { return pal[base + u32(clamp(t, 0.0, 0.99999) * f32(max(n, 1)))]; }
+
+fn smoothstepc(a: f32, b: f32, x: f32) -> f32 { if (a == b) { return step(a, x); } let t = clamp((x - a) / (b - a), 0.0, 1.0); return t * t * (3.0 - 2.0 * t); }
 
 fn dc_fingerprint_hash2(p__in: vec2f) -> vec2f {
   var p_: vec2f = p__in;
@@ -18197,7 +19397,7 @@ fn dc_fingerprint_hash2(p__in: vec2f) -> vec2f {
 fn dc_fingerprint_getRGBColor(uv_in: vec2f, time: f32, width: f32) -> vec3f {
   var uv: vec2f = uv_in;
   var color: vec3f = vec3f(0.0, 0.0, 0.0);
-  var bounds: f32 = smoothstep(9.0, 10.0, length((uv * vec2f(0.7, 0.5))));
+  var bounds: f32 = smoothstepc(9.0, 10.0, length((uv * vec2f(0.7, 0.5))));
   var a: f32 = 0.0;
   var h: vec2f = vec2f(floor((7.0 * time)), 0.0);
   for (var i: i32 = 0; (i < 50); i++) {
@@ -18211,7 +19411,7 @@ fn dc_fingerprint_getRGBColor(uv_in: vec2f, time: f32, width: f32) -> vec3f {
   var s: f32 = min(0.3, p_);
   var l: f32 = (length(uv) + (0.319 * a));
   var m: f32 = mmod(l, 2.0);
-  var v_: f32 = ((1.0 - smoothstep((2.0 - s), 2.0, m)) * smoothstep(p_, (p_ + s), m));
+  var v_: f32 = ((1.0 - smoothstepc((2.0 - s), 2.0, m)) * smoothstepc(p_, (p_ + s), m));
   return vec3f(v_, v_, v_);
 }
 
@@ -18302,8 +19502,10 @@ if ((${p[8]} == 1)) {
   "dc_pentatiles": {
     params: [{ name: "zoom", def: 20 }, { name: "border", def: 1 }, { name: "width", def: 0.1 }, { name: "ColorOnly", def: 0 }, { name: "Gradient", def: 0 }, { name: "scale_z", def: 0 }, { name: "offset_z", def: 0 }, { name: "reset_z", def: 1 }],
     verified: true, priority: 0, flags: ["dc","rgb","z"], types: ["SIMULATION","DC","BASE_SHAPE"],
-    funcNames: ["read_imageStepMode","mmod2","dc_pentatiles_lfun","dc_pentatiles_Pfun","dc_pentatiles_sfun","dc_pentatiles_Sfun","dc_pentatiles_Lfun","dc_pentatiles_getRGBColor","dbl2int","greyscale","distance_color"],
+    funcNames: ["read_imageStepMode","smoothstepc","mmod2","dc_pentatiles_lfun","dc_pentatiles_Pfun","dc_pentatiles_sfun","dc_pentatiles_Sfun","dc_pentatiles_Lfun","dc_pentatiles_getRGBColor","dbl2int","greyscale","distance_color"],
     funcs: `fn read_imageStepMode(base: u32, n: i32, t: f32) -> vec4f { return pal[base + u32(clamp(t, 0.0, 0.99999) * f32(max(n, 1)))]; }
+
+fn smoothstepc(a: f32, b: f32, x: f32) -> f32 { if (a == b) { return step(a, x); } let t = clamp((x - a) / (b - a), 0.0, 1.0); return t * t * (3.0 - 2.0 * t); }
 
 fn mmod2(a: vec2f, b: vec2f) -> vec2f { return a - b * floor(a / b); }
 
@@ -18316,7 +19518,7 @@ fn dc_pentatiles_Pfun(x: f32, y: f32, a: f32, b: f32, width: f32) -> f32 {
 }
 
 fn dc_pentatiles_sfun(v_: f32, width: f32) -> f32 {
-  return smoothstep(width, 0.0, v_);
+  return smoothstepc(width, 0.0, v_);
 }
 
 fn dc_pentatiles_Sfun(v_: f32, width: f32) -> f32 {
@@ -18570,8 +19772,10 @@ if ((${p[9]} == 1)) {
   "dc_sunflower": {
     params: [{ name: "zoom", def: 7 }, { name: "step", def: 0.1 }, { name: "N", def: 30 }, { name: "Polar", def: 1 }, { name: "Dots", def: 1 }, { name: "GridX", def: 1 }, { name: "GridY", def: 1 }, { name: "ColorOnly", def: 0 }, { name: "Gradient", def: 0 }, { name: "scale_z", def: 0 }, { name: "offset_z", def: 0 }, { name: "reset_z", def: 1 }],
     verified: true, priority: 0, flags: ["dc","rgb","z"], types: ["SIMULATION","DC","BASE_SHAPE"],
-    funcNames: ["read_imageStepMode","dc_sunflower_line","dc_sunflower_L","dc_sunflower_S","dc_sunflower_getRGBColor","dbl2int","greyscale","distance_color"],
+    funcNames: ["read_imageStepMode","smoothstepc","dc_sunflower_line","dc_sunflower_L","dc_sunflower_S","dc_sunflower_getRGBColor","dbl2int","greyscale","distance_color"],
     funcs: `fn read_imageStepMode(base: u32, n: i32, t: f32) -> vec4f { return pal[base + u32(clamp(t, 0.0, 0.99999) * f32(max(n, 1)))]; }
+
+fn smoothstepc(a: f32, b: f32, x: f32) -> f32 { if (a == b) { return step(a, x); } let t = clamp((x - a) / (b - a), 0.0, 1.0); return t * t * (3.0 - 2.0 * t); }
 
 fn dc_sunflower_line(p__in: vec2f, a: vec2f, b_in: vec2f) -> f32 {
   var p_: vec2f = p__in;
@@ -18587,7 +19791,7 @@ fn dc_sunflower_L(U: vec2f, x: f32, y: f32) -> f32 {
 }
 
 fn dc_sunflower_S(d: f32, r_: f32) -> f32 {
-  return smoothstep(r_, 0.0, d);
+  return smoothstepc(r_, 0.0, d);
 }
 
 fn dc_sunflower_getRGBColor(U_in: vec2f, N: f32, step_: f32, GridX: f32, GridY: f32, Polar: f32, Dots: f32) -> vec3f {
@@ -18847,7 +20051,7 @@ if ((${p[7]} == 1)) {
   "dc_cairotiles": {
     params: [{ name: "zoom", def: 7 }, { name: "seed", def: 10000 }, { name: "time", def: 0 }, { name: "ColorOnly", def: 0 }, { name: "Gradient", def: 0 }, { name: "scale_z", def: 0 }, { name: "offset_z", def: 0 }, { name: "reset_z", def: 1 }],
     verified: true, priority: 0, flags: ["dc","rgb","z"], types: ["SIMULATION","DC","BASE_SHAPE"],
-    funcNames: ["Mat2","read_imageStepMode","mmod2","Mat2_Init","times","dc_cairotiles_getRGBColor","dbl2int","greyscale","distance_color"],
+    funcNames: ["Mat2","read_imageStepMode","mmod2","smoothstepc","Mat2_Init","times","dc_cairotiles_getRGBColor","dbl2int","greyscale","distance_color"],
     funcs: `struct Mat2 {
   a00: f32,
   a01: f32,
@@ -18858,6 +20062,8 @@ if ((${p[7]} == 1)) {
 fn read_imageStepMode(base: u32, n: i32, t: f32) -> vec4f { return pal[base + u32(clamp(t, 0.0, 0.99999) * f32(max(n, 1)))]; }
 
 fn mmod2(a: vec2f, b: vec2f) -> vec2f { return a - b * floor(a / b); }
+
+fn smoothstepc(a: f32, b: f32, x: f32) -> f32 { if (a == b) { return step(a, x); } let t = clamp((x - a) / (b - a), 0.0, 1.0); return t * t * (3.0 - 2.0 * t); }
 
 fn Mat2_Init(m: ptr<function, Mat2>, v00: f32, v10: f32, v01: f32, v11: f32) {
   (*m).a00 = v00;
@@ -18888,7 +20094,7 @@ fn dc_cairotiles_getRGBColor(uv_in: vec2f, time: f32, zoom: f32) -> vec3f {
   Mat2_Init(&(m), cos(th_), sin(th_), -(sin(th_)), cos(th_));
   uv = times(&(m), uv);
   var w_: f32 = ((zoom / 2000.0) * 1.5);
-  var a: f32 = smoothstep(-w_, w_, (max(abs(uv.x), abs(uv.y)) - 0.5));
+  var a: f32 = smoothstepc(-w_, w_, (max(abs(uv.x), abs(uv.y)) - 0.5));
   if ((flip == 1)) {
     a = (1.0 - a);
   }
@@ -19551,8 +20757,10 @@ if ((rnd(rs) < 0.5)) {
   "cut_truchet": {
     params: [{ name: "mode", def: 1 }, { name: "type", def: 0 }, { name: "seed", def: 1000 }, { name: "zoom", def: 10 }, { name: "invert", def: 0 }],
     verified: true, priority: 0, flags: ["hide"], types: ["2D","BASE_SHAPE","SIMULATION"],
-    funcNames: ["cut_truchet_random2","cut_truchet_random","cut_truchet_truchetPattern"],
-    funcs: `fn cut_truchet_random2(p_: vec2f) -> vec2f {
+    funcNames: ["smoothstepc","cut_truchet_random2","cut_truchet_random","cut_truchet_truchetPattern"],
+    funcs: `fn smoothstepc(a: f32, b: f32, x: f32) -> f32 { if (a == b) { return step(a, x); } let t = clamp((x - a) / (b - a), 0.0, 1.0); return t * t * (3.0 - 2.0 * t); }
+
+fn cut_truchet_random2(p_: vec2f) -> vec2f {
   return fract((sin(vec2f(dot(p_, vec2f(127.1, 311.7)), dot(p_, vec2f(269.5, 183.3)))) * vec2f(43758.5453)));
 }
 
@@ -19590,7 +20798,7 @@ var fpos: vec2f = fract((st + (h * cut_truchet_random2(h))));
 var tile: vec2f = cut_truchet_truchetPattern(fpos, cut_truchet_random(ipos));
 var color: f32 = 0.0;
 if ((min(max(${p[1]}, 0.0), 2.0) == 0)) {
-  color = (smoothstep((tile.x - 0.3), tile.x, tile.y) - smoothstep(tile.x, (tile.x + 0.3), tile.y));
+  color = (smoothstepc((tile.x - 0.3), tile.x, tile.y) - smoothstepc(tile.x, (tile.x + 0.3), tile.y));
 } else if ((min(max(${p[1]}, 0.0), 2.0) == 1)) {
   color = ((step(length(tile), 0.6) - step(length(tile), 0.4)) + (step(length((tile - vec2f(1.0, 1.0))), 0.6) - step(length((tile - vec2f(1.0, 1.0))), 0.4)));
 } else if ((min(max(${p[1]}, 0.0), 2.0) == 2)) {
@@ -19730,13 +20938,15 @@ v.y = (${w} * (y - py_center));
   "cut_shapes": {
     params: [{ name: "mode", def: 1 }, { name: "type", def: 0 }, { name: "contour", def: 1 }, { name: "zoom", def: 1 }, { name: "invert", def: 0 }, { name: "n", def: 3 }, { name: "thick", def: 0.01 }, { name: "time", def: 0.5 }],
     verified: true, priority: 0, flags: ["hide"], types: ["2D","BASE_SHAPE","SIMULATION"],
-    funcNames: ["Mat2","cut_shapes_sdHexagram","cut_shapes_sdEquilateralTriangle","cut_shapes_sdStar","cut_shapes_sdCross","cut_shapes_sdOctogon","cut_shapes_sdHexagon","cut_shapes_sdPentagon","cut_shapes_sdVesica","cut_shapes_dot2","cut_shapes_sdTrapezoid","cut_shapes_sdTrapezoid_ov1","Mat2_Init","times","cut_shapes_sdArc","cut_shapes_ndot","cut_shapes_sdRhombus","cut_shapes_sdCircle","cut_shapes_sdBox"],
+    funcNames: ["Mat2","smoothstepc","cut_shapes_sdHexagram","cut_shapes_sdEquilateralTriangle","cut_shapes_sdStar","cut_shapes_sdCross","cut_shapes_sdOctogon","cut_shapes_sdHexagon","cut_shapes_sdPentagon","cut_shapes_sdVesica","cut_shapes_dot2","cut_shapes_sdTrapezoid","cut_shapes_sdTrapezoid_ov1","Mat2_Init","times","cut_shapes_sdArc","cut_shapes_ndot","cut_shapes_sdRhombus","cut_shapes_sdCircle","cut_shapes_sdBox"],
     funcs: `struct Mat2 {
   a00: f32,
   a01: f32,
   a10: f32,
   a11: f32,
 }
+
+fn smoothstepc(a: f32, b: f32, x: f32) -> f32 { if (a == b) { return step(a, x); } let t = clamp((x - a) / (b - a), 0.0, 1.0); return t * t * (3.0 - 2.0 * t); }
 
 fn cut_shapes_sdHexagram(p__in: vec2f, r_: f32) -> f32 {
   var p_: vec2f = p__in;
@@ -19966,7 +21176,7 @@ if ((min(max(${p[2]}, 0.0), 1.0) == 1)) {
   color *= cos((120.0 * d));
 } else {
   color *= (1.0 - exp((-2.0 * abs(d))));
-  color = mix(color, 1.0, (1.0 - smoothstep(0.0, ${p[6]}, abs(d))));
+  color = mix(color, 1.0, (1.0 - smoothstepc(0.0, ${p[6]}, abs(d))));
 }
 (*hd) = false;
 if ((min(max(${p[4]}, 0.0), 1.0) == 0)) {
@@ -19979,6 +21189,53 @@ if ((min(max(${p[4]}, 0.0), 1.0) == 0)) {
   if ((color <= 0.0)) {
     x = 0.0;
     y = 0.0;
+    (*hd) = true;
+  }
+}
+v.x = (${w} * x);
+v.y = (${w} * y);
+}`,
+  },
+  "cut_kaleido": {
+    params: [{ name: "seed", def: 1000 }, { name: "mode", def: 1 }, { name: "time", def: 0 }, { name: "n", def: 6 }, { name: "zoom", def: 0.5 }, { name: "invert", def: 0 }],
+    verified: true, priority: 0, flags: ["hide"], types: ["2D","BASE_SHAPE","SIMULATION"],
+    funcNames: ["cut_kaleido_distToColor"],
+    funcs: `fn cut_kaleido_distToColor(d: f32) -> f32 {
+  return (0.0 - cos((d * 13.0)));
+}`,
+    code: (w, p) => `{
+var x: f32;
+var y: f32;
+var ci: array<vec2f, 20>;
+if ((min(max(${p[1]}, 0.0), 1.0) == 0)) {
+  x = t.x;
+  y = t.y;
+} else {
+  x = (rnd(rs) - 0.5);
+  y = (rnd(rs) - 0.5);
+}
+var uv: vec2f = vec2f((x * ${p[4]}), (y * ${p[4]}));
+for (var i: i32 = 0; (f32(i) < min(max(${p[3]}, 2.0), 20.0)); i++) {
+  var fi: f32 = (((2.0 * 3.14) * (f32(i) + (0.02 * ${p[2]}))) / min(max(${p[3]}, 2.0), 20.0));
+  ci[i] = vec2f((0.5 * sin(fi)), (0.5 * cos(fi)));
+}
+var d: f32 = 1.0;
+var k: f32 = (100.0 + (10.0 * sin((${p[2]} / 5.0))));
+for (var i: i32 = 0; (f32(i) < min(max(${p[3]}, 2.0), 20.0)); i++) {
+  d += sin((k * distance(uv, ci[i])));
+}
+var color: f32 = cut_kaleido_distToColor((d / min(max(${p[3]}, 2.0), 20.0)));
+(*hd) = false;
+if ((min(max(${p[5]}, 0.0), 1.0) == 0)) {
+  if ((color > 0.0)) {
+    x = 0;
+    y = 0;
+    (*hd) = true;
+  }
+} else {
+  if ((color <= 0.0)) {
+    x = 0;
+    y = 0;
     (*hd) = true;
   }
 }
@@ -20076,8 +21333,10 @@ v.y = (${w} * y);
   "cut_fun": {
     params: [{ name: "seed", def: 1000 }, { name: "mode", def: 1 }, { name: "zoom", def: 10 }, { name: "invert", def: 0 }],
     verified: true, priority: 0, flags: ["hide"], types: ["2D","BASE_SHAPE","SIMULATION"],
-    funcNames: ["cut_fun_rand","cut_fun_pix","cut_fun_hm"],
-    funcs: `fn cut_fun_rand(co: vec2f) -> f32 {
+    funcNames: ["smoothstepc","cut_fun_rand","cut_fun_pix","cut_fun_hm"],
+    funcs: `fn smoothstepc(a: f32, b: f32, x: f32) -> f32 { if (a == b) { return step(a, x); } let t = clamp((x - a) / (b - a), 0.0, 1.0); return t * t * (3.0 - 2.0 * t); }
+
+fn cut_fun_rand(co: vec2f) -> f32 {
   return fract((sin(dot(vec2f(co.x, co.y), vec2f(12.9898, 78.233))) * 43758.5453));
 }
 
@@ -20099,7 +21358,7 @@ fn cut_fun_hm(uv: vec2f) -> f32 {
   if ((v1 == v2)) {
     v_ = select(v1, 0.0, ((v_ == cut_fun_pix((uv + pos))) && (v_ != v1)));
   }
-  return mix(v0, v_, smoothstep(d, 1.0, 1.01));
+  return mix(v0, v_, smoothstepc(d, 1.0, 1.01));
 }`,
     code: (w, p) => `{
 var x: f32;
@@ -20241,6 +21500,8 @@ v.y = (${w} * (y - py_center));
   "cut_sincos": {
     params: [{ name: "seed", def: 1000 }, { name: "mode", def: 1 }, { name: "time", def: 0.9 }, { name: "zoom", def: 0.5 }, { name: "invert", def: 0 }],
     verified: true, priority: 0, flags: ["hide"], types: ["2D","BASE_SHAPE","SIMULATION"],
+    funcNames: ["smoothstepc"],
+    funcs: `fn smoothstepc(a: f32, b: f32, x: f32) -> f32 { if (a == b) { return step(a, x); } let t = clamp((x - a) / (b - a), 0.0, 1.0); return t * t * (3.0 - 2.0 * t); }`,
     code: (w, p) => `{
 var x: f32;
 var y: f32;
@@ -20260,7 +21521,7 @@ var e: f32 = (uv.x - (${p[2]} * 0.5));
 var t_: f32 = (e + abs(uv.y));
 var f: f32 = (((1.0 + sin((uv.x * 3.0))) * 0.4) + 0.1);
 var d: f32 = (f - (abs((fract((t_ * r_)) - 0.5)) * 2.0));
-var s: f32 = smoothstep(0.0, (0.05 / max((d + 0.5), 0.0)), (d + 0.1));
+var s: f32 = smoothstepc(0.0, (0.05 / max((d + 0.5), 0.0)), (d + 0.1));
 var color: f32 = sqrt(s);
 (*hd) = false;
 if ((min(max(${p[4]}, 0.0), 1.0) == 0)) {
@@ -20466,7 +21727,7 @@ if ((min(max(${p[13]}, 0.0), 1.0) != 0)) {
   "cut_rgrid": {
     params: [{ name: "mode", def: 1 }, { name: "zoom", def: 7 }, { name: "invert", def: 0 }, { name: "angle", def: 0 }],
     verified: true, priority: 0, flags: ["hide"], types: ["2D","BASE_SHAPE","SIMULATION"],
-    funcNames: ["Mat2","mmod2","Mat2_Init","times"],
+    funcNames: ["Mat2","mmod2","smoothstepc","Mat2_Init","times"],
     funcs: `struct Mat2 {
   a00: f32,
   a01: f32,
@@ -20475,6 +21736,8 @@ if ((min(max(${p[13]}, 0.0), 1.0) != 0)) {
 }
 
 fn mmod2(a: vec2f, b: vec2f) -> vec2f { return a - b * floor(a / b); }
+
+fn smoothstepc(a: f32, b: f32, x: f32) -> f32 { if (a == b) { return step(a, x); } let t = clamp((x - a) / (b - a), 0.0, 1.0); return t * t * (3.0 - 2.0 * t); }
 
 fn Mat2_Init(m: ptr<function, Mat2>, v00: f32, v10: f32, v01: f32, v11: f32) {
   (*m).a00 = v00;
@@ -20513,7 +21776,7 @@ var m: Mat2;
 Mat2_Init(&(m), cos(th_), sin(th_), -(sin(th_)), cos(th_));
 p_ = times(&(m), p_);
 var w_: f32 = ((min(max(${p[1]}, 0.1), 50.0) / 2000.0) * 1.5);
-var color: f32 = smoothstep(-w_, w_, (max(abs(p_.x), abs(p_.y)) - 0.5));
+var color: f32 = smoothstepc(-w_, w_, (max(abs(p_.x), abs(p_.y)) - 0.5));
 if ((flip == 1)) {
   color = (1.0 - color);
 }
@@ -20579,13 +21842,15 @@ v.y = (${w} * y);
   "cut_randomtile": {
     params: [{ name: "seed", def: 1000 }, { name: "mode", def: 1 }, { name: "zoom", def: 5 }, { name: "invert", def: 0 }],
     verified: true, priority: 0, flags: ["hide"], types: ["2D","BASE_SHAPE","SIMULATION"],
-    funcNames: ["Mat2","cut_randomtile_hash21","Mat2_Init","cut_randomtile_rot2","times","cut_randomtile_TilePattern","Mat2_Init_ov1","cut_randomtile_n2D","cut_randomtile_sFract","cut_randomtile_GrungeTex","cut_randomtile_sstep"],
+    funcNames: ["Mat2","smoothstepc","cut_randomtile_hash21","Mat2_Init","cut_randomtile_rot2","times","cut_randomtile_TilePattern","Mat2_Init_ov1","cut_randomtile_n2D","cut_randomtile_sFract","cut_randomtile_GrungeTex","cut_randomtile_sstep"],
     funcs: `struct Mat2 {
   a00: f32,
   a01: f32,
   a10: f32,
   a11: f32,
 }
+
+fn smoothstepc(a: f32, b: f32, x: f32) -> f32 { if (a == b) { return step(a, x); } let t = clamp((x - a) / (b - a), 0.0, 1.0); return t * t * (3.0 - 2.0 * t); }
 
 fn cut_randomtile_hash21(p_: vec2f) -> f32 {
   var n: f32 = dot(p_, vec2f(127.183, 157.927));
@@ -20684,7 +21949,7 @@ fn cut_randomtile_GrungeTex(p_: vec2f) -> vec3f {
 }
 
 fn cut_randomtile_sstep(sf: f32, d: f32) -> f32 {
-  return (1.0 - smoothstep(0.0, sf, d));
+  return (1.0 - smoothstepc(0.0, sf, d));
 }`,
     code: (w, p) => `{
 var x: f32;
@@ -20708,8 +21973,8 @@ var eps: vec2f = vec2f(4.0, 6.0);
 var d: f32 = cut_randomtile_TilePattern(p_);
 var d2: f32 = cut_randomtile_TilePattern((p_ + eps));
 var dS: f32 = cut_randomtile_TilePattern((p_ + (eps * vec2f(3.0))));
-var b: f32 = smoothstep(0.0, (15.0 / 450.0), (d - 0.015));
-var b2: f32 = smoothstep(0.0, (15.0 / 450.0), (d2 - 0.015));
+var b: f32 = smoothstepc(0.0, (15.0 / 450.0), (d - 0.015));
+var b2: f32 = smoothstepc(0.0, (15.0 / 450.0), (d2 - 0.015));
 var bump: f32 = (max((b2 - b), 0.0) / length(eps));
 var bump2: f32 = (max((b - b2), 0.0) / length(eps));
 var sf: f32 = (5.0 / 1000.0);
@@ -20866,8 +22131,10 @@ v.y = (${w} * (y - py_center));
   "cut_apollonian": {
     params: [{ name: "mode", def: 1 }, { name: "levels", def: 4 }, { name: "zoom", def: 2 }, { name: "invert", def: 0 }],
     verified: true, priority: 0, flags: ["hide"], types: ["2D","BASE_SHAPE","SIMULATION"],
-    funcNames: ["cut_apollonian_apollo"],
-    funcs: `fn cut_apollonian_apollo(xy: vec2f, n: i32) -> f32 {
+    funcNames: ["smoothstepc","cut_apollonian_apollo"],
+    funcs: `fn smoothstepc(a: f32, b: f32, x: f32) -> f32 { if (a == b) { return step(a, x); } let t = clamp((x - a) / (b - a), 0.0, 1.0); return t * t * (3.0 - 2.0 * t); }
+
+fn cut_apollonian_apollo(xy: vec2f, n: i32) -> f32 {
   var scale: f32 = 1.0;
   var p_: vec2f = xy;
   var t0: f32 = 100000000000000000000.0;
@@ -20881,7 +22148,7 @@ v.y = (${w} * (y - py_center));
     scale *= k;
   }
   var d: f32 = ((0.25 * abs(p_.y)) / scale);
-  d = smoothstep(0.001, 0.002, d);
+  d = smoothstepc(0.001, 0.002, d);
   return d;
 }`,
     code: (w, p) => `{
@@ -20906,6 +22173,114 @@ if ((min(max(${p[3]}, 0.0), 1.0) == 0)) {
   }
 } else {
   if ((col <= 0.0)) {
+    x = 0.0;
+    y = 0.0;
+    (*hd) = true;
+  }
+}
+v.x = (${w} * x);
+v.y = (${w} * y);
+}`,
+  },
+  "cut_hextruchetflow": {
+    params: [{ name: "randomize", def: 0 }, { name: "mode", def: 1 }, { name: "grid", def: 0 }, { name: "zoom", def: 10 }, { name: "invert", def: 0 }],
+    verified: true, priority: 0, flags: ["hide"], types: ["2D","BASE_SHAPE","SIMULATION"],
+    funcNames: ["smoothstepc","cut_hextruchetflow_PixToHex","cut_hextruchetflow_HexToPix","cut_hextruchetflow_Hashfv2","cut_hextruchetflow_HexEdgeDist","cut_hextruchetflow_ShowScene"],
+    funcs: `fn smoothstepc(a: f32, b: f32, x: f32) -> f32 { if (a == b) { return step(a, x); } let t = clamp((x - a) / (b - a), 0.0, 1.0); return t * t * (3.0 - 2.0 * t); }
+
+fn cut_hextruchetflow_PixToHex(p_: vec2f) -> vec2f {
+  var sqrt3: f32 = 1.73205;
+  var c: vec3f = vec3f(0.0, 0.0, 0.0);
+  var r_: vec3f;
+  var dr: vec3f;
+  var t0: vec2f = vec2f((((1.0 / sqrt3) * p_.x) - ((1.0 / 3.0) * p_.y)), ((2.0 / 3.0) * p_.y));
+  c.x = t0.x;
+  c.z = t0.y;
+  c.y = (-c.x - c.z);
+  r_ = floor((c + vec3f(0.5)));
+  dr = abs((r_ - c));
+  var t1: vec3f = vec3f(dr.y, dr.z, dr.x);
+  var t2: vec3f = vec3f(dr.z, dr.x, dr.y);
+  r_ = (r_ - ((step(t1, dr) * step(t2, dr)) * vec3f(dot(r_, vec3f(1.0, 1.0, 1.0)))));
+  return vec2f(r_.x, r_.z);
+}
+
+fn cut_hextruchetflow_HexToPix(h: vec2f) -> vec2f {
+  var sqrt3: f32 = 1.73205;
+  return vec2f((sqrt3 * (h.x + (0.5 * h.y))), (1.5 * h.y));
+}
+
+fn cut_hextruchetflow_Hashfv2(p_: vec2f) -> f32 {
+  return fract((sin(dot(p_, vec2f(37.0, 39.0))) * 43758.54));
+}
+
+fn cut_hextruchetflow_HexEdgeDist(p__in: vec2f) -> f32 {
+  var p_: vec2f = p__in;
+  var sqrt3: f32 = 1.73205;
+  p_ = abs(p_);
+  return (((sqrt3 / 2.0) - p_.x) + (0.5 * min((p_.x - (sqrt3 * p_.y)), 0.0)));
+}
+
+fn cut_hextruchetflow_ShowScene(p_: vec2f, grid: i32) -> vec3f {
+  var sqrt3: f32 = 1.73205;
+  var col: vec3f = vec3f(0.0, 0.0, 0.0);
+  var w_: vec3f = vec3f(0.0, 0.0, 0.0);
+  var cId: vec2f;
+  var pc: vec2f;
+  var q: vec2f;
+  var dir: f32;
+  var a: f32;
+  var d: f32;
+  cId = cut_hextruchetflow_PixToHex(p_);
+  pc = cut_hextruchetflow_HexToPix(cId);
+  dir = ((2.0 * step(cut_hextruchetflow_Hashfv2(cId), 0.5)) - 1.0);
+  var t0: vec2f = (pc + vec2f(0.0, -dir));
+  w_.x = t0.x;
+  w_.y = t0.y;
+  w_.z = dot((vec2f(w_.x, w_.y) - p_), (vec2f(w_.x, w_.y) - p_));
+  q = (pc + vec2f((sqrt3 / 2.0), (0.5 * dir)));
+  d = dot((q - p_), (q - p_));
+  if ((d < w_.z)) {
+    w_ = vec3f(q.x, q.y, d);
+  }
+  q = (pc + vec2f((-sqrt3 / 2.0), (0.5 * dir)));
+  d = dot((q - p_), (q - p_));
+  if ((d < w_.z)) {
+    w_ = vec3f(q.x, q.y, d);
+  }
+  w_.z = abs((sqrt(w_.z) - 0.5));
+  d = cut_hextruchetflow_HexEdgeDist((p_ - pc));
+  if ((grid == 1)) {
+    col = (vec3f(1.0, 1.0, 1.0) * vec3f(mix(1.0, smoothstepc(1.0, 1.0, d), smoothstepc(0.01, 0.02, d))));
+  }
+  if ((w_.z < 0.25)) {
+    col = vec3f(1.0, 1.0, 1.0);
+  }
+  return col;
+}`,
+    code: (w, p) => `{
+var x: f32;
+var y: f32;
+if ((min(max(${p[1]}, 0.0), 1.0) == 0)) {
+  x = t.x;
+  y = t.y;
+} else {
+  x = (rnd(rs) - 0.5);
+  y = (rnd(rs) - 0.5);
+}
+var shiftxy: f32 = (${p[0]} * sin(((${p[0]} * 180.0) / PI)));
+var uv: vec2f = ((vec2f(x, y) * vec2f(min(max(${p[3]}, 0.1), 50.0))) - vec2f(shiftxy, shiftxy));
+var color: vec3f = vec3f(0.0, 0.0, 0.0);
+color = (color + cut_hextruchetflow_ShowScene((uv + vec2f(step(1.5, 1.0))), i32(min(max(${p[2]}, 0.0), 1.0))));
+(*hd) = false;
+if ((min(max(${p[4]}, 0.0), 1.0) == 0)) {
+  if ((color.x > 0.9)) {
+    x = 0.0;
+    y = 0.0;
+    (*hd) = true;
+  }
+} else {
+  if ((color.x <= 0.9)) {
     x = 0.0;
     y = 0.0;
     (*hd) = true;
@@ -21002,6 +22377,8 @@ v.y = (${w} * y);
   "cut_chains": {
     params: [{ name: "shiftX", def: 0 }, { name: "shiftY", def: 0 }, { name: "mode", def: 1 }, { name: "zoom", def: 2.5 }, { name: "invert", def: 0 }],
     verified: true, priority: 0, flags: ["hide"], types: ["2D","BASE_SHAPE","SIMULATION"],
+    funcNames: ["smoothstepc"],
+    funcs: `fn smoothstepc(a: f32, b: f32, x: f32) -> f32 { if (a == b) { return step(a, x); } let t = clamp((x - a) / (b - a), 0.0, 1.0); return t * t * (3.0 - 2.0 * t); }`,
     code: (w, p) => `{
 var x: f32;
 var y: f32;
@@ -21023,7 +22400,7 @@ u = (u + vec2f(${p[0]}, ${p[1]}));
 var wy: f32 = cos((u.y * 12.0));
 var wx: f32 = sin((u.x * 15.0));
 var w_: f32 = cos((u.x * 30.0));
-var color: f32 = smoothstep(-0.25, 0.25, mix((wy + wx), (wx * 1.4), (w_ * 3.0)));
+var color: f32 = smoothstepc(-0.25, 0.25, mix((wy + wx), (wx * 1.4), (w_ * 3.0)));
 (*hd) = false;
 if ((min(max(${p[4]}, 0.0), 1.0) == 0)) {
   if ((color > 0.0)) {
@@ -21508,8 +22885,10 @@ v.y = (${w} * y);
   "cut_zigzag": {
     params: [{ name: "mode", def: 1 }, { name: "xpar", def: 1 }, { name: "ypar", def: 2 }, { name: "zoom", def: 2 }, { name: "invert", def: 0 }],
     verified: true, priority: 0, flags: ["hide"], types: ["2D","BASE_SHAPE"],
-    funcNames: ["cut_zigzag_mirrorTile","cut_zigzag_fillY"],
-    funcs: `fn cut_zigzag_mirrorTile(st_in: vec2f) -> vec2f {
+    funcNames: ["smoothstepc","cut_zigzag_mirrorTile","cut_zigzag_fillY"],
+    funcs: `fn smoothstepc(a: f32, b: f32, x: f32) -> f32 { if (a == b) { return step(a, x); } let t = clamp((x - a) / (b - a), 0.0, 1.0); return t * t * (3.0 - 2.0 * t); }
+
+fn cut_zigzag_mirrorTile(st_in: vec2f) -> vec2f {
   var st: vec2f = st_in;
   if ((fract((st.y * 0.5)) > 0.5)) {
     st.x = (st.x + 0.5);
@@ -21519,7 +22898,7 @@ v.y = (${w} * y);
 }
 
 fn cut_zigzag_fillY(st: vec2f, pct: f32, antia: f32) -> f32 {
-  return smoothstep((pct - antia), pct, st.y);
+  return smoothstepc((pct - antia), pct, st.y);
 }`,
     code: (w, p) => `{
 var xp: f32;
@@ -21561,13 +22940,15 @@ v.y = (${w} * yp);
   "cut_x": {
     params: [{ name: "mode", def: 1 }, { name: "zoom", def: 1 }, { name: "invert", def: 0 }, { name: "size", def: 0.1 }],
     verified: true, priority: 0, flags: ["hide"], types: ["2D","BASE_SHAPE","SIMULATION"],
-    funcNames: ["Mat2","Mat2_Init","cut_x_rot","times"],
+    funcNames: ["Mat2","smoothstepc","Mat2_Init","cut_x_rot","times"],
     funcs: `struct Mat2 {
   a00: f32,
   a01: f32,
   a10: f32,
   a11: f32,
 }
+
+fn smoothstepc(a: f32, b: f32, x: f32) -> f32 { if (a == b) { return step(a, x); } let t = clamp((x - a) / (b - a), 0.0, 1.0); return t * t * (3.0 - 2.0 * t); }
 
 fn Mat2_Init(m: ptr<function, Mat2>, v00: f32, v10: f32, v01: f32, v11: f32) {
   (*m).a00 = v00;
@@ -21607,7 +22988,7 @@ mat = cut_x_rot((PI / 4.0));
 st = times(&(mat), st);
 st = abs(st);
 st.y -= movement;
-line = smoothstep(0.0, 0.009, st.y);
+line = smoothstepc(0.0, 0.009, st.y);
 color = mix(color, 1.0, line);
 (*hd) = false;
 if ((min(max(${p[2]}, 0.0), 1.0) == 0)) {
@@ -21955,10 +23336,12 @@ v.y = (${w} * uv.y);
   "cut_celtic": {
     params: [{ name: "mode", def: 1 }, { name: "zoom", def: 5 }, { name: "invert", def: 0 }],
     verified: true, priority: 0, flags: ["hide"], types: ["2D","BASE_SHAPE","SIMULATION"],
-    funcNames: ["cut_celtic_circ","cut_celtic_celticShit"],
-    funcs: `fn cut_celtic_circ(uv: vec2f, r_: f32) -> f32 {
+    funcNames: ["smoothstepc","cut_celtic_circ","cut_celtic_celticShit"],
+    funcs: `fn smoothstepc(a: f32, b: f32, x: f32) -> f32 { if (a == b) { return step(a, x); } let t = clamp((x - a) / (b - a), 0.0, 1.0); return t * t * (3.0 - 2.0 * t); }
+
+fn cut_celtic_circ(uv: vec2f, r_: f32) -> f32 {
   var d: f32 = length(uv);
-  var c: f32 = smoothstep(d, (d + 0.02), r_);
+  var c: f32 = smoothstepc(d, (d + 0.02), r_);
   return c;
 }
 
@@ -22969,7 +24352,7 @@ pz_ += ((${w} * z) * fLen);
   "dc_warping": {
     params: [{ name: "randomize", def: 0 }, { name: "zoom", def: 1 }, { name: "x0", def: 0 }, { name: "ColorOnly", def: 0 }, { name: "Gradient", def: 0 }, { name: "scale_z", def: 0 }, { name: "offset_z", def: 0 }, { name: "reset_z", def: 1 }],
     verified: true, priority: 0, flags: ["dc","rgb","z"], types: ["SIMULATION","DC","BASE_SHAPE"],
-    funcNames: ["Mat2","read_imageStepMode","powc","Mat2_Init","dc_warping_hash","dc_warping_noise","times","dc_warping_fbm","dc_warping_fbm2","dc_warping_map","dc_warping_getRGBColor","dbl2int","greyscale","distance_color"],
+    funcNames: ["Mat2","read_imageStepMode","smoothstepc","powc","Mat2_Init","dc_warping_hash","dc_warping_noise","times","dc_warping_fbm","dc_warping_fbm2","dc_warping_map","dc_warping_getRGBColor","dbl2int","greyscale","distance_color"],
     funcs: `struct Mat2 {
   a00: f32,
   a01: f32,
@@ -22978,6 +24361,8 @@ pz_ += ((${w} * z) * fLen);
 }
 
 fn read_imageStepMode(base: u32, n: i32, t: f32) -> vec4f { return pal[base + u32(clamp(t, 0.0, 0.99999) * f32(max(n, 1)))]; }
+
+fn smoothstepc(a: f32, b: f32, x: f32) -> f32 { if (a == b) { return step(a, x); } let t = clamp((x - a) / (b - a), 0.0, 1.0); return t * t * (3.0 - 2.0 * t); }
 
 fn powc(x: f32, y: f32) -> f32 {
   if (x >= 0.0) { return pow(x, y); }
@@ -23040,8 +24425,8 @@ fn dc_warping_map(p__in: vec2f) -> vec3f {
   var t2: vec2f = (p_ + dc_warping_fbm2(((p_ + dc_warping_fbm2(t1)) * vec2f(2.0))));
   var t0: vec2f = dc_warping_fbm2(t2);
   var f: f32 = dot(t0, vec2f(1.0, -1.0));
-  var bl: f32 = smoothstep(-0.8, 0.8, f);
-  var ti: f32 = smoothstep(-1.0, 1.0, dc_warping_fbm(p_));
+  var bl: f32 = smoothstepc(-0.8, 0.8, f);
+  var ti: f32 = smoothstepc(-1.0, 1.0, dc_warping_fbm(p_));
   return mix(mix(vec3f(0.5, 0.0, 0.0), vec3f(1.0, 0.75, 0.35), ti), vec3f(0.0, 0.0, 0.02), bl);
 }
 
@@ -25346,6 +26731,58 @@ x = t.x;
 y = t.y;
 var z: vec2f = vec2f(x, y);
 z = (z + vec2f(${p[0]}, ${p[0]}));
+var index: i32 = i32((f32((32 / 4)) * rnd(rs)));
+var f: vec2f = transfhcf(z, Tx[index].a, Tx[index].b, Tx[index].c, Tx[index].d, Tx[index].e, Tx[index].f);
+v.x += (${w} * f.x);
+v.y += (${w} * f.y);
+}`,
+  },
+  "sym_ng13": {
+    params: [{ name: "radius", def: 0 }, { name: "stepx", def: 0 }, { name: "stepy", def: 0 }],
+    verified: true, priority: 0, flags: [], types: ["2D"],
+    funcNames: ["Mathc","transfhcf"],
+    funcs: `struct Mathc {
+  a: f32,
+  b: f32,
+  c: f32,
+  d: f32,
+  e: f32,
+  f: f32,
+}
+
+fn transfhcf(xy: vec2f, a: f32, b: f32, c: f32, d: f32, e: f32, f: f32) -> vec2f {
+  var xt: f32 = (((a * xy.x) + (b * xy.y)) + c);
+  var yt: f32 = (((d * xy.x) + (e * xy.y)) + f);
+  return vec2f(xt, yt);
+}`,
+    code: (w, p) => `{
+var x: f32;
+var y: f32;
+var spacex: f32 = sqrt(((${p[0]} * ${p[0]}) / 2.0));
+var spacey: f32 = spacex;
+var sx: f32 = (${p[1]} / 2.0);
+var sy: f32 = (${p[2]} / 2.0);
+var Tx: array<Mathc, 8> = array<Mathc, 8>(Mathc(1.0, 0.0, 0.0, 0.0, -1.0, 0.0), Mathc(-0.5, -0.866, -0.0, -0.866, 0.5, 0.0), Mathc(-0.5, 0.866, -0.0, 0.866, 0.5, 0.0), Mathc(1.0, 0.0, 0.0, 0.0, -1.0, 0.0), Mathc(-0.5, -0.866, -0.0, -0.866, 0.5, 0.0), Mathc(-0.5, 0.866, -0.0, 0.866, 0.5, 0.0), Mathc(), Mathc());
+Tx[0].c = -sx;
+Tx[0].f = -sy;
+Tx[1].c = -sx;
+Tx[1].f = -sy;
+Tx[2].c = -sx;
+Tx[2].f = -sy;
+Tx[3].c = -sx;
+Tx[3].f = -sy;
+Tx[4].c = sx;
+Tx[4].f = sy;
+Tx[5].c = sx;
+Tx[5].f = sy;
+Tx[6].c = sx;
+Tx[6].f = sy;
+Tx[7].c = sx;
+Tx[7].f = sy;
+x = t.x;
+y = t.y;
+var z: vec2f = vec2f(x, y);
+z = (z + vec2f(spacex, spacey));
 var index: i32 = i32((f32((32 / 4)) * rnd(rs)));
 var f: vec2f = transfhcf(z, Tx[index].a, Tx[index].b, Tx[index].c, Tx[index].d, Tx[index].e, Tx[index].f);
 v.x += (${w} * f.x);

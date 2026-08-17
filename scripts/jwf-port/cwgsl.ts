@@ -820,7 +820,12 @@ BUILTINS.smoothstep = (a, em) => {
     const hi = isVec(a[1].ty) ? a[1].c : `${tyStr(t)}(${em.toF32(a[1])})`;
     return { c: `smoothstep(${lo}, ${hi}, ${a[2].c})`, ty: t };
   }
-  return { c: `smoothstep(${em.toF32(a[0])}, ${em.toF32(a[1])}, ${em.toF32(a[2])})`, ty: F32 };
+  // scalar: helper that tolerates equal edges (WGSL rejects smoothstep(1.0, 1.0, x) at compile time)
+  return { c: `smoothstepc(${em.toF32(a[0])}, ${em.toF32(a[1])}, ${em.toF32(a[2])})`, ty: F32 };
+};
+BUILTINS.distance = (a, em) => {
+  if (isVec(a[0].ty)) { const [x, y] = em.unifyVec(a[0], a[1]); return { c: `distance(${x.c}, ${y.c})`, ty: F32 }; }
+  return { c: `abs(${em.toF32(a[0])} - ${em.toF32(a[1])})`, ty: F32 };
 };
 BUILTINS.length = (a) => { if (!isVec(a[0].ty)) fail('length() of non-vector'); return { c: `length(${a[0].c})`, ty: F32 }; };
 BUILTINS.dot = (a, em) => {
@@ -865,6 +870,7 @@ BUILTINS.rand = () => ({ c: 'rnd(rs)', ty: F32 });
 // Extra WGSL helper functions referenced by builtin mappings (included on demand).
 export const HELPER_FUNCS: Record<string, string> = {
   sqr: `fn sqr(x: f32) -> f32 { return x * x; }`,
+  smoothstepc: `fn smoothstepc(a: f32, b: f32, x: f32) -> f32 { if (a == b) { return step(a, x); } let t = clamp((x - a) / (b - a), 0.0, 1.0); return t * t * (3.0 - 2.0 * t); }`,
   read_imageStepMode: `fn read_imageStepMode(base: u32, n: i32, t: f32) -> vec4f { return pal[base + u32(clamp(t, 0.0, 0.99999) * f32(max(n, 1)))]; }`,
   // C powf semantics: a negative base with an integer-valued exponent is defined
   powc: `fn powc(x: f32, y: f32) -> f32 {

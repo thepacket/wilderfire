@@ -156,6 +156,7 @@ for (let v0 of dump) {
         .replace(/while \(\(k\+\+<10\) && \(/, 'while ((k < 10) && (')
         .replace(/x1=y1=50000\.0-RANDFLOAT\(\)\*100000;/, 'y1 = 50000.0 - RANDFLOAT() * 100000; x1 = y1;'), f],
       dc_circuits: (c, f) => [c, f.replace(/float o,ot2,ot=ot2=1000\.0;/, 'float o; float ot2 = 1000.0; float ot = 1000.0;')],
+      sym_ng13: (c, f) => [c.replace(/Mathc Tx\[6\]=/, 'Mathc Tx[8]='), f],
       dc_moebiuslog: (c, f) => [c, f.replace(/\(logf\(length\(U=U\+\.5\)\)\)/, '(logf(length(U + .5)))').replace(/if\(Log==1\.0\)(\s*)U =/, 'if(Log==1.0) { U = U + .5; }\n if(Log==1.0)$1U =')],
     };
     const fx = fix[v0.name];
@@ -164,6 +165,37 @@ for (let v0 of dump) {
       ovCode = c;
       if (f !== (v0.gpuFunctions ?? '')) v0 = { ...v0, gpuFunctions: f };
     }
+  }
+  // fract_* (buddhabrot fractals): helpers carry per-thread state through a
+  // `struct VarPar__jwf_<name> *varpar` pointer. Flatten it: drop the pointer
+  // parameter/argument and address state fields as `__<name>_<field>` (which
+  // resolve to the per-thread `jwx_` globals via extraParams).
+  if (v0.name.startsWith('fract_') && (v0.gpuFunctions ?? '').includes('*varpar')) {
+    const flat = (t: string) => t
+      .replace(/struct VarPar__jwf_\w+ \*varpar\s*,\s*/g, '')
+      .replace(/struct VarPar__jwf_\w+ \*varpar\s*\)/g, ')')
+      .replace(/\(varpar\s*,\s*/g, '(')
+      .replace(/\(varpar\s*\)/g, '()')
+      .replace(/\*\(&varpar->(\w+)\)/g, 'varpar->$1')
+      .replace(new RegExp(`varpar->jwf_${v0.name}_`, 'g'), `__${v0.name}_`)
+      .replace(/varpar->/g, '__')
+      // `while ((i++ < n) && cond) {` → explicit increment-first loop (C: i++ evaluated every test)
+      .replace(/while \(\((\w+)\+\+ < (\w+)\) && (.*?)\) \{/g, 'while (true) { int ci_ = $1; $1 = $1 + 1; if (!((ci_ < $2) && $3)) break;');
+    let code = flat(ovCode ?? v0.gpuCode ?? '');
+    let funcs = flat(v0.gpuFunctions ?? '');
+    // helpers are shared module text and cannot see `${p[i]}`: route the params they
+    // use through per-thread state (`<param>_c`, copied at the top of the snippet)
+    const pnames = new Set(v0.params.map((q) => q.name));
+    const usedInFuncs = new Set([...funcs.matchAll(new RegExp(`__${v0.name}_(\\w+)`, 'g'))].map((m) => m[1]).filter((n) => pnames.has(n)));
+    const extra = [...(v0.extraParams ?? [])];
+    let prelude = '';
+    for (const pn of usedInFuncs) {
+      funcs = funcs.replace(new RegExp(`__${v0.name}_${pn}(?![A-Za-z0-9_])`, 'g'), `__${v0.name}_${pn}_c`);
+      extra.push(`${pn}_c`);
+      prelude += `__${v0.name}_${pn}_c = __${v0.name}_${pn};\n`;
+    }
+    ovCode = prelude + code;
+    v0 = { ...v0, gpuFunctions: funcs, extraParams: extra };
   }
   // Param-name typos in JWildfire GPU snippets (snippet uses a name the class doesn't declare)
   {
@@ -222,7 +254,7 @@ for (let v0 of dump) {
     const funcNames: string[] = [];
     for (const pn of v.extraParams ?? []) {
       const gname = `jwx_${v.name}_${pn}`.replace(/\W/g, '_');
-      if (new RegExp(`\\b${gname}\\b`).test(code)) {
+      if (new RegExp(`\\b${gname}\\b`).test(code) || new RegExp(`\\b${gname}\\b`).test(funcs ?? '')) {
         funcs = (funcs ? funcs + '\n\n' : '') + `var<private> ${gname}: f32 = 0.0;`;
         funcNames.push(gname);
         fnRegistry.set(gname, `var<private> ${gname}: f32 = 0.0;`);

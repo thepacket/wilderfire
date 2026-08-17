@@ -122,6 +122,10 @@ float r = __rings3 * (2.f - _dx * (k * 2.f / l + 1.f) - __rings3_n * (k * c - 1.
 __px += r * __x;
 __py += r * __y;`,
   },
+  sym_ng13: {
+    note: 'GPU snippet declares Mathc Tx[6] but writes Tx[6] and Tx[7] (out of bounds).',
+    // (patched textually in gen.ts: Tx[6] → Tx[8])
+  },
   // 3D solid samplers: CPU tries up to 50 random points inside the SDF before
   // hiding; the GPU snippet tries once (mostly hidden, wrong density).
   ...Object.fromEntries([

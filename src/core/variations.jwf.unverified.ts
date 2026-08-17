@@ -1302,10 +1302,12 @@ if ((${p[13]} == 1)) {
   "dc_hoshi": {
     params: [{ name: "seed", def: 100000 }, { name: "time", def: 10 }, { name: "steps", def: 28 }, { name: "scale", def: 1.25 }, { name: "translate", def: 1.5 }, { name: "ColorOnly", def: 0 }, { name: "Gradient", def: 0 }, { name: "scale_z", def: 0 }, { name: "offset_z", def: 0 }, { name: "reset_z", def: 1 }],
     verified: false, priority: 0, flags: ["dc","rgb","z"], types: ["SIMULATION","DC","BASE_SHAPE"],
-    funcNames: ["read_imageStepMode","mmod2","dc_hoshi_rotate","dc_hoshi_hsv","dc_hoshi_getRGBColor","dbl2int","greyscale","distance_color"],
+    funcNames: ["read_imageStepMode","mmod2","smoothstepc","dc_hoshi_rotate","dc_hoshi_hsv","dc_hoshi_getRGBColor","dbl2int","greyscale","distance_color"],
     funcs: `fn read_imageStepMode(base: u32, n: i32, t: f32) -> vec4f { return pal[base + u32(clamp(t, 0.0, 0.99999) * f32(max(n, 1)))]; }
 
 fn mmod2(a: vec2f, b: vec2f) -> vec2f { return a - b * floor(a / b); }
+
+fn smoothstepc(a: f32, b: f32, x: f32) -> f32 { if (a == b) { return step(a, x); } let t = clamp((x - a) / (b - a), 0.0, 1.0); return t * t * (3.0 - 2.0 * t); }
 
 fn dc_hoshi_rotate(p_: vec2f, a: f32) -> vec2f {
   return vec2f(((p_.x * cos(a)) - (p_.y * sin(a))), ((p_.x * sin(a)) + (p_.y * cos(a))));
@@ -1333,8 +1335,8 @@ fn dc_hoshi_getRGBColor(p__in: vec2f, time: f32, steps: f32, scale: f32, transla
   }
   var i: f32 = (((x * x) + atan2(p_.y, p_.x)) + (time * 0.02));
   var h: f32 = ((floor((i * 4.0)) / 8.0) + 1.107);
-  h += ((smoothstep(-0.1, 0.8, (mmod(((i * 2.0) / 5.0), (1.0 / 4.0)) * 900.0)) / 0.01) - 0.5);
-  var color: vec3f = dc_hoshi_hsv(h, 1.0, smoothstep(-3.0, 3.0, (length(p_) * 1.0)));
+  h += ((smoothstepc(-0.1, 0.8, (mmod(((i * 2.0) / 5.0), (1.0 / 4.0)) * 900.0)) / 0.01) - 0.5);
+  var color: vec3f = dc_hoshi_hsv(h, 1.0, smoothstepc(-3.0, 3.0, (length(p_) * 1.0)));
   return color;
 }
 
@@ -1841,8 +1843,10 @@ v.y += (${w} * (y0 + (sin((x0 * ${p[3]})) * ${p[1]})));
   "cut_fingerprint": {
     params: [{ name: "seed", def: 10000 }, { name: "mode", def: 1 }, { name: "zoom", def: 20 }, { name: "width", def: 0.8 }, { name: "invert", def: 0 }],
     verified: false, priority: 0, flags: ["hide"], types: ["BASE_SHAPE","SIMULATION"],
-    funcNames: ["cut_fingerprint_hash2","cut_fingerprint_getRGBColor"],
-    funcs: `fn cut_fingerprint_hash2(p__in: vec2f) -> vec2f {
+    funcNames: ["smoothstepc","cut_fingerprint_hash2","cut_fingerprint_getRGBColor"],
+    funcs: `fn smoothstepc(a: f32, b: f32, x: f32) -> f32 { if (a == b) { return step(a, x); } let t = clamp((x - a) / (b - a), 0.0, 1.0); return t * t * (3.0 - 2.0 * t); }
+
+fn cut_fingerprint_hash2(p__in: vec2f) -> vec2f {
   var p_: vec2f = p__in;
   p_ = vec2f(dot(p_, vec2f(63.31, 127.63)), dot(p_, vec2f(395.467, 213.799)));
   return ((fract((sin(p_) * vec2f(43141.59265))) * vec2f(2.0)) - vec2f(1.0));
@@ -1851,7 +1855,7 @@ v.y += (${w} * (y0 + (sin((x0 * ${p[3]})) * ${p[1]})));
 fn cut_fingerprint_getRGBColor(uv_in: vec2f, seed: f32, width: f32) -> vec3f {
   var uv: vec2f = uv_in;
   var color: vec3f = vec3f(0.0, 0.0, 0.0);
-  var bounds: f32 = smoothstep(9.0, 10.0, length((uv * vec2f(0.7, 0.5))));
+  var bounds: f32 = smoothstepc(9.0, 10.0, length((uv * vec2f(0.7, 0.5))));
   var a: f32 = 0.0;
   var h: vec2f = vec2f(floor((7.0 * seed)), 0.0);
   for (var i: i32 = 0; (i < 50); i++) {
@@ -1865,7 +1869,7 @@ fn cut_fingerprint_getRGBColor(uv_in: vec2f, seed: f32, width: f32) -> vec3f {
   var s: f32 = min(0.3, p_);
   var l: f32 = (length(uv) + (0.319 * a));
   var m: f32 = mmod(l, 2.0);
-  var v_: f32 = ((1.0 - smoothstep((2.0 - s), 2.0, m)) * smoothstep(p_, (p_ + s), m));
+  var v_: f32 = ((1.0 - smoothstepc((2.0 - s), 2.0, m)) * smoothstepc(p_, (p_ + s), m));
   return vec3f(v_, v_, v_);
 }`,
     code: (w, p) => `{
@@ -1908,6 +1912,8 @@ v.y = (${w} * (y - py_center));
   "cut_glypho": {
     params: [{ name: "mode", def: 1 }, { name: "zoom", def: 1 }, { name: "invert", def: 0 }, { name: "f1", def: 0.115 }, { name: "f2", def: 0.75 }, { name: "f3", def: 1.5 }],
     verified: false, priority: 0, flags: ["hide"], types: ["2D","BASE_SHAPE","SIMULATION"],
+    funcNames: ["smoothstepc"],
+    funcs: `fn smoothstepc(a: f32, b: f32, x: f32) -> f32 { if (a == b) { return step(a, x); } let t = clamp((x - a) / (b - a), 0.0, 1.0); return t * t * (3.0 - 2.0 * t); }`,
     code: (w, p) => `{
 var x: f32;
 var y: f32;
@@ -1932,7 +1938,7 @@ for (var n: f32 = 1.0; (n < 2.5); n += 0.5) {
   for (var i: f32 = 0.0001; (i < (2.0 * PI)); i += stp) {
     var uvi: vec2f = ((uv * vec2f(n)) + vec2f((cos((i + ((n * stp) * 0.5))) * 0.4), (sin((i + ((n * stp) * 0.5))) * 0.4)));
     var l: f32 = length(uvi);
-    m += (smoothstep((${p[3]} * n), 0.0, l) * ${p[5]});
+    m += (smoothstepc((${p[3]} * n), 0.0, l) * ${p[5]});
   }
 }
 m = step(${p[4]}, fract((m * ${p[5]})));
@@ -1955,63 +1961,18 @@ v.x = (${w} * (x - px_center));
 v.y = (${w} * (y - py_center));
 }`,
   },
-  "cut_kaleido": {
-    params: [{ name: "seed", def: 1000 }, { name: "mode", def: 1 }, { name: "time", def: 0 }, { name: "n", def: 6 }, { name: "zoom", def: 0.5 }, { name: "invert", def: 0 }],
-    verified: false, priority: 0, flags: ["hide"], types: ["2D","BASE_SHAPE","SIMULATION"],
-    funcNames: ["cut_kaleido_distToColor"],
-    funcs: `fn cut_kaleido_distToColor(d: f32) -> f32 {
-  return (0.0 - cos((d * 13.0)));
-}`,
-    code: (w, p) => `{
-var x: f32;
-var y: f32;
-var ci: array<vec2f, 20>;
-if ((min(max(${p[1]}, 0.0), 1.0) == 0)) {
-  x = t.x;
-  y = t.y;
-} else {
-  x = (rnd(rs) - 0.5);
-  y = (rnd(rs) - 0.5);
-}
-var uv: vec2f = vec2f((x * ${p[4]}), (y * ${p[4]}));
-for (var i: i32 = 0; (f32(i) < min(max(${p[3]}, 2.0), 20.0)); i++) {
-  var fi: f32 = (((2.0 * 3.14) * (f32(i) + (0.02 * ${p[2]}))) / min(max(${p[3]}, 2.0), 20.0));
-  ci[i] = vec2f((0.5 * sin(fi)), (0.5 * cos(fi)));
-}
-var d: f32 = 1.0;
-var k: f32 = (100.0 + (10.0 * sin((${p[2]} / 5.0))));
-for (var i: i32 = 0; (f32(i) < min(max(${p[3]}, 2.0), 20.0)); i++) {
-  d = (vec2f(d) + sin((vec2f(k) * distance(uv, ci[i]))));
-}
-var color: f32 = cut_kaleido_distToColor((d / min(max(${p[3]}, 2.0), 20.0)));
-(*hd) = false;
-if ((min(max(${p[5]}, 0.0), 1.0) == 0)) {
-  if ((color > 0.0)) {
-    x = 0;
-    y = 0;
-    (*hd) = true;
-  }
-} else {
-  if ((color <= 0.0)) {
-    x = 0;
-    y = 0;
-    (*hd) = true;
-  }
-}
-v.x = (${w} * x);
-v.y = (${w} * y);
-}`,
-  },
   "cut_triantess": {
     params: [{ name: "mode", def: 1 }, { name: "Iters", def: 20 }, { name: "SRadius", def: 0.01 }, { name: "pParam", def: 3 }, { name: "qParam", def: 3 }, { name: "rParam", def: 4 }, { name: "uBaryc", def: 1 }, { name: "vBaryc", def: 1 }, { name: "wBaryc", def: 0 }, { name: "zoom", def: 2 }, { name: "invert", def: 0 }],
     verified: false, priority: 0, flags: ["hide"], types: ["2D","BASE_SHAPE","SIMULATION"],
-    funcNames: ["Mat2","cut_triantess_hdott","hlengtht","cut_triantess_hnormalizet","cut_triantess_hdots","Mat2_Init","times","cut_triantess_hlengths","cut_triantess_DD","cut_triantess_dist2Segment","cut_triantess_dist2Segments"],
+    funcNames: ["Mat2","smoothstepc","cut_triantess_hdott","hlengtht","cut_triantess_hnormalizet","cut_triantess_hdots","Mat2_Init","times","cut_triantess_hlengths","cut_triantess_DD","cut_triantess_dist2Segment","cut_triantess_dist2Segments"],
     funcs: `struct Mat2 {
   a00: f32,
   a01: f32,
   a10: f32,
   a11: f32,
 }
+
+fn smoothstepc(a: f32, b: f32, x: f32) -> f32 { if (a == b) { return step(a, x); } let t = clamp((x - a) / (b - a), 0.0, 1.0); return t * t * (3.0 - 2.0 * t); }
 
 fn cut_triantess_hdott(a: vec3f, b: vec3f, spaceType: f32) -> f32 {
   return ((dot(vec2f(a.x, a.y), vec2f(b.x, b.y)) * spaceType) + (a.z * b.z));
@@ -2130,9 +2091,9 @@ for (var i: i32 = 0; (f32(i) < min(max(${p[1]}, 0.0), 20.0)); i++) {
   z3 = (z3 + ((nc * vec3f(1.0, 1.0, spaceType)) * vec3f(t_)));
 }
 var ds: f32 = cut_triantess_dist2Segments(z3, r_, nb, nc, spaceType, p_, min(max(${p[2]}, 0.001), 0.1));
-color = mix(segColor, color, smoothstep(-1.0, 1.0, ((ds * 0.5) / aaScale)));
+color = mix(segColor, color, smoothstepc(-1.0, 1.0, ((ds * 0.5) / aaScale)));
 if ((spaceType == -1.0)) {
-  color = mix(backGroundColor, color, smoothstep(0.0, 1.0, (((1.0 - r_) * 0.5) / aaScale)));
+  color = mix(backGroundColor, color, smoothstepc(0.0, 1.0, (((1.0 - r_) * 0.5) / aaScale)));
 }
 (*hd) = false;
 if ((min(max(${p[10]}, 0.0), 1.0) == 0)) {
@@ -2155,7 +2116,7 @@ v.y = (${w} * y);
   "cut_truchetweaving": {
     params: [{ name: "randomize", def: 0 }, { name: "mode", def: 1 }, { name: "type", def: 0 }, { name: "width", def: 0.15 }, { name: "zoom", def: 8 }, { name: "invert", def: 0 }],
     verified: false, priority: 0, flags: ["hide"], types: ["2D","BASE_SHAPE","SIMULATION"],
-    funcNames: ["Mat2","mmod2","cut_truchetweaving_N21","Mat2_Init","times","cut_truchetweaving_UvCirc","cut_truchetweaving_UvBeam","cut_truchetweaving_Truchet"],
+    funcNames: ["Mat2","mmod2","smoothstepc","cut_truchetweaving_N21","Mat2_Init","times","cut_truchetweaving_UvCirc","cut_truchetweaving_UvBeam","cut_truchetweaving_Truchet"],
     funcs: `struct Mat2 {
   a00: f32,
   a01: f32,
@@ -2164,6 +2125,8 @@ v.y = (${w} * y);
 }
 
 fn mmod2(a: vec2f, b: vec2f) -> vec2f { return a - b * floor(a / b); }
+
+fn smoothstepc(a: f32, b: f32, x: f32) -> f32 { if (a == b) { return step(a, x); } let t = clamp((x - a) / (b - a), 0.0, 1.0); return t * t * (3.0 - 2.0 * t); }
 
 fn cut_truchetweaving_N21(id: vec2f) -> f32 {
   return fract((sin(((id.x * 324.23) + (id.y * 5604.342))) * 87654.53));
@@ -2186,8 +2149,8 @@ fn cut_truchetweaving_UvCirc(uv: vec2f, radius: f32, thickness: f32) -> vec4f {
   var w_: f32 = 0.01;
   var r1: f32 = (radius - t_);
   var r2_: f32 = (radius + t_);
-  var mask: f32 = smoothstep((t_ + w_), t_, abs((radius - st.y)));
-  var alpha: f32 = smoothstep((t_ + 0.1), t_, abs((radius - st.y)));
+  var mask: f32 = smoothstepc((t_ + w_), t_, abs((radius - st.y)));
+  var alpha: f32 = smoothstepc((t_ + 0.1), t_, abs((radius - st.y)));
   alpha = ((alpha * alpha) * mix(0.5, 1.0, mask));
   return vec4f((st.x * radius), st.y, mask, alpha);
 }
@@ -2195,8 +2158,8 @@ fn cut_truchetweaving_UvCirc(uv: vec2f, radius: f32, thickness: f32) -> vec4f {
 fn cut_truchetweaving_UvBeam(uv: vec2f, thickness: f32) -> vec4f {
   var t_: f32 = (thickness / 2.0);
   var w_: f32 = 0.01;
-  var mask: f32 = smoothstep((t_ + w_), t_, abs(uv.y));
-  var alpha: f32 = smoothstep((t_ + 0.1), t_, abs(uv.y));
+  var mask: f32 = smoothstepc((t_ + w_), t_, abs(uv.y));
+  var alpha: f32 = smoothstepc((t_ + 0.1), t_, abs(uv.y));
   alpha = ((alpha * alpha) * (0.5 + (0.5 * mask)));
   return vec4f(uv.x, uv.y, mask, alpha);
 }
@@ -2323,116 +2286,10 @@ v.x = (${w} * x);
 v.y = (${w} * y);
 }`,
   },
-  "cut_hextruchetflow": {
-    params: [{ name: "randomize", def: 0 }, { name: "mode", def: 1 }, { name: "grid", def: 0 }, { name: "zoom", def: 10 }, { name: "invert", def: 0 }],
-    verified: false, priority: 0, flags: ["hide"], types: ["2D","BASE_SHAPE","SIMULATION"],
-    funcNames: ["cut_hextruchetflow_PixToHex","cut_hextruchetflow_HexToPix","cut_hextruchetflow_Hashfv2","cut_hextruchetflow_HexEdgeDist","cut_hextruchetflow_ShowScene"],
-    funcs: `fn cut_hextruchetflow_PixToHex(p_: vec2f) -> vec2f {
-  var sqrt3: f32 = 1.73205;
-  var c: vec3f = vec3f(0.0, 0.0, 0.0);
-  var r_: vec3f;
-  var dr: vec3f;
-  var t0: vec2f = vec2f((((1.0 / sqrt3) * p_.x) - ((1.0 / 3.0) * p_.y)), ((2.0 / 3.0) * p_.y));
-  c.x = t0.x;
-  c.z = t0.y;
-  c.y = (-c.x - c.z);
-  r_ = floor((c + vec3f(0.5)));
-  dr = abs((r_ - c));
-  var t1: vec3f = vec3f(dr.y, dr.z, dr.x);
-  var t2: vec3f = vec3f(dr.z, dr.x, dr.y);
-  r_ = (r_ - ((step(t1, dr) * step(t2, dr)) * vec3f(dot(r_, vec3f(1.0, 1.0, 1.0)))));
-  return vec2f(r_.x, r_.z);
-}
-
-fn cut_hextruchetflow_HexToPix(h: vec2f) -> vec2f {
-  var sqrt3: f32 = 1.73205;
-  return vec2f((sqrt3 * (h.x + (0.5 * h.y))), (1.5 * h.y));
-}
-
-fn cut_hextruchetflow_Hashfv2(p_: vec2f) -> f32 {
-  return fract((sin(dot(p_, vec2f(37.0, 39.0))) * 43758.54));
-}
-
-fn cut_hextruchetflow_HexEdgeDist(p__in: vec2f) -> f32 {
-  var p_: vec2f = p__in;
-  var sqrt3: f32 = 1.73205;
-  p_ = abs(p_);
-  return (((sqrt3 / 2.0) - p_.x) + (0.5 * min((p_.x - (sqrt3 * p_.y)), 0.0)));
-}
-
-fn cut_hextruchetflow_ShowScene(p_: vec2f, grid: i32) -> vec3f {
-  var sqrt3: f32 = 1.73205;
-  var col: vec3f = vec3f(0.0, 0.0, 0.0);
-  var w_: vec3f = vec3f(0.0, 0.0, 0.0);
-  var cId: vec2f;
-  var pc: vec2f;
-  var q: vec2f;
-  var dir: f32;
-  var a: f32;
-  var d: f32;
-  cId = cut_hextruchetflow_PixToHex(p_);
-  pc = cut_hextruchetflow_HexToPix(cId);
-  dir = ((2.0 * step(cut_hextruchetflow_Hashfv2(cId), 0.5)) - 1.0);
-  var t0: vec2f = (pc + vec2f(0.0, -dir));
-  w_.x = t0.x;
-  w_.y = t0.y;
-  w_.z = dot((vec2f(w_.x, w_.y) - p_), (vec2f(w_.x, w_.y) - p_));
-  q = (pc + vec2f((sqrt3 / 2.0), (0.5 * dir)));
-  d = dot((q - p_), (q - p_));
-  if ((d < w_.z)) {
-    w_ = vec3f(q.x, q.y, d);
-  }
-  q = (pc + vec2f((-sqrt3 / 2.0), (0.5 * dir)));
-  d = dot((q - p_), (q - p_));
-  if ((d < w_.z)) {
-    w_ = vec3f(q.x, q.y, d);
-  }
-  w_.z = abs((sqrt(w_.z) - 0.5));
-  d = cut_hextruchetflow_HexEdgeDist((p_ - pc));
-  if ((grid == 1)) {
-    col = (vec3f(1.0, 1.0, 1.0) * vec3f(mix(1.0, smoothstep(1.0, 1.0, d), smoothstep(0.01, 0.02, d))));
-  }
-  if ((w_.z < 0.25)) {
-    col = vec3f(1.0, 1.0, 1.0);
-  }
-  return col;
-}`,
-    code: (w, p) => `{
-var x: f32;
-var y: f32;
-if ((min(max(${p[1]}, 0.0), 1.0) == 0)) {
-  x = t.x;
-  y = t.y;
-} else {
-  x = (rnd(rs) - 0.5);
-  y = (rnd(rs) - 0.5);
-}
-var shiftxy: f32 = (${p[0]} * sin(((${p[0]} * 180.0) / PI)));
-var uv: vec2f = ((vec2f(x, y) * vec2f(min(max(${p[3]}, 0.1), 50.0))) - vec2f(shiftxy, shiftxy));
-var color: vec3f = vec3f(0.0, 0.0, 0.0);
-color = (color + cut_hextruchetflow_ShowScene((uv + vec2f(step(1.5, 1.0))), i32(min(max(${p[2]}, 0.0), 1.0))));
-(*hd) = false;
-if ((min(max(${p[4]}, 0.0), 1.0) == 0)) {
-  if ((color.x > 0.9)) {
-    x = 0.0;
-    y = 0.0;
-    (*hd) = true;
-  }
-} else {
-  if ((color.x <= 0.9)) {
-    x = 0.0;
-    y = 0.0;
-    (*hd) = true;
-  }
-}
-v.x = (${w} * x);
-v.y = (${w} * y);
-}`,
-  },
   "cut_wood": {
     params: [{ name: "shiftX", def: 0 }, { name: "shiftY", def: 0 }, { name: "freq", def: 1.8 }, { name: "smooth", def: 1 }, { name: "LineCount", def: 20 }, { name: "LineWidth", def: 0.2 }, { name: "mode", def: 1 }, { name: "zoom", def: 2.5 }, { name: "invert", def: 0 }],
     verified: false, priority: 0, flags: ["hide"], types: ["2D","BASE_SHAPE","SIMULATION"],
-    funcNames: ["Mat2","powc","cut_wood_random","cut_wood_noise","Mat2_Init","cut_wood_rotate","times","cut_wood_twist","cut_wood_line"],
+    funcNames: ["Mat2","powc","smoothstepc","cut_wood_random","cut_wood_noise","Mat2_Init","cut_wood_rotate","times","cut_wood_twist","cut_wood_line"],
     funcs: `struct Mat2 {
   a00: f32,
   a01: f32,
@@ -2447,6 +2304,8 @@ fn powc(x: f32, y: f32) -> f32 {
   let m = pow(-x, y);
   return select(m, -m, (i32(yi) & 1) != 0);
 }
+
+fn smoothstepc(a: f32, b: f32, x: f32) -> f32 { if (a == b) { return step(a, x); } let t = clamp((x - a) / (b - a), 0.0, 1.0); return t * t * (3.0 - 2.0 * t); }
 
 fn cut_wood_random(st: vec2f) -> f32 {
   return fract((sin(dot(vec2f(st.x, st.y), vec2f(12.9898, 78.233))) * 43758.5453123));
@@ -2494,7 +2353,7 @@ fn cut_wood_twist(c: vec2f, angle: f32) -> vec2f {
 
 fn cut_wood_line(c: vec2f, width: f32) -> f32 {
   var smoothing: f32 = 0.04;
-  return (smoothstep((0.5 - width), ((0.5 - width) + smoothing), c.y) - smoothstep(((0.5 + width) - smoothing), (0.5 + width), c.y));
+  return (smoothstepc((0.5 - width), ((0.5 - width) + smoothing), c.y) - smoothstepc(((0.5 + width) - smoothing), (0.5 + width), c.y));
 }`,
     code: (w, p) => `{
 var x: f32;
@@ -2714,15 +2573,17 @@ if ((min(max(${p[4]}, 0.0), 1.0) == 1)) {
   "cut_mandala": {
     params: [{ name: "seed", def: 1000 }, { name: "mode", def: 1 }, { name: "time", def: 0 }, { name: "zoom", def: 2 }, { name: "invert", def: 1 }],
     verified: false, priority: 0, flags: ["hide"], types: ["2D","BASE_SHAPE","SIMULATION"],
-    funcNames: ["mmod2","cut_mandala_spiral","cut_mandala_rose","rose2","cut_mandala_circle"],
+    funcNames: ["mmod2","smoothstepc","cut_mandala_spiral","cut_mandala_rose","rose2","cut_mandala_circle"],
     funcs: `fn mmod2(a: vec2f, b: vec2f) -> vec2f { return a - b * floor(a / b); }
+
+fn smoothstepc(a: f32, b: f32, x: f32) -> f32 { if (a == b) { return step(a, x); } let t = clamp((x - a) / (b - a), 0.0, 1.0); return t * t * (3.0 - 2.0 * t); }
 
 fn cut_mandala_spiral(p_: vec2f, width: f32) -> f32 {
   var d: f32 = 0.0;
-  d += smoothstep(1.0, 0.0, (width * abs((p_.x - ((0.5 * p_.y) / PI)))));
-  d += smoothstep(1.0, 0.0, (width * abs((p_.x - ((0.5 * abs(p_.y)) / PI)))));
-  d += smoothstep(1.0, 0.0, (width * abs((abs(p_.x) - ((0.5 * p_.y) / PI)))));
-  d += smoothstep(1.0, 0.0, (width * abs((abs(p_.x) - ((0.5 * abs(p_.y)) / PI)))));
+  d += smoothstepc(1.0, 0.0, (width * abs((p_.x - ((0.5 * p_.y) / PI)))));
+  d += smoothstepc(1.0, 0.0, (width * abs((p_.x - ((0.5 * abs(p_.y)) / PI)))));
+  d += smoothstepc(1.0, 0.0, (width * abs((abs(p_.x) - ((0.5 * p_.y) / PI)))));
+  d += smoothstepc(1.0, 0.0, (width * abs((abs(p_.x) - ((0.5 * abs(p_.y)) / PI)))));
   return d;
 }
 
@@ -2731,10 +2592,10 @@ fn cut_mandala_rose(p__in: vec2f, t_: f32, width: f32) -> f32 {
   var a0: f32 = 6.0;
   var d: f32 = 0.0;
   p_.x *= (7.0 + (8.0 * t_));
-  d += smoothstep(1.0, 0.0, (width * abs((p_.x - sin((a0 * p_.y))))));
-  d += smoothstep(1.0, 0.0, (width * abs((p_.x - abs(sin((a0 * p_.y)))))));
-  d += smoothstep(1.0, 0.0, (width * abs((abs(p_.x) - sin((a0 * p_.y))))));
-  d += smoothstep(1.0, 0.0, (width * abs((abs(p_.x) - abs(sin((a0 * p_.y)))))));
+  d += smoothstepc(1.0, 0.0, (width * abs((p_.x - sin((a0 * p_.y))))));
+  d += smoothstepc(1.0, 0.0, (width * abs((p_.x - abs(sin((a0 * p_.y)))))));
+  d += smoothstepc(1.0, 0.0, (width * abs((abs(p_.x) - sin((a0 * p_.y))))));
+  d += smoothstepc(1.0, 0.0, (width * abs((abs(p_.x) - abs(sin((a0 * p_.y)))))));
   return d;
 }
 
@@ -2743,16 +2604,16 @@ fn rose2(p__in: vec2f, t_: f32, width: f32) -> f32 {
   var a0: f32 = 6.0;
   var d: f32 = 0.0;
   p_.x *= (7.0 + (8.0 * t_));
-  d += smoothstep(1.0, 0.0, (width * abs((p_.x - cos((a0 * p_.y))))));
-  d += smoothstep(1.0, 0.0, (width * abs((p_.x - abs(cos((a0 * p_.y)))))));
-  d += smoothstep(1.0, 0.0, (width * abs((abs(p_.x) - cos((a0 * p_.y))))));
-  d += smoothstep(1.0, 0.0, (width * abs((abs(p_.x) - abs(cos((a0 * p_.y)))))));
+  d += smoothstepc(1.0, 0.0, (width * abs((p_.x - cos((a0 * p_.y))))));
+  d += smoothstepc(1.0, 0.0, (width * abs((p_.x - abs(cos((a0 * p_.y)))))));
+  d += smoothstepc(1.0, 0.0, (width * abs((abs(p_.x) - cos((a0 * p_.y))))));
+  d += smoothstepc(1.0, 0.0, (width * abs((abs(p_.x) - abs(cos((a0 * p_.y)))))));
   return d;
 }
 
 fn cut_mandala_circle(p_: vec2f, r_: f32, width: f32) -> f32 {
   var d: f32 = 0.0;
-  d += smoothstep(1.0, 0.0, (width * abs((p_.x - r_))));
+  d += smoothstepc(1.0, 0.0, (width * abs((p_.x - r_))));
   return d;
 }`,
     code: (w, p) => `{
@@ -3026,58 +2887,6 @@ if ((${p[19]} == 1)) {
 } else {
   pz_ += dz;
 }
-}`,
-  },
-  "sym_ng13": {
-    params: [{ name: "radius", def: 0 }, { name: "stepx", def: 0 }, { name: "stepy", def: 0 }],
-    verified: false, priority: 0, flags: [], types: ["2D"],
-    funcNames: ["Mathc","transfhcf"],
-    funcs: `struct Mathc {
-  a: f32,
-  b: f32,
-  c: f32,
-  d: f32,
-  e: f32,
-  f: f32,
-}
-
-fn transfhcf(xy: vec2f, a: f32, b: f32, c: f32, d: f32, e: f32, f: f32) -> vec2f {
-  var xt: f32 = (((a * xy.x) + (b * xy.y)) + c);
-  var yt: f32 = (((d * xy.x) + (e * xy.y)) + f);
-  return vec2f(xt, yt);
-}`,
-    code: (w, p) => `{
-var x: f32;
-var y: f32;
-var spacex: f32 = sqrt(((${p[0]} * ${p[0]}) / 2.0));
-var spacey: f32 = spacex;
-var sx: f32 = (${p[1]} / 2.0);
-var sy: f32 = (${p[2]} / 2.0);
-var Tx: array<Mathc, 6> = array<Mathc, 6>(Mathc(1.0, 0.0, 0.0, 0.0, -1.0, 0.0), Mathc(-0.5, -0.866, -0.0, -0.866, 0.5, 0.0), Mathc(-0.5, 0.866, -0.0, 0.866, 0.5, 0.0), Mathc(1.0, 0.0, 0.0, 0.0, -1.0, 0.0), Mathc(-0.5, -0.866, -0.0, -0.866, 0.5, 0.0), Mathc(-0.5, 0.866, -0.0, 0.866, 0.5, 0.0));
-Tx[0].c = -sx;
-Tx[0].f = -sy;
-Tx[1].c = -sx;
-Tx[1].f = -sy;
-Tx[2].c = -sx;
-Tx[2].f = -sy;
-Tx[3].c = -sx;
-Tx[3].f = -sy;
-Tx[4].c = sx;
-Tx[4].f = sy;
-Tx[5].c = sx;
-Tx[5].f = sy;
-Tx[6].c = sx;
-Tx[6].f = sy;
-Tx[7].c = sx;
-Tx[7].f = sy;
-x = t.x;
-y = t.y;
-var z: vec2f = vec2f(x, y);
-z = (z + vec2f(spacex, spacey));
-var index: i32 = i32((f32((24 / 4)) * rnd(rs)));
-var f: vec2f = transfhcf(z, Tx[index].a, Tx[index].b, Tx[index].c, Tx[index].d, Tx[index].e, Tx[index].f);
-v.x += (${w} * f.x);
-v.y += (${w} * f.y);
 }`,
   },
   "post_point_crop": {
