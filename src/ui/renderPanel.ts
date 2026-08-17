@@ -289,9 +289,15 @@ export function buildRenderPanel(app: App, root: HTMLElement) {
   // Hi-res tiled export
   const hiRow = el('div', 'btn-row');
   const hiScale = el('select') as HTMLSelectElement;
+  hiScale.title = 'Output size: a multiple of the canvas, or a fixed 16:9 frame (the flame is scaled to the width)';
   for (const s of ['2', '3', '4']) {
     const o = el('option', '', s + '×') as HTMLOptionElement;
     o.value = s;
+    hiScale.append(o);
+  }
+  for (const [label, v] of [['1080p', '1920x1080'], ['1440p', '2560x1440'], ['4K', '3840x2160']] as const) {
+    const o = el('option', '', label) as HTMLOptionElement;
+    o.value = v;
     hiScale.append(o);
   }
   const hiQ = el('select') as HTMLSelectElement;
@@ -316,11 +322,12 @@ export function buildRenderPanel(app: App, root: HTMLElement) {
 
   hiBtn.onclick = async () => {
     const r = app.renderer;
-    const scale = parseInt(hiScale.value);
     const spp = parseInt(hiQ.value);
     const transparent = alphaChk.checked;
-    const fullW = (r.width * scale) & ~1;
-    const fullH = (r.height * scale) & ~1;
+    const fixed = /^(\d+)x(\d+)$/.exec(hiScale.value);
+    const scale = fixed ? 1 : parseInt(hiScale.value);
+    const fullW = fixed ? Number(fixed[1]) : (r.width * scale) & ~1;
+    const fullH = fixed ? Number(fixed[2]) : (r.height * scale) & ~1;
     const TILE = 1024, PAD = 8;
     const target = await pickSave({ suggestedName: `${baseName()}-${fullW}x${fullH}.png`, description: 'PNG image', mime: 'image/png', ext: '.png' });
     if (!target) return;
