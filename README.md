@@ -137,7 +137,10 @@ in the stack.
   defaults are ~1.6k tokens/turn instead of ~19k. An **Explain** button asks
   the model to walk through the current flame — what each transform,
   variation, layer, final transform, palette and camera setting contributes,
-  plus a few tweaks to try — in prose, without touching it. The key is stored in
+  plus a few tweaks to try — in prose, without touching it. Instead of
+  OpenRouter you can point the assistant at a **local OpenAI-compatible
+  server** (Ollama, LM Studio, llama.cpp, vLLM — base URL + model id, models
+  listed from the server, key optional). The key is stored in
   `localStorage` and requests go straight from your browser to OpenRouter.
 
 ## Keyboard shortcuts

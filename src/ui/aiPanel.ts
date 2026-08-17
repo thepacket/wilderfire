@@ -3,7 +3,7 @@
 // parse, normalize, and apply live.
 import { App, el } from './common';
 import { normalizeFlame, type Flame } from '../core/flame';
-import { streamChat, SUGGESTED_MODELS, type ChatMessage, type ChatPart } from '../ai/openrouter';
+import { streamChat, fetchLocalModels, SUGGESTED_MODELS, type ChatMessage, type ChatPart } from '../ai/openrouter';
 import { createModelPicker } from './modelPicker';
 import {
   DEFAULT_CONTEXT, EDITS_SPEC, applyEdits, estimateTokens, flameJSONFor, flameSummary, variationCatalogue,
@@ -13,6 +13,9 @@ import {
 const LS_KEY = 'wilderfire.openrouter.key';
 const LS_MODEL = 'wilderfire.openrouter.model';
 const LS_CTX = 'wilderfire.ai.context';
+const LS_ENDPOINT = 'wilderfire.ai.endpoint';      // 'openrouter' | 'local'
+const LS_LOCAL_URL = 'wilderfire.ai.localUrl';
+const LS_LOCAL_MODEL = 'wilderfire.ai.localModel';
 
 /** System prompt assembled from the user's context choices (see ../ai/context.ts). */
 function systemPrompt(flame: Flame, o: ContextOpts): string {
@@ -58,6 +61,48 @@ export function buildAIPanel(app: App, root: HTMLElement) {
   root.classList.add('ai-panel');
 
   const cfg = el('div', 'section');
+  // ---- Endpoint: OpenRouter (default) or a local OpenAI-compatible server ----
+  const epRow = el('div', 'row');
+  epRow.append(el('label', '', 'Endpoint'));
+  const epSel = el('select') as HTMLSelectElement;
+  for (const [v, txt] of [['openrouter', 'OpenRouter.ai'], ['local', 'Local server']] as const) { const o = el('option', '', txt) as HTMLOptionElement; o.value = v; epSel.append(o); }
+  epSel.value = localStorage.getItem(LS_ENDPOINT) === 'local' ? 'local' : 'openrouter';
+  epSel.title = 'Local server: any OpenAI-compatible endpoint on your machine — Ollama (http://localhost:11434/v1, start it with OLLAMA_ORIGINS=* for browser access), LM Studio (http://localhost:1234/v1, enable CORS), llama.cpp, vLLM. No key needed unless the server wants one.';
+  epRow.append(epSel);
+  const urlRow = el('div', 'row');
+  urlRow.append(el('label', '', 'Base URL'));
+  const urlInp = el('input') as HTMLInputElement;
+  urlInp.placeholder = 'http://localhost:11434/v1';
+  urlInp.style.flex = '1';
+  urlInp.value = localStorage.getItem(LS_LOCAL_URL) ?? 'http://localhost:11434/v1';
+  urlInp.addEventListener('change', () => { localStorage.setItem(LS_LOCAL_URL, urlInp.value.trim()); refreshLocalModels(); });
+  urlRow.append(urlInp);
+  const localModelRow = el('div', 'row');
+  localModelRow.append(el('label', '', 'Model'));
+  const localModelInp = el('input') as HTMLInputElement;
+  localModelInp.placeholder = 'model id (list loads from …/models)';
+  localModelInp.style.flex = '1';
+  localModelInp.setAttribute('list', 'wf-local-models');
+  const localList = el('datalist') as HTMLDataListElement;
+  localList.id = 'wf-local-models';
+  localModelInp.value = localStorage.getItem(LS_LOCAL_MODEL) ?? '';
+  localModelInp.addEventListener('change', () => localStorage.setItem(LS_LOCAL_MODEL, localModelInp.value.trim()));
+  localModelRow.append(localModelInp, localList);
+  const localHint = el('div', 'hint', '');
+  const isLocal = () => epSel.value === 'local';
+  const refreshLocalModels = async () => {
+    if (!isLocal()) return;
+    localList.textContent = '';
+    localHint.textContent = 'Fetching model list…';
+    try {
+      const ids = await fetchLocalModels(urlInp.value.trim());
+      for (const id of ids) { const o = el('option') as HTMLOptionElement; o.value = id; localList.append(o); }
+      if (!localModelInp.value && ids[0]) { localModelInp.value = ids[0]; localStorage.setItem(LS_LOCAL_MODEL, ids[0]); }
+      localHint.textContent = ids.length ? `${ids.length} model${ids.length > 1 ? 's' : ''} on the server.` : 'The server lists no models.';
+    } catch (e) {
+      localHint.textContent = `⚠ Could not reach ${urlInp.value.trim()}/models (${(e as Error).message}). Is the server running and allowing browser (CORS) requests? Ollama: OLLAMA_ORIGINS=* ollama serve.`;
+    }
+  };
   const keyRow = el('div', 'row');
   keyRow.append(el('label', '', 'API key'));
   const keyInp = el('input') as HTMLInputElement;
@@ -144,8 +189,27 @@ export function buildAIPanel(app: App, root: HTMLElement) {
     estimate.textContent = `≈ ${tok >= 1000 ? (tok / 1000).toFixed(1) + 'k' : tok} tokens sent per turn · reply ${out} tokens`;
   };
 
-  cfg.append(keyRow, modelRow, ctxBox);
-  cfg.append(el('div', 'hint', 'Runs fully in your browser via OpenRouter.ai — pick a model or type any model ID. Get a key at openrouter.ai/keys.'));
+  const orHint = el('div', 'hint', 'Runs fully in your browser via OpenRouter.ai — pick a model or type any model ID. Get a key at openrouter.ai/keys.');
+  cfg.append(epRow, keyRow, modelRow, urlRow, localModelRow, localHint, ctxBox, orHint);
+  const applyEndpoint = () => {
+    const local = isLocal();
+    localStorage.setItem(LS_ENDPOINT, local ? 'local' : 'openrouter');
+    for (const r of [urlRow, localModelRow, localHint]) r.style.display = local ? '' : 'none';
+    modelRow.style.display = local ? 'none' : '';
+    orHint.style.display = local ? 'none' : '';
+    keyInp.placeholder = local ? 'optional' : 'sk-or-v1-…';
+    if (local) refreshLocalModels();
+  };
+  epSel.onchange = applyEndpoint;
+  applyEndpoint();
+  /** the model id for the active endpoint */
+  const currentModel = () => isLocal() ? localModelInp.value.trim() : (modelPicker.value.trim() || SUGGESTED_MODELS[0]);
+  /** true when a request can be sent (key present, or local endpoint with a model) — else a hint is shown */
+  const readyToSend = (): boolean => {
+    if (isLocal()) { if (!currentModel()) { addMsg('system', 'Enter (or pick) the local model id first.'); return false; } return true; }
+    if (!keyInp.value.trim()) { addMsg('system', 'Enter your OpenRouter API key first.'); return false; }
+    return true;
+  };
 
   const msgs = el('div', 'ai-msgs');
   const inputRow = el('div', 'ai-input-row');
@@ -256,7 +320,8 @@ export function buildAIPanel(app: App, root: HTMLElement) {
       ];
       await streamChat({
         apiKey: key,
-        model: modelPicker.value.trim() || SUGGESTED_MODELS[0],
+        baseUrl: isLocal() ? urlInp.value.trim() : undefined,
+        model: currentModel(),
         messages,
         onDelta: (d) => {
           acc += d;
@@ -285,10 +350,7 @@ export function buildAIPanel(app: App, root: HTMLElement) {
   async function send() {
     const q = ta.value.trim();
     if (!q || busy) return;
-    if (!keyInp.value.trim()) {
-      addMsg('system', 'Enter your OpenRouter API key first.');
-      return;
-    }
+    if (!readyToSend()) return;
     busy = true;
     sendBtn.disabled = true;
     ta.value = '';
@@ -319,7 +381,7 @@ export function buildAIPanel(app: App, root: HTMLElement) {
     'Finish with 2–3 concrete tweaks worth exploring (which transform, which knob, which direction) and what to expect from each. Prose only — no JSON, no edit blocks; do not change the flame.';
   explainBtn.onclick = async () => {
     if (busy) return;
-    if (!keyInp.value.trim()) { addMsg('system', 'Enter your OpenRouter API key first.'); return; }
+    if (!readyToSend()) return;
     busy = true;
     sendBtn.disabled = true;
     explainBtn.disabled = true;

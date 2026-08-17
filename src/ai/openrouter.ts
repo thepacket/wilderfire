@@ -11,7 +11,10 @@ export interface ChatMessage {
 }
 
 export interface StreamOptions {
+  /** OpenRouter key; may be empty for a local endpoint */
   apiKey: string;
+  /** Any OpenAI-compatible base URL (…/v1) instead of OpenRouter — Ollama, LM Studio, llama.cpp, vLLM */
+  baseUrl?: string;
   model: string;
   messages: ChatMessage[];
   onDelta?: (text: string) => void;
@@ -79,14 +82,25 @@ export async function fetchModels(opts: { force?: boolean } = {}): Promise<ORMod
   return models;
 }
 
+/** `…/v1/chat/completions` for a local base URL (with or without a trailing slash or `/v1`). */
+export const chatUrl = (baseUrl?: string) => baseUrl ? baseUrl.replace(/\/+$/, '').replace(/\/chat\/completions$/, '') + '/chat/completions' : OPENROUTER_URL;
+
+/** Model ids offered by a local OpenAI-compatible server (`GET …/v1/models`). */
+export async function fetchLocalModels(baseUrl: string): Promise<string[]> {
+  const res = await fetch(baseUrl.replace(/\/+$/, '') + '/models');
+  if (!res.ok) throw new Error(`HTTP ${res.status}`);
+  const j = await res.json() as { data?: { id?: string }[] };
+  return (j.data ?? []).map((m) => String(m.id ?? '')).filter(Boolean);
+}
+
 export async function streamChat(opts: StreamOptions): Promise<string> {
-  const res = await fetch(OPENROUTER_URL, {
+  const res = await fetch(chatUrl(opts.baseUrl), {
     method: 'POST',
     signal: opts.signal,
     headers: {
       'Content-Type': 'application/json',
-      Authorization: `Bearer ${opts.apiKey}`,
-      'X-Title': 'WilderFire',
+      ...(opts.apiKey ? { Authorization: `Bearer ${opts.apiKey}` } : {}),
+      ...(opts.baseUrl ? {} : { 'X-Title': 'WilderFire' }),
     },
     body: JSON.stringify({
       model: opts.model,
