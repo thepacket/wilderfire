@@ -1,8 +1,9 @@
-// Right panel — Gradient tab: presets, stop editor, .ugr/.map import.
-import { App, el, slider } from './common';
+// Right panel — Gradient tab: presets, stop editor, .ugr/.map import (gradient packs open a chooser) and export.
+import { App, el, slider, openModal } from './common';
 import type { RGB } from '../core/flame';
 import { expandStops } from '../core/flame';
 import { PALETTE_PRESETS, paletteFromPreset, randomPalette, rotatePalette, drawPalette } from '../core/palette';
+import { saveText } from './saveFile';
 
 interface Stop { pos: number; rgb: RGB; }
 
@@ -13,20 +14,39 @@ const fromHex = (h: string): RGB => [
   parseInt(h.slice(5, 7), 16) / 255,
 ];
 
-/** Parse an UltraFractal/Apophysis .ugr gradient file (first gradient). */
-export function parseUGR(text: string): RGB[] | null {
-  const seg = text.split(/gradient:/i)[1];
-  if (!seg) return null;
-  const stops: [number, number, number, number][] = [];
-  const re = /index=(\d+)\s+color=(\d+)/g;
-  let m: RegExpExecArray | null;
-  while ((m = re.exec(seg))) {
-    const idx = parseInt(m[1]);
-    const c = parseInt(m[2]); // UltraFractal packs colors as R + G·256 + B·65536
-    stops.push([Math.min(idx / 399, 1), (c & 255) / 255, ((c >> 8) & 255) / 255, ((c >> 16) & 255) / 255]);
+/** Parse every gradient of an UltraFractal/Apophysis .ugr file (gradient packs hold hundreds). */
+export function parseUGRAll(text: string): { name: string; palette: RGB[] }[] {
+  const out: { name: string; palette: RGB[] }[] = [];
+  const re = /([^\n{]*?)\s*\{\s*gradient:([\s\S]*?)\}/gi;
+  let g: RegExpExecArray | null;
+  while ((g = re.exec(text))) {
+    const seg = g[2];
+    const nm = /title="([^"]*)"/.exec(seg)?.[1] ?? g[1].trim();
+    const stops: [number, number, number, number][] = [];
+    const sr = /index=(\d+)\s+color=(\d+)/g;
+    let m: RegExpExecArray | null;
+    while ((m = sr.exec(seg))) {
+      const idx = parseInt(m[1]);
+      const c = parseInt(m[2]); // UltraFractal packs colors as R + G·256 + B·65536
+      stops.push([Math.min(idx / 399, 1), (c & 255) / 255, ((c >> 8) & 255) / 255, ((c >> 16) & 255) / 255]);
+    }
+    if (stops.length >= 2) out.push({ name: nm || `gradient ${out.length + 1}`, palette: expandStops(stops.sort((a, b) => a[0] - b[0])) });
   }
-  return stops.length >= 2 ? expandStops(stops) : null;
+  return out;
 }
+/** First gradient of a .ugr (kept for callers that want just one). */
+export const parseUGR = (text: string): RGB[] | null => parseUGRAll(text)[0]?.palette ?? null;
+
+/** Serialise a 256-entry palette as one UltraFractal .ugr gradient (every 8th entry → 32 stops on the 0..399 index scale). */
+export function toUGR(pal: RGB[], title: string): string {
+  const packed = (c: RGB) => Math.round(c[0] * 255) + Math.round(c[1] * 255) * 256 + Math.round(c[2] * 255) * 65536;
+  const lines: string[] = [];
+  for (let i = 0; i < 256; i += 8) lines.push(`  index=${Math.round((i / 255) * 399)} color=${packed(pal[i])}`);
+  lines.push(`  index=399 color=${packed(pal[255])}`);
+  return `${title.replace(/[{}"]/g, '') || 'WilderFire'} {\ngradient:\n  title="${title.replace(/"/g, "'")}" smooth=yes\n${lines.join('\n')}\n}\n`;
+}
+/** Serialise a palette as a fractint .map (256 lines "R G B"). */
+export const toMAP = (pal: RGB[]): string => pal.map((c) => c.map((v) => Math.round(v * 255)).join(' ')).join('\n') + '\n';
 
 /** Parse a fractint-style .map (lines of "R G B", 0-255). */
 export function parseMAP(text: string): RGB[] | null {
@@ -106,24 +126,46 @@ export function buildPalettePanel(app: App, root: HTMLElement) {
   impFile.accept = '.ugr,.map,.txt';
   impFile.style.display = 'none';
   impBtn.onclick = () => impFile.click();
+  const useImported = (pal: RGB[]) => { base = pal; shift = 0; shiftS.set(0); sel.value = ''; apply(); initStops(); };
   impFile.onchange = async () => {
     const f = impFile.files?.[0];
     if (!f) return;
     const text = await f.text();
-    const pal = f.name.toLowerCase().endsWith('.map') ? parseMAP(text) : (parseUGR(text) ?? parseMAP(text));
-    if (!pal) {
-      alert('Could not parse a gradient from this file.');
-    } else {
-      base = pal;
-      shift = 0;
-      shiftS.set(0);
-      sel.value = '';
-      apply();
-      initStops();
-    }
     impFile.value = '';
+    const grads = f.name.toLowerCase().endsWith('.map') ? [] : parseUGRAll(text);
+    if (grads.length > 1) {
+      // a gradient pack: pick one
+      const { body, close } = openModal(`${f.name} — ${grads.length} gradients`);
+      const grid = el('div', 'ugr-grid');
+      for (const g of grads) {
+        const item = el('div', 'ugr-item');
+        const c = el('canvas') as HTMLCanvasElement;
+        c.width = 256; c.height = 18;
+        drawPalette(c, g.palette);
+        item.append(c, el('span', 'ugr-name', g.name));
+        item.title = g.name;
+        item.onclick = () => { useImported(g.palette); close(); };
+        grid.append(item);
+      }
+      body.append(grid);
+      return;
+    }
+    const pal = grads[0]?.palette ?? parseMAP(text);
+    if (!pal) alert('Could not parse a gradient from this file.');
+    else useImported(pal);
   };
-  btnRow.append(randBtn, impBtn, impFile);
+  const expBtn = el('button', '', '⬇ .ugr');
+  expBtn.title = 'Save the current gradient as an UltraFractal / Apophysis .ugr file (Shift-click: fractint .map)';
+  expBtn.onclick = (ev) => {
+    const name = (app.flame.name || 'wilderfire').replace(/[\\/:*?"<>|]+/g, '_');
+    const pal = app.activeLayer.palette;
+    if (ev.shiftKey) saveText(toMAP(pal), { suggestedName: `${name}.map`, description: 'fractint gradient', mime: 'text/plain', ext: '.map' });
+    else saveText(toUGR(pal, app.flame.name || 'WilderFire'), { suggestedName: `${name}.ugr`, description: 'UltraFractal gradient', mime: 'text/plain', ext: '.ugr' });
+  };
+  const invBtn = el('button', '', '⇆ Invert');
+  invBtn.title = 'Reverse the gradient';
+  invBtn.onclick = () => useImported([...base].reverse());
+  btnRow.append(randBtn, invBtn, impBtn, impFile, expBtn);
   sec.append(btnRow);
   sec.append(el('div', 'hint', 'Edits the ACTIVE layer’s gradient. Each transform picks its hue via its Color slider (position in this gradient).'));
 

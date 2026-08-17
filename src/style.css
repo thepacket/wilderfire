@@ -371,3 +371,10 @@ a { color: var(--accent2); }
 .batch-file { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .batch-status { color: var(--fg-dim); white-space: nowrap; }
 .batch-status.busy { color: var(--accent); }
+
+/* ---------- .ugr gradient pack chooser ---------- */
+.ugr-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(200px, 1fr)); gap: 8px; min-width: min(640px, 86vw); }
+.ugr-item { cursor: pointer; border: 1px solid var(--border); border-radius: 6px; padding: 5px; background: var(--bg3); }
+.ugr-item:hover { border-color: var(--accent); }
+.ugr-item canvas { width: 100%; height: 18px; display: block; border-radius: 3px; }
+.ugr-name { display: block; font-size: 11px; margin-top: 3px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
