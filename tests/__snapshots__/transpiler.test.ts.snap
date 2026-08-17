@@ -1,0 +1,146 @@
+// Vitest Snapshot v1, https://vitest.dev/guide/snapshot.html
+
+exports[`cwgsl: control flow > \`i++\` inside an expression goes through the jpostinc builtin 1`] = `
+"  var n: i32 = 0;
+  var a: f32 = 0.0;
+  if ((jpostinc(&(n)) < 1)) {
+    a += 1.0;
+  }
+  v.x += (\${w} * (a + f32(n)));
+"
+`;
+
+exports[`cwgsl: control flow > a bare \`return;\` in the snippet becomes a breakable wrapper (no early exit from the xform fn) 1`] = `
+"  loop {
+  if ((r2 < 0.000001)) {
+    break;
+  }
+  v.x += ((\${w} * t.x) / r2);
+  v.y += ((\${w} * t.y) / r2);
+  break;
+  }
+"
+`;
+
+exports[`cwgsl: control flow > for/while loops, break/continue, switch with block-terminated cases 1`] = `
+"  var acc: f32 = 0.0;
+  for (var i: i32 = 0; (i < 4); i++) {
+    if ((i == 2)) {
+      continue;
+    }
+    acc += (t.x * f32(i));
+  }
+  var j: i32 = 0;
+  while ((j < 10)) {
+    j++;
+    if ((acc > 3.0)) {
+      break;
+    }
+    acc += 0.1;
+  }
+  switch (j & 3) {
+    case 0: {
+      acc += 1.0;
+    }
+    case 1, 2: {
+      acc -= 1.0;
+    }
+    case default: {
+      acc = 0.0;
+    }
+  }
+  v.x += (\${w} * acc);
+"
+`;
+
+exports[`cwgsl: expressions and magic variables > gives snippets that assign their own weight/params a mutable local copy 1`] = `
+"  var p0_: f32 = \${p[0]};
+  var w_: f32 = \${w};
+  p0_ = abs(p0_);
+  w_ = (w_ * 0.5);
+  v.x += ((w_ * t.x) * p0_);
+"
+`;
+
+exports[`cwgsl: expressions and magic variables > keeps integer arithmetic integer (int params, casts, %, bit ops) 1`] = `
+"  var n: i32 = i32(\${p[0]});
+  var k: i32 = (n % 3);
+  var m: i32 = ((k << 1) | 1);
+  var f: f32 = (f32(k) / f32(n));
+  v.x += (\${w} * (f + f32((m & 2))));
+"
+`;
+
+exports[`cwgsl: expressions and magic variables > maps the point/output magic vars, weight and params; C float math to WGSL 1`] = `
+"  var a: f32 = ((ph * \${p[0]}) + \${w});
+  var q: vec2f = (vec2f(cos(a), sin(a)) * vec2f(r));
+  v.x += (\${w} * q.x);
+  v.y += ((\${w} * abs(q.y)) + powc(r2, 0.5));
+  pz_ += (\${w} * z_);
+"
+`;
+
+exports[`cwgsl: expressions and magic variables > ternaries, compound assignments and unary minus 1`] = `
+"  var s: f32 = select(-1.0, 1.0, (t.x > 0.0));
+  var t2: f32 = -t.y;
+  t2 *= 2.0;
+  t2 -= s;
+  t2 /= 3.0;
+  v.x += ((\${w} * s) * t2);
+"
+`;
+
+exports[`cwgsl: helpers, structs and state > emits only the helpers the snippet uses and threads the rng state into helpers that draw randoms 1`] = `
+"fn atan2j(y: f32, x: f32) -> f32 { if (x == 0.0 && y == 0.0) { return select(0.0, PI, (bitcast<u32>(x) >> 31u) == 1u) * select(1.0, -1.0, (bitcast<u32>(y) >> 31u) == 1u); } return atan2(y, x); }
+
+fn demo_jit(x: f32, rs: ptr<function, u32>) -> f32 {
+  return (x + ((rnd(rs) - 0.5) * 0.01));
+}
+
+fn demo_sq(x: f32) -> f32 {
+  return (x * x);
+}"
+`;
+
+exports[`cwgsl: helpers, structs and state > structs, pointer parameters and module-scope constant tables 1`] = `
+"  var p_: demo_Pt = demo_Pt_make(t.x, t.y);
+  demo_rot(&(p_), \${p[0]});
+  v.x += (\${w} * (p_.x + demo_TAB[1]));
+  v.y += (\${w} * p_.y);
+struct demo_Pt {
+  x: f32,
+  y: f32,
+}
+
+fn atan2j(y: f32, x: f32) -> f32 { if (x == 0.0 && y == 0.0) { return select(0.0, PI, (bitcast<u32>(x) >> 31u) == 1u) * select(1.0, -1.0, (bitcast<u32>(y) >> 31u) == 1u); } return atan2(y, x); }
+
+fn demo_Pt_make(x: f32, y: f32) -> demo_Pt {
+  var r_: demo_Pt;
+  r_.x = x;
+  r_.y = y;
+  return r_;
+}
+
+fn demo_rot(p_: ptr<function, demo_Pt>, a: f32) {
+  var c: f32 = cos(a);
+  var s: f32 = sin(a);
+  var x: f32 = (((*p_).x * c) - ((*p_).y * s));
+  (*p_).y = (((*p_).x * s) + ((*p_).y * c));
+  (*p_).x = x;
+}
+
+const demo_TAB: array<f32, 3> = array<f32, 3>(0.25, 0.5, 0.75);"
+`;
+
+exports[`cwgsl: helpers, structs and state > typed per-thread "extra" state becomes jwx_ globals with the state flag 1`] = `
+"  if ((jwx_demo_inited_ == 0.0)) {
+    jwx_demo_inited_ = 1.0;
+    jwx_demo_pos = vec2f(t.x, t.y);
+    jwx_demo_n = 0;
+  }
+  jwx_demo_pos = vec2f(jwx_demo_pos.y, -jwx_demo_pos.x);
+  jwx_demo_n = (jwx_demo_n + 1);
+  v.x += (\${w} * jwx_demo_pos.x);
+  v.y += ((\${w} * jwx_demo_pos.y) * f32(jwx_demo_n));
+"
+`;

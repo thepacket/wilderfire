@@ -1,0 +1,174 @@
+// Vitest Snapshot v1, https://vitest.dev/guide/snapshot.html
+
+exports[`java2cu: params, constants, helpers, state > replays init(), inlines static-final constants, ports long→int, threads params into helpers, keeps written fields as state > cuda 1`] = `
+"varpar->reg_demo_dist_c = __reg_demo_dist;
+float invPower = 0;
+if (varpar->reg_demo_inited_ == 0.0f) {
+  varpar->reg_demo_inited_ = 1.0f;
+  varpar->reg_demo_seed_s = __reg_demo_seed;
+}
+{
+
+    invPower = 1.0 / __reg_demo_power;
+  
+}
+
+    float a = atan2f(__y, __x) * invPower;
+    int n = 0;
+    float r = sqrtf(__x * __x + __y * __y);
+    if (jpostinc(&n) < 1 && r > __reg_demo_dist) {
+      r = reg_demo_jitter(r) * (0.75);
+    }
+    float sn = sinf(a), cs = cosf(a);
+    __px += __amount_ * r * cs;
+    __py += __amount_ * r * sn;
+    if (false) {
+      __pz += __amount_ * __z;
+    }
+    varpar->reg_demo_seed_s = varpar->reg_demo_seed_s * 1103515245 + 1;
+  "
+`;
+
+exports[`java2cu: params, constants, helpers, state > replays init(), inlines static-final constants, ports long→int, threads params into helpers, keeps written fields as state > wgsl 1`] = `
+"  jwx_reg_demo_dist_c = \${p[1]};
+  var invPower: f32 = 0;
+  if ((jwx_reg_demo_inited_ == 0.0)) {
+    jwx_reg_demo_inited_ = 1.0;
+    jwx_reg_demo_seed_s = i32(\${p[2]});
+  }
+  {
+    invPower = (1.0 / \${p[0]});
+  }
+  var a: f32 = (atan2j(t.y, t.x) * invPower);
+  var n: i32 = 0;
+  var r_: f32 = sqrt(((t.x * t.x) + (t.y * t.y)));
+  if (((jpostinc(&(n)) < 1) && (r_ > \${p[1]}))) {
+    r_ = (reg_demo_jitter(r_, rs) * 0.75);
+  }
+  var sn: f32 = sin(a);
+  var cs: f32 = cos(a);
+  v.x += ((\${w} * r_) * cs);
+  v.y += ((\${w} * r_) * sn);
+  if (false) {
+    pz_ += (\${w} * z_);
+  }
+  jwx_reg_demo_seed_s = ((jwx_reg_demo_seed_s * 1103515245) + 1);
+"
+`;
+
+exports[`java2cu: plain-data classes, tables, pointer params > inner class → struct + _make, constant array → module table, mutated object param → pointer, chained assignment after else → braces, random field initialiser → per-instance state (initialised once) > cuda 1`] = `
+"if (varpar->reg_pod_inited_ == 0.0f) {
+  varpar->reg_pod_inited_ = 1.0f;
+  varpar->reg_pod_phase = RANDFLOAT() * 0.1;
+}
+
+    reg_pod_Pt p = reg_pod_Pt_make(__x, __y);
+    int k = ((int)(RANDFLOAT() * (float)(__reg_pod_sides)));
+    reg_pod_rotate(p, 2.0 * M_PI * k / __reg_pod_sides + varpar->reg_pod_phase);
+    float d;
+    if (k % 2 == 0)
+      d = __reg_pod_spread * reg_pod_OFFSETS[k & 3];
+    else
+      { p.x = p.x + __reg_pod_spread; d = p.x; }
+    __px += __amount_ * (p.x + d);
+    __py += __amount_ * p.y;
+  "
+`;
+
+exports[`java2cu: plain-data classes, tables, pointer params > inner class → struct + _make, constant array → module table, mutated object param → pointer, chained assignment after else → braces, random field initialiser → per-instance state (initialised once) > cuda functions 1`] = `
+"struct jxyz_ { float x; float y; float z; float color; };
+__device__ jxyz_ jxyz__zero() { jxyz_ r_; return r_; }
+__device__ void jxyz_assign(jxyz_ *a, jxyz_ b) { a->x = b.x; a->y = b.y; a->z = b.z; a->color = b.color; }
+float reg_pod_OFFSETS[4] = {0.0, 0.25, 0.5, 0.75};
+struct reg_pod_Pt { float x; float y; };
+__device__ reg_pod_Pt reg_pod_Pt_zero() { reg_pod_Pt r_; return r_; }
+__device__ reg_pod_Pt reg_pod_Pt_make(float x, float y) { reg_pod_Pt r_; r_.x = x; r_.y = y; return r_; }
+__device__ void reg_pod_rotate(reg_pod_Pt *p, float a) {
+    float c = cosf(a), s = sinf(a);
+    float x = p->x * c - p->y * s;
+    p->y = p->x * s + p->y * c;
+    p->x = x;
+  }
+"
+`;
+
+exports[`java2cu: plain-data classes, tables, pointer params > inner class → struct + _make, constant array → module table, mutated object param → pointer, chained assignment after else → braces, random field initialiser → per-instance state (initialised once) > wgsl 1`] = `
+"  if ((jwx_reg_pod_inited_ == 0.0)) {
+    jwx_reg_pod_inited_ = 1.0;
+    jwx_reg_pod_phase = (rnd(rs) * 0.1);
+  }
+  var p_: reg_pod_Pt = reg_pod_Pt_make(t.x, t.y);
+  var k: i32 = i32((rnd(rs) * \${p[0]}));
+  reg_pod_rotate(&(p_), ((((2.0 * PI) * f32(k)) / \${p[0]}) + jwx_reg_pod_phase));
+  var d: f32;
+  if (((k % 2) == 0)) {
+    d = (\${p[1]} * reg_pod_OFFSETS[(k & 3)]);
+  } else {
+    p_.x = (p_.x + \${p[1]});
+    d = p_.x;
+  }
+  v.x += (\${w} * (p_.x + d));
+  v.y += (\${w} * p_.y);
+"
+`;
+
+exports[`java2cu: prepost pairs > invtransform() becomes preCode (helper taking pAffineTP inlined, precalc refresh appended) and shares the init() preamble with transform() > cuda pre 1`] = `
+"float sina = 0;
+float cosa = 0;
+{
+
+    sina = sinf(__reg_prepost_angle * M_PI / 180.0);
+    cosa = cosf(__reg_prepost_angle * M_PI / 180.0);
+  
+}
+
+    {
+
+    float x = __x * (1.0 / __reg_prepost_scale), y = __y * (1.0 / __reg_prepost_scale);
+    __x = x * cosa - y * sina;
+    __y = x * sina + y * cosa;
+  
+}
+  
+__r2 = __x*__x+__y*__y; __r = sqrtf(__r2); __rinv = 1.0f/__r; __phi = atan2f(__x,__y); __theta = 0.5f*M_PI-__phi; if (__theta > M_PI) __theta -= 2.0f*M_PI;
+"
+`;
+
+exports[`java2cu: prepost pairs > invtransform() becomes preCode (helper taking pAffineTP inlined, precalc refresh appended) and shares the init() preamble with transform() > wgsl 1`] = `
+"  var sina: f32 = 0;
+  var cosa: f32 = 0;
+  {
+    sina = sin(((\${p[1]} * PI) / 180.0));
+    cosa = cos(((\${p[1]} * PI) / 180.0));
+  }
+  var x: f32 = (v.x * \${p[0]});
+  var y: f32 = (v.y * \${p[0]});
+  v.x = ((x * cosa) + (y * sina));
+  v.y = ((-x * sina) + (y * cosa));
+"
+`;
+
+exports[`java2cu: prepost pairs > invtransform() becomes preCode (helper taking pAffineTP inlined, precalc refresh appended) and shares the init() preamble with transform() > wgsl pre 1`] = `
+"  var rinv_: f32 = 1.0 / r;
+  var sina: f32 = 0;
+  var cosa: f32 = 0;
+  {
+    sina = sin(((\${p[1]} * PI) / 180.0));
+    cosa = cos(((\${p[1]} * PI) / 180.0));
+  }
+  {
+    var x: f32 = (t.x * (1.0 / \${p[0]}));
+    var y: f32 = (t.y * (1.0 / \${p[0]}));
+    t.x = ((x * cosa) - (y * sina));
+    t.y = ((x * sina) + (y * cosa));
+  }
+  r2 = ((t.x * t.x) + (t.y * t.y));
+  r = sqrt(r2);
+  rinv_ = (1.0 / r);
+  th = atan2j(t.x, t.y);
+  ph = ((0.5 * PI) - th);
+  if ((ph > PI)) {
+    ph -= (2.0 * PI);
+  }
+"
+`;

@@ -57,7 +57,7 @@ const concrete = (t: Ty): Ty => t.k === 'aint' ? I32 : t.k === 'afloat' ? F32 : 
 function tyEq(a: Ty, b: Ty): boolean { return tyStr(a) === tyStr(b); }
 
 export class TranspileError extends Error {}
-const fail = (msg: string): never => { throw new TranspileError(msg); };
+function fail(msg: string): never { throw new TranspileError(msg); } // a declaration (not a const arrow) so TS narrows after `if (!x) fail(…)`
 
 // ---------------------------------------------------------------------------
 // Lexer
@@ -1519,10 +1519,10 @@ class Emitter {
               return `${ind}{\n${pre}${rest}${ind}}\n`;
             }
             init = this.stmt(s.init, inner, '').trim().replace(/;$/, '');
-          } else {
+          } else if (s.init.t === 'expr') {
             init = this.exprStmt(s.init.e, inner, '').trim().replace(/;$/, '');
             if (init.includes('\n')) fail('complex for-init');
-          }
+          } else fail('unsupported for-init');
         }
         const c = s.c ? this.toBool(this.expr(s.c, inner)) : '';
         let u = '';
@@ -1570,6 +1570,7 @@ class Emitter {
         if (!hasDefault) out += `${ind}  default: {}\n`;
         return out + `${ind}}\n`;
       }
+      default: return fail(`loopStmt: unexpected statement ${(s as Stmt).t}`);
     }
   }
   blockOf(s: Stmt, sc: Scope, ind: string): string {

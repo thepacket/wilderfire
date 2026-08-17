@@ -33,19 +33,28 @@ for (let i = 0; i < args.length; i++) {
   else only.push(args[i]);
 }
 const varDir = path.join(jwfRoot, 'src/org/jwildfire/create/tina/variation');
-if (!fs.existsSync(varDir)) { console.error(`JWildfire sources not found at ${varDir} (use --jwf)`); process.exit(1); }
 
-interface DumpVar { name: string; params: { name: string; def: number; int: boolean }[]; gpuCode?: string; gpu?: boolean; resources?: number; priority?: number }
+export interface DumpVar { name: string; params: { name: string; def: number; int: boolean }[]; gpuCode?: string; gpu?: boolean; resources?: number; priority?: number }
 const dump: DumpVar[] = fs.readFileSync(path.join(here, 'data/jwf-variations.jsonl'), 'utf8').split('\n').filter(Boolean).map((l) => JSON.parse(l));
 const dumpByName = new Map(dump.map((d) => [d.name, d]));
 
 // name → java file (by getName())
-const files = walk(varDir).filter((f) => f.endsWith('.java'));
-const fileByName = new Map<string, string>();
-for (const f of files) {
-  const s = fs.readFileSync(f, 'latin1');
-  const m = /public String getName\(\)\s*\{\s*return\s+"([A-Za-z0-9_]+)"\s*;/.exec(s);
-  if (m && (!fileByName.has(m[1]) || /public\s+abstract\s+class/.test(fs.readFileSync(fileByName.get(m[1])!, 'latin1')))) fileByName.set(m[1], f); // a concrete class beats an abstract one with the same name
+// The JWildfire source tree is only needed by main() and by MERGE_PARENTS lookups —
+// resolved lazily so the module can be imported as a library (tests) without it.
+let filesCache: string[] | null = null;
+function javaFiles(): string[] {
+  if (filesCache) return filesCache;
+  if (!fs.existsSync(varDir)) throw new Error(`JWildfire sources not found at ${varDir} (use --jwf or JWF=)`);
+  return (filesCache = walk(varDir).filter((f) => f.endsWith('.java')));
+}
+function fileIndex(): Map<string, string> {
+  const fileByName = new Map<string, string>();
+  for (const f of javaFiles()) {
+    const s = fs.readFileSync(f, 'latin1');
+    const m = /public String getName\(\)\s*\{\s*return\s+"([A-Za-z0-9_]+)"\s*;/.exec(s);
+    if (m && (!fileByName.has(m[1]) || /public\s+abstract\s+class/.test(fs.readFileSync(fileByName.get(m[1])!, 'latin1')))) fileByName.set(m[1], f); // a concrete class beats an abstract one with the same name
+  }
+  return fileByName;
 }
 function walk(d: string): string[] { return fs.readdirSync(d, { withFileTypes: true }).flatMap((e) => e.isDirectory() ? walk(path.join(d, e.name)) : [path.join(d, e.name)]); }
 
@@ -229,7 +238,7 @@ const BARE_MAP: Record<string, string> = { fabs: 'fabsf', iabs: 'abs', sqrt: 'sq
   acosh: 'acoshf', asinh: 'asinhf', atanh: 'atanhf', toRadians: 'radians', toDegrees: 'degrees' };
 const RESERVED_LOCALS = new Set(['x', 'y', 'z']);
 
-interface Ctx { name: string; params: Set<string>; fieldMap: Map<string, string>; state: Set<string>; helperNames: Set<string>; usedHelperParams: Set<string>; inHelper: boolean; consts: Map<string, string>; usedLib: Set<string>; pods: Map<string, string>; podMethods: Map<string, string>; podFields: Map<string, Set<string>>; podValue: boolean }
+interface Ctx { name: string; params: Set<string>; fieldMap: Map<string, string>; state: Set<string>; /** state field → varpar slot name (a field that shares its name with a param gets `_s`, or `varpar->x` would read as the param `__x`) */ stateName: (id: string) => string; helperNames: Set<string>; usedHelperParams: Set<string>; inHelper: boolean; consts: Map<string, string>; usedLib: Set<string>; pods: Map<string, string>; podMethods: Map<string, string>; podFields: Map<string, Set<string>>; podValue: boolean }
 // small device helpers some conversions need (appended to gpuFunctions when used)
 const LIB: Record<string, string> = {
   jgcd: '__device__ int jgcd(int a, int b) { a = abs(a); b = abs(b); while (b != 0) { int t = a % b; a = b; b = t; } return a; }',
@@ -359,7 +368,7 @@ function convertJava(code: string, ctx: Ctx, extraLocals: Iterable<string> = [])
       if (ctx.inHelper) { ctx.usedHelperParams.add(pn); return `__${ctx.name}_${pn}_c`; }
       return `__${ctx.name}_${pn}`;
     }
-    if (ctx.state.has(id)) return `varpar->${ctx.name}_${id}`;
+    if (ctx.state.has(id)) return `varpar->${ctx.name}_${ctx.stateName(id)}`;
     return forced ? id : m0;
   });
   s = s.replace(/THISF_/g, '');
@@ -391,17 +400,19 @@ const JAVA_PATCHES: Record<string, [string | RegExp, string][]> = {
 };
 
 // ---------------------------------------------------------------- per-variation conversion
-interface Port { name: string; gpuCode: string; preCode?: string; gpuFunctions: string; extraParams: string[]; note: string; javaFile: string }
+export interface Port { name: string; gpuCode: string; preCode?: string; gpuFunctions: string; extraParams: string[]; note: string; javaFile: string }
 const MERGE_PARENTS: Record<string, string> = { GLSLFunc: 'GLSLFunc.java', AbstractFalloff3Func: 'AbstractFalloff3Func.java', AbstractAffine3DFunc: 'AbstractAffine3DFunc.java' };
-function convertVariation(d: DumpVar, src0: string, javaFile: string): Port {
+/** Java variation class source → CUDA-dialect port. `parentSources` lets a caller supply
+ *  MERGE_PARENTS sources directly (tests); otherwise they are read from the JWildfire tree. */
+export function convertVariation(d: DumpVar, src0: string, javaFile: string, parentSources?: Record<string, string>): Port {
   let src = src0;
   for (const [from, to] of PRE_PATCHES[d.name] ?? []) { const s2 = src.replace(from, to); if (s2 === src) throw new Error(`pre-patch did not match: ${from}`); src = s2; }
   const cls = parseClass(src);
   // known abstract parents whose fields/params/setParameter the subclass relies on (GLSLFunc: resolution, gradient)
   if (MERGE_PARENTS[cls.parent]) {
-    const pf = files.find((f) => f.endsWith('/' + MERGE_PARENTS[cls.parent]));
-    if (!pf) throw new Error(`parent source ${cls.parent} not found`);
-    const par = parseClass(fs.readFileSync(pf, 'latin1'));
+    const pf = parentSources?.[cls.parent] !== undefined ? null : javaFiles().find((f) => f.endsWith('/' + MERGE_PARENTS[cls.parent]));
+    if (!pf && parentSources?.[cls.parent] === undefined) throw new Error(`parent source ${cls.parent} not found`);
+    const par = parseClass(parentSources?.[cls.parent] ?? fs.readFileSync(pf!, 'latin1'));
     for (const [k, v] of par.consts) if (!cls.consts.has(k)) cls.consts.set(k, v);
     for (const [k, v] of par.numConsts) if (!cls.numConsts.has(k)) cls.numConsts.set(k, v);
     for (const pd of par.pods) if (!cls.pods.some((x) => x.name === pd.name)) cls.pods.push(pd);
@@ -535,7 +546,8 @@ function convertVariation(d: DumpVar, src0: string, javaFile: string): Port {
   }
   if (state.size > 40) throw new Error(`too much state (${[...state].join(',')})`);
   const helperNames = new Set(helpers.map((h) => h.name));
-  const ctx: Ctx = { name: d.name, params: new Set([...paramFields].filter((f) => !state.has(f))), fieldMap, state, helperNames, usedHelperParams: new Set(), inHelper: false, consts: new Map(), usedLib: new Set(), podFields: new Map(), pods: new Map(cls.pods.map((pd) => [pd.name, pd.builtin ? pd.builtin.cuda : `${d.name}_${pd.name}`])), podMethods: new Map(cls.pods.flatMap((pd) => pd.builtin ? Object.entries(pd.builtin.methods).map(([m, fn]) => [`${pd.name}.${m}`, fn] as [string, string]) : pd.setters.map((st) => [`${pd.name}.${st.name}`, `${d.name}_${pd.name}_${st.name}`] as [string, string]))), podValue: cls.pods.some((pd) => pd.fields.some((f) => f.name === 'value')) };
+  const stateName = (id: string) => (paramNames.has(id) ? `${id}_s` : id);
+  const ctx: Ctx = { name: d.name, params: new Set([...paramFields].filter((f) => !state.has(f))), fieldMap, state, stateName, helperNames, usedHelperParams: new Set(), inHelper: false, consts: new Map(), usedLib: new Set(), podFields: new Map(), pods: new Map(cls.pods.map((pd) => [pd.name, pd.builtin ? pd.builtin.cuda : `${d.name}_${pd.name}`])), podMethods: new Map(cls.pods.flatMap((pd) => pd.builtin ? Object.entries(pd.builtin.methods).map(([m, fn]) => [`${pd.name}.${m}`, fn] as [string, string]) : pd.setters.map((st) => [`${pd.name}.${st.name}`, `${d.name}_${pd.name}_${st.name}`] as [string, string]))), podValue: cls.pods.some((pd) => pd.fields.some((f) => f.name === 'value')) };
   for (const pd of cls.pods) if (pd.builtin) ctx.usedLib.add(pd.builtin.lib);
   ctx.podFields = new Map(cls.pods.map((pd) => [pd.name, new Set(cls.fields.filter((f) => f.type === pd.name).map((f) => f.name))]));
   for (const [k, v] of cls.numConsts) ctx.consts.set(k, convertJava(v, ctx));
@@ -631,28 +643,31 @@ function convertVariation(d: DumpVar, src0: string, javaFile: string): Port {
   // state: first-call init from Java initialiser (or param value)
   const stateType = (n: string) => { const f = cls.fields.find((x) => x.name === n); const t = f?.type ?? 'double'; return t in VEC_TYPES ? ':' + VEC_TYPES[t] : t === 'int' || t === 'long' || t === 'short' ? ':int' : ''; };
   if (state.size) {
-    extra.push('inited_', ...[...state].map((n) => n + stateType(n)));
+    extra.push('inited_', ...[...state].map((n) => stateName(n) + stateType(n)));
     code += `if (varpar->${d.name}_inited_ == 0.0f) {\n  varpar->${d.name}_inited_ = 1.0f;\n`;
     for (const f of cls.fields) {
       if (!state.has(f.name)) continue;
       const initExpr = paramState.includes(f.name) ? `__${d.name}_${fieldMap.get(f.name)}` : f.init !== null ? convertJava(f.init, ctx) : '0';
-      code += `  varpar->${d.name}_${f.name} = ${initExpr};\n`;
+      code += `  varpar->${d.name}_${stateName(f.name)} = ${initExpr};\n`;
     }
     if (initTouchesState && init) code += '  {\n' + convertJava(init.body, ctx) + '\n  }\n';
     // trajectory state (attractor coordinates: float state written by transform()): Java runs a
     // handful of long identical trajectories; our 65k walkers would all trace the same short
     // one, so each thread starts a hair off — chaotic maps decorrelate within the fuse
     for (const f of cls.fields) {
-      if (!state.has(f.name) || !tAssigned.has(f.name) || f.array !== null || f.type === 'int' || f.type === 'boolean' || f.type in VEC_TYPES) continue;
-      code += `  varpar->${d.name}_${f.name} += (RANDFLOAT() - 0.5f) * 1.0e-4f;\n`;
+      if (!state.has(f.name) || !tAssigned.has(f.name) || f.array !== null || f.type === 'int' || f.type === 'long' || f.type === 'short' || f.type === 'boolean' || f.type in VEC_TYPES) continue;
+      code += `  varpar->${d.name}_${stateName(f.name)} += (RANDFLOAT() - 0.5f) * 1.0e-4f;\n`;
     }
     code += '}\n';
   }
   // state fields that are only read by helpers (never written per point) are plain derived values:
   // reset them from their initialiser every call before the setParameter/init replay
+  // (a random initialiser is a per-instance constant: the first-call init above is all it needs)
   for (const f of nonParamFields) {
     if (!state.has(f.name) || f.array !== null || tAssigned.has(f.name) || hAssigned.has(f.name) || initAssigned.has(f.name)) continue;
-    code += `varpar->${d.name}_${f.name} = ${f.init !== null ? convertJava(f.init, ctx) : '0'};\n`;
+    const initExpr = f.init !== null ? convertJava(f.init, ctx) : '0';
+    if (/RANDFLOAT|RANDINT|jrand_|jmrg_/.test(initExpr)) continue;
+    code += `varpar->${d.name}_${stateName(f.name)} = ${initExpr};\n`;
   }
   // derived fields computed in setParameter() (`pwx = pValue * M_2PI;`): replay those branches
   if (setParam) {
@@ -982,6 +997,7 @@ function convertSegment(seg: Tok[]): string {
 function main() {
 const ports: Port[] = [];
 const failures: [string, string][] = [];
+const fileByName = fileIndex();
 
 for (const d of targets) {
   const file = fileByName.get(d.name);

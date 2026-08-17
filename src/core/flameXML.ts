@@ -219,8 +219,10 @@ function parseXFormEl(elm: Element, ctx?: CurveCtx): XForm {
       const vn = name.slice(0, us);
       const pn = name.slice(us + 1);
       const res = resolve(vn);
-      if (res && VARIATIONS[res.vname]?.params?.some((p) => p.name === pn)) {
-        (params[attr.name.slice(0, attr.name.length - name.length + us)] ??= {})[pn] = val;
+      // (a param name with spaces/punctuation — "Density Pixels" — arrives sanitised by the lenient pre-parser)
+      const pd = VARIATIONS[res?.vname ?? '']?.params?.find((p) => p.name === pn || p.name.replace(/[^\w.-]/g, '_') === pn);
+      if (res && pd) {
+        (params[attr.name.slice(0, attr.name.length - name.length + us)] ??= {})[pd.name] = val;
         matched = true;
         break;
       }
