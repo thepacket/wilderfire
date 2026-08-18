@@ -270,6 +270,7 @@ async function boot() {
   renderer.onError = (msg) => { status.textContent = '⚠ ' + msg; };
   renderer.onFrame = (s) => {
     const mps = s.samplesPerSec / 1e6;
+    if (s.note) { status.textContent = swNote + s.note + (s.converged ? ' · done' : ' · rendering') + ` · ${renderer.width}×${renderer.height}`; return; }
     status.textContent = swNote +
       `quality ${s.spp.toFixed(0)} spp` +
       (s.converged ? ' · done' : s.paused ? ' · paused' : ` · ${mps.toFixed(0)} M iters/s`) +

@@ -37,6 +37,8 @@ export interface RenderStats {
   budgetScale: number;
   /** measured GPU time per preview frame (ms, smoothed) */
   gpuMs: number;
+  /** free-form status of a non-flame layer (escape: tier, reference length, frame cost) */
+  note?: string;
 }
 
 export class FlameRenderer {

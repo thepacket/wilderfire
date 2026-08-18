@@ -595,7 +595,9 @@ export class EscapeRenderer {
         }, () => { this.bandInFlight = false; });
       }
     }
-    return { spp: 0, samplesPerSec: 0, paused: false, converged: this.nextRow >= this.h, budgetScale: 1, gpuMs: 0 };
+    const tier = escapeTier(this.data);
+    const note = `escape · ${tier === 'perturb' ? `perturbation (ref ${this.refN}${this.refOff[0] || this.refOff[1] ? ', off-centre' : ''})` : tier === 'ds' ? 'double-single' : 'f32'}${this.msPerRow > 0 ? ` · ${(this.msPerRow * this.h).toFixed(0)} ms/frame` : ''}`;
+    return { spp: 0, samplesPerSec: 0, paused: false, converged: this.nextRow >= this.h, budgetScale: 1, gpuMs: 0, note };
   }
 
   /** Finish the picture now (capture paths). */
