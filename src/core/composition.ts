@@ -27,6 +27,49 @@ export interface CompLayerBase {
   ownBackground: boolean;
   /** Clip to the layer below: this layer's alpha is multiplied by the alpha of what is already composited under it (Photoshop's clipping mask). */
   clip: boolean;
+  /** mask: multiplies this layer's alpha by a channel of what is already composited below it, or of another layer (post-effects) */
+  mask?: LayerMask;
+  /** per-layer effects applied to the layer's picture before it is blended */
+  effects?: LayerEffects;
+}
+export interface LayerMask {
+  source: 'below' | 'layer';
+  /** the masking layer's id when source = 'layer' */
+  layerId?: string;
+  channel: 'alpha' | 'luma';
+  invert: boolean;
+}
+export interface LayerEffects {
+  /** gaussian blur radius in canvas pixels (0 = off) */
+  blur: number;
+  /** −1..1 */
+  brightness: number;
+  contrast: number;
+  saturation: number;
+  /** degrees */
+  hue: number;
+  gamma: number;
+  invert: boolean;
+}
+export const defaultEffects = (): LayerEffects => ({ blur: 0, brightness: 0, contrast: 0, saturation: 0, hue: 0, gamma: 1, invert: false });
+export function effectsActive(f?: LayerEffects): boolean {
+  return !!f && (f.blur > 0 || f.brightness !== 0 || f.contrast !== 0 || f.saturation !== 0 || f.hue !== 0 || f.gamma !== 1 || f.invert);
+}
+/** the colour adjustments of `LayerEffects` on one straight-alpha rgb (0..1) — the CPU twin of the fxAdjust shader */
+export function adjustPixel(f: LayerEffects, r: number, g: number, b: number): [number, number, number] {
+  let c: [number, number, number] = f.invert ? [1 - r, 1 - g, 1 - b] : [r, g, b];
+  if (f.brightness) c = c.map((v) => v + f.brightness) as typeof c;
+  if (f.contrast) c = c.map((v) => (v - 0.5) * (1 + f.contrast) + 0.5) as typeof c;
+  if (f.saturation) { const l = 0.2126 * c[0] + 0.7152 * c[1] + 0.0722 * c[2]; c = c.map((v) => l + (v - l) * (1 + f.saturation)) as typeof c; }
+  if (f.hue) {
+    // rotate the chroma in YIQ
+    const a = f.hue * Math.PI / 180, ca = Math.cos(a), sa = Math.sin(a);
+    const y = 0.299 * c[0] + 0.587 * c[1] + 0.114 * c[2], i = 0.596 * c[0] - 0.274 * c[1] - 0.322 * c[2], q = 0.211 * c[0] - 0.523 * c[1] + 0.312 * c[2];
+    const i2 = i * ca - q * sa, q2 = i * sa + q * ca;
+    c = [y + 0.956 * i2 + 0.621 * q2, y - 0.272 * i2 - 0.647 * q2, y - 1.106 * i2 + 1.703 * q2];
+  }
+  if (f.gamma !== 1) c = c.map((v) => Math.pow(Math.max(v, 0), 1 / f.gamma)) as typeof c;
+  return c.map((v) => Math.min(1, Math.max(0, v))) as typeof c;
 }
 export interface FlameCompLayer extends CompLayerBase { kind: 'flame'; flame: Flame }
 /** an escape-time fractal (Mandelbrot/Julia/… families, custom formulas), see escape.ts */
@@ -105,11 +148,18 @@ export function normalizeComposition(obj: any, fallbackPalette: RGB[]): Composit
     const layers: CompLayer[] = [];
     for (const l of obj.layers.slice(0, MAX_COMP_LAYERS)) {
       if (l.kind !== 'flame' && l.kind !== 'escape' && l.kind !== 'image') continue; // unknown kinds (future files) are dropped
+      const m = l.mask;
+      const mask: LayerMask | undefined = m && typeof m === 'object' && (m.source === 'below' || m.source === 'layer')
+        ? { source: m.source, ...(typeof m.layerId === 'string' ? { layerId: m.layerId } : {}), channel: m.channel === 'luma' ? 'luma' : 'alpha', invert: m.invert === true } : undefined;
+      const fx = l.effects;
+      const effects: LayerEffects | undefined = fx && typeof fx === 'object'
+        ? { blur: Math.max(0, Math.min(200, num(fx.blur, 0))), brightness: Math.max(-1, Math.min(1, num(fx.brightness, 0))), contrast: Math.max(-1, Math.min(1, num(fx.contrast, 0))), saturation: Math.max(-1, Math.min(1, num(fx.saturation, 0))), hue: num(fx.hue, 0), gamma: Math.max(0.1, Math.min(10, num(fx.gamma, 1))), invert: fx.invert === true } : undefined;
       const base = {
         id: typeof l.id === 'string' && l.id ? l.id : newLayerId(),
         visible: l.visible !== false, opacity: clamp01(num(l.opacity, 1)),
         blend: ((BLEND_MODES as readonly string[]).includes(l.blend) ? l.blend : 'normal') as BlendMode,
         ownBackground: l.ownBackground !== false, clip: l.clip === true,
+        ...(mask ? { mask } : {}), ...(effects && effectsActive(effects) ? { effects } : {}),
       };
       if (l.kind === 'flame') {
         const flame = normalizeFlame(l.flame, fallbackPalette);

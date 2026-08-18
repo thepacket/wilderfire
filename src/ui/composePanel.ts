@@ -2,7 +2,7 @@
 // renderer and blended into the picture (blend mode, opacity, own background, clip to what is below).
 // The active layer is what the transforms/render/gradient panels and the overlay edit.
 import { App, el, slider } from './common';
-import { BLEND_MODES, MAX_COMP_LAYERS, defaultEscape, defaultImage } from '../core/composition';
+import { BLEND_MODES, MAX_COMP_LAYERS, defaultEscape, defaultImage, defaultEffects, effectsActive } from '../core/composition';
 import { cloneFlame } from '../core/flame';
 import { randomFlame } from '../core/random';
 
@@ -147,6 +147,46 @@ export function buildComposePanel(app: App, root: HTMLElement) {
         slider({ label: 'Rotation', min: -180, max: 180, step: 1, value: im.rotation * 180 / Math.PI, fmt: (v) => `${v.toFixed(0)}°`, onInput: (v) => { im.rotation = v * Math.PI / 180; app.commitComp(SRC); } }).root,
         el('div', 'hint', `${im.w}×${im.h} px · stored in this browser; a saved composition file embeds it`));
     }
+    // ---- mask ----
+    const maskRow = el('div', 'row');
+    maskRow.append(el('label', '', 'Mask'));
+    const maskSel = el('select') as HTMLSelectElement;
+    const others = app.comp.layers.filter((l) => l !== ly);
+    const opts: [string, string][] = [['', 'none'], ['below:alpha', 'below · alpha'], ['below:luma', 'below · luminance'], ...others.flatMap((l): [string, string][] => [[`layer:${l.id}:alpha`, `${l.name} · alpha`], [`layer:${l.id}:luma`, `${l.name} · luminance`]])];
+    for (const [v, t] of opts) { const o = el('option', '', t) as HTMLOptionElement; o.value = v; maskSel.append(o); }
+    maskSel.value = ly.mask ? (ly.mask.source === 'below' ? `below:${ly.mask.channel}` : `layer:${ly.mask.layerId}:${ly.mask.channel}`) : '';
+    if (!maskSel.value && ly.mask) maskSel.value = '';
+    maskSel.title = 'Multiply this layer\'s alpha by a channel of what is below it, or of another layer (after its effects)';
+    maskSel.onchange = () => {
+      const v = maskSel.value;
+      if (!v) delete ly.mask;
+      else if (v.startsWith('below:')) ly.mask = { source: 'below', channel: v.endsWith('luma') ? 'luma' : 'alpha', invert: ly.mask?.invert ?? false };
+      else { const [, id, ch] = v.split(':'); ly.mask = { source: 'layer', layerId: id, channel: ch === 'luma' ? 'luma' : 'alpha', invert: ly.mask?.invert ?? false }; }
+      app.commitComp();
+    };
+    const invChk = el('input') as HTMLInputElement; invChk.type = 'checkbox'; invChk.checked = !!ly.mask?.invert; invChk.disabled = !ly.mask; invChk.title = 'invert the mask';
+    invChk.onchange = () => { if (ly.mask) { ly.mask.invert = invChk.checked; app.commitComp(); } };
+    const invLab = el('label'); invLab.append(invChk, document.createTextNode(' inv'));
+    maskRow.append(maskSel, invLab);
+    ctl.append(maskRow);
+    // ---- effects ----
+    const fxHead = el('h3', '', 'Effects');
+    fxHead.title = 'Applied to this layer\'s picture before it is blended';
+    const fx = ly.effects ?? defaultEffects();
+    const touch = (src = '') => { ly.effects = fx; if (!effectsActive(fx)) delete ly.effects; app.commitComp(src); };
+    const invFx = el('input') as HTMLInputElement; invFx.type = 'checkbox'; invFx.checked = fx.invert; invFx.onchange = () => { fx.invert = invFx.checked; touch(); };
+    const invFxLab = el('label'); invFxLab.append(invFx, document.createTextNode(' invert'));
+    const resetFx = el('button', '', 'Reset');
+    resetFx.onclick = () => { delete ly.effects; app.commitComp(); };
+    const fxRow = el('div', 'row'); fxRow.append(invFxLab, resetFx);
+    ctl.append(fxHead,
+      slider({ label: 'Blur', min: 0, max: 100, step: 0.5, value: fx.blur, fmt: (v) => `${v.toFixed(1)} px`, onInput: (v) => { fx.blur = v; touch(SRC); } }).root,
+      slider({ label: 'Brightness', min: -1, max: 1, step: 0.01, value: fx.brightness, onInput: (v) => { fx.brightness = v; touch(SRC); } }).root,
+      slider({ label: 'Contrast', min: -1, max: 1, step: 0.01, value: fx.contrast, onInput: (v) => { fx.contrast = v; touch(SRC); } }).root,
+      slider({ label: 'Saturation', min: -1, max: 1, step: 0.01, value: fx.saturation, onInput: (v) => { fx.saturation = v; touch(SRC); } }).root,
+      slider({ label: 'Hue', min: -180, max: 180, step: 1, value: fx.hue, fmt: (v) => `${v.toFixed(0)}°`, onInput: (v) => { fx.hue = v; touch(SRC); } }).root,
+      slider({ label: 'Gamma', min: 0.2, max: 4, step: 0.01, value: fx.gamma, onInput: (v) => { fx.gamma = v; touch(SRC); } }).root,
+      fxRow);
     ctl.append(bgRow);
   };
 

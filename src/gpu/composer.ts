@@ -8,31 +8,93 @@
 import { FlameRenderer, type RenderStats } from './renderer';
 import { EscapeRenderer } from './escapeRenderer';
 import { ImageRenderer } from './imageRenderer';
-import type { Composition, CompLayer, BlendMode } from '../core/composition';
-import { BLEND_MODES, BLEND_WGSL, blendPixel } from '../core/composition';
+import type { Composition, CompLayer, BlendMode, LayerEffects } from '../core/composition';
+import { BLEND_MODES, BLEND_WGSL, blendPixel, effectsActive, adjustPixel } from '../core/composition';
 
 /** what every layer kind's renderer offers the composer */
 export type LayerRenderer = FlameRenderer | EscapeRenderer | ImageRenderer;
 
 const COMPOSITE_WGSL = `
-struct CP { mode: u32, opacity: f32, flags: u32, pad: u32, bg: vec4f }
+struct CP { mode: u32, opacity: f32, flags: u32, maskMode: u32, bg: vec4f }
 @group(0) @binding(0) var<uniform> P: CP;
 @group(0) @binding(1) var backdrop: texture_2d<f32>;
 @group(0) @binding(2) var source: texture_2d<f32>;
+@group(0) @binding(3) var maskTex: texture_2d<f32>;
 struct VOut { @builtin(position) pos: vec4f }
 @vertex fn vs(@builtin(vertex_index) vi: u32) -> VOut {
   var p = array<vec2f, 3>(vec2f(-1.0, -1.0), vec2f(3.0, -1.0), vec2f(-1.0, 3.0));
   var o: VOut; o.pos = vec4f(p[vi], 0.0, 1.0); return o;
 }
 ${BLEND_WGSL}
+fn luma(c: vec4f) -> f32 { return 0.2126 * c.r + 0.7152 * c.g + 0.0722 * c.b; }
 @fragment fn fs(in: VOut) -> @location(0) vec4f {
   let xy = vec2i(in.pos.xy);
   // flags: 1 = first layer (backdrop is the composition background), 2 = clip to the backdrop's alpha
+  // maskMode: 0 none, 1 backdrop alpha, 2 backdrop luma, 3 mask texture alpha, 4 mask texture luma; +8 = invert
   var b = P.bg;
   if ((P.flags & 1u) == 0u) { b = textureLoad(backdrop, xy, 0); }
   var s = textureLoad(source, xy, 0);
   if ((P.flags & 2u) != 0u) { s.a = s.a * b.a; }
+  let mm = P.maskMode & 7u;
+  if (mm != 0u) {
+    var m = 1.0;
+    if (mm == 1u) { m = b.a; } else if (mm == 2u) { m = luma(b) * b.a; }
+    else { let t = textureLoad(maskTex, xy, 0); if (mm == 3u) { m = t.a; } else { m = luma(t) * t.a; } }
+    if ((P.maskMode & 8u) != 0u) { m = 1.0 - m; }
+    s.a = s.a * clamp(m, 0.0, 1.0);
+  }
   return blendOver(P.mode, b, s, P.opacity);
+}
+`;
+
+// per-layer effects: separable gaussian blur (premultiplied, so edges do not darken) + colour adjustments
+const FX_WGSL = `
+struct FP { dir: vec2f, radius: f32, sigma: f32, brightness: f32, contrast: f32, saturation: f32, hue: f32, gamma: f32, invert: u32, adjust: u32, pad: u32 }
+@group(0) @binding(0) var<uniform> P: FP;
+@group(0) @binding(1) var src: texture_2d<f32>;
+struct VOut { @builtin(position) pos: vec4f }
+@vertex fn vs(@builtin(vertex_index) vi: u32) -> VOut {
+  var p = array<vec2f, 3>(vec2f(-1.0, -1.0), vec2f(3.0, -1.0), vec2f(-1.0, 3.0));
+  var o: VOut; o.pos = vec4f(p[vi], 0.0, 1.0); return o;
+}
+fn adjustRgb(c0: vec3f) -> vec3f {
+  var c = c0;
+  if (P.invert != 0u) { c = vec3f(1.0) - c; }
+  c = c + vec3f(P.brightness);
+  c = (c - vec3f(0.5)) * (1.0 + P.contrast) + vec3f(0.5);
+  let l = 0.2126 * c.r + 0.7152 * c.g + 0.0722 * c.b;
+  c = vec3f(l) + (c - vec3f(l)) * (1.0 + P.saturation);
+  if (P.hue != 0.0) {
+    let a = P.hue * 3.14159265 / 180.0; let ca = cos(a); let sa = sin(a);
+    let y = 0.299 * c.r + 0.587 * c.g + 0.114 * c.b; let i = 0.596 * c.r - 0.274 * c.g - 0.322 * c.b; let q = 0.211 * c.r - 0.523 * c.g + 0.312 * c.b;
+    let i2 = i * ca - q * sa; let q2 = i * sa + q * ca;
+    c = vec3f(y + 0.956 * i2 + 0.621 * q2, y - 0.272 * i2 - 0.647 * q2, y - 1.106 * i2 + 1.703 * q2);
+  }
+  if (P.gamma != 1.0) { c = pow(max(c, vec3f(0.0)), vec3f(1.0 / P.gamma)); }
+  return clamp(c, vec3f(0.0), vec3f(1.0));
+}
+@fragment fn fs(in: VOut) -> @location(0) vec4f {
+  let xy = vec2i(in.pos.xy);
+  let dims = vec2i(textureDimensions(src));
+  var acc = vec4f(0.0);
+  if (P.radius > 0.0) {
+    // premultiplied gaussian along P.dir
+    let r = i32(ceil(P.radius));
+    var wsum = 0.0;
+    for (var k = -r; k <= r; k = k + 1) {
+      let w = exp(-f32(k * k) / (2.0 * P.sigma * P.sigma));
+      let q = clamp(xy + vec2i(P.dir) * k, vec2i(0), dims - vec2i(1));
+      let t = textureLoad(src, q, 0);
+      acc = acc + vec4f(t.rgb * t.a, t.a) * w;
+      wsum = wsum + w;
+    }
+    acc = acc / wsum;
+    if (acc.a > 1e-6) { acc = vec4f(acc.rgb / acc.a, acc.a); } else { acc = vec4f(0.0); }
+  } else {
+    acc = textureLoad(src, xy, 0);
+  }
+  if (P.adjust != 0u) { acc = vec4f(adjustRgb(acc.rgb), acc.a); }
+  return acc;
 }
 `;
 
@@ -42,6 +104,9 @@ interface Slot {
   layer: CompLayer;
   /** JSON of the layer's content last pushed (flame or escape data) — unchanged content keeps accumulating */
   json: string;
+  /** effects output (and the blur's intermediate), created when the layer has effects */
+  fx?: GPUTexture;
+  fxTmp?: GPUTexture;
 }
 
 export interface CompRegionOpts {
@@ -56,6 +121,8 @@ export class Composer {
   private pipeCanvas!: GPURenderPipeline;
   private pipeTex!: GPURenderPipeline;
   private bgLayout!: GPUBindGroupLayout;
+  private fxPipe!: GPURenderPipeline;
+  private fxBufs: GPUBuffer[] = [];
   private ping: GPUTexture[] = [];
   private pingW = 0;
   private pingH = 0;
@@ -153,7 +220,10 @@ export class Composer {
       { binding: 0, visibility: F, buffer: { type: 'uniform' } },
       { binding: 1, visibility: F, texture: { sampleType: 'float' } },
       { binding: 2, visibility: F, texture: { sampleType: 'float' } },
+      { binding: 3, visibility: F, texture: { sampleType: 'float' } },
     ] });
+    const fxModule = d.createShaderModule({ code: FX_WGSL });
+    this.fxPipe = d.createRenderPipeline({ layout: 'auto', vertex: { module: fxModule, entryPoint: 'vs' }, fragment: { module: fxModule, entryPoint: 'fs', targets: [{ format: 'rgba16float' }] }, primitive: { topology: 'triangle-list' } });
     const layout = d.createPipelineLayout({ bindGroupLayouts: [this.bgLayout] });
     const mk = (format: GPUTextureFormat) => d.createRenderPipeline({ layout, vertex: { module, entryPoint: 'vs' }, fragment: { module, entryPoint: 'fs', targets: [{ format }] }, primitive: { topology: 'triangle-list' } });
     this.pipeCanvas = mk(this.format);
@@ -226,7 +296,7 @@ export class Composer {
       if (!this.pushContent(slot, force) && bgChanged) slot.renderer.invalidate();
       next.push(slot);
     }
-    for (const gone of byId.values()) gone.renderer.destroy();
+    for (const gone of byId.values()) { gone.renderer.destroy(); gone.fx?.destroy(); gone.fxTmp?.destroy(); }
     this.slots = next;
     this.needsComposite = true;
   }
@@ -239,6 +309,40 @@ export class Composer {
     return this.cpBufs[i];
   }
 
+  private fxBuf(i: number): GPUBuffer {
+    while (this.fxBufs.length <= i) this.fxBufs.push(this.device.createBuffer({ size: 48, usage: GPUBufferUsage.UNIFORM | GPUBufferUsage.COPY_DST }));
+    return this.fxBufs[i];
+  }
+  /** Apply a slot's effects to its layer texture (blur H → tmp, blur V + adjust → fx); returns the texture to composite. */
+  private encodeEffects(enc: GPUCommandEncoder, s: Slot, i: number): GPUTexture {
+    const src = s.renderer.layerTexture!;
+    const fx = s.layer.effects;
+    if (!effectsActive(fx)) { s.fx?.destroy(); s.fx = undefined; s.fxTmp?.destroy(); s.fxTmp = undefined; return src; }
+    const w = src.width, h = src.height;
+    const mk = () => this.device.createTexture({ size: [w, h], format: 'rgba16float', usage: GPUTextureUsage.RENDER_ATTACHMENT | GPUTextureUsage.TEXTURE_BINDING });
+    if (!s.fx || s.fx.width !== w || s.fx.height !== h) { s.fx?.destroy(); s.fx = mk(); }
+    const blur = Math.min(fx!.blur, 100);
+    if (blur > 0 && (!s.fxTmp || s.fxTmp.width !== w || s.fxTmp.height !== h)) { s.fxTmp?.destroy(); s.fxTmp = mk(); }
+    const write = (buf: GPUBuffer, dir: [number, number], radius: number, adjust: boolean) => {
+      const f = new Float32Array(12); const u = new Uint32Array(f.buffer);
+      f.set([dir[0], dir[1], radius, Math.max(0.5, radius / 2), fx!.brightness, fx!.contrast, fx!.saturation, fx!.hue, fx!.gamma], 0);
+      u[9] = fx!.invert ? 1 : 0; u[10] = adjust ? 1 : 0;
+      this.device.queue.writeBuffer(buf, 0, f);
+    };
+    const pass = (buf: GPUBuffer, from: GPUTexture, to: GPUTexture) => {
+      const bg = this.device.createBindGroup({ layout: this.fxPipe.getBindGroupLayout(0), entries: [{ binding: 0, resource: { buffer: buf } }, { binding: 1, resource: from.createView() }] });
+      const p = enc.beginRenderPass({ colorAttachments: [{ view: to.createView(), loadOp: 'clear', clearValue: { r: 0, g: 0, b: 0, a: 0 }, storeOp: 'store' }] });
+      p.setPipeline(this.fxPipe); p.setBindGroup(0, bg); p.draw(3); p.end();
+    };
+    if (blur > 0) {
+      write(this.fxBuf(i * 2), [1, 0], blur, false); pass(this.fxBuf(i * 2), src, s.fxTmp!);
+      write(this.fxBuf(i * 2 + 1), [0, 1], blur, true); pass(this.fxBuf(i * 2 + 1), s.fxTmp!, s.fx);
+    } else {
+      write(this.fxBuf(i * 2), [0, 0], 0, true); pass(this.fxBuf(i * 2), src, s.fx);
+    }
+    return s.fx;
+  }
+
   /** Blend the visible layers into `target` (the canvas view unless given). */
   private encodeComposite(enc: GPUCommandEncoder, target: GPUTextureView) {
     const vis = this.slots.filter((s) => s.layer.visible && s.renderer.layerTexture);
@@ -249,17 +353,30 @@ export class Composer {
       return;
     }
     this.ensurePing(w, h);
+    // effects first (a layer used as a mask must be post-effects too)
+    const texOf = new Map<Slot, GPUTexture>();
+    this.slots.forEach((s, i) => { if (s.layer.visible && s.renderer.layerTexture) texOf.set(s, this.encodeEffects(enc, s, i)); });
     vis.forEach((s, i) => {
       const last = i === vis.length - 1;
       const u = new ArrayBuffer(32); const u32 = new Uint32Array(u); const f32 = new Float32Array(u);
-      u32[0] = Math.max(0, BLEND_MODES.indexOf(s.layer.blend)); f32[1] = s.layer.opacity; u32[2] = (i === 0 ? 1 : 0) | (s.layer.clip ? 2 : 0);
+      const mk = s.layer.mask;
+      let maskMode = 0;
+      let maskTex: GPUTexture | undefined;
+      if (mk) {
+        if (mk.source === 'below') maskMode = mk.channel === 'luma' ? 2 : 1;
+        else { const ms = this.slots.find((x) => x.id === mk.layerId); maskTex = ms ? texOf.get(ms) ?? (ms.renderer.layerTexture ?? undefined) : undefined; if (maskTex) maskMode = mk.channel === 'luma' ? 4 : 3; }
+        if (maskMode && mk.invert) maskMode |= 8;
+      }
+      u32[0] = Math.max(0, BLEND_MODES.indexOf(s.layer.blend)); f32[1] = s.layer.opacity; u32[2] = (i === 0 ? 1 : 0) | (s.layer.clip ? 2 : 0); u32[3] = maskMode;
       f32.set([this.bg[0], this.bg[1], this.bg[2], 1], 4);
       this.device.queue.writeBuffer(this.cpBuf(i), 0, u);
       const backdrop = this.ping[(i + 1) & 1].createView();
+      const srcTex = texOf.get(s)!;
       const bg = this.device.createBindGroup({ layout: this.bgLayout, entries: [
         { binding: 0, resource: { buffer: this.cpBuf(i) } },
         { binding: 1, resource: backdrop },
-        { binding: 2, resource: s.renderer.layerTexture!.createView() },
+        { binding: 2, resource: srcTex.createView() },
+        { binding: 3, resource: (maskTex ?? srcTex).createView() },
       ] });
       const view = last ? target : this.ping[i & 1].createView();
       const pass = enc.beginRenderPass({ colorAttachments: [{ view, clearValue: { r: 0, g: 0, b: 0, a: 0 }, loadOp: 'clear', storeOp: 'store' }] });
@@ -312,8 +429,9 @@ export class Composer {
   get nPoints() { return this.anyFlame?.nPoints ?? 1 << 16; }
   get itersPerPass() { return this.anyFlame?.itersPerPass ?? 64; }
 
-  /** Render a tile of every visible layer offscreen and composite them on the CPU (hi-res export, thumbnails, dev tools).
-   *  Straight-alpha rgba8 like FlameRenderer.renderRegion; `transparent` renders every layer without a background. */
+  /** Render a tile of every visible layer offscreen and composite them on the CPU (hi-res export, thumbnails, dev tools)
+   *  with the same blend/mask/effects maths as the live compositor. Straight-alpha rgba8 like FlameRenderer.renderRegion;
+   *  `transparent` renders every layer without a background. */
   async renderRegion(o: CompRegionOpts): Promise<Uint8ClampedArray<ArrayBuffer>> {
     const vis = this.slots.filter((s) => s.layer.visible);
     const n = o.tileW * o.tileH;
@@ -322,23 +440,48 @@ export class Composer {
     if (!o.transparent) for (let i = 0; i < n; i++) { out[i * 4] = Math.round(bg[0] * 255); out[i * 4 + 1] = Math.round(bg[1] * 255); out[i * 4 + 2] = Math.round(bg[2] * 255); out[i * 4 + 3] = 255; }
     if (!vis.length) return out;
     // one layer with its own opaque background over an opaque bg = the plain single-flame render (bit-exact with the old path)
-    if (vis.length === 1 && vis[0].layer.blend === 'normal' && vis[0].layer.opacity >= 1 && !vis[0].layer.clip && (vis[0].layer.ownBackground || o.transparent)) {
+    if (vis.length === 1 && vis[0].layer.blend === 'normal' && vis[0].layer.opacity >= 1 && !vis[0].layer.clip && !vis[0].layer.mask && !effectsActive(vis[0].layer.effects) && (vis[0].layer.ownBackground || o.transparent)) {
       return vis[0].renderer.renderRegion({ ...o, transparent: !!o.transparent || !vis[0].layer.ownBackground });
     }
-    const acc = new Float32Array(n * 4);
-    for (let i = 0; i < n * 4; i++) acc[i] = out[i] / 255;
-    for (let li = 0; li < vis.length; li++) {
-      const s = vis[li];
-      const px = await s.renderer.renderRegion({ ...o, transparent: !!o.transparent || !s.layer.ownBackground });
+    // blur needs pixels beyond the tile: render every layer with a margin, crop at the end
+    const scale = o.fullW / Math.max(1, this.canvas.width);
+    const maxBlur = Math.max(0, ...vis.map((s) => (effectsActive(s.layer.effects) ? Math.min(s.layer.effects!.blur, 100) * scale : 0)));
+    const pad = Math.ceil(maxBlur * 2);
+    const W = o.tileW + 2 * pad, H = o.tileH + 2 * pad, N = W * H;
+    const region = { ...o, tileX: o.tileX - pad, tileY: o.tileY - pad, tileW: W, tileH: H };
+    const acc = new Float32Array(N * 4);
+    if (!o.transparent) for (let i = 0; i < N; i++) { acc[i * 4] = bg[0]; acc[i * 4 + 1] = bg[1]; acc[i * 4 + 2] = bg[2]; acc[i * 4 + 3] = 1; }
+    // every visible layer's tile (post-effects) — masks may refer to any of them
+    const tiles = new Map<string, Float32Array>();
+    for (const s of vis) {
+      const px = await s.renderer.renderRegion({ ...region, transparent: !!o.transparent || !s.layer.ownBackground });
+      const t = new Float32Array(N * 4);
+      for (let i = 0; i < N * 4; i++) t[i] = px[i] / 255;
+      tiles.set(s.id, effectsActive(s.layer.effects) ? applyEffectsCPU(t, W, H, s.layer.effects!, scale) : t);
+    }
+    for (const s of vis) {
+      const t = tiles.get(s.id)!;
       const mode: BlendMode = s.layer.blend;
-      for (let i = 0; i < n; i++) {
+      const mk = s.layer.mask;
+      const maskTile = mk?.source === 'layer' && mk.layerId ? tiles.get(mk.layerId) : undefined;
+      for (let i = 0; i < N; i++) {
         const b: [number, number, number, number] = [acc[i * 4], acc[i * 4 + 1], acc[i * 4 + 2], acc[i * 4 + 3]];
-        const src: [number, number, number, number] = [px[i * 4] / 255, px[i * 4 + 1] / 255, px[i * 4 + 2] / 255, px[i * 4 + 3] / 255 * (s.layer.clip ? b[3] : 1)];
-        const r = blendPixel(mode, b, src, s.layer.opacity);
+        let a = t[i * 4 + 3] * (s.layer.clip ? b[3] : 1);
+        if (mk) {
+          let m = 1;
+          if (mk.source === 'below') m = mk.channel === 'luma' ? (0.2126 * b[0] + 0.7152 * b[1] + 0.0722 * b[2]) * b[3] : b[3];
+          else if (maskTile) m = mk.channel === 'luma' ? (0.2126 * maskTile[i * 4] + 0.7152 * maskTile[i * 4 + 1] + 0.0722 * maskTile[i * 4 + 2]) * maskTile[i * 4 + 3] : maskTile[i * 4 + 3];
+          if (mk.invert) m = 1 - m;
+          a *= Math.min(1, Math.max(0, m));
+        }
+        const r = blendPixel(mode, b, [t[i * 4], t[i * 4 + 1], t[i * 4 + 2], a], s.layer.opacity);
         acc[i * 4] = r[0]; acc[i * 4 + 1] = r[1]; acc[i * 4 + 2] = r[2]; acc[i * 4 + 3] = r[3];
       }
     }
-    for (let i = 0; i < n * 4; i++) out[i] = Math.round(Math.min(1, Math.max(0, acc[i])) * 255);
+    for (let y = 0; y < o.tileH; y++) for (let x = 0; x < o.tileW; x++) {
+      const si = ((y + pad) * W + (x + pad)) * 4, di = (y * o.tileW + x) * 4;
+      for (let k = 0; k < 4; k++) out[di + k] = Math.round(Math.min(1, Math.max(0, acc[si + k])) * 255);
+    }
     return out;
   }
 
@@ -351,4 +494,40 @@ export class Composer {
     for (const s of this.slots) s.renderer.destroy();
     this.slots = [];
   }
+}
+
+/** CPU twin of the effects pass: premultiplied separable gaussian blur (radius in output pixels) + colour adjustments. */
+export function applyEffectsCPU(t: Float32Array, W: number, H: number, fx: LayerEffects, scale: number): Float32Array {
+  let cur = t;
+  const radius = Math.min(fx.blur, 100) * scale;
+  if (radius > 0) {
+    const r = Math.ceil(radius), sigma = Math.max(0.5, radius / 2);
+    const wts = new Float32Array(2 * r + 1);
+    let wsum = 0;
+    for (let k = -r; k <= r; k++) { wts[k + r] = Math.exp(-(k * k) / (2 * sigma * sigma)); wsum += wts[k + r]; }
+    for (let k = 0; k < wts.length; k++) wts[k] /= wsum;
+    // premultiply
+    const pm = new Float32Array(cur.length);
+    for (let i = 0; i < W * H; i++) { const a = cur[i * 4 + 3]; pm[i * 4] = cur[i * 4] * a; pm[i * 4 + 1] = cur[i * 4 + 1] * a; pm[i * 4 + 2] = cur[i * 4 + 2] * a; pm[i * 4 + 3] = a; }
+    const tmp = new Float32Array(cur.length);
+    for (let y = 0; y < H; y++) for (let x = 0; x < W; x++) {
+      let a0 = 0, a1 = 0, a2 = 0, a3 = 0;
+      for (let k = -r; k <= r; k++) { const xx = Math.min(W - 1, Math.max(0, x + k)); const w = wts[k + r]; const j = (y * W + xx) * 4; a0 += pm[j] * w; a1 += pm[j + 1] * w; a2 += pm[j + 2] * w; a3 += pm[j + 3] * w; }
+      const j = (y * W + x) * 4; tmp[j] = a0; tmp[j + 1] = a1; tmp[j + 2] = a2; tmp[j + 3] = a3;
+    }
+    const outp = new Float32Array(cur.length);
+    for (let y = 0; y < H; y++) for (let x = 0; x < W; x++) {
+      let a0 = 0, a1 = 0, a2 = 0, a3 = 0;
+      for (let k = -r; k <= r; k++) { const yy = Math.min(H - 1, Math.max(0, y + k)); const w = wts[k + r]; const j = (yy * W + x) * 4; a0 += tmp[j] * w; a1 += tmp[j + 1] * w; a2 += tmp[j + 2] * w; a3 += tmp[j + 3] * w; }
+      const j = (y * W + x) * 4;
+      if (a3 > 1e-6) { outp[j] = a0 / a3; outp[j + 1] = a1 / a3; outp[j + 2] = a2 / a3; outp[j + 3] = a3; }
+    }
+    cur = outp;
+  }
+  if (fx.brightness || fx.contrast || fx.saturation || fx.hue || fx.gamma !== 1 || fx.invert) {
+    const o = cur === t ? new Float32Array(cur) : cur;
+    for (let i = 0; i < W * H; i++) { const c = adjustPixel(fx, o[i * 4], o[i * 4 + 1], o[i * 4 + 2]); o[i * 4] = c[0]; o[i * 4 + 1] = c[1]; o[i * 4 + 2] = c[2]; }
+    cur = o;
+  }
+  return cur;
 }
