@@ -3,6 +3,8 @@
 // layers (JWildfire-style); each layer has its own transforms and gradient,
 // all accumulating into the shared histogram. Camera and tone are global.
 
+import { normFilterKernel, type FilterKernel } from '../gpu/filters';
+
 export type Affine = [number, number, number, number, number, number]; // x' = a x + b y + c ; y' = d x + e y + f
 export type RGB = [number, number, number]; // 0..1
 
@@ -195,7 +197,8 @@ export interface Flame {
   lowDensityBrightness: number;
   /** Spatial filter over the log-scaled image (JWildfire `filter` radius, 0 = off) and kernel. */
   filterRadius: number;
-  filterKernel: 'mitchell' | 'gaussian';
+  /** JWildfire FilterKernelType name (MITCHELL_SMOOTH default; SINEPOW15 etc.) */
+  filterKernel: FilterKernel;
   /** JWildfire antialiasing: a fraction of samples get a random sub-pixel-ish jitter. */
   antialiasAmount: number;
   antialiasRadius: number;
@@ -253,7 +256,7 @@ export function defaultFlame(palette: RGB[]): Flame {
     vibrancy: 1,
     background: [0, 0, 0],
     contrast: 1, whiteLevel: 220, lowDensityBrightness: 0.24,
-    filterRadius: 0, filterKernel: 'mitchell',
+    filterRadius: 0, filterKernel: 'MITCHELL_SMOOTH',
     antialiasAmount: 0.25, antialiasRadius: 0.5,
     deRadius: 1, deCurve: 0.8,
   };
@@ -457,7 +460,7 @@ export function normalizeFlame(obj: any, fallbackPalette: RGB[]): Flame {
     whiteLevel: Math.max(1, num(obj?.whiteLevel, 220)),
     lowDensityBrightness: Math.max(0, num(obj?.lowDensityBrightness, 0.24)),
     filterRadius: Math.min(3, Math.max(0, num(obj?.filterRadius, 0))),
-    filterKernel: obj?.filterKernel === 'gaussian' ? 'gaussian' : 'mitchell',
+    filterKernel: normFilterKernel(obj?.filterKernel),
     antialiasAmount: clamp01(num(obj?.antialiasAmount, 0.25)),
     antialiasRadius: Math.max(0, num(obj?.antialiasRadius, 0.5)),
     deRadius: Math.min(2, Math.max(0, num(obj?.deRadius, 1))),

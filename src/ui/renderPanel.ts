@@ -6,6 +6,7 @@ import { pickSave, saveBlob, saveText } from './saveFile';
 import { renderHiRes, resolveSize, SIZE_OPTIONS, QUALITY_OPTIONS } from './hiresExport';
 import { openBatchExport } from './batchExport';
 import { buildSolidSection } from './solidPanel';
+import { FILTER_KERNELS, normFilterKernel, type FilterKernel } from '../gpu/filters';
 
 const SRC = 'render';
 
@@ -126,7 +127,15 @@ export function buildRenderPanel(app: App, root: HTMLElement) {
     label: 'Filter', min: 0, max: 2, step: 0.05, value: app.flame.filterRadius ?? 0,
     onInput: (v) => { app.flame.filterRadius = v; app.commitTone(SRC); },
   });
-  sfS.root.title = 'Spatial filter radius (Mitchell kernel over the log-scaled image); 0 = off';
+  sfS.root.title = 'Spatial filter radius (kernel below, over the log-scaled image); 0 = off';
+  const fkRow = el('div', 'row');
+  fkRow.append(el('label', '', 'Filter kernel'));
+  const fkSel = el('select') as HTMLSelectElement;
+  for (const k of FILTER_KERNELS) { if (k === 'MITCHELL_SINEPOW') continue; const o = el('option', '', k.toLowerCase().replace(/_/g, ' ')) as HTMLOptionElement; o.value = k; fkSel.append(o); }
+  fkSel.title = 'Shape of the spatial filter (Mitchell-smooth is the default; the sine-power kernels are popular for crisp results)';
+  fkSel.onchange = () => { app.flame.filterKernel = fkSel.value as FilterKernel; app.commitTone(SRC); };
+  fkRow.append(fkSel);
+  fkSel.value = normFilterKernel(app.flame.filterKernel);
   const bgRow = el('div', 'row');
   bgRow.append(el('label', '', 'Background'));
   const bgInp = el('input') as HTMLInputElement;
@@ -143,7 +152,7 @@ export function buildRenderPanel(app: App, root: HTMLElement) {
     app.commitTone(SRC);
   });
   bgRow.append(bgInp);
-  tone.append(brS.root, gaS.root, gtS.root, viS.root, ctS.root, wlS.root, sfS.root, bgRow);
+  tone.append(brS.root, gaS.root, gtS.root, viS.root, ctS.root, wlS.root, sfS.root, fkRow, bgRow);
 
   const perf = el('div', 'section');
   perf.append(el('h3', '', 'Engine'));
@@ -414,7 +423,7 @@ export function buildRenderPanel(app: App, root: HTMLElement) {
     gaS.set(app.flame.gamma);
     gtS.set(app.flame.gammaThreshold ?? 0.04);
     viS.set(app.flame.vibrancy);
-    ctS.set(app.flame.contrast ?? 1); wlS.set(app.flame.whiteLevel ?? 220); sfS.set(app.flame.filterRadius ?? 0);
+    ctS.set(app.flame.contrast ?? 1); wlS.set(app.flame.whiteLevel ?? 220); sfS.set(app.flame.filterRadius ?? 0); fkSel.value = normFilterKernel(app.flame.filterKernel);
     deS.set(app.flame.deRadius ?? 1); deCurveS.set(app.flame.deCurve ?? 0.8);
     bgInp.value = toHex(app.flame.background);
   });

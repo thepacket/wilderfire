@@ -63,14 +63,14 @@ describe('solid rendering codegen', () => {
 
 describe('solid spatial filter (JWildfire FilterHolder in raster cells)', () => {
   it('sizes follow int(2·os·support·r)+1 made odd, weights sum to os²', () => {
-    expect(solidFilterWeights(0, 'gaussian', 1).n).toBe(0);
-    const g = solidFilterWeights(0.5, 'gaussian', 1); // fw = int(1.5) = 1 → 3
+    expect(solidFilterWeights(0, 'GAUSSIAN', 1).n).toBe(0);
+    const g = solidFilterWeights(0.5, 'GAUSSIAN', 1); // fw = int(1.5) = 1 → 3
     expect(g.n).toBe(3);
     expect(g.w.reduce((a, b) => a + b, 0)).toBeCloseTo(1, 5);
-    const g2 = solidFilterWeights(0.5, 'gaussian', 2); // fw = 3 → 4 → 5
+    const g2 = solidFilterWeights(0.5, 'GAUSSIAN', 2); // fw = 3 → 4 → 5
     expect(g2.n).toBe(5);
     expect(g2.w.reduce((a, b) => a + b, 0)).toBeCloseTo(4, 4);
-    const m = solidFilterWeights(1, 'mitchell', 2); // fw = 8 → 9
+    const m = solidFilterWeights(1, 'MITCHELL_SMOOTH', 2); // fw = 8 → 9
     expect(m.n).toBe(9);
     // symmetric kernel, centre weight is the largest
     const c = m.w[4 * 9 + 4];
@@ -83,7 +83,7 @@ describe('AO smoothing kernel', () => {
   it('the 1-D gaussian factor reproduces JWildfire\'s N×N FilterHolder kernel exactly (separable blur)', async () => {
     const { gaussianFilter1D } = await import('../src/gpu/filters');
     for (const r of [0.5, 2.17, 7.3]) {
-      const k2 = solidFilterWeights(r, 'gaussian', 1, 45);
+      const k2 = solidFilterWeights(r, 'GAUSSIAN', 1, 45);
       const k1 = gaussianFilter1D(r, 45);
       expect(k1.n).toBe(k2.n);
       for (let i = 0; i < k1.n; i++) for (let j = 0; j < k1.n; j++) expect(k1.w[i] * k1.w[j]).toBeCloseTo(k2.w[i * k1.n + j], 6);

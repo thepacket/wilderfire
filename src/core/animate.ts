@@ -192,7 +192,7 @@ export function interpFlame(a: Flame, b: Flame, t: number): Flame {
     gammaThreshold: lerp(a.gammaThreshold ?? 0.04, b.gammaThreshold ?? 0.04, t),
     contrast: lerp(a.contrast ?? 1, b.contrast ?? 1, t), whiteLevel: lerp(a.whiteLevel ?? 220, b.whiteLevel ?? 220, t),
     lowDensityBrightness: lerp(a.lowDensityBrightness ?? 0.24, b.lowDensityBrightness ?? 0.24, t),
-    filterRadius: lerp(a.filterRadius ?? 0, b.filterRadius ?? 0, t), filterKernel: t < 0.5 ? (a.filterKernel ?? 'mitchell') : (b.filterKernel ?? 'mitchell'),
+    filterRadius: lerp(a.filterRadius ?? 0, b.filterRadius ?? 0, t), filterKernel: t < 0.5 ? (a.filterKernel ?? 'MITCHELL_SMOOTH') : (b.filterKernel ?? 'MITCHELL_SMOOTH'),
     antialiasAmount: lerp(a.antialiasAmount ?? 0.25, b.antialiasAmount ?? 0.25, t), antialiasRadius: lerp(a.antialiasRadius ?? 0.5, b.antialiasRadius ?? 0.5, t),
     deRadius: lerp(a.deRadius ?? 1, b.deRadius ?? 1, t), deCurve: lerp(a.deCurve ?? 0.8, b.deCurve ?? 0.8, t),
     vibrancy: lerp(a.vibrancy, b.vibrancy, t),

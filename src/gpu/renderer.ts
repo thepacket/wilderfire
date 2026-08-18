@@ -5,7 +5,7 @@
 import type { Flame } from '../core/flame';
 import { flameSignature, visibleLayers, MAX_LAYERS, LIGHT_DIFF_FUNCS } from '../core/flame';
 import { compileFlame, TONEMAP_WGSL, type CompiledFlame } from './codegen';
-import { buildSpatialFilters, solidFilterWeights, gaussianFilter1D, FILT_FLOATS } from './filters';
+import { buildSpatialFilters, solidFilterWeights, gaussianFilter1D, normFilterKernel, FILT_FLOATS, type FilterKernel } from './filters';
 import { SOLID_POST_WGSL, SOLID_TONEMAP_WGSL, SOLID_AO_WGSL, SOLID_SHADOW_WGSL, SOLID_PAY_WORDS, SOLID_MAX_LIGHTS, SOLID_MAX_MATS, SOLID_FILT_FLOATS } from './solid.wgsl';
 import { flameMeshKeys, ensureMesh, meshSampler, meshLayout } from '../core/meshes';
 
@@ -662,7 +662,7 @@ export class FlameRenderer {
     const tf32 = new Float32Array(tu32.buffer);
     tu32[0] = tile ? tile.tileW : this.width; // output pixels; hist rows are width×os
     tu32[1] = tile ? tile.tileH : this.height;
-    { const [nc, ni] = this.uploadFilters(f.filterRadius ?? 0, f.filterKernel ?? 'mitchell'); tu32[2] = nc; tu32[3] = ni; }
+    { const [nc, ni] = this.uploadFilters(f.filterRadius ?? 0, normFilterKernel(f.filterKernel)); tu32[2] = nc; tu32[3] = ni; }
     // world area covered by the full image (zoom-invariant density normalisation)
     const ppuOut = ppu / os;
     tf32[16] = (fullW / os) * (fullH / os) / (ppuOut * ppuOut);
@@ -722,7 +722,7 @@ export class FlameRenderer {
       this.device.queue.writeBuffer(this.aopBuf, 0, a);
     }
 
-    const { n, w: fw } = solidFilterWeights(f.filterRadius ?? 0, f.filterKernel ?? 'mitchell', os);
+    const { n, w: fw } = solidFilterWeights(f.filterRadius ?? 0, normFilterKernel(f.filterKernel), os);
     const fkey = `${f.filterKernel}:${(f.filterRadius ?? 0).toFixed(4)}:${os}`;
     if (n && fkey !== this.sfiltKey) { this.sfiltKey = fkey; this.device.queue.writeBuffer(this.sfiltBuf, 0, fw); }
 
@@ -876,7 +876,7 @@ export class FlameRenderer {
   }
 
   /** Upload the JWildfire spatial-filter kernels for the flame's settings; returns [Ncolour, Nintensity]. */
-  private uploadFilters(radius: number, kernel: 'mitchell' | 'gaussian'): [number, number] {
+  private uploadFilters(radius: number, kernel: FilterKernel): [number, number] {
     const { weights, nc, ni, key } = buildSpatialFilters(radius, kernel);
     if (nc === 0 && ni === 0) return [0, 0];
     if (key !== this.filtKey) {

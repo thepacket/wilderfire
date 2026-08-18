@@ -14,6 +14,7 @@
 import type { Flame, XForm, Layer, Affine, RGB, WeightingField, LightDiffFunc } from './flame';
 import { defaultXForm, defaultFlame, normalizeFlame, MAX_LAYERS, MAX_XFORMS, WFIELD_TYPES, defaultWeightingField, defaultSolidRender, defaultSolidMaterial, LIGHT_DIFF_FUNCS } from './flame';
 import { VARIATIONS } from './variations';
+import { normFilterKernel } from '../gpu/filters';
 import type { MotionCurve, CurvePoint, CurveInterp } from './motion';
 
 const NON_VARIATION_ATTRS = new Set([
@@ -439,7 +440,7 @@ export function parseFlameXML(text: string, fallbackPalette: RGB[]): Flame[] {
     f.whiteLevel = Math.max(1, numOr('white_level', 220));
     f.lowDensityBrightness = Math.max(0, numOr('low_density_brightness', 0.24));
     f.filterRadius = Math.min(3, Math.max(0, numOr('filter', 0.75)));
-    f.filterKernel = /GAUSS/i.test(fe.getAttribute('filter_kernel') ?? '') ? 'gaussian' : 'mitchell';
+    f.filterKernel = normFilterKernel(fe.getAttribute('filter_kernel') ?? 'MITCHELL_SMOOTH');
     f.antialiasAmount = Math.min(1, Math.max(0, numOr('antialias_amount', 0.25)));
     f.antialiasRadius = Math.max(0, numOr('antialias_radius', 0.5));
     f.deRadius = Math.min(2, Math.max(0, numOr('de_radius', 1)));
@@ -752,7 +753,7 @@ export function flameToXML(f: Flame, opts: XMLExportOpts = {}): string {
     `cam_dof="${fmt(f.camDOF ?? 0)}" cam_dof_area="${fmt(f.camDOFArea ?? 0.5)}" cam_dof_exponent="${fmt(f.camDOFExponent ?? 2)}" new_dof="${f.newDOF ? 1 : 0}" ` +
     `cam_dof_shape="BUBBLE" cam_dof_scale="${fmt(f.camDOFScale ?? 1)}" cam_dof_rotate="0" cam_dof_fade="${fmt(f.camDOFFade ?? 1)}" ` +
     `cam_zdimish="${fmt(f.dimishZ ?? 0)}" cam_zdimdist="${fmt(f.dimZDist ?? 0)}" cam_zdimcolor="${(f.dimZColor ?? [0, 0, 0]).map(fmt).join(' ')}" ` +
-    `filter="${fmt(f.filterRadius ?? 0)}" filter_kernel="${(f.filterKernel ?? 'mitchell') === 'gaussian' ? 'GAUSSIAN' : 'MITCHELL_SMOOTH'}" ` +
+    `filter="${fmt(f.filterRadius ?? 0)}" filter_kernel="${normFilterKernel(f.filterKernel)}" ` +
     `antialias_amount="${fmt(f.antialiasAmount ?? 0.25)}" antialias_radius="${fmt(f.antialiasRadius ?? 0.5)}" ` +
     `de_radius="${fmt(f.deRadius ?? 1)}" de_curve="${fmt(f.deCurve ?? 0.8)}" ` +
     `quality="200" brightness="${fmt(f.brightness)}" gamma="${fmt(f.gamma)}" gamma_threshold="${fmt(f.gammaThreshold)}" ` +

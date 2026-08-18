@@ -88,7 +88,8 @@ in the stack.
   brightness, white level, low-density glow, gamma threshold, vibrancy),
   the same **density estimation** (`de_radius` / `de_curve` similar-density
   gather; the live preview caps its radius, exports use it in full),
-  **spatial filter** (Mitchell / Gaussian) and antialias jitter, verified
+  **spatial filter** (all 18 JWildfire kernels — Mitchell, Gaussian, the
+  SinePow family, Lanczos, Catmull-Rom, …) and antialias jitter, verified
   pixel-for-pixel against headless JWildfire on synthetic flames and by
   whole-image metrics on the bundled samples and presets (`scripts/jwf-port`
   compare harness); two-pass tonemap so filtering is free; plus **2× oversampling**. The

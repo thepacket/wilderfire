@@ -1,26 +1,88 @@
 // JWildfire spatial filters (FilterHolder / FilterKernel), CPU side.
 // FilterHolder builds an N×N kernel from a radius: N = int(2·support·r)+1, made
 // odd; coefficient index ii = ((2i+1)/N − 1)·adjust with adjust = support·N/fw;
-// weights are normalised to 1. Mitchell-smooth (b = 0.42, c = 0.29, support 2)
-// is JWildfire's default; the flam3 gaussian has support 1.5. LogDensityFilter
-// filters colours with the primary kernel and, for "sharpening" kernels
-// (Mitchell), the intensity with a gaussian of radius 0.75.
+// weights are normalised to 1. All 18 FilterKernelType kernels are here (Mitchell-smooth
+// b = 0.42, c = 0.29 is JWildfire's default; the SinePow family is popular in the wild).
+// LogDensityFilter filters colours with the primary kernel and, for "sharpening"
+// kernels (Mitchell, Lanczos, CatRom, Blackman, Hamming, Hanning), the intensity with a gaussian of radius 0.75.
 
 export const FILT_FLOATS = 256; // colour kernel at [0..), intensity kernel at [128..)
 export const FILT_INTENSITY_OFFSET = 128;
 const MAX_N = 11;
 
-export type FilterKernel = 'mitchell' | 'gaussian';
+/** JWildfire FilterKernelType names (render/filter/*FilterKernel.java); MITCHELL_SINEPOW is JWildfire's adaptive mode, treated as MITCHELL_SMOOTH. */
+export const FILTER_KERNELS = ['MITCHELL_SMOOTH', 'MITCHELL', 'GAUSSIAN', 'SINEPOW5', 'SINEPOW10', 'SINEPOW15', 'BSPLINE', 'BELL', 'BLACKMAN', 'BOX', 'CATROM', 'HAMMING', 'HANNING', 'HERMITE', 'LANCZOS2', 'LANCZOS3', 'QUADRATIC', 'TRIANGLE', 'MITCHELL_SINEPOW'] as const;
+export type FilterKernel = typeof FILTER_KERNELS[number];
 
-export function kernelCoeff(kernel: FilterKernel, t: number): number {
-  if (kernel === 'gaussian') return Math.exp(-2 * t * t) * Math.sqrt(2 / Math.PI);
-  const b = 0.42, c = 0.29, tt = t * t;
-  if (t < 1) return (((12 - 9 * b - 6 * c) * (t * tt)) + ((-18 + 12 * b + 6 * c) * tt) + (6 - 2 * b)) / 6;
-  if (t < 2) return (((-b - 6 * c) * (t * tt)) + ((6 * b + 30 * c) * tt) + ((-12 * b - 48 * c) * t) + (8 * b + 24 * c)) / 6;
-  return 0;
+/** Old model values / loose input → a JWildfire kernel name. */
+export function normFilterKernel(v: unknown): FilterKernel {
+  if (typeof v !== 'string') return 'MITCHELL_SMOOTH';
+  if (v === 'mitchell') return 'MITCHELL_SMOOTH';
+  if (v === 'gaussian') return 'GAUSSIAN';
+  const u = v.toUpperCase();
+  return (FILTER_KERNELS as readonly string[]).includes(u) ? (u as FilterKernel) : 'MITCHELL_SMOOTH';
 }
 
-export const kernelSupport = (kernel: FilterKernel) => (kernel === 'gaussian' ? 1.5 : 2.0);
+const sinc = (x: number) => { x *= Math.PI; return x !== 0 ? Math.sin(x) / x : 1; };
+function mitchell(t: number, b: number, c: number): number {
+  const tt = t * t;
+  if (t < 0) t = -t;
+  if (t < 1) return ((12 - 9 * b - 6 * c) * (t * tt) + (-18 + 12 * b + 6 * c) * tt + (6 - 2 * b)) / 6;
+  if (t < 2) return ((-b - 6 * c) * (t * tt) + (6 * b + 30 * c) * tt + (-12 * b - 48 * c) * t + (8 * b + 24 * c)) / 6;
+  return 0;
+}
+function sinePow(x: number, p: number): number {
+  const r = Math.acos(2 * Math.exp(p * Math.log10(x)) * 2 - 1) / Math.PI; // JWildfire SinePowFilterKernel (log10 of x ≤ 0 → NaN/−∞ → handled)
+  return Number.isFinite(r) ? r : 0;
+}
+
+/** FilterKernel.getFilterCoeff for every JWildfire kernel (t may be negative for the asymmetric ones). */
+export function kernelCoeff(kernel: FilterKernel, t: number): number {
+  switch (kernel) {
+    case 'GAUSSIAN': return Math.exp(-2 * t * t) * Math.sqrt(2 / Math.PI);
+    case 'MITCHELL': return mitchell(t, 1 / 3, 1 / 3);
+    case 'MITCHELL_SMOOTH': case 'MITCHELL_SINEPOW': return mitchell(t, 0.42, 0.29);
+    case 'SINEPOW5': return sinePow(t, 5);
+    case 'SINEPOW10': return sinePow(t, 10);
+    case 'SINEPOW15': return sinePow(t, 15);
+    case 'BSPLINE': { if (t < 0) t = -t; if (t < 1) { const tt = t * t; return 0.5 * tt * t - tt + 2 / 3; } if (t < 2) { t = 2 - t; return (t * t * t) / 6; } return 0; }
+    case 'BELL': { if (t < 0) t = -t; if (t < 0.5) return 0.75 - t * t; if (t < 1.5) { t -= 1.5; return 0.5 * t * t; } return 0; }
+    case 'BLACKMAN': return sinc(t) * (0.42 + 0.5 * Math.cos(Math.PI * t) + 0.08 * Math.cos(2 * Math.PI * t));
+    case 'BOX': return t > -0.5 && t <= 0.5 ? 1 : 0;
+    case 'CATROM': {
+      const x = t;
+      if (x < -2) return 0;
+      if (x < -1) return 0.5 * (4 + x * (8 + x * (5 + x)));
+      if (x < 0) return 0.5 * (2 + x * x * (-5 - 3 * x));
+      if (x < 1) return 0.5 * (2 + x * x * (-5 + 3 * x));
+      if (x < 2) return 0.5 * (4 + x * (-8 + x * (5 - x)));
+      return 0;
+    }
+    case 'HAMMING': return sinc(t) * (0.54 + 0.46 * Math.cos(Math.PI * t));
+    case 'HANNING': return sinc(t) * (0.5 + 0.5 * Math.cos(Math.PI * t));
+    case 'HERMITE': { if (t < 0) t = -t; return t < 1 ? (2 * t - 3) * t * t + 1 : 0; }
+    case 'LANCZOS2': { if (t < 0) t = -t; return t < 2 ? sinc(t / 2) * (sinc(t) * sinc(t / 2)) : 0; }
+    case 'LANCZOS3': { if (t < 0) t = -t; return t < 3 ? sinc(t / 3) * (sinc(t) * sinc(t / 3)) : 0; }
+    case 'QUADRATIC': { const x = t; if (x < -1.5) return 0; if (x < -0.5) return 0.5 * (x + 1.5) * (x + 1.5); if (x < 0.5) return 0.75 - x * x; if (x < 1.5) return 0.5 * (x - 1.5) * (x - 1.5); return 0; }
+    case 'TRIANGLE': { if (t < 0) t = -t; return t < 1 ? 1 - t : 0; }
+  }
+}
+
+/** FilterKernel.getSpatialSupport */
+export function kernelSupport(kernel: FilterKernel): number {
+  switch (kernel) {
+    case 'GAUSSIAN': case 'BELL': case 'QUADRATIC': return 1.5;
+    case 'MITCHELL': case 'MITCHELL_SMOOTH': case 'MITCHELL_SINEPOW': case 'BSPLINE': case 'CATROM': case 'LANCZOS2': return 2;
+    case 'LANCZOS3': return 3;
+    case 'BOX': return 0.5;
+    default: return 1; // SINEPOW*, BLACKMAN, HAMMING, HANNING, HERMITE, TRIANGLE
+  }
+}
+
+/** FilterKernelType.isSharpening: these kernels filter the colours only; the intensity gets a gaussian 0.75 (LogDensityFilter). */
+export function kernelSharpening(kernel: FilterKernel): boolean {
+  return kernel === 'MITCHELL' || kernel === 'MITCHELL_SMOOTH' || kernel === 'MITCHELL_SINEPOW' || kernel === 'BLACKMAN' || kernel === 'CATROM' || kernel === 'HAMMING' || kernel === 'HANNING' || kernel === 'LANCZOS2' || kernel === 'LANCZOS3';
+}
 
 /** Kernel size for a radius (0 = off). Mirrors FilterKernel.getFilterSize with oversample 1. */
 export function kernelSize(radius: number, kernel: FilterKernel): number {
@@ -84,7 +146,7 @@ export function solidFilterWeights(radius: number, kernel: FilterKernel, os: num
 export function buildSpatialFilters(radius: number, kernel: FilterKernel): { weights: Float32Array<ArrayBuffer>; nc: number; ni: number; key: string } {
   const weights = new Float32Array(new ArrayBuffer(FILT_FLOATS * 4));
   const c = kernelWeights(radius, kernel);
-  const i = kernel === 'mitchell' ? kernelWeights(0.75, 'gaussian') : c;
+  const i = kernelSharpening(kernel) ? kernelWeights(0.75, 'GAUSSIAN') : c;
   weights.set(c.w, 0);
   weights.set(i.w, FILT_INTENSITY_OFFSET);
   return { weights, nc: c.n, ni: radius < 1e-6 ? 0 : i.n, key: `${kernel}:${radius.toFixed(4)}` };
@@ -94,7 +156,7 @@ export function buildSpatialFilters(radius: number, kernel: FilterKernel): { wei
  *  over its N×N window equals the outer product of these normalised 1-D weights. n = 0 when the radius is 0. */
 export function gaussianFilter1D(radius: number, maxN: number): { n: number; w: Float32Array<ArrayBuffer> } {
   if (radius < 1e-6) return { n: 0, w: new Float32Array(new ArrayBuffer(0)) };
-  const support = kernelSupport('gaussian');
+  const support = kernelSupport('GAUSSIAN');
   const fw = Math.floor(2 * support * radius);
   let n = fw + 1;
   if (n % 2 === 0) n++;

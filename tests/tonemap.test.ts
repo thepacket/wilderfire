@@ -32,14 +32,14 @@ describe('JWildfire log scale (reference numbers from JWildfire itself)', () => 
 
 describe('spatial filter kernels (FilterHolder)', () => {
   it('sizes match JWildfire: mitchell 0.5 → 3, 0.75 → 5; gaussian 0.75 → 3; 0 → off', () => {
-    expect(kernelSize(0.5, 'mitchell')).toBe(3);
-    expect(kernelSize(0.75, 'mitchell')).toBe(5);
-    expect(kernelSize(0.75, 'gaussian')).toBe(3);
-    expect(kernelSize(0, 'mitchell')).toBe(0);
-    expect(kernelSize(0.2, 'mitchell')).toBe(0); // fw = 0
+    expect(kernelSize(0.5, 'MITCHELL_SMOOTH')).toBe(3);
+    expect(kernelSize(0.75, 'MITCHELL_SMOOTH')).toBe(5);
+    expect(kernelSize(0.75, 'GAUSSIAN')).toBe(3);
+    expect(kernelSize(0, 'MITCHELL_SMOOTH')).toBe(0);
+    expect(kernelSize(0.2, 'MITCHELL_SMOOTH')).toBe(0); // fw = 0
   });
   it('weights are normalised, symmetric and centre-peaked', () => {
-    for (const k of ['mitchell', 'gaussian'] as const) {
+    for (const k of ['MITCHELL_SMOOTH', 'GAUSSIAN'] as const) {
       const { n, w } = kernelWeights(0.75, k);
       let sum = 0; for (const v of w) sum += v;
       expect(sum).toBeCloseTo(1, 6);
@@ -50,16 +50,43 @@ describe('spatial filter kernels (FilterHolder)', () => {
     }
   });
   it('mitchell-smooth coefficient: 1 - 2b/6·… at 0, zero beyond support', () => {
-    expect(kernelCoeff('mitchell', 0)).toBeCloseTo((6 - 2 * 0.42) / 6, 9);
-    expect(kernelCoeff('mitchell', 2)).toBe(0);
-    expect(kernelCoeff('gaussian', 0)).toBeCloseTo(Math.sqrt(2 / Math.PI), 9);
+    expect(kernelCoeff('MITCHELL_SMOOTH', 0)).toBeCloseTo((6 - 2 * 0.42) / 6, 9);
+    expect(kernelCoeff('MITCHELL_SMOOTH', 2)).toBe(0);
+    expect(kernelCoeff('GAUSSIAN', 0)).toBeCloseTo(Math.sqrt(2 / Math.PI), 9);
   });
   it('sharpening kernels get a gaussian-0.75 intensity filter; gaussian uses itself; radius 0 → nothing', () => {
-    const m = buildSpatialFilters(0.75, 'mitchell');
+    const m = buildSpatialFilters(0.75, 'MITCHELL_SMOOTH');
     expect([m.nc, m.ni]).toEqual([5, 3]);
     expect(m.weights[FILT_INTENSITY_OFFSET + 4]).toBeGreaterThan(0); // 3×3 centre present
-    const g = buildSpatialFilters(0.75, 'gaussian');
+    const g = buildSpatialFilters(0.75, 'GAUSSIAN');
     expect([g.nc, g.ni]).toEqual([3, 3]);
-    expect(buildSpatialFilters(0, 'mitchell')).toMatchObject({ nc: 0, ni: 0 });
+    expect(buildSpatialFilters(0, 'MITCHELL_SMOOTH')).toMatchObject({ nc: 0, ni: 0 });
+  });
+});
+
+describe('JWildfire filter kernel table', () => {
+  it('every kernel is normalised, symmetric where JWildfire is, and the sharpening set matches FilterKernelType', async () => {
+    const { FILTER_KERNELS, kernelCoeff, kernelSupport, kernelSharpening, kernelWeights, normFilterKernel } = await import('../src/gpu/filters');
+    for (const k of FILTER_KERNELS) {
+      expect(kernelCoeff(k, 0)).toBeGreaterThan(0);
+      const { n, w } = kernelWeights(1, k);
+      expect(n, k).toBeGreaterThan(0);
+      expect(w.reduce((a, b) => a + b, 0), k).toBeCloseTo(1, 5);
+      expect(kernelSupport(k)).toBeGreaterThan(0);
+    }
+    // SinePow15: acos(4·x^15 − 1)/π — 1 at 0, 0 at 1, steep in between (JWildfire's most used non-default kernel)
+    expect(kernelCoeff('SINEPOW15', 0)).toBeCloseTo(1, 6);
+    expect(kernelCoeff('SINEPOW15', 1)).toBeCloseTo(0, 6);
+    expect(kernelCoeff('SINEPOW15', 0.8)).toBeGreaterThan(kernelCoeff('SINEPOW15', 0.95));
+    expect(kernelCoeff('SINEPOW15', -0.5)).toBe(0); // log10 of a negative → NaN → 0
+    expect(kernelSharpening('MITCHELL_SMOOTH')).toBe(true);
+    expect(kernelSharpening('LANCZOS3')).toBe(true);
+    expect(kernelSharpening('SINEPOW15')).toBe(false);
+    expect(kernelSharpening('GAUSSIAN')).toBe(false);
+    expect(kernelSupport('LANCZOS3')).toBe(3);
+    expect(kernelSupport('BOX')).toBe(0.5);
+    expect(normFilterKernel('mitchell')).toBe('MITCHELL_SMOOTH');
+    expect(normFilterKernel('sinepow15')).toBe('SINEPOW15');
+    expect(normFilterKernel('nope')).toBe('MITCHELL_SMOOTH');
   });
 });

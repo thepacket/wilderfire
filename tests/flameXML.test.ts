@@ -37,14 +37,14 @@ describe('.flame round-trip', () => {
     const f = preset('Ember');
     Object.assign(f, { camPitch: 30, camYaw: -15, camBank: 5, camPersp: 0.3, camPosZ: 0.2, preserveZ: true,
       camDOF: 0.4, camDOFArea: 0.3, newDOF: true, focusZ: 0.15, dimishZ: 2, dimZDist: 0.5, dimZColor: [0.5, 0, 0.25],
-      contrast: 1.2, whiteLevel: 200, filterRadius: 0.75, filterKernel: 'gaussian', antialiasAmount: 0.1, deRadius: 0.5, deCurve: 0.6 });
+      contrast: 1.2, whiteLevel: 200, filterRadius: 0.75, filterKernel: 'GAUSSIAN', antialiasAmount: 0.1, deRadius: 0.5, deCurve: 0.6 });
     f.layers[0].xforms[0].yz = [0.9, 0.1, 0.05, -0.1, 0.9, 0];
     f.layers[0].xforms[1].zxPost = [1, 0.2, 0, 0, 1, 0.1];
     const { flame: b } = roundTrip(f);
     for (const k of ['camPitch', 'camYaw', 'camBank', 'camPersp', 'camPosZ', 'camDOF', 'camDOFArea', 'focusZ', 'dimishZ', 'dimZDist', 'contrast', 'whiteLevel', 'filterRadius', 'antialiasAmount', 'deRadius', 'deCurve'] as const) {
       expect(b[k], k).toBeCloseTo(f[k] as number, 4);
     }
-    expect(b.preserveZ).toBe(true); expect(b.newDOF).toBe(true); expect(b.filterKernel).toBe('gaussian');
+    expect(b.preserveZ).toBe(true); expect(b.newDOF).toBe(true); expect(b.filterKernel).toBe('GAUSSIAN');
     expect(b.dimZColor.map((v) => +v.toFixed(3))).toEqual([0.5, 0, 0.25]);
     b.layers[0].xforms[0].yz!.forEach((v, i) => expect(v).toBeCloseTo(f.layers[0].xforms[0].yz![i], 5));
     b.layers[0].xforms[1].zxPost!.forEach((v, i) => expect(v).toBeCloseTo(f.layers[0].xforms[1].zxPost![i], 5));
