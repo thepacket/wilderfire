@@ -5,16 +5,18 @@
 import type { Flame } from '../core/flame';
 import { flameSignature, visibleLayers, MAX_LAYERS, LIGHT_DIFF_FUNCS } from '../core/flame';
 import { compileFlame, TONEMAP_WGSL, type CompiledFlame } from './codegen';
-import { buildSpatialFilters, solidFilterWeights, FILT_FLOATS } from './filters';
-import { SOLID_POST_WGSL, SOLID_TONEMAP_WGSL, SOLID_PAY_WORDS, SOLID_MAX_LIGHTS, SOLID_MAX_MATS, SOLID_FILT_FLOATS } from './solid.wgsl';
+import { buildSpatialFilters, solidFilterWeights, gaussianFilter1D, FILT_FLOATS } from './filters';
+import { SOLID_POST_WGSL, SOLID_TONEMAP_WGSL, SOLID_AO_WGSL, SOLID_PAY_WORDS, SOLID_MAX_LIGHTS, SOLID_MAX_MATS, SOLID_FILT_FLOATS } from './solid.wgsl';
 
 const XD_FLOATS = 8192;
 /** bytes per raster cell: density histogram (rgba u32) vs solid z-buffer (key + payload + normal) */
 const HIST_CELL_BYTES = 16;
-const SOLID_CELL_BYTES = 4 + SOLID_PAY_WORDS * 4 + 4;
+const SOLID_CELL_BYTES = 4 + SOLID_PAY_WORDS * 4 + 4 + 4 + 4 + 4 + 4; // key, payload, normal, depth (raster units), AO out, AO raw, AO temp
+/** AO smoothing kernel: gaussian FilterHolder up to 45×45 raster cells */
+const AO_FILT_MAX_N = 45;
 
 /** Solid-rendering z-buffer set for one raster (live view or an offscreen tile). */
-interface SolidBufs { key: GPUBuffer; pay: GPUBuffer; nrm: GPUBuffer; cells: number }
+interface SolidBufs { key: GPUBuffer; pay: GPUBuffer; nrm: GPUBuffer; zr: GPUBuffer; ao: GPUBuffer; aoRaw: GPUBuffer | null; aoTmp: GPUBuffer | null; aoValid: boolean; cells: number }
 
 export interface RenderStats {
   spp: number;           // samples per pixel accumulated
@@ -69,7 +71,15 @@ export class FlameRenderer {
   private lightsBuf!: GPUBuffer;    // lights + materials
   private sfiltBuf!: GPUBuffer;     // JWildfire raster-cell filter kernel
   private sfiltKey = '';
-  private solidBGs = new WeakMap<GPUBuffer, { post: GPUBindGroup; tm: GPUBindGroup }>();
+  private aoRawPipe!: GPUComputePipeline;
+  private aoBlurHPipe!: GPUComputePipeline;
+  private aoBlurVPipe!: GPUComputePipeline;
+  private aopBuf!: GPUBuffer;       // AO pass params
+  private aoFiltBuf!: GPUBuffer;    // AO smoothing kernel
+  private aoFiltKey = '';
+  private aoBlurN = 0;
+  private aoOn = false;
+  private solidBGs = new WeakMap<GPUBuffer, { post: GPUBindGroup; tm: GPUBindGroup; ao: GPUBindGroup | null }>();
 
   private compiled: CompiledFlame | null = null;
   private sig = '';
@@ -153,10 +163,28 @@ export class FlameRenderer {
     this.filtBuf = d.createBuffer({ size: FILT_FLOATS * 4, usage: GPUBufferUsage.STORAGE | GPUBufferUsage.COPY_DST });
     this.matsBuf = d.createBuffer({ size: this.nPoints * 4, usage: GPUBufferUsage.STORAGE | GPUBufferUsage.COPY_DST });
     this.sppBuf = d.createBuffer({ size: 32, usage: GPUBufferUsage.UNIFORM | GPUBufferUsage.COPY_DST });
-    this.spBuf = d.createBuffer({ size: 48, usage: GPUBufferUsage.UNIFORM | GPUBufferUsage.COPY_DST });
+    this.spBuf = d.createBuffer({ size: 64, usage: GPUBufferUsage.UNIFORM | GPUBufferUsage.COPY_DST });
     this.lightsBuf = d.createBuffer({ size: (SOLID_MAX_LIGHTS * 2 + SOLID_MAX_MATS * 3) * 16, usage: GPUBufferUsage.UNIFORM | GPUBufferUsage.COPY_DST });
     this.sfiltBuf = d.createBuffer({ size: SOLID_FILT_FLOATS * 4, usage: GPUBufferUsage.STORAGE | GPUBufferUsage.COPY_DST });
     this.solidPostPipe = d.createComputePipeline({ layout: 'auto', compute: { module: d.createShaderModule({ code: SOLID_POST_WGSL }), entryPoint: 'main' } });
+    this.aopBuf = d.createBuffer({ size: 48, usage: GPUBufferUsage.UNIFORM | GPUBufferUsage.COPY_DST });
+    this.aoFiltBuf = d.createBuffer({ size: AO_FILT_MAX_N * 4, usage: GPUBufferUsage.STORAGE | GPUBufferUsage.COPY_DST });
+    {
+      const aoModule = d.createShaderModule({ code: SOLID_AO_WGSL });
+      const C = GPUShaderStage.COMPUTE;
+      const aoLayout = d.createPipelineLayout({ bindGroupLayouts: [d.createBindGroupLayout({ entries: [
+        { binding: 0, visibility: C, buffer: { type: 'uniform' } },
+        { binding: 1, visibility: C, buffer: { type: 'read-only-storage' } },
+        { binding: 2, visibility: C, buffer: { type: 'read-only-storage' } },
+        { binding: 3, visibility: C, buffer: { type: 'storage' } },
+        { binding: 4, visibility: C, buffer: { type: 'storage' } },
+        { binding: 5, visibility: C, buffer: { type: 'read-only-storage' } },
+        { binding: 6, visibility: C, buffer: { type: 'storage' } },
+      ] })] });
+      this.aoRawPipe = d.createComputePipeline({ layout: aoLayout, compute: { module: aoModule, entryPoint: 'aoRawPass' } });
+      this.aoBlurHPipe = d.createComputePipeline({ layout: aoLayout, compute: { module: aoModule, entryPoint: 'aoBlurH' } });
+      this.aoBlurVPipe = d.createComputePipeline({ layout: aoLayout, compute: { module: aoModule, entryPoint: 'aoBlurV' } });
+    }
     const solidModule = d.createShaderModule({ code: SOLID_TONEMAP_WGSL });
     // explicit layout so one bind group serves both the canvas and the rgba8 export pipeline
     const F = GPUShaderStage.FRAGMENT;
@@ -168,6 +196,7 @@ export class FlameRenderer {
         { binding: 3, visibility: F, buffer: { type: 'read-only-storage' } },
         { binding: 4, visibility: F, buffer: { type: 'read-only-storage' } },
         { binding: 5, visibility: F, buffer: { type: 'uniform' } },
+        { binding: 6, visibility: F, buffer: { type: 'read-only-storage' } },
       ],
     });
     const solidLayout = d.createPipelineLayout({ bindGroupLayouts: [this.solidTmLayout] });
@@ -228,10 +257,15 @@ export class FlameRenderer {
       key: d.createBuffer({ size: cells * 4, usage }),
       pay: d.createBuffer({ size: cells * SOLID_PAY_WORDS * 4, usage }),
       nrm: d.createBuffer({ size: cells * 4, usage }),
+      zr: d.createBuffer({ size: cells * 4, usage }),
+      ao: d.createBuffer({ size: cells * 4, usage }),
+      aoRaw: null, // allocated the first time AO runs on this set
+      aoTmp: null,
+      aoValid: false,
       cells,
     };
   }
-  private destroySolidBufs(b: SolidBufs | null) { if (b) { b.key.destroy(); b.pay.destroy(); b.nrm.destroy(); } }
+  private destroySolidBufs(b: SolidBufs | null) { if (b) { b.key.destroy(); b.pay.destroy(); b.nrm.destroy(); b.zr.destroy(); b.ao.destroy(); b.aoRaw?.destroy(); b.aoTmp?.destroy(); } }
 
   private allocHistogram() {
     const os = this.oversample;
@@ -280,20 +314,34 @@ export class FlameRenderer {
   }
 
   /** Bind groups of the solid post pass and tonemap for one z-buffer set (cached per set). */
-  private solidBindGroups(b: SolidBufs): { post: GPUBindGroup; tm: GPUBindGroup } {
+  private solidBindGroups(b: SolidBufs, withAO: boolean): { post: GPUBindGroup; tm: GPUBindGroup; ao: GPUBindGroup | null } {
     let bg = this.solidBGs.get(b.key);
-    if (bg) return bg;
+    if (bg && (!withAO || bg.ao)) return bg;
     const d = this.device;
+    if (withAO && !b.aoRaw) { b.aoRaw = d.createBuffer({ size: b.cells * 4, usage: GPUBufferUsage.STORAGE | GPUBufferUsage.COPY_DST }); b.aoTmp = d.createBuffer({ size: b.cells * 4, usage: GPUBufferUsage.STORAGE | GPUBufferUsage.COPY_DST }); }
     bg = {
-      post: d.createBindGroup({
+      post: bg?.post ?? d.createBindGroup({
         layout: this.solidPostPipe.getBindGroupLayout(0),
         entries: [
           { binding: 0, resource: { buffer: this.sppBuf } },
           { binding: 1, resource: { buffer: b.key } },
           { binding: 2, resource: { buffer: b.pay } },
           { binding: 3, resource: { buffer: b.nrm } },
+          { binding: 4, resource: { buffer: b.zr } },
         ],
       }),
+      ao: b.aoRaw ? d.createBindGroup({
+        layout: this.aoRawPipe.getBindGroupLayout(0),
+        entries: [
+          { binding: 0, resource: { buffer: this.aopBuf } },
+          { binding: 1, resource: { buffer: b.zr } },
+          { binding: 2, resource: { buffer: b.nrm } },
+          { binding: 3, resource: { buffer: b.aoRaw } },
+          { binding: 4, resource: { buffer: b.ao } },
+          { binding: 5, resource: { buffer: this.aoFiltBuf } },
+          { binding: 6, resource: { buffer: b.aoTmp! } },
+        ],
+      }) : null,
       tm: d.createBindGroup({
         layout: this.solidTmLayout,
         entries: [
@@ -303,6 +351,7 @@ export class FlameRenderer {
           { binding: 3, resource: { buffer: b.nrm } },
           { binding: 4, resource: { buffer: this.sfiltBuf } },
           { binding: 5, resource: { buffer: this.lightsBuf } },
+          { binding: 6, resource: { buffer: b.ao } },
         ],
       }),
     };
@@ -412,7 +461,7 @@ export class FlameRenderer {
     this.reseedPoints(100); // live: a shorter fuse keeps drags snappy (exports use the full 200)
     const enc = this.device.createCommandEncoder();
     enc.clearBuffer(this.histBuf);
-    if (this.solidLive) enc.clearBuffer(this.solidLive.key); // key 0 = empty cell; payload/normals are ignored until a key is set
+    if (this.solidLive) { enc.clearBuffer(this.solidLive.key); this.solidLive.aoValid = false; } // key 0 = empty cell; payload/normals are ignored until a key is set
     this.device.queue.submit([enc.finish()]);
   }
 
@@ -503,29 +552,54 @@ export class FlameRenderer {
     tf32[15] = f.gammaThreshold ?? 0.04; // packed into bg.w
     this.device.queue.writeBuffer(this.tmBuf, 0, tu32);
 
-    if (this.solid) this.writeSolidUniforms(f, w, h, os, transparent, [m02, m12, m22]);
+    if (this.solid) this.writeSolidUniforms(f, w, h, os, transparent, [m02, m12, m22], ppu, Math.hypot(fullW, fullH));
   }
 
   /** Solid rendering: post-pass params, tonemap params, lights/materials, raster-cell filter kernel. */
-  private writeSolidUniforms(f: Flame, rasterW: number, rasterH: number, os: number, transparent: boolean, m2: number[]) {
+  private writeSolidUniforms(f: Flame, rasterW: number, rasterH: number, os: number, transparent: boolean, m2: number[], ppu: number, imgSize: number) {
     const s = f.solid!;
     const q = new Uint32Array(8);
     const qf = new Float32Array(q.buffer);
-    q[0] = rasterW; q[1] = rasterH;
+    q[0] = rasterW; q[1] = rasterH; qf[2] = ppu;
     qf.set([m2[0], m2[1], m2[2], f.camPosZ], 4);
     this.device.queue.writeBuffer(this.sppBuf, 0, q);
+
+    // AOCalculator params (Tools.limitValue ranges); radii scale with the raster diagonal / 500
+    this.aoOn = !!s.ao.enabled;
+    if (this.aoOn) {
+      const clampN = (v: number, lo: number, hi: number) => Math.min(hi, Math.max(lo, v));
+      // imgSize = the FULL raster's diagonal (a hi-res tile keeps the whole image's AO radius)
+      const searchR = clampN(s.ao.searchRadius, 0.25, 120), blurR = clampN(s.ao.blurRadius, 0.25, 10) * imgSize / 500;
+      const rs = clampN(Math.round(s.ao.radiusSamples), 1, 128), as = clampN(Math.round(s.ao.azimuthSamples), 1, 128);
+      const sphere = searchR * imgSize / 500;
+      let blurN = 0;
+      if (blurR >= 0.42) {
+        const { n, w } = gaussianFilter1D(blurR, AO_FILT_MAX_N);
+        blurN = n;
+        const key = blurR.toFixed(4);
+        if (n && key !== this.aoFiltKey) { this.aoFiltKey = key; this.device.queue.writeBuffer(this.aoFiltBuf, 0, w); }
+      }
+      this.aoBlurN = blurN;
+      const a = new Uint32Array(12);
+      const af = new Float32Array(a.buffer);
+      a[0] = rasterW; a[1] = rasterH; a[2] = rs; a[3] = as;
+      af[4] = sphere; af[5] = sphere / rs; af[6] = (2 * Math.PI) / as; af[7] = clampN(s.ao.falloff, 0, 10);
+      a[8] = blurN; a[9] = 32851137;
+      this.device.queue.writeBuffer(this.aopBuf, 0, a);
+    }
 
     const { n, w: fw } = solidFilterWeights(f.filterRadius ?? 0, f.filterKernel ?? 'mitchell', os);
     const fkey = `${f.filterKernel}:${(f.filterRadius ?? 0).toFixed(4)}:${os}`;
     if (n && fkey !== this.sfiltKey) { this.sfiltKey = fkey; this.device.queue.writeBuffer(this.sfiltBuf, 0, fw); }
 
-    const p = new Uint32Array(12);
+    const p = new Uint32Array(16);
     const pf = new Float32Array(p.buffer);
     p[0] = rasterW / os; p[1] = rasterH / os; p[2] = os; p[3] = n;
     pf[4] = f.gamma; pf[5] = transparent ? 1 : 0;
     const nL = Math.min(s.lights.length, SOLID_MAX_LIGHTS), nM = Math.min(s.materials.length, SOLID_MAX_MATS);
     p[6] = nL; p[7] = nM;
     pf.set([f.background[0], f.background[1], f.background[2], 0], 8);
+    pf.set([this.aoOn ? 1 : 0, Math.min(4, Math.max(0, s.ao.intensity)), Math.max(0, s.ao.affectDiffuse), 0], 12);
     this.device.queue.writeBuffer(this.spBuf, 0, p);
 
     // LightViewCalculator: lightDir = aᵀ·(0,0,−1) with a = rotation from alpha = −altitude, beta = −azimuth
@@ -593,12 +667,26 @@ export class FlameRenderer {
   }
 
   /** Solid rendering: post pass (key repair + normals) over the raster, then the shading/filter/composite pass to `target`. */
-  private encodeSolid(enc: GPUCommandEncoder, bufs: SolidBufs, rasterW: number, rasterH: number, pipe: GPURenderPipeline, target: GPUTextureView, clear: GPUColor) {
-    const bg = this.solidBindGroups(bufs);
+  private encodeSolid(enc: GPUCommandEncoder, bufs: SolidBufs, rasterW: number, rasterH: number, pipe: GPURenderPipeline, target: GPUTextureView, clear: GPUColor, refreshAO = true) {
+    const bg = this.solidBindGroups(bufs, this.aoOn);
     const cp = enc.beginComputePass();
     cp.setPipeline(this.solidPostPipe);
     cp.setBindGroup(0, bg.post);
-    cp.dispatchWorkgroups(Math.ceil(rasterW / 16), Math.ceil(rasterH / 16));
+    const gx = Math.ceil(rasterW / 16), gy = Math.ceil(rasterH / 16);
+    cp.dispatchWorkgroups(gx, gy);
+    if (this.aoOn && bg.ao && (refreshAO || !bufs.aoValid)) {
+      bufs.aoValid = true;
+      // AOCalculator: raw occlusion from the z-buffer, then (blur radius ≥ 0.42 cells) the gaussian smoothing × 0.1
+      cp.setPipeline(this.aoRawPipe);
+      cp.setBindGroup(0, bg.ao);
+      cp.dispatchWorkgroups(gx, gy);
+      if (this.aoBlurN > 0) {
+        cp.setPipeline(this.aoBlurHPipe);
+        cp.dispatchWorkgroups(gx, gy);
+        cp.setPipeline(this.aoBlurVPipe);
+        cp.dispatchWorkgroups(gx, gy);
+      }
+    }
     cp.end();
     const rp = enc.beginRenderPass({ colorAttachments: [{ view: target, loadOp: 'clear', clearValue: clear, storeOp: 'store' }] });
     rp.setPipeline(pipe);
@@ -752,9 +840,13 @@ export class FlameRenderer {
   }
 
   /** Encode the live view's tonemap (density or solid) to `view`. */
-  private presentTo(enc: GPUCommandEncoder, view: GPUTextureView) {
+  private aoTick = 0;
+  private presentTo(enc: GPUCommandEncoder, view: GPUTextureView, live = false) {
     const os = this.oversample;
-    if (this.solid && this.solidLive) this.encodeSolid(enc, this.solidLive, this.width * os, this.height * os, this.solidPipe, view, { r: 0, g: 0, b: 0, a: 1 });
+    // live view: the AO passes (the costliest part of a solid present) refresh every third presented frame while
+    // accumulating — the z-buffer changes slowly once the surface is in; captures/exports always refresh
+    const refreshAO = !live || (this.aoTick++ % 3) === 0;
+    if (this.solid && this.solidLive) this.encodeSolid(enc, this.solidLive, this.width * os, this.height * os, this.solidPipe, view, { r: 0, g: 0, b: 0, a: 1 }, refreshAO);
     else this.encodeTonemap(enc, this.renderBG!, this.renderPipeline, view, this.width, this.height, false, { r: 0, g: 0, b: 0, a: 1 });
   }
 
@@ -855,7 +947,7 @@ export class FlameRenderer {
     const present = !accumulate || sppAfter >= this.minDisplaySpp || !this.hasPresented;
     if (present) {
       const view = this.context.getCurrentTexture().createView();
-      this.presentTo(enc, view);
+      this.presentTo(enc, view, accumulate);
       this.hasPresented = true;
       this.needsPresent = false;
     }

@@ -279,9 +279,29 @@ collections use it) is ported from `RasterFloatIntForSolidRendering` / `NormalsC
   argument that draws a random (`julia3D`: `atan2 + 2π·(int)(rnd·n)`, `blur3D`, `circleblur`,
   `farblur`) drew *two* — the (cos, sin) pair was off the unit circle. `cwgsl.ts` now hoists the angle;
   those four re-verified, `TINA0019` moved closer to JWildfire, baseline updated.
-* Not yet: **AO** (`AOCalculator`), **shadow maps** (`ShadowCalculator`, light-space splats), the
-  reflection map, JWildfire's post-process DOF for solid flames (`PostDOFCalculator`), `receiveOnlyShadows`
-  (`plane_wf`/`obj_mesh_*`), light motion curves. Their attributes round-trip untouched.
+* Not yet: **shadow maps** (`ShadowCalculator`, light-space splats), the reflection map, JWildfire's
+  post-process DOF for solid flames (`PostDOFCalculator`), `receiveOnlyShadows` (`plane_wf`/`obj_mesh_*`),
+  light motion curves. Their attributes round-trip untouched.
+
+### Solid rendering — stage 2: ambient occlusion (2026-08-18)
+
+`AOCalculator` ported literally as two compute passes over the raster (`SOLID_AO_WGSL`): the post pass now
+also writes the depth in raster units (`zr = depth · ppu`, JWildfire's `zBuf = prj.z · bws`; `ZBUF_ZMIN`
+for empty cells, which therefore never occlude); `aoRawPass` walks `azimuthSamples` directions ×
+`radiusSamples` radii up to `sphere_radius = aoSearchRadius · imgSize/500` (imgSize = the FULL raster's
+diagonal, so hi-res tiles keep the whole image's radius), jittered (`r_jitter = step/10`, per-cell hash
+instead of the shared Marsaglia stream), horizon `atan2(z − z0, r) + 0.001` against the tangent-plane
+angle — including JWildfire's normalisation of the *absolute* sample position instead of the offset —,
+monotone `prevH` gate, `exp(−dist²·falloff) · 0.5`. `SmoothAOBufferThread` (gaussian `FilterHolder`,
+os 1, radius `aoBlurRadius · imgSize/500`, only when ≥ 0.42 cells, result × 0.1 — without smoothing the
+raw sum is used unscaled) is a pure gaussian, so it runs as two 1-D passes with the exact same weights
+(`gaussianFilter1D`; unit test asserts the outer product equals the N×N kernel). Shading: `ambient −=
+ao·aoIntensity`, `diffuse −= ao·aoIntensity·aoAffectDiffuse` (`addSolidColors`). Live view refreshes the AO
+passes every third presented frame while accumulating (a 3016×3408 raster: 28 ms per full solid present).
+Verified on the same 8 collection flames with their own AO settings restored + `Solid_2`: 7 at ratio
+1.00–1.03 / blkMAE ≤ 2 / corr 1.00 (AO visibly darkens both engines alike: `_solid5` 188 → 184,
+`_solid8` 99 → 94), the lacy `_ao2` at 0.95 (its z-buffer holes differ by the point-distribution noise
+already seen without AO). UI: Solid → Ambient occlusion knobs.
 
 ## Semantics worth knowing
 

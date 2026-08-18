@@ -73,3 +73,15 @@ describe('solid spatial filter (JWildfire FilterHolder in raster cells)', () => 
     expect(m.w[4 * 9 + 0]).toBeCloseTo(m.w[4 * 9 + 8], 6);
   });
 });
+
+describe('AO smoothing kernel', () => {
+  it('the 1-D gaussian factor reproduces JWildfire\'s N×N FilterHolder kernel exactly (separable blur)', async () => {
+    const { gaussianFilter1D } = await import('../src/gpu/filters');
+    for (const r of [0.5, 2.17, 7.3]) {
+      const k2 = solidFilterWeights(r, 'gaussian', 1, 45);
+      const k1 = gaussianFilter1D(r, 45);
+      expect(k1.n).toBe(k2.n);
+      for (let i = 0; i < k1.n; i++) for (let j = 0; j < k1.n; j++) expect(k1.w[i] * k1.w[j]).toBeCloseTo(k2.w[i * k1.n + j], 6);
+    }
+  });
+});

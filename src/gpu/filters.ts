@@ -57,13 +57,13 @@ export function kernelWeights(radius: number, kernel: FilterKernel): { n: number
 /** JWildfire FilterHolder kernel in RASTER cells for an oversampled raster (solid rendering applies it
  *  cell by cell): N = int(2·os·support·r)+1 made odd, weights normalised to sum os² (LogDensityFilter
  *  divides by os² again). n = 0 when the radius is 0. */
-export function solidFilterWeights(radius: number, kernel: FilterKernel, os: number): { n: number; w: Float32Array<ArrayBuffer> } {
+export function solidFilterWeights(radius: number, kernel: FilterKernel, os: number, maxN = 25): { n: number; w: Float32Array<ArrayBuffer> } {
   if (radius < 1e-6) return { n: 0, w: new Float32Array(new ArrayBuffer(0)) };
   const support = kernelSupport(kernel);
   const fw = Math.floor(2 * os * support * radius);
   let n = fw + 1;
   if (n % 2 === 0) n++;
-  n = Math.min(n, 25);
+  n = Math.min(n, maxN);
   const adjust = fw > 0 ? (support * n) / fw : 0;
   const w = new Float32Array(new ArrayBuffer(n * n * 4));
   let sum = 0;
@@ -88,4 +88,21 @@ export function buildSpatialFilters(radius: number, kernel: FilterKernel): { wei
   weights.set(c.w, 0);
   weights.set(i.w, FILT_INTENSITY_OFFSET);
   return { weights, nc: c.n, ni: radius < 1e-6 ? 0 : i.n, key: `${kernel}:${radius.toFixed(4)}` };
+}
+
+/** The 1-D factor of a JWildfire gaussian FilterHolder kernel (os 1): the 2-D kernel exp(−2(ii²+jj²)) normalised
+ *  over its N×N window equals the outer product of these normalised 1-D weights. n = 0 when the radius is 0. */
+export function gaussianFilter1D(radius: number, maxN: number): { n: number; w: Float32Array<ArrayBuffer> } {
+  if (radius < 1e-6) return { n: 0, w: new Float32Array(new ArrayBuffer(0)) };
+  const support = kernelSupport('gaussian');
+  const fw = Math.floor(2 * support * radius);
+  let n = fw + 1;
+  if (n % 2 === 0) n++;
+  n = Math.min(n, maxN);
+  const adjust = fw > 0 ? (support * n) / fw : 0;
+  const w = new Float32Array(new ArrayBuffer(n * 4));
+  let sum = 0;
+  for (let i = 0; i < n; i++) { const ii = ((2 * i + 1) / n - 1) * adjust; w[i] = Math.exp(-2 * ii * ii); sum += w[i]; }
+  for (let i = 0; i < n; i++) w[i] /= sum;
+  return { n, w };
 }

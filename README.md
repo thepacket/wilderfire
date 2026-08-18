@@ -63,8 +63,11 @@ in the stack.
   JWildfire model ported literally — its shading, its filter-in-raster-cells,
   its coverage alpha — and verified against headless JWildfire on solid flames
   from public collections (mean-luma ratio 1.00–1.03, block MAE ≤ 2, structure
-  correlation 1.00); `sld_render_*` attributes import/export. Ambient occlusion
-  and shadow maps are not rendered yet (their settings round-trip)
+  correlation 1.00), plus **ambient occlusion** from the depth buffer (JWildfire's
+  `AOCalculator`: search radius, radius/direction samples, falloff, gaussian
+  smoothing — separable on the GPU —, intensity, diffuse influence; verified the
+  same way); `sld_render_*` attributes import/export. Shadow maps are not rendered
+  yet (their settings round-trip)
 - **Layers** (up to 8) — each with its own transforms, final transform,
   gradient, density weight, and visibility, blended in one histogram; walker
   threads are partitioned across layers on the GPU

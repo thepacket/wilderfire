@@ -114,14 +114,40 @@ export function buildSolidSection(app: App): HTMLElement {
   mAdd.onclick = () => { const s = solid(); if (s.materials.length >= MAX_MATS) return; s.materials.push(defaultSolidMaterial()); mi = s.materials.length - 1; refreshMat(); app.commitTone(SRC); };
   mDel.onclick = () => { const s = solid(); if (!s.materials.length) return; s.materials.splice(mi, 1); refreshMat(); app.commitTone(SRC); };
 
-  body.append(lHead, lightBox, mHead, matBox);
-  body.append(el('div', 'hint', 'Surfaces are lit by ambient + per-light diffuse and specular terms; each transform can carry a material index (files keep it). Ambient occlusion and shadows are not rendered yet.'));
+  // ---- ambient occlusion ----
+  const aoRow = el('div', 'row');
+  const aoChk = el('input') as HTMLInputElement;
+  aoChk.type = 'checkbox';
+  const aoLab = el('label', 'check', ' Ambient occlusion');
+  aoLab.prepend(aoChk);
+  aoLab.title = 'Darken creases and cavities from the depth buffer (screen-space AO)';
+  aoChk.onchange = () => { solid().ao.enabled = aoChk.checked; aoBox.style.display = aoChk.checked ? '' : 'none'; app.commitTone(SRC); };
+  aoRow.append(aoLab);
+  const ao = () => solid().ao;
+  const aoIntS = slider({ label: 'Intensity', min: 0, max: 4, step: 0.01, value: 0.6, onInput: (v) => { ao().intensity = v; app.commitTone(SRC); } });
+  const aoRadS = slider({ label: 'Radius', min: 0.25, max: 40, step: 0.25, value: 4, onInput: (v) => { ao().searchRadius = v; app.commitTone(SRC); } });
+  const aoBlurS = slider({ label: 'Blur', min: 0.25, max: 10, step: 0.05, value: 1.5, onInput: (v) => { ao().blurRadius = v; app.commitTone(SRC); } });
+  const aoRsS = slider({ label: 'Radius steps', min: 1, max: 32, step: 1, value: 6, fmt: (v) => v.toFixed(0), onInput: (v) => { ao().radiusSamples = v; app.commitTone(SRC); } });
+  const aoAsS = slider({ label: 'Directions', min: 1, max: 32, step: 1, value: 7, fmt: (v) => v.toFixed(0), onInput: (v) => { ao().azimuthSamples = v; app.commitTone(SRC); } });
+  const aoFallS = slider({ label: 'Falloff', min: 0, max: 10, step: 0.05, value: 0.5, onInput: (v) => { ao().falloff = v; app.commitTone(SRC); } });
+  const aoDifS = slider({ label: 'On diffuse', min: 0, max: 1, step: 0.01, value: 0.1, onInput: (v) => { ao().affectDiffuse = v; app.commitTone(SRC); } });
+  const aoBox = el('div');
+  aoBox.append(aoIntS.root, aoRadS.root, aoBlurS.root, aoRsS.root, aoAsS.root, aoFallS.root, aoDifS.root);
+  const refreshAO = () => {
+    const a = solid().ao;
+    aoChk.checked = a.enabled;
+    aoBox.style.display = a.enabled ? '' : 'none';
+    aoIntS.set(a.intensity); aoRadS.set(a.searchRadius); aoBlurS.set(a.blurRadius); aoRsS.set(a.radiusSamples); aoAsS.set(a.azimuthSamples); aoFallS.set(a.falloff); aoDifS.set(a.affectDiffuse);
+  };
+
+  body.append(lHead, lightBox, mHead, matBox, aoRow, aoBox);
+  body.append(el('div', 'hint', 'Surfaces are lit by ambient + per-light diffuse and specular terms; each transform can carry a material index (files keep it). Ambient occlusion darkens the ambient term (and, by "On diffuse", the diffuse term) where the depth buffer shows nearby occluders. Shadows are not rendered yet.'));
 
   const refresh = () => {
     const on = !!app.flame.solid?.enabled;
     enChk.checked = on;
     body.style.display = on ? '' : 'none';
-    if (on) { refreshLight(); refreshMat(); }
+    if (on) { refreshLight(); refreshMat(); refreshAO(); }
   };
   refresh();
   app.on('flame', (src) => { if (src !== SRC) refresh(); });

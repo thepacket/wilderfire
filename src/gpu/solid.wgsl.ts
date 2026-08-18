@@ -49,7 +49,7 @@ export const SOLID_POST_WGSL = `
 struct SPP {
   width: u32,   // raster cells (output × oversample)
   height: u32,
-  _p0: u32,
+  ppu: f32,     // raster cells per world unit (JWildfire view.bws): zr = depth · ppu
   _p1: u32,
   m2: vec4f,    // camera matrix row z (+ camPos.z in w): depth = m2·origin + w
 };
@@ -57,6 +57,9 @@ struct SPP {
 @group(0) @binding(1) var<storage, read_write> zkey: array<atomic<u32>>;
 @group(0) @binding(2) var<storage, read> zpay: array<u32>;
 @group(0) @binding(3) var<storage, read_write> nrm: array<u32>;
+@group(0) @binding(4) var<storage, read_write> zr: array<f32>; // depth in raster units (JWildfire zBuf); ZBUF_ZMIN when empty
+
+const ZBUF_ZMIN: f32 = -3.0e38; // JWildfire: -Float.MAX_VALUE (any real depth is above this)
 
 fn zkeyOf(z: f32) -> u32 {
   let b = bitcast<u32>(z);
@@ -89,11 +92,13 @@ fn main(@builtin(global_invocation_id) gid: vec3u) {
   if (x >= W || y >= H) { return; }
   let cell = u32(y * W + x);
   let key = atomicLoad(&zkey[cell]);
-  if (key == 0u) { nrm[cell] = 0u; return; }
+  if (key == 0u) { nrm[cell] = 0u; zr[cell] = ZBUF_ZMIN; return; }
   let o = originAt(cell);
   // repair: a payload written behind a concurrent, higher key — the key must describe the payload
-  let zk = zkeyOf(dot(Q.m2.xyz, o) + Q.m2.w);
+  let depth = dot(Q.m2.xyz, o) + Q.m2.w;
+  let zk = zkeyOf(depth);
   if (zk != key) { atomicStore(&zkey[cell], zk); }
+  zr[cell] = depth * Q.ppu;
   // NormalsCalculator.refreshNormalAtLocation with MAX_NORMALS_SAMPLES = 8 (the final refreshAllNormals)
   var n = vec3f(0.0);
   var samples = 0;
@@ -134,6 +139,7 @@ struct SP {
   nLights: u32,
   nMats: u32,
   bg: vec4f,
+  ao: vec4f,      // x: AO enabled, y: aoIntensity (0..4), z: aoAffectDiffuse
 };
 struct Light { dir: vec4f, col: vec4f };          // dir.xyz = direction (LightViewCalculator), dir.w = intensity
 struct Mat { a: vec4f, b: vec4f, c: vec4f };      // a: diffuse, ambient, phong, phongSize; b: phong rgb, diffFunc; c: reflMapIntensity
@@ -145,6 +151,7 @@ struct SolidLights { lights: array<Light, ${SOLID_MAX_LIGHTS}>, mats: array<Mat,
 @group(0) @binding(3) var<storage, read> nrm: array<u32>;
 @group(0) @binding(4) var<storage, read> sfilt: array<f32>;
 @group(0) @binding(5) var<uniform> L: SolidLights;
+@group(0) @binding(6) var<storage, read> aoBuf: array<f32>; // AOCalculator result per cell (zeros when AO is off)
 
 @vertex
 fn vs(@builtin(vertex_index) vi: u32) -> @builtin(position) vec4f {
@@ -217,13 +224,21 @@ fn shadeCell(cell: u32, out: ptr<function, vec3f>) -> bool {
     // no material for this index: the background lit by the lights' visibility (1 each)
     raw = S.bg.xyz * clamp(f32(S.nLights), 0.0, 1.0);
   } else {
-    raw = obj * m.ambient;
+    // SSAO darkens the ambient term and, by aoAffectDiffuse, the diffuse term
+    var ambient = m.ambient;
+    var diffuse = m.diffuse;
+    if (S.ao.x > 0.5) {
+      let ao = aoBuf[cell];
+      ambient = max(0.0, ambient - ao * S.ao.y);
+      diffuse = max(0.0, diffuse - ao * S.ao.y * S.ao.z);
+    }
+    raw = obj * ambient;
     for (var i = 0u; i < S.nLights; i = i + 1u) {
       let lt = L.lights[i];
       let ld = lt.dir.xyz;
       let cosa = dot(ld, normal);
       if (cosa > 1e-8) {
-        raw += (lt.col.xyz + obj * m.ambient / 3.0) * (diffResp(m, cosa) * m.diffuse * lt.dir.w);
+        raw += (lt.col.xyz + obj * ambient / 3.0) * (diffResp(m, cosa) * diffuse * lt.dir.w);
       }
       if (m.phong > 1e-8) {
         let r = ld - 2.0 * dot(ld, normal) * normal;
@@ -289,5 +304,128 @@ fn fs(@builtin(position) fragPos: vec4f) -> @location(0) vec4f {
   let bg255 = floor(S.bg.xyz * 255.0 + 0.5);
   let outc = clamp(solid255 + floor((255.0 - alphaI) * bg255 / 256.0), vec3f(0.0), vec3f(255.0));
   return vec4f(outc / 255.0, 1.0);
+}
+`;
+
+/** AOCalculator (screen-space ambient occlusion on the z-buffer): raw pass + optional gaussian smoothing pass. */
+export const SOLID_AO_WGSL = `
+struct AOP {
+  width: u32,
+  height: u32,
+  radiusSamples: u32,
+  azimuthSamples: u32,
+  sphereRadius: f32,   // aoSearchRadius · imgSize / 500 (raster cells)
+  radiusStep: f32,     // sphereRadius / radiusSamples
+  azimuthStep: f32,    // 2π / azimuthSamples
+  falloff: f32,
+  blurN: u32,          // smoothing kernel size (0 = raw result stays)
+  seed: u32,
+  _p0: u32,
+  _p1: u32,
+};
+const ZBUF_ZMIN: f32 = -3.0e38; // JWildfire: -Float.MAX_VALUE (any real depth is above this)
+@group(0) @binding(0) var<uniform> A: AOP;
+@group(0) @binding(1) var<storage, read> zr: array<f32>;
+@group(0) @binding(2) var<storage, read> nrm: array<u32>;
+@group(0) @binding(3) var<storage, read_write> aoRaw: array<f32>;
+@group(0) @binding(4) var<storage, read_write> aoOut: array<f32>;
+@group(0) @binding(5) var<storage, read> bfilt: array<f32>;
+@group(0) @binding(6) var<storage, read_write> aoTmp: array<f32>;
+
+fn unpackNormal(p: u32) -> vec3f {
+  return vec3f(f32(p & 1023u), f32((p >> 10u) & 1023u), f32((p >> 20u) & 1023u)) / 1023.0 * 2.0 - 1.0;
+}
+fn pcg(v: u32) -> u32 {
+  let st = v * 747796405u + 2891336453u;
+  let w = ((st >> ((st >> 28u) + 4u)) ^ st) * 277803737u;
+  return (w >> 22u) ^ w;
+}
+fn rnd01(h: ptr<function, u32>) -> f32 { *h = pcg(*h); return f32(*h) * 2.3283064365386963e-10; }
+// Tools.FTOI + clamp to the raster (AOCalculator.getZ)
+fn zAt(x: f32, y: f32) -> f32 {
+  let xi = clamp(i32(select(x - 0.5, x + 0.5, x > 0.0)), 0, i32(A.width) - 1);
+  let yi = clamp(i32(select(y - 0.5, y + 0.5, y > 0.0)), 0, i32(A.height) - 1);
+  return zr[u32(yi) * A.width + u32(xi)];
+}
+
+@compute @workgroup_size(16, 16)
+fn aoRawPass(@builtin(global_invocation_id) gid: vec3u) {
+  let x = gid.x; let y = gid.y;
+  if (x >= A.width || y >= A.height) { return; }
+  let cell = y * A.width + x;
+  var acc = 0.0;
+  let z0 = zr[cell];
+  let np = nrm[cell];
+  if (z0 != ZBUF_ZMIN && (np & 0x80000000u) != 0u) {
+    let n = unpackNormal(np);
+    var h = pcg(cell ^ A.seed);
+    let rJitter = A.radiusStep / 10.0;
+    var angle = (0.5 - rnd01(&h)) * A.azimuthStep / 4.0;
+    let x0 = f32(x); let y0 = f32(y);
+    for (var k = 0u; k < A.azimuthSamples; k = k + 1u) {
+      let dx = cos(angle); let dy = sin(angle);
+      var r0 = A.radiusStep;
+      var prevH = 0.0;
+      for (var l = 0u; l < A.radiusSamples; l = l + 1u) {
+        let r = r0 + (0.5 - rnd01(&h)) * rJitter;
+        let px = x0 + r * dx + (0.5 - rnd01(&h)) * rJitter;
+        let py = y0 + r * dy + (0.5 - rnd01(&h)) * rJitter;
+        let z = zAt(px, py);
+        let hh = atan2(z - z0, r) + 0.001;
+        // (JWildfire normalises the absolute sample position here, not the offset — kept as is)
+        let RR = sqrt(px * px + py * py);
+        let Rx = px / RR; let Ry = py / RR;
+        let tt = n.x * Rx + Ry * n.y;
+        let tx = -(Ry * n.x * n.y - Rx * n.y * n.y - Rx * n.z * n.z) / tt;
+        let ty = (Ry * n.x * n.x + Ry * n.z * n.z - n.x * Rx * n.y) / tt;
+        let tz = (-Ry * n.y * n.z - n.x * Rx * n.z) / tt;
+        let ta = atan2(tz, sqrt(tx * tx + ty * ty));
+        let ao = sin(hh) - sin(ta);
+        if (ao > prevH) {
+          prevH = ao;
+          let dist = r / A.sphereRadius;
+          acc += ao * exp(-dist * dist * A.falloff) * 0.5;
+        }
+        r0 += A.radiusStep;
+      }
+      angle += A.azimuthStep;
+    }
+  }
+  aoRaw[cell] = acc;
+  if (A.blurN == 0u) { aoOut[cell] = acc; }
+}
+
+// SmoothAOBufferThread: gaussian FilterHolder (os 1) over the raw buffer, × 0.1. The kernel is a pure gaussian
+// exp(−2t²) normalised over the N×N window, so it factorises exactly into two 1-D passes (bfilt holds the
+// normalised 1-D weights): H aoRaw → aoTmp, V aoTmp → aoOut.
+@compute @workgroup_size(16, 16)
+fn aoBlurH(@builtin(global_invocation_id) gid: vec3u) {
+  let x = i32(gid.x); let y = i32(gid.y);
+  let W = i32(A.width); let H = i32(A.height);
+  if (x >= W || y >= H) { return; }
+  let N = i32(A.blurN);
+  let c = N / 2;
+  var v = 0.0;
+  for (var k = 0; k < N; k = k + 1) {
+    let px = x + k - c;
+    if (px < 0 || px >= W) { continue; }
+    v += aoRaw[u32(y * W + px)] * bfilt[u32(k)];
+  }
+  aoTmp[u32(y * W + x)] = v;
+}
+@compute @workgroup_size(16, 16)
+fn aoBlurV(@builtin(global_invocation_id) gid: vec3u) {
+  let x = i32(gid.x); let y = i32(gid.y);
+  let W = i32(A.width); let H = i32(A.height);
+  if (x >= W || y >= H) { return; }
+  let N = i32(A.blurN);
+  let c = N / 2;
+  var v = 0.0;
+  for (var l = 0; l < N; l = l + 1) {
+    let py = y + l - c;
+    if (py < 0 || py >= H) { continue; }
+    v += aoTmp[u32(py * W + x)] * bfilt[u32(l)];
+  }
+  aoOut[u32(y * W + x)] = v * 0.1;
 }
 `;
