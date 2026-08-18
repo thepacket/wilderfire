@@ -25,7 +25,7 @@ describe('JWildfire log scale (reference numbers from JWildfire itself)', () => 
   });
   it('the shader carries the same formula and JWildfire palette scale', () => {
     expect(TONEMAP_WGSL).toContain('k1 * 0.43429448 * log(1.0 + d / (contrast * T.jw.x))'); // log10 via ln
-    expect(TONEMAP_WGSL).toMatch(/ccol \+ T\.bg\.rgb \* \(1\.0 - alpha\)/);              // colour + bg·(1−alpha), not mix()
+    expect(TONEMAP_WGSL).toMatch(/ccol \+ bgc \* \(1\.0 - alpha\)/); // bgc = bgAt(x, y): single colour or JWildfire background gradient              // colour + bg·(1−alpha), not mix()
     expect(TONEMAP_WGSL).toContain('erf1(');                                              // DeCalculator acceptance test
   });
 });

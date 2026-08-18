@@ -74,7 +74,8 @@ in the stack.
   per-light shadow intensity; verified the same way); `sld_render_*` attributes
   import/export. `obj_mesh_primitive_wf` (ball, box, torus, gears, mandelbulb, …)
   is available for solid scenes — the primitives are sampled on the GPU from a
-  face CDF, loaded on demand
+  face CDF, loaded on demand; JWildfire's **background gradients** (2×2 corners,
+  optional centre colour) render in both paths
 - **Layers** (up to 8) — each with its own transforms, final transform,
   gradient, density weight, and visibility, blended in one histogram; walker
   threads are partitioned across layers on the GPU

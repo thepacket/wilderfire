@@ -193,3 +193,16 @@ describe('zero-amount variations (JWildfire applies them)', () => {
     expect(flame.brightness).toBe(150);
   });
 });
+
+describe('JWildfire background gradients', () => {
+  it('imports GRADIENT_2X2_C corners + centre, treats an all-equal gradient as a single colour, round-trips', () => {
+    const g = '<flame name="g" size="64 64" scale="10" background_type="GRADIENT_2X2_C" background_ul="0.0 0.2 0.4" background_ur="0.0 0.0 0.4" background_ll="0.6 0.0 0.0" background_lr="0.6 0.0 0.0" background_cc="0.0 0.0 0.0"><xform weight="1" linear="1" coefs="1 0 0 1 0 0"/></flame>';
+    const { flame } = importFlameText(g, GREY);
+    expect(flame.bgGradient).toEqual({ type: 'GRADIENT_2X2_C', ul: [0, 0.2, 0.4], ur: [0, 0, 0.4], ll: [0.6, 0, 0], lr: [0.6, 0, 0], cc: [0, 0, 0] });
+    const back = roundTrip(flame).flame;
+    expect(back.bgGradient).toEqual(flame.bgGradient);
+    const flat = importFlameText('<flame name="f" size="64 64" scale="10" background_type="GRADIENT_2X2_C" background_ul="0.1 0.1 0.1" background_ur="0.1 0.1 0.1" background_ll="0.1 0.1 0.1" background_lr="0.1 0.1 0.1" background_cc="0.1 0.1 0.1"><xform weight="1" linear="1" coefs="1 0 0 1 0 0"/></flame>', GREY).flame;
+    expect(flat.bgGradient).toBeUndefined();
+    expect(flat.background[0]).toBeCloseTo(0.1, 6);
+  });
+});

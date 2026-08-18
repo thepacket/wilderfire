@@ -351,6 +351,11 @@ same sample density and depth distribution as JWildfire's.
   `post_mirror_wf="0"`, `post_axis_symmetry_wf="0"` are common in the collections) and still drops plain sums.
   `Bokeh_1` — the worst-matching random-generator fixture — went from 0.80 / hist 0.89 to 0.91 / 0.97 because of it.
 * Importer clamp lifted: `brightness` up to 1000 (JWildfire files carry 50 and 150; ours stopped at 6).
+* **Background gradients** (`BGColorType` GRADIENT_2X2 / GRADIENT_2X2_C: `background_ul/ur/ll/lr/cc`): `bgAt()` in both
+  tonemaps ports `LogDensityFilter.calculateBGColor` (bilinear on rounded 0..255 corners; the centre variant is four
+  bilinear quadrants of size W/2−1 meeting at `cc`), spanning the full image so hi-res tiles agree; only 36 of the 864
+  files carrying the attribute have non-uniform colours — an all-equal gradient imports as the single colour.
+  `_solid7`/`_sh1` (the flame that was 0.74 for that reason) → 0.99, density variant 0.99.
 * Verified: `inversion` flames `_pv1` 0.99, `_pv2` 1.12, `_pv3` 0.95, `_pv4nc` 0.97 (`_pv4` itself has `curliecue2`, a
   sequential-state variation); `mobius3D_with_inverse` `_pv5` 0.99, `_pv6` 1.09, `_pv7` 1.00; `pre_stabilize` flames are
   attractor scenes whose look depends on the long single trajectory (JWildfire's points diffuse for ~10 k steps

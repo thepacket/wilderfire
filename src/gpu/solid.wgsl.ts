@@ -179,6 +179,12 @@ struct SP {
   bg: vec4f,
   ao: vec4f,      // x: AO enabled, y: aoIntensity (0..4), z: aoAffectDiffuse
   sh: vec4u,      // x: shadows on, y: cells per light in svis, z: casting light count
+  bgUL: vec4f,    // background gradient (see the density tonemap's bgAt); bgUL.w = kind
+  bgUR: vec4f,
+  bgLL: vec4f,
+  bgLR: vec4f,
+  bgCC: vec4f,
+  bgGeom: vec4f,
 };
 struct Light { dir: vec4f, col: vec4f, sh: vec4f }; // dir.xyz = direction (LightViewCalculator), dir.w = intensity; sh.x = casting index (−1 = none), sh.y = 1 − shadowIntensity
 struct Mat { a: vec4f, b: vec4f, c: vec4f };      // a: diffuse, ambient, phong, phongSize; b: phong rgb, diffFunc; c: reflMapIntensity
@@ -201,6 +207,29 @@ fn vs(@builtin(vertex_index) vi: u32) -> @builtin(position) vec4f {
 
 fn unpackNormal(p: u32) -> vec3f {
   return (vec3f(f32(p & 1023u), f32((p >> 10u) & 1023u), f32((p >> 20u) & 1023u)) - 511.0) / 511.0;
+}
+
+fn bgAt(x: i32, y: i32) -> vec3f {
+  let kind = i32(S.bgUL.w + 0.5);
+  if (kind == 0) { return S.bg.xyz; }
+  let px = f32(x) + S.bgGeom.x; let py = f32(y) + S.bgGeom.y;
+  let W = S.bgGeom.z; let H = S.bgGeom.w;
+  let UL = floor(S.bgUL.rgb * 255.0 + 0.5); let UR = floor(S.bgUR.rgb * 255.0 + 0.5);
+  let LL = floor(S.bgLL.rgb * 255.0 + 0.5); let LR = floor(S.bgLR.rgb * 255.0 + 0.5); let CC = floor(S.bgCC.rgb * 255.0 + 0.5);
+  var c00 = UL; var c10 = UR; var c01 = LL; var c11 = LR;
+  var tx: f32; var ty: f32;
+  if (kind == 1) {
+    tx = px / (W - 1.0); ty = py / (H - 1.0);
+  } else {
+    let w2 = floor(W / 2.0) - 1.0; let h2 = floor(H / 2.0) - 1.0;
+    let left = px <= w2; let top = py <= h2;
+    tx = select((px - w2) / w2, px / w2, left); ty = select((py - h2) / h2, py / h2, top);
+    if (left && top) { c00 = UL; c10 = mix(UL, UR, 0.5); c01 = mix(LL, UL, 0.5); c11 = CC; }
+    else if (left) { c00 = mix(UL, LL, 0.5); c10 = CC; c01 = LL; c11 = mix(LL, LR, 0.5); }
+    else if (top) { c00 = mix(UL, UR, 0.5); c10 = UR; c01 = CC; c11 = mix(UR, LR, 0.5); }
+    else { c00 = CC; c10 = mix(UR, LR, 0.5); c01 = mix(LL, LR, 0.5); c11 = LR; }
+  }
+  return floor(mix(mix(c00, c10, tx), mix(c01, c11, tx), ty) + 0.5) / 255.0;
 }
 
 // LightDiffFuncPreset
@@ -249,7 +278,7 @@ fn diffResp(m: MatI, cosa: f32) -> f32 {
 }
 
 // LogDensityFilter.addSolidColors without shadows/AO (visibility 1). Returns rgb (0..1 scale) and whether the cell had a normal.
-fn shadeCell(cell: u32, out: ptr<function, vec3f>) -> bool {
+fn shadeCell(cell: u32, bgc: vec3f, out: ptr<function, vec3f>) -> bool {
   if (zkey[cell] == 0u) { return false; }
   let np = nrm[cell];
   if ((np & 0x80000000u) == 0u) { return false; }
@@ -280,7 +309,7 @@ fn shadeCell(cell: u32, out: ptr<function, vec3f>) -> bool {
     // no material for this index: the background lit by the lights' visibility
     var vsum = 0.0;
     for (var i = 0u; i < S.nLights; i = i + 1u) { vsum += select(avgVis, visL[i], L.lights[i].sh.x >= 0.0 && S.sh.x != 0u); }
-    raw = S.bg.xyz * clamp(vsum, 0.0, 1.0);
+    raw = bgc * clamp(vsum, 0.0, 1.0);
   } else {
     // SSAO darkens the ambient term and, by aoAffectDiffuse, the diffuse term
     var ambient = m.ambient;
@@ -315,9 +344,10 @@ fn shadeCell(cell: u32, out: ptr<function, vec3f>) -> bool {
 @fragment
 fn fs(@builtin(position) fragPos: vec4f) -> @location(0) vec4f {
   let transparent = S.transparent > 0.5;
-  let bgOut = select(vec4f(S.bg.xyz, 1.0), vec4f(0.0), transparent);
   let x = i32(fragPos.x);
   let y = i32(fragPos.y);
+  let bgc = bgAt(x, y);
+  let bgOut = select(vec4f(bgc, 1.0), vec4f(0.0), transparent);
   if (x >= i32(S.width) || y >= i32(S.height)) { return bgOut; }
   let os = i32(S.os);
   let W = i32(S.width) * os;
@@ -331,7 +361,7 @@ fn fs(@builtin(position) fragPos: vec4f) -> @location(0) vec4f {
     var cnt = 0;
     for (var j = 0; j < os; j = j + 1) {
       for (var i = 0; i < os; i = i + 1) {
-        if (shadeCell(u32((y * os + j) * W + x * os + i), &c)) { sum += c; cnt = cnt + 1; }
+        if (shadeCell(u32((y * os + j) * W + x * os + i), bgc, &c)) { sum += c; cnt = cnt + 1; }
       }
     }
     if (cnt > 0) { sum = sum / f32(cnt); inten = f32(cnt) / f32(os * os); }
@@ -343,7 +373,7 @@ fn fs(@builtin(position) fragPos: vec4f) -> @location(0) vec4f {
       for (var j = 0; j < N; j = j + 1) {
         let cx = x * os + j - half;
         if (cx < 0 || cx >= W) { continue; }
-        if (shadeCell(u32(cy * W + cx), &c)) {
+        if (shadeCell(u32(cy * W + cx), bgc, &c)) {
           let f = sfilt[u32(i * N + j)] / f32(os * os);
           sum += c * f;
           inten += f;
@@ -360,7 +390,7 @@ fn fs(@builtin(position) fragPos: vec4f) -> @location(0) vec4f {
     let a = alphaI / 255.0;
     return vec4f(clamp(solid255 / 255.0 / max(a, 1e-6), vec3f(0.0), vec3f(1.0)), a);
   }
-  let bg255 = floor(S.bg.xyz * 255.0 + 0.5);
+  let bg255 = floor(bgc * 255.0 + 0.5);
   let outc = clamp(solid255 + floor((255.0 - alphaI) * bg255 / 256.0), vec3f(0.0), vec3f(255.0));
   return vec4f(outc / 255.0, 1.0);
 }

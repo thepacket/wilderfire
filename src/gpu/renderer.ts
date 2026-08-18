@@ -181,12 +181,12 @@ export class FlameRenderer {
     this.xdBuf = d.createBuffer({ size: XD_FLOATS * 4, usage: GPUBufferUsage.STORAGE | GPUBufferUsage.COPY_DST });
     this.palBuf = d.createBuffer({ size: MAX_LAYERS * 256 * 16, usage: GPUBufferUsage.STORAGE | GPUBufferUsage.COPY_DST });
     this.paramsBuf = d.createBuffer({ size: 512, usage: GPUBufferUsage.UNIFORM | GPUBufferUsage.COPY_DST });
-    this.tmBuf = d.createBuffer({ size: 128, usage: GPUBufferUsage.UNIFORM | GPUBufferUsage.COPY_DST });
+    this.tmBuf = d.createBuffer({ size: 256, usage: GPUBufferUsage.UNIFORM | GPUBufferUsage.COPY_DST });
     this.filtBuf = d.createBuffer({ size: FILT_FLOATS * 4, usage: GPUBufferUsage.STORAGE | GPUBufferUsage.COPY_DST });
     this.matsBuf = d.createBuffer({ size: this.nPoints * 4, usage: GPUBufferUsage.STORAGE | GPUBufferUsage.COPY_DST });
     this.meshBuf = d.createBuffer({ size: 16, usage: GPUBufferUsage.STORAGE | GPUBufferUsage.COPY_DST });
     this.sppBuf = d.createBuffer({ size: 32, usage: GPUBufferUsage.UNIFORM | GPUBufferUsage.COPY_DST });
-    this.spBuf = d.createBuffer({ size: 80, usage: GPUBufferUsage.UNIFORM | GPUBufferUsage.COPY_DST });
+    this.spBuf = d.createBuffer({ size: 192, usage: GPUBufferUsage.UNIFORM | GPUBufferUsage.COPY_DST });
     this.lightsBuf = d.createBuffer({ size: (SOLID_MAX_LIGHTS * 3 + SOLID_MAX_MATS * 3) * 16, usage: GPUBufferUsage.UNIFORM | GPUBufferUsage.COPY_DST });
     this.shpBuf = d.createBuffer({ size: 32 + 12 * 16, usage: GPUBufferUsage.UNIFORM | GPUBufferUsage.COPY_DST });
     {
@@ -658,7 +658,7 @@ export class FlameRenderer {
     pf32.set([this.solid ? 0 : f.antialiasAmount ?? 0.25, this.solid ? 0 : f.antialiasRadius ?? 0.5, 0, 0], 48);
     this.device.queue.writeBuffer(this.paramsBuf, 0, pu32);
 
-    const tu32 = new Uint32Array(24);
+    const tu32 = new Uint32Array(48);
     const tf32 = new Float32Array(tu32.buffer);
     tu32[0] = tile ? tile.tileW : this.width; // output pixels; hist rows are width×os
     tu32[1] = tile ? tile.tileH : this.height;
@@ -684,13 +684,24 @@ export class FlameRenderer {
     tf32[11] = os;
     tf32[12] = f.background[0]; tf32[13] = f.background[1]; tf32[14] = f.background[2];
     tf32[15] = f.gammaThreshold ?? 0.04; // packed into bg.w
+    // JWildfire background gradient (corner colours + kind in bgUL.w; the gradient spans the FULL image, tiles offset into it)
+    const bgWords = this.bgGradientWords(f, tile ? tile.tileX : 0, tile ? tile.tileY : 0, fullW / os, fullH / os);
+    tf32.set(bgWords, 20);
     this.device.queue.writeBuffer(this.tmBuf, 0, tu32);
 
-    if (this.solid) this.writeSolidUniforms(f, w, h, os, transparent, [m02, m12, m22], ppu, Math.hypot(fullW, fullH));
+    if (this.solid) this.writeSolidUniforms(f, w, h, os, transparent, [m02, m12, m22], ppu, Math.hypot(fullW, fullH), bgWords);
   }
 
   /** Solid rendering: post-pass params, tonemap params, lights/materials, raster-cell filter kernel. */
-  private writeSolidUniforms(f: Flame, rasterW: number, rasterH: number, os: number, transparent: boolean, m2: number[], ppu: number, imgSize: number) {
+  /** TP/SP background-gradient block: UL, UR, LL, LR, CC (w of UL = kind), geometry (tile origin, full size in output pixels). */
+  private bgGradientWords(f: Flame, tileX: number, tileY: number, fullW: number, fullH: number): number[] {
+    const g = f.bgGradient;
+    const kind = g ? (g.type === 'GRADIENT_2X2_C' ? 2 : 1) : 0;
+    const c = (v?: [number, number, number]) => (v ? [v[0], v[1], v[2]] : [0, 0, 0]);
+    return [...c(g?.ul), kind, ...c(g?.ur), 0, ...c(g?.ll), 0, ...c(g?.lr), 0, ...c(g?.cc), 0, tileX, tileY, fullW, fullH];
+  }
+
+  private writeSolidUniforms(f: Flame, rasterW: number, rasterH: number, os: number, transparent: boolean, m2: number[], ppu: number, imgSize: number, bgWords: number[]) {
     const s = f.solid!;
     const q = new Uint32Array(8);
     const qf = new Float32Array(q.buffer);
@@ -726,7 +737,7 @@ export class FlameRenderer {
     const fkey = `${f.filterKernel}:${(f.filterRadius ?? 0).toFixed(4)}:${os}`;
     if (n && fkey !== this.sfiltKey) { this.sfiltKey = fkey; this.device.queue.writeBuffer(this.sfiltBuf, 0, fw); }
 
-    const p = new Uint32Array(20);
+    const p = new Uint32Array(44);
     const pf = new Float32Array(p.buffer);
     p[0] = rasterW / os; p[1] = rasterH / os; p[2] = os; p[3] = n;
     pf[4] = f.gamma; pf[5] = transparent ? 1 : 0;
@@ -776,6 +787,7 @@ export class FlameRenderer {
     this.shSmoothR = smoothR;
     pf.set([this.aoOn ? 1 : 0, Math.min(4, Math.max(0, s.ao.intensity)), Math.max(0, s.ao.affectDiffuse), 0], 12);
     p[16] = shOn ? 1 : 0; p[17] = rasterW * rasterH; p[18] = nCast; p[19] = 0;
+    pf.set(bgWords, 20);
     this.device.queue.writeBuffer(this.spBuf, 0, p);
     const hp = new Uint32Array(8 + 12 * 4);
     const hf = new Float32Array(hp.buffer);

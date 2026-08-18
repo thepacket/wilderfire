@@ -208,6 +208,8 @@ export interface Flame {
   deCurve: number;
   /** JWildfire solid rendering (z-buffer surface shading instead of density accumulation). Absent = off. */
   solid?: SolidRender;
+  /** JWildfire background gradient (`background_type`): 2×2 corner colours, optionally with a centre colour. Absent = single colour `background`. */
+  bgGradient?: { type: 'GRADIENT_2X2' | 'GRADIENT_2X2_C'; ul: RGB; ur: RGB; ll: RGB; lr: RGB; cc: RGB };
 }
 
 export const IDENTITY: Affine = [1, 0, 0, 0, 1, 0];
@@ -466,6 +468,7 @@ export function normalizeFlame(obj: any, fallbackPalette: RGB[]): Flame {
     deRadius: Math.min(2, Math.max(0, num(obj?.deRadius, 1))),
     deCurve: Math.min(1, Math.max(0.01, num(obj?.deCurve, 0.8))),
     ...(obj?.solid && typeof obj.solid === 'object' ? { solid: normSolid(obj.solid) } : {}),
+    ...(obj?.bgGradient && (obj.bgGradient.type === 'GRADIENT_2X2' || obj.bgGradient.type === 'GRADIENT_2X2_C') ? { bgGradient: { type: obj.bgGradient.type, ul: rgb(obj.bgGradient.ul, [0, 0, 0]), ur: rgb(obj.bgGradient.ur, [0, 0, 0]), ll: rgb(obj.bgGradient.ll, [0, 0, 0]), lr: rgb(obj.bgGradient.lr, [0, 0, 0]), cc: rgb(obj.bgGradient.cc, [0, 0, 0]) } } : {}),
   };
 }
 

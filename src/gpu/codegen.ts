@@ -704,6 +704,12 @@ struct TP {
   de: vec4f, // x: DE estimator radius in px (0 = off), y: deCurve, z: transparent bg flag, w: oversample factor
   bg: vec4f, // rgb: background, w: gamma threshold
   jw: vec4f, // x: world area of the image (W·H/ppu²), y: contrast, z: colour scale 199.2/whiteLevel, w: low-density brightness
+  bgUL: vec4f, // JWildfire background gradient corners (w of bgUL: 0 single colour, 1 GRADIENT_2X2, 2 GRADIENT_2X2_C)
+  bgUR: vec4f,
+  bgLL: vec4f,
+  bgLR: vec4f,
+  bgCC: vec4f,
+  bgGeom: vec4f, // x, y: this tile's origin in the full image; z, w: full image size (the gradient spans the full image)
 };
 
 // Two passes: fsA = DE + log-scale per pixel into an rgba16float texture,
@@ -812,6 +818,31 @@ fn logScaled(x: i32, y: i32) -> vec4f {
   return vec4f(avg * a * T.jw.z, a);    // ×199.2/whiteLevel (JWildfire palette scaling)
 }
 
+// LogDensityFilter.calculateBGColor: single colour, bilinear 2×2 gradient, or the 2×2 + centre variant (four bilinear
+// quadrants meeting at the centre colour; JWildfire's w2 = W/2 − 1 quadrant size), on 0..255 rounded values
+fn bgAt(x: i32, y: i32) -> vec3f {
+  let kind = i32(T.bgUL.w + 0.5);
+  if (kind == 0) { return T.bg.rgb; }
+  let px = f32(x) + T.bgGeom.x; let py = f32(y) + T.bgGeom.y;
+  let W = T.bgGeom.z; let H = T.bgGeom.w;
+  let UL = floor(T.bgUL.rgb * 255.0 + 0.5); let UR = floor(T.bgUR.rgb * 255.0 + 0.5);
+  let LL = floor(T.bgLL.rgb * 255.0 + 0.5); let LR = floor(T.bgLR.rgb * 255.0 + 0.5); let CC = floor(T.bgCC.rgb * 255.0 + 0.5);
+  var c00 = UL; var c10 = UR; var c01 = LL; var c11 = LR;
+  var tx: f32; var ty: f32;
+  if (kind == 1) {
+    tx = px / (W - 1.0); ty = py / (H - 1.0);
+  } else {
+    let w2 = floor(W / 2.0) - 1.0; let h2 = floor(H / 2.0) - 1.0;
+    let left = px <= w2; let top = py <= h2;
+    tx = select((px - w2) / w2, px / w2, left); ty = select((py - h2) / h2, py / h2, top);
+    if (left && top) { c00 = UL; c10 = mix(UL, UR, 0.5); c01 = mix(LL, UL, 0.5); c11 = CC; }
+    else if (left) { c00 = mix(UL, LL, 0.5); c10 = CC; c01 = LL; c11 = mix(LL, LR, 0.5); }
+    else if (top) { c00 = mix(UL, UR, 0.5); c10 = UR; c01 = CC; c11 = mix(UR, LR, 0.5); }
+    else { c00 = CC; c10 = mix(UR, LR, 0.5); c01 = mix(LL, LR, 0.5); c11 = LR; }
+  }
+  return floor(mix(mix(c00, c10, tx), mix(c01, c11, tx), ty) + 0.5) / 255.0;
+}
+
 @fragment
 fn fsA(@builtin(position) fragPos: vec4f) -> @location(0) vec4f {
   let x = i32(fragPos.x);
@@ -829,9 +860,10 @@ fn mid(x: i32, y: i32) -> vec4f {
 @fragment
 fn fsB(@builtin(position) fragPos: vec4f) -> @location(0) vec4f {
   let transparent = T.de.z > 0.5;
-  let bgOut = select(vec4f(T.bg.rgb, 1.0), vec4f(0.0), transparent);
   let x = i32(fragPos.x);
   let y = i32(fragPos.y);
+  let bgc = bgAt(x, y);
+  let bgOut = select(vec4f(bgc, 1.0), vec4f(0.0), transparent);
   if (x >= i32(T.width) || y >= i32(T.height) || T.spp <= 0.0) {
     return bgOut;
   }
@@ -898,6 +930,6 @@ fn fsB(@builtin(position) fragPos: vec4f) -> @location(0) vec4f {
     // straight (un-premultiplied) colour for the PNG alpha channel
     return vec4f(select(ccol, clamp(col / max(alpha, 1e-6), vec3f(0.0), vec3f(1.0)), alpha > 1e-6), alpha);
   }
-  return vec4f(clamp(ccol + T.bg.rgb * (1.0 - alpha), vec3f(0.0), vec3f(1.0)), 1.0);
+  return vec4f(clamp(ccol + bgc * (1.0 - alpha), vec3f(0.0), vec3f(1.0)), 1.0);
 }
 `;

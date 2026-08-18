@@ -455,6 +455,15 @@ export function parseFlameXML(text: string, fallbackPalette: RGB[]): Flame[] {
       const mx = Math.max(...bg);
       f.background = bg.map((v) => (mx > 1 ? v / 255 : v)) as RGB;
     }
+    // JWildfire background gradient (BGColorType GRADIENT_2X2 / GRADIENT_2X2_C: corner colours ul/ur/ll/lr + centre cc, 0..1)
+    const bgt = (fe.getAttribute('background_type') ?? '').toUpperCase();
+    if (bgt === 'GRADIENT_2X2' || bgt === 'GRADIENT_2X2_C') {
+      const col = (n: string): RGB => { const c = nums(fe.getAttribute(n)); return (c.length === 3 ? c.map((v) => Math.min(1, Math.max(0, v))) : [0, 0, 0]) as RGB; };
+      const g = { type: bgt as 'GRADIENT_2X2' | 'GRADIENT_2X2_C', ul: col('background_ul'), ur: col('background_ur'), ll: col('background_ll'), lr: col('background_lr'), cc: col('background_cc') };
+      // a gradient whose colours are all equal (JWildfire's default file state) is just a single colour
+      const flat = [g.ur, g.ll, g.lr, ...(bgt === 'GRADIENT_2X2_C' ? [g.cc] : [])].every((c) => c.every((v, i) => Math.abs(v - g.ul[i]) < 1e-9));
+      if (!flat) f.bgGradient = g; else f.background = g.ul;
+    }
     // JWildfire solid rendering (sld_render_* — attribute names as JWildfire writes them, typos included)
     if (numAttr('sld_render_enabled') === 1) {
       const s = defaultSolidRender(true);
@@ -697,6 +706,14 @@ function paletteToXML(palette: RGB[], indent: string): string {
   return `${indent}<palette count="256" format="RGB">\n${indent}   ${hex.trimEnd()}\n${indent}</palette>`;
 }
 
+/** JWildfire background gradient attributes (only when a gradient is set; SINGLE_COLOR is the default). */
+function bgAttrs(f: Flame): string {
+  const g = f.bgGradient;
+  if (!g) return '';
+  const c = (v: RGB) => v.map(fmt).join(' ');
+  return ` background_type="${g.type}" background_ul="${c(g.ul)}" background_ur="${c(g.ur)}" background_ll="${c(g.ll)}" background_lr="${c(g.lr)}" background_cc="${c(g.cc)}"`;
+}
+
 /** JWildfire `sld_render_*` attributes (written only when solid rendering is on; names as JWildfire spells them). */
 function solidAttrs(f: Flame): string {
   const s = f.solid;
@@ -763,7 +780,7 @@ export function flameToXML(f: Flame, opts: XMLExportOpts = {}): string {
     `quality="200" brightness="${fmt(f.brightness)}" gamma="${fmt(f.gamma)}" gamma_threshold="${fmt(f.gammaThreshold)}" ` +
     `contrast="${fmt(f.contrast ?? 1)}" white_level="${fmt(f.whiteLevel ?? 220)}" low_density_brightness="${fmt(f.lowDensityBrightness ?? 0.24)}" ` +
     `vibrancy="${fmt(f.vibrancy)}" background="${fmt(f.background[0])} ${fmt(f.background[1])} ${fmt(f.background[2])}"` +
-    solidAttrs(f) + timeAttrs + (flameCurveAttrs.length ? ' ' + flameCurveAttrs.join(' ') : '') + '>',
+    bgAttrs(f) + solidAttrs(f) + timeAttrs + (flameCurveAttrs.length ? ' ' + flameCurveAttrs.join(' ') : '') + '>',
   );
   const writeLayerBody = (ly: Layer, li: number, indent: string) => {
     ly.xforms.forEach((x, xi) => {
