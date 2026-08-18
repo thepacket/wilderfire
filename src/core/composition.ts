@@ -11,6 +11,7 @@
 
 import type { Flame, RGB } from './flame';
 import { normalizeFlame } from './flame';
+import { type EscapeLayerData, normalizeEscape, defaultEscape } from './escape';
 
 export const BLEND_MODES = ['normal', 'add', 'multiply', 'screen', 'overlay', 'darken', 'lighten', 'color-dodge', 'color-burn', 'hard-light', 'soft-light', 'difference', 'exclusion'] as const;
 export type BlendMode = typeof BLEND_MODES[number];
@@ -28,7 +29,9 @@ export interface CompLayerBase {
   clip: boolean;
 }
 export interface FlameCompLayer extends CompLayerBase { kind: 'flame'; flame: Flame }
-export type CompLayer = FlameCompLayer;
+/** an escape-time fractal (Mandelbrot/Julia/… families, custom formulas), see escape.ts */
+export interface EscapeCompLayer extends CompLayerBase { kind: 'escape'; escape: EscapeLayerData }
+export type CompLayer = FlameCompLayer | EscapeCompLayer;
 
 export interface Composition {
   version: 1;
@@ -46,6 +49,11 @@ export function newLayerId(): string { return `L${Date.now().toString(36)}${(idS
 export function flameLayer(flame: Flame, opts: Partial<Omit<FlameCompLayer, 'kind' | 'flame'>> = {}): FlameCompLayer {
   return { kind: 'flame', id: newLayerId(), name: flame.name || 'Flame', visible: true, opacity: 1, blend: 'normal', ownBackground: true, clip: false, flame, ...opts };
 }
+
+export function escapeLayer(escape: EscapeLayerData, opts: Partial<Omit<EscapeCompLayer, 'kind' | 'escape'>> = {}): EscapeCompLayer {
+  return { kind: 'escape', id: newLayerId(), name: 'Escape', visible: true, opacity: 1, blend: 'normal', ownBackground: true, clip: false, escape, ...opts };
+}
+export { defaultEscape };
 
 /** A one-layer composition around a flame (what every existing file/entry becomes). */
 export function wrapFlame(flame: Flame): Composition {
@@ -65,14 +73,19 @@ export function normalizeComposition(obj: any, fallbackPalette: RGB[]): Composit
   if (obj && typeof obj === 'object' && Array.isArray(obj.layers) && obj.layers.length && obj.layers.every((l: any) => l && typeof l === 'object' && 'kind' in l)) {
     const layers: CompLayer[] = [];
     for (const l of obj.layers.slice(0, MAX_COMP_LAYERS)) {
-      if (l.kind !== 'flame') continue; // unknown kinds (future files) are dropped
-      const flame = normalizeFlame(l.flame, fallbackPalette);
-      layers.push({
-        kind: 'flame', id: typeof l.id === 'string' && l.id ? l.id : newLayerId(), name: typeof l.name === 'string' ? l.name : flame.name || 'Flame',
+      if (l.kind !== 'flame' && l.kind !== 'escape') continue; // unknown kinds (future files) are dropped
+      const base = {
+        id: typeof l.id === 'string' && l.id ? l.id : newLayerId(),
         visible: l.visible !== false, opacity: clamp01(num(l.opacity, 1)),
-        blend: (BLEND_MODES as readonly string[]).includes(l.blend) ? l.blend : 'normal',
-        ownBackground: l.ownBackground !== false, clip: l.clip === true, flame,
-      });
+        blend: ((BLEND_MODES as readonly string[]).includes(l.blend) ? l.blend : 'normal') as BlendMode,
+        ownBackground: l.ownBackground !== false, clip: l.clip === true,
+      };
+      if (l.kind === 'flame') {
+        const flame = normalizeFlame(l.flame, fallbackPalette);
+        layers.push({ kind: 'flame', ...base, name: typeof l.name === 'string' ? l.name : flame.name || 'Flame', flame });
+      } else {
+        layers.push({ kind: 'escape', ...base, name: typeof l.name === 'string' ? l.name : 'Escape', escape: normalizeEscape(l.escape, fallbackPalette) });
+      }
     }
     if (!layers.length) layers.push(flameLayer(normalizeFlame(null, fallbackPalette)));
     const bg = Array.isArray(obj.background) && obj.background.length === 3 ? obj.background.map((v: unknown) => clamp01(num(v, 0))) as RGB : [0, 0, 0] as RGB;

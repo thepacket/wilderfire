@@ -60,7 +60,7 @@ export async function openBatchExport(app: App) {
   const r = app.renderer;
   /** a single flame renders in the active layer's renderer; a stack goes through the composer (its layers get renderers on demand) */
   const renderStill = async (doc: Composition, o: Parameters<typeof renderHiRes>[2]) => {
-    if (isSingleFlame(doc)) return renderHiRes(r.layerRenderer, doc.layers[0].flame, o);
+    if (isSingleFlame(doc) && doc.layers[0].kind === 'flame') return renderHiRes(r.layerRenderer, doc.layers[0].flame, o);
     await r.setComposition(doc, 0);
     return renderHiRes(r, null, o);
   };

@@ -14,6 +14,7 @@ import { buildAnimPanel, type AnimState } from './ui/animPanel';
 import { buildLibrary, loadAutosave, restoreComposition } from './ui/library';
 import { wrapFlame } from './core/composition';
 import { buildComposePanel } from './ui/composePanel';
+import { buildEscapePanel } from './ui/escapePanel';
 import { buildMutate } from './ui/mutate';
 import { buildOverlay } from './ui/overlay';
 import { loadJwfVariations } from './core/variations';
@@ -219,7 +220,7 @@ async function boot() {
 
   // ---------- Right panel tabs ----------
   const tabs = el('div', 'tabs');
-  const tabDefs = ['Render', 'Gradient', 'Anim', 'AI'] as const;
+  const tabDefs = ['Render', 'Escape', 'Gradient', 'Anim', 'AI'] as const;
   const bodies: HTMLElement[] = [];
   tabDefs.forEach((name, i) => {
     const b = el('button', i === 0 ? 'active' : '', name);
@@ -281,9 +282,13 @@ async function boot() {
   buildComposePanel(app, left);
   buildTransformsPanel(app, left);
   buildRenderPanel(app, bodies[0]);
-  buildPalettePanel(app, bodies[1]);
-  const anim = buildAnimPanel(app, bodies[2], overlay);
-  buildAIPanel(app, bodies[3]);
+  buildEscapePanel(app, bodies[1]);
+  buildPalettePanel(app, bodies[2]);
+  const anim = buildAnimPanel(app, bodies[3], overlay);
+  buildAIPanel(app, bodies[4]);
+  // selecting an escape-time layer opens its tab
+  const showTab = (i: number) => { tabs.querySelectorAll('button').forEach((x, k) => x.classList.toggle('active', k === i)); bodies.forEach((x, k) => x.classList.toggle('active', k === i)); };
+  app.on('comp', () => { if (app.escapeLayer && !bodies[1].classList.contains('active')) showTab(1); });
   if (saved?.anim) anim.setState(saved.anim as AnimState);
   const library = buildLibrary(app, anim);
   saveBtn.onclick = () => {

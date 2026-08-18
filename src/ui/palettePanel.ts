@@ -72,12 +72,12 @@ export function buildPalettePanel(app: App, root: HTMLElement) {
   strip.height = 26;
   sec.append(strip);
 
-  let base: RGB[] = app.activeLayer.palette.map((c) => [...c] as RGB);
+  let base: RGB[] = app.editPalette.map((c) => [...c] as RGB);
   let shift = 0;
 
   const apply = () => {
-    app.activeLayer.palette = rotatePalette(base, shift);
-    drawPalette(strip, app.activeLayer.palette);
+    app.setEditPalette(rotatePalette(base, shift));
+    drawPalette(strip, app.editPalette);
     app.commit(SRC);
   };
 
@@ -158,7 +158,7 @@ export function buildPalettePanel(app: App, root: HTMLElement) {
   expBtn.title = 'Save the current gradient as an UltraFractal / Apophysis .ugr file (Shift-click: fractint .map)';
   expBtn.onclick = (ev) => {
     const name = (app.flame.name || 'wilderfire').replace(/[\\/:*?"<>|]+/g, '_');
-    const pal = app.activeLayer.palette;
+    const pal = app.editPalette;
     if (ev.shiftKey) saveText(toMAP(pal), { suggestedName: `${name}.map`, description: 'fractint gradient', mime: 'text/plain', ext: '.map' });
     else saveText(toUGR(pal, app.flame.name || 'WilderFire'), { suggestedName: `${name}.ugr`, description: 'UltraFractal gradient', mime: 'text/plain', ext: '.ugr' });
   };
@@ -195,7 +195,7 @@ export function buildPalettePanel(app: App, root: HTMLElement) {
   edSec.append(el('div', 'hint', 'Drag stops along the strip; pick colors below. Changes apply live to the active layer.'));
 
   function initStops() {
-    const pal = app.activeLayer.palette;
+    const pal = app.editPalette;
     stops = [0, 0.25, 0.5, 0.75, 1].map((p) => ({
       pos: p,
       rgb: [...(pal[Math.round(p * 255)] ?? [0, 0, 0])] as RGB,
@@ -264,7 +264,7 @@ export function buildPalettePanel(app: App, root: HTMLElement) {
     applyStops();
   });
   addStopBtn.onclick = () => {
-    const pal = app.activeLayer.palette;
+    const pal = app.editPalette;
     stops.push({ pos: 0.5, rgb: [...(pal[128] ?? [0.5, 0.5, 0.5])] as RGB });
     selIdx = stops.length - 1;
     renderTrack();
@@ -279,18 +279,19 @@ export function buildPalettePanel(app: App, root: HTMLElement) {
   };
 
   root.append(sec, edSec);
-  drawPalette(strip, app.activeLayer.palette);
+  drawPalette(strip, app.editPalette);
   initStops();
 
   const refresh = (src: string) => {
     if (src === SRC) return;
-    base = app.activeLayer.palette.map((c) => [...c] as RGB);
+    base = app.editPalette.map((c) => [...c] as RGB);
     shift = 0;
     shiftS.set(0);
     sel.value = '';
-    drawPalette(strip, app.activeLayer.palette);
+    drawPalette(strip, app.editPalette);
     initStops();
   };
   app.on('flame', refresh);
+  app.on('comp', refresh);
   app.on('select', refresh);
 }

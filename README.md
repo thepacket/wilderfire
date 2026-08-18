@@ -87,6 +87,19 @@ in the stack.
   optional own background, and clipping to what is below; a plain flame is a
   one-layer composition, so every file and library entry keeps working. Hi-res
   export, PNG, video and the library thumbnail composite the stack the same way.
+- **Escape-time layers** (Composition → + Escape, Escape tab) — Ultra-Fractal-style
+  per-pixel fractals in the same stack as the flames: Mandelbrot z^p+c, Burning
+  Ship, Tricorn, Celtic, Perpendicular, Lambda, Phoenix, Magnet, Newton, Nova and
+  **custom formulas** (`z^3 + p1*z + c`, `sin(z) + c`, … — a small complex
+  expression language compiled to WGSL), Mandelbrot or Julia mode, seed/constant,
+  bailout, up to 20 000 iterations, 1–3× supersampling; colourings: smooth
+  iteration, iterations, exponential smoothing, orbit traps (point, cross, lines,
+  circle, square, ring; closest approach or last), distance estimate, angle, solid;
+  inside colourings; gradient density/offset/transfer; inside/outside alpha (a
+  transparent inside lets the flames below show through the set). The layer's
+  gradient is edited in the Gradient tab; pan/zoom on the canvas; the picture
+  refines in bands so heavy settings never freeze the UI. Precision is f32
+  (deep zoom beyond ~10⁵× blurs; double-single/perturbation is a later step).
 - **Flame layers** (up to 8 per flame) — each with its own transforms, final transform,
   gradient, density weight, and visibility, blended in one histogram; walker
   threads are partitioned across layers on the GPU
@@ -218,7 +231,8 @@ nginx on Fly.io with `fly deploy`.
 ```
 src/
   core/       flame model (flame.ts), composition model + blend maths
-              (composition.ts), variation registry (variations.ts:
+              (composition.ts), escape-time layer model (escape.ts) + the
+              custom-formula compiler (formula.ts), variation registry (variations.ts:
               hand-written WGSL + generated variations.jwf.ts ports, the
               latter a lazily loaded, separately cached ~300 KB gz chunk),
               palettes, presets, randomizer, .flame XML I/O (flameXML.ts),
@@ -227,7 +241,9 @@ src/
               renderer.ts — WebGPU pipelines, atomic histogram, tonemap, camera
               composer.ts — the canvas owner: one renderer per composition
               layer (offscreen rgba16f), blend-mode compositor, capture/export
-  ui/         panels (composition, transforms, render, gradient, anim, AI), triangle
+              escapeRenderer.ts — escape-time layers: generated per-pixel
+              fragment shader (formula, colourings), banded progressive render
+  ui/         panels (composition, transforms, render, escape, gradient, anim, AI), triangle
               overlay, variation + model pickers, library, mutation grid
   ai/         OpenRouter streaming chat client + model catalogue
   dev/        browser harnesses (variation oracle diff, fixture-flame compile)

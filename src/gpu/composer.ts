@@ -6,8 +6,12 @@
 // synchronous capture the video/thumbnail paths need.
 
 import { FlameRenderer, type RenderStats } from './renderer';
+import { EscapeRenderer } from './escapeRenderer';
 import type { Composition, CompLayer, BlendMode } from '../core/composition';
 import { BLEND_MODES, BLEND_WGSL, blendPixel } from '../core/composition';
+
+/** what every layer kind's renderer offers the composer */
+export type LayerRenderer = FlameRenderer | EscapeRenderer;
 
 const COMPOSITE_WGSL = `
 struct CP { mode: u32, opacity: f32, flags: u32, pad: u32, bg: vec4f }
@@ -33,9 +37,10 @@ ${BLEND_WGSL}
 
 interface Slot {
   id: string;
-  renderer: FlameRenderer;
+  renderer: LayerRenderer;
   layer: CompLayer;
-  flameJson: string;
+  /** JSON of the layer's content last pushed (flame or escape data) — unchanged content keeps accumulating */
+  json: string;
 }
 
 export interface CompRegionOpts {
@@ -94,13 +99,32 @@ export class Composer {
   get width() { return this.canvas.width; }
   get height() { return this.canvas.height; }
   get gpuDevice(): GPUDevice { return this.device; }
-  /** the active layer's own renderer — single-flame paths (mutation grid, batch export of flames, dev tools) */
-  get layerRenderer(): FlameRenderer { const r = this.slots[this.active]?.renderer ?? this.slots[0]?.renderer; if (!r) throw new Error('no layer renderer yet'); return r; }
-  /** Render `f` in the active layer's renderer (exports/previews driving frames themselves — the document is untouched);
-   *  every other layer re-accumulates its own flame. Restore afterwards with `restore()` or by setting the document's flame. */
+  /** index of the flame layer being edited (the panels' flame) — its renderer is `layerRenderer` */
+  flameActive = 0;
+  /** the edited flame layer's own renderer — single-flame paths (mutation grid, batch export of flames, dev tools) */
+  get layerRenderer(): FlameRenderer {
+    const s = this.slots[this.flameActive]?.layer.kind === 'flame' ? this.slots[this.flameActive] : this.slots.find((x) => x.layer.kind === 'flame');
+    if (!s) throw new Error('no flame layer');
+    return s.renderer as FlameRenderer;
+  }
+  /** Render `f` in the edited flame layer's renderer (exports/previews driving frames themselves — the document is untouched);
+   *  every other layer re-renders its own content. Restore afterwards with `restore()` or by pushing the document again. */
   setFlame(f: import('../core/flame').Flame) {
-    this.slots.forEach((s, i) => { s.renderer.setFlame(i === this.active ? f : s.layer.flame); s.flameJson = i === this.active ? '' : s.flameJson; });
+    const target = this.slots[this.flameActive]?.layer.kind === 'flame' ? this.slots[this.flameActive] : this.slots.find((x) => x.layer.kind === 'flame');
+    for (const s of this.slots) {
+      if (s === target) { (s.renderer as FlameRenderer).setFlame(f); s.json = ''; }
+      else this.pushContent(s, true);
+    }
     this.needsComposite = true;
+  }
+  /** push a layer's content to its renderer (when changed, or forced) */
+  private pushContent(s: Slot, force: boolean) {
+    const json = JSON.stringify(s.layer.kind === 'flame' ? s.layer.flame : s.layer.escape);
+    if (!force && json === s.json) return false;
+    s.json = json;
+    if (s.layer.kind === 'flame') (s.renderer as FlameRenderer).setFlame(s.layer.flame);
+    else (s.renderer as EscapeRenderer).setLayer(s.layer.escape);
+    return true;
   }
   /** total spp of the active layer, budget etc. come through onFrame */
   paused = false;
@@ -151,7 +175,14 @@ export class Composer {
     this.needsComposite = true;
   }
 
-  private async makeRenderer(): Promise<FlameRenderer> {
+  private async makeRenderer(kind: CompLayer['kind']): Promise<LayerRenderer> {
+    if (kind === 'escape') {
+      const r = new EscapeRenderer(this.device);
+      r.onError = (m) => this.onError?.(m);
+      r.resize(this.canvas.width, this.canvas.height);
+      r.exporting = this._exporting;
+      return r;
+    }
     const r = new FlameRenderer(null);
     r.driven = true;
     r.onError = (m) => this.onError?.(m);
@@ -174,15 +205,15 @@ export class Composer {
     const next: Slot[] = [];
     for (const layer of comp.layers) {
       let slot = byId.get(layer.id);
+      if (slot && slot.layer.kind !== layer.kind) { slot.renderer.destroy(); slot = undefined; byId.delete(layer.id); }
       if (!slot) {
-        slot = { id: layer.id, renderer: await this.makeRenderer(), layer, flameJson: '' };
+        slot = { id: layer.id, renderer: await this.makeRenderer(layer.kind), layer, json: '' };
       }
       byId.delete(layer.id);
-      const json = JSON.stringify(layer.flame);
       slot.renderer.transparentBg = !layer.ownBackground;
-      if (force || json !== slot.flameJson) { slot.flameJson = json; slot.renderer.setFlame(layer.flame); }
-      else if (slot.layer.ownBackground !== layer.ownBackground) slot.renderer.invalidate();
+      const bgChanged = slot.layer.ownBackground !== layer.ownBackground;
       slot.layer = layer;
+      if (!this.pushContent(slot, force) && bgChanged) slot.renderer.invalidate();
       next.push(slot);
     }
     for (const gone of byId.values()) gone.renderer.destroy();
@@ -267,8 +298,9 @@ export class Composer {
   }
   async ready(): Promise<void> { for (const s of this.slots) await s.renderer.ready(); }
   /** the visible layers' walkers all reseed (video export frame changes) */
-  get nPoints() { return this.slots[0]?.renderer.nPoints ?? 1 << 16; }
-  get itersPerPass() { return this.slots[0]?.renderer.itersPerPass ?? 64; }
+  private get anyFlame(): FlameRenderer | undefined { return this.slots.find((s) => s.layer.kind === 'flame')?.renderer as FlameRenderer | undefined; }
+  get nPoints() { return this.anyFlame?.nPoints ?? 1 << 16; }
+  get itersPerPass() { return this.anyFlame?.itersPerPass ?? 64; }
 
   /** Render a tile of every visible layer offscreen and composite them on the CPU (hi-res export, thumbnails, dev tools).
    *  Straight-alpha rgba8 like FlameRenderer.renderRegion; `transparent` renders every layer without a background. */

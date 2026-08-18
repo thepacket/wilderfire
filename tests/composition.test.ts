@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { blendPixel, normalizeComposition, wrapFlame, isSingleFlame, compositionToJSON, BLEND_MODES, BLEND_WGSL } from '../src/core/composition';
+import { blendPixel, normalizeComposition, wrapFlame, isSingleFlame, compositionToJSON, BLEND_MODES, BLEND_WGSL, type FlameCompLayer } from '../src/core/composition';
 import { PRESETS } from '../src/core/presets';
 import { GREY } from './helpers';
 
@@ -28,16 +28,16 @@ describe('composition model + blend maths', () => {
     const f = PRESETS[0].make();
     const c1 = normalizeComposition(JSON.parse(JSON.stringify(f)), GREY);
     expect(isSingleFlame(c1)).toBe(true);
-    expect(c1.layers[0].flame.name).toBe(f.name);
+    expect(c1.layers[0].kind === 'flame' && c1.layers[0].flame.name).toBe(f.name);
     const c2 = wrapFlame(f);
-    c2.layers.push({ ...c2.layers[0], id: 'x', name: 'top', blend: 'screen', opacity: 0.4, ownBackground: false, clip: true, flame: PRESETS[1].make() });
+    c2.layers.push({ ...(c2.layers[0] as FlameCompLayer), id: 'x', name: 'top', blend: 'screen', opacity: 0.4, ownBackground: false, clip: true, flame: PRESETS[1].make() });
     const back = normalizeComposition(JSON.parse(compositionToJSON(c2)), GREY);
     expect(back.layers.length).toBe(2);
     expect(back.layers[1]).toMatchObject({ id: 'x', name: 'top', blend: 'screen', opacity: 0.4, ownBackground: false, clip: true });
     expect(isSingleFlame(back)).toBe(false);
-    // unknown blend / kinds are tolerated
-    const c3 = normalizeComposition({ layers: [{ kind: 'flame', flame: f, blend: 'weird' }, { kind: 'escape', foo: 1 }] }, GREY);
-    expect(c3.layers.length).toBe(1);
+    // unknown blend / kinds are tolerated (an escape layer with junk data gets the defaults)
+    const c3 = normalizeComposition({ layers: [{ kind: 'flame', flame: f, blend: 'weird' }, { kind: 'escape', foo: 1 }, { kind: 'image', src: 'x' }] }, GREY);
+    expect(c3.layers.map((l) => l.kind)).toEqual(['flame', 'escape']);
     expect(c3.layers[0].blend).toBe('normal');
   });
 });

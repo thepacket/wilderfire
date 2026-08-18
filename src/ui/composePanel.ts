@@ -2,7 +2,7 @@
 // renderer and blended into the picture (blend mode, opacity, own background, clip to what is below).
 // The active layer is what the transforms/render/gradient panels and the overlay edit.
 import { App, el, slider } from './common';
-import { BLEND_MODES, MAX_COMP_LAYERS } from '../core/composition';
+import { BLEND_MODES, MAX_COMP_LAYERS, defaultEscape } from '../core/composition';
 import { cloneFlame } from '../core/flame';
 import { randomFlame } from '../core/random';
 
@@ -20,12 +20,14 @@ export function buildComposePanel(app: App, root: HTMLElement) {
   dupBtn.title = 'New layer above this one: a copy of this flame';
   const randBtn = el('button', '', '+ Random');
   randBtn.title = 'New layer above this one: a random flame';
+  const escBtn = el('button', '', '+ Escape');
+  escBtn.title = 'New layer above this one: an escape-time fractal (Mandelbrot, Julia, Newton, custom formulas… — Escape tab)';
   const delBtn = el('button', 'danger', 'Delete');
   const upBtn = el('button', 'icon', '↑');
   const dnBtn = el('button', 'icon', '↓');
   upBtn.title = 'Move layer up (in front)';
   dnBtn.title = 'Move layer down (behind)';
-  btns.append(dupBtn, randBtn, delBtn, upBtn, dnBtn);
+  btns.append(dupBtn, randBtn, escBtn, delBtn, upBtn, dnBtn);
   sec.append(btns);
   const ctl = el('div');
   sec.append(ctl);
@@ -45,18 +47,22 @@ export function buildComposePanel(app: App, root: HTMLElement) {
       vis.addEventListener('click', (e) => e.stopPropagation());
       vis.addEventListener('change', () => { ly.visible = vis.checked; app.commitComp(); });
       const sw = el('span', 'xform-swatch');
-      const mid = ly.flame.layers[0]?.palette[128] ?? [0.5, 0.5, 0.5];
-      sw.style.background = `rgb(${mid.map((v) => Math.round(v * 255)).join(',')})`;
-      const name = el('span', 'xname', ly.name);
+      const pal = ly.kind === 'flame' ? ly.flame.layers[0]?.palette : ly.escape.palette;
+      const mid = pal?.[128] ?? [0.5, 0.5, 0.5];
+      sw.style.background = `rgb(${mid.map((v: number) => Math.round(v * 255)).join(',')})`;
+      const name = el('span', 'xname', (ly.kind === 'escape' ? '⌘ ' : '') + ly.name);
+      name.title = ly.kind === 'escape' ? 'escape-time fractal layer (Escape tab)' : 'flame layer';
       const info = el('span', 'xinfo', `${ly.blend}${ly.opacity < 1 ? ` · ${Math.round(ly.opacity * 100)}%` : ''}${ly.clip ? ' · clip' : ''}`);
       item.append(vis, sw, name, info);
       item.onclick = () => { if (app.compIdx !== i) app.selectCompLayer(i); };
       list.append(item);
     }
     const n = layers.length;
-    delBtn.disabled = n <= 1;
-    dupBtn.disabled = n >= MAX_COMP_LAYERS;
+    // a document keeps at least one flame layer (the flame panels always have something to edit)
+    delBtn.disabled = n <= 1 || (app.compLayer.kind === 'flame' && layers.filter((l) => l.kind === 'flame').length <= 1);
+    dupBtn.disabled = n >= MAX_COMP_LAYERS || app.compLayer.kind !== 'flame';
     randBtn.disabled = n >= MAX_COMP_LAYERS;
+    escBtn.disabled = n >= MAX_COMP_LAYERS;
     upBtn.disabled = app.compIdx >= n - 1;
     dnBtn.disabled = app.compIdx <= 0;
   };
@@ -113,9 +119,11 @@ export function buildComposePanel(app: App, root: HTMLElement) {
 
   dupBtn.onclick = () => { const f = cloneFlame(app.flame); f.name = (f.name || 'Flame') + ' copy'; app.addCompLayer(f); };
   randBtn.onclick = () => { app.addCompLayer(randomFlame()); };
+  escBtn.onclick = () => { app.addCompLayer({ escape: defaultEscape(app.editPalette) }); };
   delBtn.onclick = () => {
-    if (app.comp.layers.length <= 1) return;
+    if (delBtn.disabled) return;
     app.comp.layers.splice(app.compIdx, 1);
+    if (app.flameIdx > app.compIdx) app.flameIdx--;
     app.compIdx = Math.max(0, app.compIdx - 1);
     app.commitComp();
     app.emit('select');
@@ -125,6 +133,7 @@ export function buildComposePanel(app: App, root: HTMLElement) {
     if (j < 0 || j >= app.comp.layers.length) return;
     const ls = app.comp.layers;
     [ls[i], ls[j]] = [ls[j], ls[i]];
+    if (app.flameIdx === i) app.flameIdx = j; else if (app.flameIdx === j) app.flameIdx = i;
     app.compIdx = j;
     app.commitComp();
   };
