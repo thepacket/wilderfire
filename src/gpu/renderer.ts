@@ -14,6 +14,10 @@ export interface RenderStats {
   samplesPerSec: number;
   paused: boolean;
   converged: boolean;
+  /** adaptive preview budget: fraction of the configured iterations per pass currently used (1 = full) */
+  budgetScale: number;
+  /** measured GPU time per preview frame (ms, smoothed) */
+  gpuMs: number;
 }
 
 export class FlameRenderer {
@@ -54,6 +58,15 @@ export class FlameRenderer {
 
   nPoints = 1 << 16;
   itersPerPass = 64;
+  /** Adaptive preview budget: on a heavy kernel (many layers × variations) a full pass can take longer than a
+   *  frame and the UI stalls behind the GPU queue. When on, the iterations per preview pass are scaled down
+   *  until the measured GPU time per frame fits `frameBudgetMs`, and scaled back up when there is headroom.
+   *  Exports always use the full `itersPerPass`. */
+  adaptiveBudget = true;
+  frameBudgetMs = 14;
+  private budgetScale = 1;
+  private gpuMs = 0;
+  private gpuProbeInFlight = false;
   passesPerFrame = 2;
   targetQuality = 4000; // spp cap
   /** Live-preview cap on the DE estimator radius (px); exports use the flame's full radius. */
@@ -293,6 +306,7 @@ export class FlameRenderer {
     spp: number,
     tile?: { tileX: number; tileY: number; fullW: number; fullH: number; tileW: number; tileH: number },
     transparent = false,
+    iters = this.itersPerPass,
   ) {
     const f = this.flame!;
     const os = tile ? 1 : this.oversample;
@@ -307,7 +321,7 @@ export class FlameRenderer {
     const dimOn = (f.dimishZ ?? 0) > 1e-9;
     const cam3d = Math.abs(f.camPitch) > 1e-9 || Math.abs(f.camYaw) > 1e-9 || Math.abs(f.camBank) > 1e-9 || Math.abs(f.camPersp) > 1e-9
       || Math.abs(f.camPosX) > 1e-9 || Math.abs(f.camPosY) > 1e-9 || Math.abs(f.camPosZ) > 1e-9 || dofOn || dimOn;
-    pu32[0] = w; pu32[1] = h; pu32[2] = this.itersPerPass; pu32[3] = (f.preserveZ ? 1 : 0) | (cam3d ? 2 : 0);
+    pu32[0] = w; pu32[1] = h; pu32[2] = iters; pu32[3] = (f.preserveZ ? 1 : 0) | (cam3d ? 2 : 0);
     pf32[4] = f.centerX; pf32[5] = f.centerY; pf32[6] = ppu; pf32[7] = f.rotation;
     pf32[8] = tile ? tile.tileX : 0; pf32[9] = tile ? tile.tileY : 0;
     pf32[10] = fullW; pf32[11] = fullH;
@@ -585,13 +599,23 @@ export class FlameRenderer {
 
     const dt = this.lastT ? (t - this.lastT) / 1000 : 0;
     this.lastT = t;
+    if (dt > 0.5) this.gpuMs = 0; // we were away (hidden tab, stall): the last probe says nothing about the GPU load
 
     // Idle: converged (or paused) and nothing to redraw → do no GPU work at all.
     // The canvas keeps its last presented frame. invalidate() wakes us up.
     if (!accumulate && !this.needsPresent) {
-      this.onFrame?.({ spp, samplesPerSec: 0, paused: this.paused, converged });
+      this.onFrame?.({ spp, samplesPerSec: 0, paused: this.paused, converged, budgetScale: this.budgetScale, gpuMs: this.gpuMs });
       return;
     }
+
+    // Adaptive budget: shrink the iterations per preview pass while the GPU time per frame overshoots the
+    // budget, grow them back (up to the configured count) when there is headroom. Measured with
+    // onSubmittedWorkDone on the frame's own submission (queue backlog included — exactly the stall we avoid).
+    if (this.adaptiveBudget && accumulate && this.gpuMs > 0) {
+      if (this.gpuMs > this.frameBudgetMs * 1.3) this.budgetScale = Math.max(1 / 16, this.budgetScale * 0.7);
+      else if (this.gpuMs < this.frameBudgetMs * 0.6 && this.budgetScale < 1) this.budgetScale = Math.min(1, this.budgetScale * 1.2);
+    } else if (!this.adaptiveBudget) this.budgetScale = 1;
+    const iters = Math.max(4, Math.round(this.itersPerPass * this.budgetScale));
 
     // The tonemap must see the sample count *including* this frame's passes:
     // the compute pass runs before the tonemap in the same submission, and
@@ -600,14 +624,14 @@ export class FlameRenderer {
     // Burst: right after a reset run extra passes (bounded) so the new image
     // reaches minDisplaySpp within a frame or two instead of freezing the view
     // during a fast drag.
-    const perPass = this.nPoints * this.itersPerPass;
+    const perPass = this.nPoints * iters;
     let passes = this.passesPerFrame;
     if (accumulate && this.minDisplaySpp > 0) {
       const need = Math.ceil((this.minDisplaySpp * w * h - this.samples) / perPass);
       if (need > passes) passes = Math.min(need, this.passesPerFrame * 4);
     }
     if (accumulate) this.samples += this.countIters(perPass * passes);
-    this.writeUniforms(this.samples / Math.max(w * h, 1)); // tonemap spp is per output pixel
+    this.writeUniforms(this.samples / Math.max(w * h, 1), undefined, false, iters); // tonemap spp is per output pixel
 
     const enc = this.device.createCommandEncoder();
     if (accumulate) {
@@ -633,12 +657,22 @@ export class FlameRenderer {
       this.needsPresent = false;
     }
     this.device.queue.submit([enc.finish()]);
+    if (accumulate && !this.gpuProbeInFlight) {
+      // one probe at a time: how long until this frame's work (and whatever was queued before it) is done
+      this.gpuProbeInFlight = true;
+      const t0 = performance.now();
+      this.device.queue.onSubmittedWorkDone().then(() => {
+        const ms = Math.min(performance.now() - t0, 200); // capped: one stall must not poison the average for long
+        this.gpuMs = this.gpuMs ? this.gpuMs * 0.8 + ms * 0.2 : ms;
+        this.gpuProbeInFlight = false;
+      }, () => { this.gpuProbeInFlight = false; });
+    }
 
     if (accumulate && dt > 0 && dt < 0.5) {
       const sps = (perPass * passes) / dt;
       this.emaSps = this.emaSps ? this.emaSps * 0.95 + sps * 0.05 : sps;
     }
-    this.onFrame?.({ spp, samplesPerSec: this.emaSps, paused: this.paused, converged });
+    this.onFrame?.({ spp, samplesPerSec: this.emaSps, paused: this.paused, converged, budgetScale: this.budgetScale, gpuMs: this.gpuMs });
   };
 
   /** Dev diagnostic: total opacity-weighted hits in the live histogram and the count at a pixel. */

@@ -106,7 +106,11 @@ in the stack.
   and a **preview hold** (Engine → Preview hold): after each edit the last
   image stays on screen until the new one has accumulated N samples per
   pixel (a bounded burst of extra passes gets it there within a frame), so
-  dragging a triangle never shows the sparse first frames
+  dragging a triangle never shows the sparse first frames; Draft / Final /
+  Custom engine modes; and an **adaptive preview budget** that shrinks the
+  work per frame on very heavy flames (many layers × variations) so the
+  editor stays responsive — measured from the GPU's own completion time,
+  scaled back up when there is headroom, never applied to exports
 - Gradient presets, IQ-cosine **random palettes**, hue rotation, a
   **draggable stop editor**, invert, and **.ugr / .map gradient import and
   export** (a .ugr gradient pack opens a chooser)

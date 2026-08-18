@@ -233,6 +233,17 @@ export function buildRenderPanel(app: App, root: HTMLElement) {
   qSel.onchange = () => { app.renderer.targetQuality = parseInt(qSel.value); app.renderer.invalidate(); };
   qRow.append(qSel);
 
+  const adaptRow = el('div', 'row');
+  const adaptChk = el('input') as HTMLInputElement;
+  adaptChk.type = 'checkbox';
+  const LS_ADAPT = 'wilderfire.render.adaptive';
+  adaptChk.checked = localStorage.getItem(LS_ADAPT) !== '0';
+  app.renderer.adaptiveBudget = adaptChk.checked;
+  const adaptLab = el('label', '', ' Adaptive budget');
+  adaptLab.prepend(adaptChk);
+  adaptLab.title = 'On a heavy flame (many layers × variations) shrink the work per preview frame so the editor stays responsive; scaled back up when the GPU has headroom. Exports always render at full quality. The status bar shows "budget n%" while it is active.';
+  adaptChk.onchange = () => { app.renderer.adaptiveBudget = adaptChk.checked; localStorage.setItem(LS_ADAPT, adaptChk.checked ? '1' : '0'); };
+  adaptRow.append(adaptLab);
   const pauseBtn = el('button', '', '⏸ Pause');
   pauseBtn.onclick = () => {
     const p = !app.renderer.isPaused();
@@ -243,7 +254,7 @@ export function buildRenderPanel(app: App, root: HTMLElement) {
   restartBtn.onclick = () => app.renderer.resetAccumulation();
   const pRow = el('div', 'btn-row');
   pRow.append(pauseBtn, restartBtn);
-  perf.append(modeRow, speedRow, holdS.root, deS.root, deCurveS.root, deLiveRow, osRow, qRow, pRow);
+  perf.append(modeRow, speedRow, holdS.root, deS.root, deCurveS.root, deLiveRow, osRow, qRow, adaptRow, pRow);
 
   const LS_MODE = 'wilderfire.render.mode';
   const MODES: Record<string, { speed: string; hold: number; deLive: string; os: string; q: string }> = {
