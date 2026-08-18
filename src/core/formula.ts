@@ -145,8 +145,18 @@ fn ds_ts(a0: f32, b0: f32) -> vec2f { let a = op_(a0); let b = op_(b0); let s = 
 fn ds_add(x: vec2f, y: vec2f) -> vec2f { var s = ds_ts(x.x, y.x); let t = ds_ts(x.y, y.y); s.y = op_(s.y + t.x); s = ds_qts(s.x, s.y); s.y = op_(s.y + t.y); return ds_qts(s.x, s.y); }
 fn ds_neg(x: vec2f) -> vec2f { return vec2f(-x.x, -x.y); }
 fn ds_sub(x: vec2f, y: vec2f) -> vec2f { return ds_add(x, ds_neg(y)); }
-fn ds_mulf(x: vec2f, b: f32) -> vec2f { let p = op_(x.x * b); var e = fma(x.x, b, -p); e = op_(e + x.y * b); return ds_qts(p, e); }
-fn ds_mul(x: vec2f, y: vec2f) -> vec2f { let p = op_(x.x * y.x); var e = fma(x.x, y.x, -p); e = op_(e + op_(x.x * y.y + x.y * y.x)); return ds_qts(p, e); }
+// TwoProduct by Veltkamp/Dekker splitting rather than fma: WGSL's fma is not fused on every backend (HLSL mad), and an
+// unfused fma silently turns the error term into 0 — which would make double-single no better than f32 exactly where it
+// is needed. Every intermediate goes through op_ so the compiler can neither reassociate nor contract them.
+fn ds_split(a: f32) -> vec2f { let t = op_(4097.0 * a); let hi = op_(t - op_(t - a)); return vec2f(hi, op_(a - hi)); }
+fn ds_twoprod(a: f32, b: f32) -> vec2f {
+  let p = op_(a * b);
+  let as_ = ds_split(a); let bs = ds_split(b);
+  let e = op_(op_(op_(op_(as_.x * bs.x) - p) + op_(as_.x * bs.y)) + op_(as_.y * bs.x)) + op_(as_.y * bs.y);
+  return vec2f(p, e);
+}
+fn ds_mulf(x: vec2f, b: f32) -> vec2f { let pe = ds_twoprod(x.x, b); let e = op_(pe.y + op_(x.y * b)); return ds_qts(pe.x, e); }
+fn ds_mul(x: vec2f, y: vec2f) -> vec2f { let pe = ds_twoprod(x.x, y.x); let e = op_(pe.y + op_(op_(x.x * y.y) + op_(x.y * y.x))); return ds_qts(pe.x, e); }
 fn ds_div(x: vec2f, y: vec2f) -> vec2f {
   let q1 = x.x / y.x;
   let r = ds_sub(x, ds_mulf(y, q1));
