@@ -7,11 +7,12 @@
 
 import { FlameRenderer, type RenderStats } from './renderer';
 import { EscapeRenderer } from './escapeRenderer';
+import { ImageRenderer } from './imageRenderer';
 import type { Composition, CompLayer, BlendMode } from '../core/composition';
 import { BLEND_MODES, BLEND_WGSL, blendPixel } from '../core/composition';
 
 /** what every layer kind's renderer offers the composer */
-export type LayerRenderer = FlameRenderer | EscapeRenderer;
+export type LayerRenderer = FlameRenderer | EscapeRenderer | ImageRenderer;
 
 const COMPOSITE_WGSL = `
 struct CP { mode: u32, opacity: f32, flags: u32, pad: u32, bg: vec4f }
@@ -119,11 +120,12 @@ export class Composer {
   }
   /** push a layer's content to its renderer (when changed, or forced) */
   private pushContent(s: Slot, force: boolean) {
-    const json = JSON.stringify(s.layer.kind === 'flame' ? s.layer.flame : s.layer.escape);
+    const json = JSON.stringify(s.layer.kind === 'flame' ? s.layer.flame : s.layer.kind === 'escape' ? s.layer.escape : s.layer.image);
     if (!force && json === s.json) return false;
     s.json = json;
     if (s.layer.kind === 'flame') (s.renderer as FlameRenderer).setFlame(s.layer.flame);
-    else (s.renderer as EscapeRenderer).setLayer(s.layer.escape);
+    else if (s.layer.kind === 'escape') (s.renderer as EscapeRenderer).setLayer(s.layer.escape);
+    else (s.renderer as ImageRenderer).setLayer(s.layer.image);
     return true;
   }
   /** total spp of the active layer, budget etc. come through onFrame */
@@ -176,6 +178,14 @@ export class Composer {
   }
 
   private async makeRenderer(kind: CompLayer['kind']): Promise<LayerRenderer> {
+    if (kind === 'image') {
+      const r = new ImageRenderer(this.device);
+      r.onError = (m) => this.onError?.(m);
+      r.onLoaded = () => { this.needsComposite = true; };
+      r.resize(this.canvas.width, this.canvas.height);
+      r.exporting = this._exporting;
+      return r;
+    }
     if (kind === 'escape') {
       const r = new EscapeRenderer(this.device);
       r.onError = (m) => this.onError?.(m);

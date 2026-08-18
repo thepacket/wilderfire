@@ -3,7 +3,7 @@ import type { Flame, Layer, XForm } from '../core/flame';
 import type { Composer } from '../gpu/composer';
 import type { MotionCurve } from '../core/motion';
 import type { Composition, CompLayer, FlameCompLayer, EscapeCompLayer } from '../core/composition';
-import { wrapFlame, flameLayer, escapeLayer, MAX_COMP_LAYERS } from '../core/composition';
+import { wrapFlame, flameLayer, escapeLayer, imageLayer, MAX_COMP_LAYERS, type ImageLayerData } from '../core/composition';
 import type { EscapeLayerData } from '../core/escape';
 import type { RGB } from '../core/flame';
 
@@ -285,11 +285,13 @@ export class App {
   }
 
   /** Add a flame (or an escape-time fractal) as a new composition layer above the selected one and select it. */
-  addCompLayer(content: Flame | { escape: EscapeLayerData }, source = ''): boolean {
+  addCompLayer(content: Flame | { escape: EscapeLayerData } | { image: ImageLayerData; name?: string }, source = ''): boolean {
     if (this.comp.layers.length >= MAX_COMP_LAYERS) return false;
     const layer: CompLayer = 'escape' in content
       ? escapeLayer(content.escape, { ownBackground: false, name: `Escape ${this.comp.layers.length + 1}` })
-      : flameLayer(content, { ownBackground: false, name: content.name || `Layer ${this.comp.layers.length + 1}` });
+      : 'image' in content
+        ? imageLayer(content.image, { name: content.name || `Image ${this.comp.layers.length + 1}` })
+        : flameLayer(content, { ownBackground: false, name: content.name || `Layer ${this.comp.layers.length + 1}` });
     this.comp.layers.splice(this.compIdx + 1, 0, layer);
     this.compIdx++;
     if (layer.kind === 'flame') { this.flameIdx = this.compIdx; this.layerIdx = 0; this.selected = 0; }

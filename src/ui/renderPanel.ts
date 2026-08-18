@@ -4,7 +4,8 @@ import { flameToJSON } from '../core/flame';
 import { flameToXML, importFlameText } from '../core/flameXML';
 import { pickSave, saveBlob, saveText } from './saveFile';
 import { renderHiRes, resolveSize, SIZE_OPTIONS, QUALITY_OPTIONS } from './hiresExport';
-import { isSingleFlame, compositionToJSON, normalizeComposition } from '../core/composition';
+import { isSingleFlame, normalizeComposition } from '../core/composition';
+import { compositionFileJSON, importCompositionAssets } from '../core/images';
 import { openBatchExport } from './batchExport';
 import { buildSolidSection } from './solidPanel';
 import { FILTER_KERNELS, normFilterKernel, type FilterKernel } from '../gpu/filters';
@@ -313,7 +314,7 @@ export function buildRenderPanel(app: App, root: HTMLElement) {
   jsonBtn.onclick = () =>
     isSingleFlame(app.comp)
       ? saveText(flameToJSON(app.flame), { suggestedName: `${baseName()}.json`, description: 'WilderFire flame (JSON)', mime: 'application/json', ext: '.json' })
-      : saveText(compositionToJSON(app.comp), { suggestedName: `${(app.comp.name || 'composition').replace(/[\\/:*?"<>|]+/g, '_')}.json`, description: 'WilderFire composition (JSON)', mime: 'application/json', ext: '.json' });
+      : compositionFileJSON(app.comp).then((json) => saveText(json, { suggestedName: `${(app.comp.name || 'composition').replace(/[\\/:*?"<>|]+/g, '_')}.json`, description: 'WilderFire composition (JSON)', mime: 'application/json', ext: '.json' }));
   const xmlBtn = el('button', '', '⬇ .flame');
   xmlBtn.title = 'Export as .flame XML (flam3 / Apophysis compatible)';
   xmlBtn.onclick = () =>
@@ -332,7 +333,7 @@ export function buildRenderPanel(app: App, root: HTMLElement) {
       // a WilderFire composition (layer stack) JSON
       if (text.trim().startsWith('{')) {
         const obj = JSON.parse(text);
-        if (obj?.layers?.[0]?.kind) { app.setComposition(normalizeComposition(obj, app.activeLayer.palette)); return; }
+        if (obj?.layers?.[0]?.kind) { await importCompositionAssets(obj); app.setComposition(normalizeComposition(obj, app.activeLayer.palette)); return; }
       }
       const { flame, count, unknown, curves } = importFlameText(text, app.activeLayer.palette);
       app.setFlame(flame);

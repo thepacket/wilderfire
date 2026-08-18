@@ -2,7 +2,7 @@
 // renderer and blended into the picture (blend mode, opacity, own background, clip to what is below).
 // The active layer is what the transforms/render/gradient panels and the overlay edit.
 import { App, el, slider } from './common';
-import { BLEND_MODES, MAX_COMP_LAYERS, defaultEscape } from '../core/composition';
+import { BLEND_MODES, MAX_COMP_LAYERS, defaultEscape, defaultImage } from '../core/composition';
 import { cloneFlame } from '../core/flame';
 import { randomFlame } from '../core/random';
 
@@ -22,12 +22,27 @@ export function buildComposePanel(app: App, root: HTMLElement) {
   randBtn.title = 'New layer above this one: a random flame';
   const escBtn = el('button', '', '+ Escape');
   escBtn.title = 'New layer above this one: an escape-time fractal (Mandelbrot, Julia, Newton, custom formulas… — Escape tab)';
+  const imgBtn = el('button', '', '+ Image');
+  imgBtn.title = 'New layer above this one: a picture (PNG, JPEG, WebP…) kept in this browser\'s image store';
+  const imgFile = el('input') as HTMLInputElement;
+  imgFile.type = 'file'; imgFile.accept = 'image/*'; imgFile.style.display = 'none';
+  imgBtn.onclick = () => imgFile.click();
+  imgFile.onchange = async () => {
+    const f = imgFile.files?.[0]; imgFile.value = '';
+    if (!f) return;
+    try {
+      const { storeImage } = await import('../core/images');
+      const info = await storeImage(f);
+      app.addCompLayer({ image: defaultImage(info.key, info.w, info.h), name: f.name.replace(/\.[^.]+$/, '') });
+    } catch (e) { alert('Image load failed: ' + (e as Error).message); }
+  };
   const delBtn = el('button', 'danger', 'Delete');
   const upBtn = el('button', 'icon', '↑');
   const dnBtn = el('button', 'icon', '↓');
   upBtn.title = 'Move layer up (in front)';
   dnBtn.title = 'Move layer down (behind)';
-  btns.append(dupBtn, randBtn, escBtn, delBtn, upBtn, dnBtn);
+  btns.append(dupBtn, randBtn, escBtn, imgBtn, delBtn, upBtn, dnBtn);
+  sec.append(imgFile);
   sec.append(btns);
   const ctl = el('div');
   sec.append(ctl);
@@ -47,11 +62,11 @@ export function buildComposePanel(app: App, root: HTMLElement) {
       vis.addEventListener('click', (e) => e.stopPropagation());
       vis.addEventListener('change', () => { ly.visible = vis.checked; app.commitComp(); });
       const sw = el('span', 'xform-swatch');
-      const pal = ly.kind === 'flame' ? ly.flame.layers[0]?.palette : ly.escape.palette;
+      const pal = ly.kind === 'flame' ? ly.flame.layers[0]?.palette : ly.kind === 'escape' ? ly.escape.palette : null;
       const mid = pal?.[128] ?? [0.5, 0.5, 0.5];
-      sw.style.background = `rgb(${mid.map((v: number) => Math.round(v * 255)).join(',')})`;
-      const name = el('span', 'xname', (ly.kind === 'escape' ? 'ƒ ' : '') + ly.name);
-      name.title = ly.kind === 'escape' ? 'escape-time fractal layer (Escape tab)' : 'flame layer';
+      sw.style.background = pal ? `rgb(${mid.map((v: number) => Math.round(v * 255)).join(',')})` : 'linear-gradient(135deg, #888 25%, #444 25%, #444 50%, #888 50%, #888 75%, #444 75%)';
+      const name = el('span', 'xname', (ly.kind === 'escape' ? 'ƒ ' : ly.kind === 'image' ? '🖼 ' : '') + ly.name);
+      name.title = ly.kind === 'escape' ? 'escape-time fractal layer (Escape tab)' : ly.kind === 'image' ? 'image layer' : 'flame layer';
       const info = el('span', 'xinfo', `${ly.blend}${ly.opacity < 1 ? ` · ${Math.round(ly.opacity * 100)}%` : ''}${ly.clip ? ' · clip' : ''}`);
       item.append(vis, sw, name, info);
       item.onclick = () => { if (app.compIdx !== i) app.selectCompLayer(i); };
@@ -63,6 +78,7 @@ export function buildComposePanel(app: App, root: HTMLElement) {
     dupBtn.disabled = n >= MAX_COMP_LAYERS || app.compLayer.kind !== 'flame';
     randBtn.disabled = n >= MAX_COMP_LAYERS;
     escBtn.disabled = n >= MAX_COMP_LAYERS;
+    imgBtn.disabled = n >= MAX_COMP_LAYERS;
     upBtn.disabled = app.compIdx >= n - 1;
     dnBtn.disabled = app.compIdx <= 0;
   };
@@ -110,7 +126,28 @@ export function buildComposePanel(app: App, root: HTMLElement) {
       app.commitComp(SRC);
     });
     bgRow.append(bgInp);
-    ctl.append(nameRow, blendRow, opS.root, flags, bgRow);
+    ctl.append(nameRow, blendRow, opS.root, flags);
+    if (ly.kind === 'image') {
+      const im = ly.image;
+      const fitRow = el('div', 'row');
+      fitRow.append(el('label', '', 'Fit'));
+      const fitSel = el('select') as HTMLSelectElement;
+      for (const [v, t] of [['contain', 'contain'], ['cover', 'cover'], ['stretch', 'stretch'], ['none', 'pixels']]) { const o = el('option', '', t) as HTMLOptionElement; o.value = v; fitSel.append(o); }
+      fitSel.value = im.fit;
+      fitSel.onchange = () => { im.fit = fitSel.value as typeof im.fit; app.commitComp(); };
+      fitRow.append(fitSel);
+      const tileChk = el('input') as HTMLInputElement; tileChk.type = 'checkbox'; tileChk.checked = im.tile; tileChk.title = 'repeat the picture beyond its edges';
+      tileChk.onchange = () => { im.tile = tileChk.checked; app.commitComp(); };
+      const tileLab = el('label'); tileLab.append(tileChk, document.createTextNode(' tile'));
+      fitRow.append(tileLab);
+      ctl.append(fitRow,
+        slider({ label: 'Scale', min: -2, max: 2, step: 0.01, value: Math.log2(im.scale), fmt: (v) => Math.pow(2, v).toFixed(2) + '×', onInput: (v) => { im.scale = Math.pow(2, v); app.commitComp(SRC); } }).root,
+        slider({ label: 'Offset X', min: -1, max: 1, step: 0.005, value: im.offsetX, onInput: (v) => { im.offsetX = v; app.commitComp(SRC); } }).root,
+        slider({ label: 'Offset Y', min: -1, max: 1, step: 0.005, value: im.offsetY, onInput: (v) => { im.offsetY = v; app.commitComp(SRC); } }).root,
+        slider({ label: 'Rotation', min: -180, max: 180, step: 1, value: im.rotation * 180 / Math.PI, fmt: (v) => `${v.toFixed(0)}°`, onInput: (v) => { im.rotation = v * Math.PI / 180; app.commitComp(SRC); } }).root,
+        el('div', 'hint', `${im.w}×${im.h} px · stored in this browser; a saved composition file embeds it`));
+    }
+    ctl.append(bgRow);
   };
 
   const rebuild = () => { rebuildList(); rebuildCtl(); };

@@ -31,7 +31,24 @@ export interface CompLayerBase {
 export interface FlameCompLayer extends CompLayerBase { kind: 'flame'; flame: Flame }
 /** an escape-time fractal (Mandelbrot/Julia/… families, custom formulas), see escape.ts */
 export interface EscapeCompLayer extends CompLayerBase { kind: 'escape'; escape: EscapeLayerData }
-export type CompLayer = FlameCompLayer | EscapeCompLayer;
+/** a picture (PNG/JPEG/WebP…) from the browser's image store, placed on the canvas */
+export interface ImageLayerData {
+  /** content hash — the key in the image store (and in a composition file's `assets`) */
+  key: string;
+  /** natural size (kept so the layout works before the image is loaded) */
+  w: number;
+  h: number;
+  fit: 'contain' | 'cover' | 'stretch' | 'none';
+  /** extra scale on top of the fit, offset as a fraction of the canvas, rotation in radians */
+  scale: number;
+  offsetX: number;
+  offsetY: number;
+  rotation: number;
+  /** repeat the picture beyond its edges */
+  tile: boolean;
+}
+export interface ImageCompLayer extends CompLayerBase { kind: 'image'; image: ImageLayerData }
+export type CompLayer = FlameCompLayer | EscapeCompLayer | ImageCompLayer;
 
 export interface Composition {
   version: 1;
@@ -53,6 +70,20 @@ export function flameLayer(flame: Flame, opts: Partial<Omit<FlameCompLayer, 'kin
 export function escapeLayer(escape: EscapeLayerData, opts: Partial<Omit<EscapeCompLayer, 'kind' | 'escape'>> = {}): EscapeCompLayer {
   return { kind: 'escape', id: newLayerId(), name: 'Escape', visible: true, opacity: 1, blend: 'normal', ownBackground: true, clip: false, escape, ...opts };
 }
+export function imageLayer(image: ImageLayerData, opts: Partial<Omit<ImageCompLayer, 'kind' | 'image'>> = {}): ImageCompLayer {
+  return { kind: 'image', id: newLayerId(), name: 'Image', visible: true, opacity: 1, blend: 'normal', ownBackground: false, clip: false, image, ...opts };
+}
+export function defaultImage(key: string, w: number, h: number): ImageLayerData {
+  return { key, w, h, fit: 'contain', scale: 1, offsetX: 0, offsetY: 0, rotation: 0, tile: false };
+}
+function normalizeImage(obj: any): ImageLayerData | null {
+  if (!obj || typeof obj.key !== 'string' || !obj.key) return null;
+  return {
+    key: obj.key, w: Math.max(1, Math.round(num(obj.w, 1))), h: Math.max(1, Math.round(num(obj.h, 1))),
+    fit: ['contain', 'cover', 'stretch', 'none'].includes(obj.fit) ? obj.fit : 'contain',
+    scale: Math.max(1e-6, num(obj.scale, 1)), offsetX: num(obj.offsetX, 0), offsetY: num(obj.offsetY, 0), rotation: num(obj.rotation, 0), tile: obj.tile === true,
+  };
+}
 export { defaultEscape };
 
 /** A one-layer composition around a flame (what every existing file/entry becomes). */
@@ -73,7 +104,7 @@ export function normalizeComposition(obj: any, fallbackPalette: RGB[]): Composit
   if (obj && typeof obj === 'object' && Array.isArray(obj.layers) && obj.layers.length && obj.layers.every((l: any) => l && typeof l === 'object' && 'kind' in l)) {
     const layers: CompLayer[] = [];
     for (const l of obj.layers.slice(0, MAX_COMP_LAYERS)) {
-      if (l.kind !== 'flame' && l.kind !== 'escape') continue; // unknown kinds (future files) are dropped
+      if (l.kind !== 'flame' && l.kind !== 'escape' && l.kind !== 'image') continue; // unknown kinds (future files) are dropped
       const base = {
         id: typeof l.id === 'string' && l.id ? l.id : newLayerId(),
         visible: l.visible !== false, opacity: clamp01(num(l.opacity, 1)),
@@ -83,8 +114,11 @@ export function normalizeComposition(obj: any, fallbackPalette: RGB[]): Composit
       if (l.kind === 'flame') {
         const flame = normalizeFlame(l.flame, fallbackPalette);
         layers.push({ kind: 'flame', ...base, name: typeof l.name === 'string' ? l.name : flame.name || 'Flame', flame });
-      } else {
+      } else if (l.kind === 'escape') {
         layers.push({ kind: 'escape', ...base, name: typeof l.name === 'string' ? l.name : 'Escape', escape: normalizeEscape(l.escape, fallbackPalette) });
+      } else {
+        const image = normalizeImage(l.image);
+        if (image) layers.push({ kind: 'image', ...base, name: typeof l.name === 'string' ? l.name : 'Image', image });
       }
     }
     if (!layers.length) layers.push(flameLayer(normalizeFlame(null, fallbackPalette)));
