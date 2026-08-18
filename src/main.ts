@@ -3,7 +3,7 @@
 // See LICENSE and NOTICE.md (third-party material, notably JWildfire-derived code).
 import './style.css';
 import { App, el, openModal } from './ui/common';
-import { FlameRenderer } from './gpu/renderer';
+import { Composer } from './gpu/composer';
 import { PRESETS } from './core/presets';
 import { randomFlame } from './core/random';
 import { buildTransformsPanel } from './ui/transformsPanel';
@@ -11,7 +11,9 @@ import { buildRenderPanel } from './ui/renderPanel';
 import { buildPalettePanel } from './ui/palettePanel';
 import { buildAIPanel } from './ui/aiPanel';
 import { buildAnimPanel, type AnimState } from './ui/animPanel';
-import { buildLibrary, loadAutosave, restoreFlame } from './ui/library';
+import { buildLibrary, loadAutosave, restoreComposition } from './ui/library';
+import { wrapFlame } from './core/composition';
+import { buildComposePanel } from './ui/composePanel';
 import { buildMutate } from './ui/mutate';
 import { buildOverlay } from './ui/overlay';
 import { loadJwfVariations } from './core/variations';
@@ -232,10 +234,10 @@ async function boot() {
   right.append(tabs, ...bodies);
 
   // ---------- Renderer ----------
-  const renderer = new FlameRenderer(canvas);
+  const renderer = new Composer(canvas);
   app.renderer = renderer;
   const saved = loadAutosave();
-  app.flame = saved ? restoreFlame(saved as { flame: unknown }, PRESETS[0].make()) : PRESETS[0].make();
+  app.comp = saved ? restoreComposition(saved as { flame: unknown }, PRESETS[0].make()) : wrapFlame(PRESETS[0].make());
 
   try {
     await renderer.init();
@@ -276,6 +278,7 @@ async function boot() {
 
   // ---------- Panels ----------
   const overlay = buildOverlay(app, overlayCanvas, wrap);
+  buildComposePanel(app, left);
   buildTransformsPanel(app, left);
   buildRenderPanel(app, bodies[0]);
   buildPalettePanel(app, bodies[1]);
@@ -300,7 +303,7 @@ async function boot() {
 
   new ResizeObserver(fit).observe(wrap);
   fit();
-  app.setFlame(app.flame);
+  app.setComposition(app.comp);
 
   // Offline: the build ships a service worker (vite.config.ts) that precaches this build's assets;
   // production only, so the dev server's modules are never cached. A newer build waiting to

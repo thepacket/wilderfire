@@ -16,7 +16,7 @@ const SRC = 'transforms';
 export function buildTransformsPanel(app: App, root: HTMLElement) {
   let lastPicked = 'linear'; // picker selection survives editor rebuilds
   const layerSec = el('div', 'section');
-  layerSec.append(el('h3', '', 'Layers'));
+  layerSec.append(el('h3', '', 'Flame layers'));
   const layerList = el('div', 'xform-list');
   layerSec.append(layerList);
   const layerBtns = el('div', 'btn-row');

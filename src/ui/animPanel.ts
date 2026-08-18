@@ -504,8 +504,8 @@ export function buildAnimPanel(app: App, root: HTMLElement, overlay: OverlayHand
     } finally {
       exporting = false;
       renderer.exporting = false;
-      renderer.setFlame(savedFlame);
       app.flame = savedFlame;
+      app.pushRender();
       rebuildList();
     }
   }

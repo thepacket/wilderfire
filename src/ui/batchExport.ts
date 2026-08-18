@@ -3,7 +3,7 @@
 // a series of downloads. Jobs run one after another on the single renderer; the queue can
 // be cancelled between tiles.
 import { App, el, openModal } from './common';
-import { normalizeFlame, type Flame } from '../core/flame';
+import { normalizeComposition, isSingleFlame, type Composition } from '../core/composition';
 import { listLibrary } from './library';
 import { pickDirectory, hasDirDialog, type DirTarget } from './saveFile';
 import { renderHiRes, resolveSize, safeFileName, SIZE_OPTIONS, QUALITY_OPTIONS } from './hiresExport';
@@ -11,8 +11,8 @@ import { renderVideo, videoFileExt, VIDEO_SIZE_OPTIONS, VIDEO_QUALITY_OPTIONS, t
 
 interface Job {
   name: string; file: string; status: HTMLElement; done: boolean;
-  /** still: flame + size */
-  flame?: Flame; size?: string; w: number; h: number;
+  /** still: document (a flame or a layer stack) + size */
+  doc?: Composition; size?: string; w: number; h: number;
   /** animation job (the current timeline) */
   video?: { format: VideoFormat; fps: number; passes: number; size?: { w: number; h: number } };
 }
@@ -27,8 +27,8 @@ export async function openBatchExport(app: App) {
   const flamesSec = el('div', 'batch-sec');
   flamesSec.append(el('h4', '', 'Flames'));
   const flameList = el('div', 'batch-list');
-  const flameChecks: { chk: HTMLInputElement; get: () => Flame; name: () => string }[] = [];
-  const row = (label: string, thumb: string | null, get: () => Flame, name: () => string, checked: boolean) => {
+  const flameChecks: { chk: HTMLInputElement; get: () => Composition; name: () => string }[] = [];
+  const row = (label: string, thumb: string | null, get: () => Composition, name: () => string, checked: boolean) => {
     const lab = el('label', 'batch-item');
     const chk = el('input') as HTMLInputElement;
     chk.type = 'checkbox';
@@ -41,8 +41,8 @@ export async function openBatchExport(app: App) {
     flameChecks.push({ chk, get, name });
     chk.onchange = refresh;
   };
-  row(`Current flame (${app.flame.name || 'untitled'})`, null, () => app.flame, () => app.flame.name || 'untitled', true);
-  for (const e of lib) row(e.name, e.thumb, () => normalizeFlame(e.flame, app.activeLayer.palette), () => e.name, false);
+  row(`Current ${isSingleFlame(app.comp) ? 'flame' : 'composition'} (${(isSingleFlame(app.comp) ? app.flame.name : app.comp.name) || 'untitled'})`, null, () => JSON.parse(JSON.stringify(app.comp)) as Composition, () => (isSingleFlame(app.comp) ? app.flame.name : app.comp.name) || 'untitled', true);
+  for (const e of lib) row(e.name, e.thumb, () => normalizeComposition(e.flame, app.activeLayer.palette), () => e.name, false);
   const allRow = el('div', 'btn-row');
   const allBtn = el('button', '', 'Select all');
   const noneBtn = el('button', '', 'None');
@@ -58,6 +58,12 @@ export async function openBatchExport(app: App) {
   const sizeRow = el('div', 'batch-sizes');
   const sizeChecks: { chk: HTMLInputElement; value: string }[] = [];
   const r = app.renderer;
+  /** a single flame renders in the active layer's renderer; a stack goes through the composer (its layers get renderers on demand) */
+  const renderStill = async (doc: Composition, o: Parameters<typeof renderHiRes>[2]) => {
+    if (isSingleFlame(doc)) return renderHiRes(r.layerRenderer, doc.layers[0].flame, o);
+    await r.setComposition(doc, 0);
+    return renderHiRes(r, null, o);
+  };
   for (const s of SIZE_OPTIONS) {
     const lab = el('label', 'batch-size');
     const chk = el('input') as HTMLInputElement;
@@ -140,10 +146,10 @@ export async function openBatchExport(app: App) {
     const flames = flameChecks.filter((f) => f.chk.checked);
     const sizes = sizeChecks.filter((s) => s.chk.checked).map((s) => s.value);
     for (const f of flames) {
-      let flame: Flame | null = null;
+      let doc: Composition | null = null;
       for (const size of sizes) {
         const { w, h } = resolveSize(size, r.width, r.height);
-        out.push({ name: f.name(), file: '', flame: (flame ??= f.get()), size, w, h, status: el('span', 'batch-status', 'queued'), done: false });
+        out.push({ name: f.name(), file: '', doc: (doc ??= f.get()), size, w, h, status: el('span', 'batch-status', 'queued'), done: false });
       }
     }
     // animation jobs: the current timeline at each chosen video size
@@ -213,7 +219,7 @@ export async function openBatchExport(app: App) {
               onFrame: (i, n) => { j.status.textContent = `frame ${i}/${n}`; },
               onStatus: (t) => { j.status.textContent = t; },
             })
-            : await renderHiRes(r, j.flame!, {
+            : await renderStill(j.doc!, {
               w: j.w, h: j.h, spp, transparent, signal: abort.signal,
               onTile: (d, n) => { j.status.textContent = n > 1 ? `tile ${d}/${n}` : 'rendering…'; },
             });
@@ -231,7 +237,7 @@ export async function openBatchExport(app: App) {
       }
     } finally {
       r.exporting = false;
-      r.setFlame(app.flame);
+      app.pushRender();
       running = false;
       abort = null;
       cancelBtn.disabled = true;

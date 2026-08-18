@@ -71,7 +71,7 @@ export function buildMutate(app: App) {
   const SPP = 220;
 
   async function renderCell(flame: Flame, canvas: HTMLCanvasElement) {
-    const r = app.renderer;
+    const r = app.renderer.layerRenderer; // the mutated flame alone, not the whole composition
     r.setFlame(flame);
     const px = await r.renderRegion({
       fullW: CELL, fullH: CELL, tileX: 0, tileY: 0, tileW: CELL, tileH: CELL,
@@ -124,7 +124,7 @@ export function buildMutate(app: App) {
         hint.textContent = 'Click a tile to adopt it, or mutate again.';
       } finally {
         r.exporting = false;
-        r.setFlame(app.flame);
+        app.renderer.restore();
       }
     }
 

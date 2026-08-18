@@ -80,7 +80,14 @@ in the stack.
   for solid scenes — the meshes are sampled on the GPU from a face CDF, loaded on
   demand; JWildfire's **background gradients** (2×2 corners,
   optional centre colour) render in both paths
-- **Layers** (up to 8) — each with its own transforms, final transform,
+- **Composition** (left pane, top) — the picture is a stack of up to 8 image
+  layers, each a complete flame with its own renderer, blended bottom-up with
+  the W3C/Photoshop blend modes (normal, add, multiply, screen, overlay,
+  darken/lighten, dodge/burn, hard/soft light, difference, exclusion), opacity,
+  optional own background, and clipping to what is below; a plain flame is a
+  one-layer composition, so every file and library entry keeps working. Hi-res
+  export, PNG, video and the library thumbnail composite the stack the same way.
+- **Flame layers** (up to 8 per flame) — each with its own transforms, final transform,
   gradient, density weight, and visibility, blended in one histogram; walker
   threads are partitioned across layers on the GPU
 - **Xaos** (flam3 "chaos") — per-pair transition weight matrix between
@@ -210,14 +217,17 @@ nginx on Fly.io with `fly deploy`.
 
 ```
 src/
-  core/       flame model (flame.ts), variation registry (variations.ts:
+  core/       flame model (flame.ts), composition model + blend maths
+              (composition.ts), variation registry (variations.ts:
               hand-written WGSL + generated variations.jwf.ts ports, the
               latter a lazily loaded, separately cached ~300 KB gz chunk),
               palettes, presets, randomizer, .flame XML I/O (flameXML.ts),
               keyframe morphing (animate.ts), motion curves (motion.ts)
   gpu/        codegen.ts  — flame → WGSL compute kernel + data layout
               renderer.ts — WebGPU pipelines, atomic histogram, tonemap, camera
-  ui/         panels (transforms, render, gradient, anim, AI), triangle
+              composer.ts — the canvas owner: one renderer per composition
+              layer (offscreen rgba16f), blend-mode compositor, capture/export
+  ui/         panels (composition, transforms, render, gradient, anim, AI), triangle
               overlay, variation + model pickers, library, mutation grid
   ai/         OpenRouter streaming chat client + model catalogue
   dev/        browser harnesses (variation oracle diff, fixture-flame compile)

@@ -74,8 +74,8 @@ export async function runRenderCheck(app: App, opts: RenderCheckOpts = {}): Prom
       const H = Math.max(16, Math.round(W * fh / fw));
       const { flame } = importFlameText(it.xml, app.activeLayer.palette);
       app.setFlame(flame);
-      app.renderer.setFlame(app.flame);
-      const px = await app.renderer.renderRegion({ fullW: W, fullH: H, tileX: 0, tileY: 0, tileW: W, tileH: H, spp: quality });
+      app.renderer.layerRenderer.setFlame(app.flame);
+      const px = await app.renderer.layerRenderer.renderRegion({ fullW: W, fullH: H, tileX: 0, tileY: 0, tileW: W, tileH: H, spp: quality });
       const sig = signature(px, W, H);
       sigs[it.id] = sig;
       const base = baseline[it.id];
@@ -87,7 +87,7 @@ export async function runRenderCheck(app: App, opts: RenderCheckOpts = {}): Prom
     if (opts.verbose) console.log('renderCheck', out[out.length - 1].id, out[out.length - 1].status, out[out.length - 1].why ?? '');
   }
   app.setFlame(saved);
-  app.renderer.setFlame(app.flame);
+  app.renderer.restore();
   const n = (s: string) => out.filter((o) => o.status === s).length;
   console.log(`renderCheck: ${n('pass')} pass, ${n('fail')} fail, ${n('new')} new, ${n('error')} error` + (n('fail') ? ' — ' + out.filter((o) => o.status === 'fail').map((o) => `${o.id}: ${o.why}`).join('; ') : ''));
   if (opts.update) {
