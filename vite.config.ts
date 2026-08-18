@@ -57,8 +57,31 @@ function compareSink(): Plugin {
   };
 }
 
+/** Dev-only: writes the render-regression baseline (src/dev/renderCheck.ts) to scripts/jwf-port/render-baseline.json. */
+function baselineSink(): Plugin {
+  return {
+    name: 'wilderfire-baseline-sink',
+    apply: 'serve',
+    configureServer(server) {
+      server.middlewares.use('/__jwf/baseline', (req, res) => {
+        if (req.method !== 'POST') { res.statusCode = 405; res.end(); return; }
+        let body = '';
+        req.on('data', (c) => { body += c; });
+        req.on('end', () => {
+          try {
+            JSON.parse(body);
+            const file = resolve(import.meta.dirname, 'scripts/jwf-port/render-baseline.json');
+            writeFileSync(file, body.endsWith('\n') ? body : body + '\n');
+            res.end(JSON.stringify({ ok: true, file }));
+          } catch (err) { res.statusCode = 400; res.end(String(err)); }
+        });
+      });
+    },
+  };
+}
+
 export default defineConfig({
-  plugins: [jwfReportSink(), compareSink()],
+  plugins: [jwfReportSink(), compareSink(), baselineSink()],
   build: {
     // the JWildfire variation registry (variations.jwf.ts) is loaded lazily and is ~1.9 MB on purpose
     chunkSizeWarningLimit: 2100,

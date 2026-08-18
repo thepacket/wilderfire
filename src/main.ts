@@ -337,6 +337,11 @@ async function boot() {
       const { runFlameCompare } = await import('./dev/flameCompare');
       return runFlameCompare(app, opts);
     },
+    // Render-regression check against scripts/jwf-port/render-baseline.json ({ update: true } re-records it)
+    renderCheck: async (opts?: { only?: string[]; update?: boolean; width?: number; quality?: number; sets?: ("fixtures" | "samples" | "presets")[]; verbose?: boolean }) => {
+      const { runRenderCheck } = await import('./dev/renderCheck');
+      return runRenderCheck(app, opts);
+    },
     // Import + compile every JWildfire fixture flame (scripts/jwf-port/testflames)
     flameTest: async (opts?: { files?: string[]; verbose?: boolean }) => {
       const { runFlameTest } = await import('./dev/flameTest');

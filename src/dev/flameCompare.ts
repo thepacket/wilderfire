@@ -16,7 +16,7 @@ import type { App } from '../ui/common';
 export interface CompareOpts { only?: string[]; width?: number; quality?: number; sets?: ('fixtures' | 'samples' | 'presets')[]; files?: string[]; prefix?: string }
 export interface CompareItem { id: string; set: string; xml: string }
 
-async function collect(app: App, sets: string[], files: string[] = []): Promise<CompareItem[]> {
+export async function collect(app: App, sets: string[], files: string[] = []): Promise<CompareItem[]> {
   const items: CompareItem[] = [];
   if (sets.includes('fixtures') || files.length) {
     for (const f of sets.includes('fixtures') ? [...FIXTURES, ...files] : files) {
