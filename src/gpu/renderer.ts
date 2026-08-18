@@ -121,7 +121,7 @@ export class FlameRenderer {
   private dtMs = 0; // smoothed rAF interval — the UI-stall symptom the budget reacts to
   private gpuProbeInFlight = false;
   passesPerFrame = 2;
-  targetQuality = 4000; // spp cap
+  targetQuality = 1000; // spp cap (the live view stops accumulating here; exports pick their own quality)
   /** Live-preview cap on the DE estimator radius (px); exports use the flame's full radius. */
   deLiveCap = 6;
   /** Don't present a freshly reset accumulation until it has this many samples per

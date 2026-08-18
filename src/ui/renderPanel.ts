@@ -156,7 +156,7 @@ export function buildRenderPanel(app: App, root: HTMLElement) {
     o.value = v;
     modeSel.append(o);
   }
-  modeSel.title = 'Draft: responsive editing (balanced speed, DE r ≤ 6, no oversampling, quality cap 4000). Final: full quality on screen (fast speed, full DE radius, 2× oversampling, cap 10000). Custom: your own settings below.';
+  modeSel.title = 'Draft: responsive editing (balanced speed, DE r ≤ 6, no oversampling, quality cap 1000 — the GPU idles once reached). Final: full quality on screen (fast speed, full DE radius, 2× oversampling, cap 4000). Custom: your own settings below.';
   modeRow.append(modeSel);
   const speedRow = el('div', 'row');
   speedRow.append(el('label', '', 'Speed'));
@@ -228,7 +228,7 @@ export function buildRenderPanel(app: App, root: HTMLElement) {
   for (const q of [500, 1000, 2000, 4000, 10000]) {
     const o = el('option', '', String(q)) as HTMLOptionElement;
     o.value = String(q);
-    if (q === 4000) o.selected = true;
+    if (q === 1000) o.selected = true;
     qSel.append(o);
   }
   qSel.onchange = () => { app.renderer.targetQuality = parseInt(qSel.value); app.renderer.invalidate(); };
@@ -259,8 +259,8 @@ export function buildRenderPanel(app: App, root: HTMLElement) {
 
   const LS_MODE = 'wilderfire.render.mode';
   const MODES: Record<string, { speed: string; hold: number; deLive: string; os: string; q: string }> = {
-    draft: { speed: '2', hold: 10, deLive: '6', os: '1', q: '4000' }, // = the long-standing defaults
-    final: { speed: '4', hold: 10, deLive: '-1', os: '2', q: '10000' },
+    draft: { speed: '2', hold: 10, deLive: '6', os: '1', q: '1000' }, // 1000 spp is plenty for the live view and lets the GPU cool down
+    final: { speed: '4', hold: 10, deLive: '-1', os: '2', q: '4000' },
   };
   let applyingMode = false;
   const applyMode = (mode: string) => {
