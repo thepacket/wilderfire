@@ -7,7 +7,7 @@
 
 import { type EscapeLayerData, escapeSignature, escapeFormulaWgsl, escapeTier } from '../core/escape';
 import { COMPLEX_WGSL, DS_WGSL } from '../core/formula';
-import { bitsForZoom, centreFixed, fromNumber, referenceOrbit } from '../core/bigfloat';
+import { bitsForZoom, centreFixed, fromNumber, referenceOrbit, fxSub, toNumber } from '../core/bigfloat';
 import type { RenderStats } from './renderer';
 
 const OUTSIDE = ['smooth', 'iterations', 'exp-smooth', 'orbit-trap', 'distance', 'angle', 'solid'];
@@ -235,12 +235,41 @@ ${shade}
 
 const UNIFORM_FLOATS = 56; // 224 bytes
 
+// While a new view renders band by band, the display shows the last complete picture warped into the new view
+// (scale/rotate/shift about the centre) — a zoom or pan never flashes; sharp bands then overwrite it top-down.
+const REPROJ_WGSL = `
+struct RP { size: vec2f, shift: vec2f, k: f32, cs: f32, sn: f32, pad: f32 }   // k = oldPpu/newPpu; shift = old-pixel offset of the new centre; rotation delta
+@group(0) @binding(0) var<uniform> P: RP;
+@group(0) @binding(1) var src: texture_2d<f32>;
+@group(0) @binding(2) var samp: sampler;
+struct VOut { @builtin(position) pos: vec4f }
+@vertex fn vs(@builtin(vertex_index) vi: u32) -> VOut {
+  var p = array<vec2f, 3>(vec2f(-1.0, -1.0), vec2f(3.0, -1.0), vec2f(-1.0, 3.0));
+  var o: VOut; o.pos = vec4f(p[vi], 0.0, 1.0); return o;
+}
+@fragment fn fs(in: VOut) -> @location(0) vec4f {
+  let c = P.size * 0.5;
+  let d = in.pos.xy - c;                                   // new-view pixel offset (y down)
+  let r = vec2f(P.cs * d.x - P.sn * d.y, P.sn * d.x + P.cs * d.y);
+  let q = r * P.k + P.shift + c;                           // where it was in the old picture
+  if (q.x < 0.0 || q.y < 0.0 || q.x >= P.size.x || q.y >= P.size.y) { return vec4f(0.0); }
+  return textureSampleLevel(src, samp, q / P.size, 0.0);
+}
+`;
+
 export class EscapeRenderer {
   private device: GPUDevice;
-  private tex: GPUTexture | null = null;
-  private view: GPUTextureView | null = null;
+  private tex: GPUTexture | null = null;    // display texture (what the composer blends)
+  private back: GPUTexture | null = null;   // the picture being rendered, band by band
+  private front: GPUTexture | null = null;  // the last complete picture
+  private frontView: { cx: number; cy: number; hi?: [string, string]; zoom: number; rot: number } | null = null;
+  private view: GPUTextureView | null = null; // back's view (band target)
   private w = 2;
   private h = 2;
+  private reprojPipe: GPURenderPipeline;
+  private reprojBuf: GPUBuffer;
+  private reprojSampler: GPUSampler;
+  private needsReproject = false;
   private sig = '';
   private pipe: GPURenderPipeline | null = null;      // → rgba16float (layer texture)
   private pipeExport: GPURenderPipeline | null = null; // → rgba8unorm (tiles)
@@ -275,6 +304,10 @@ export class EscapeRenderer {
     this.uOff = device.createBuffer({ size: UNIFORM_FLOATS * 4, usage: GPUBufferUsage.UNIFORM | GPUBufferUsage.COPY_DST });
     this.palBuf = device.createBuffer({ size: 256 * 16, usage: GPUBufferUsage.STORAGE | GPUBufferUsage.COPY_DST });
     this.refBuf = device.createBuffer({ size: 64, usage: GPUBufferUsage.STORAGE | GPUBufferUsage.COPY_DST });
+    const rm = device.createShaderModule({ code: REPROJ_WGSL });
+    this.reprojPipe = device.createRenderPipeline({ layout: 'auto', vertex: { module: rm, entryPoint: 'vs' }, fragment: { module: rm, entryPoint: 'fs', targets: [{ format: 'rgba16float' }] }, primitive: { topology: 'triangle-list' } });
+    this.reprojBuf = device.createBuffer({ size: 32, usage: GPUBufferUsage.UNIFORM | GPUBufferUsage.COPY_DST });
+    this.reprojSampler = device.createSampler({ magFilter: 'linear', minFilter: 'linear' });
   }
 
   get layerTexture(): GPUTexture | null { return this.tex; }
@@ -285,10 +318,12 @@ export class EscapeRenderer {
     w = Math.max(2, w); h = Math.max(2, h);
     if (this.tex && w === this.w && h === this.h) return;
     this.w = w; this.h = h;
-    this.tex?.destroy();
-    this.tex = this.device.createTexture({ size: [w, h], format: 'rgba16float', usage: GPUTextureUsage.RENDER_ATTACHMENT | GPUTextureUsage.TEXTURE_BINDING | GPUTextureUsage.COPY_SRC });
-    this.view = this.tex.createView();
+    const mk = () => this.device.createTexture({ size: [w, h], format: 'rgba16float', usage: GPUTextureUsage.RENDER_ATTACHMENT | GPUTextureUsage.TEXTURE_BINDING | GPUTextureUsage.COPY_SRC | GPUTextureUsage.COPY_DST });
+    this.tex?.destroy(); this.back?.destroy(); this.front?.destroy();
+    this.tex = mk(); this.back = mk(); this.front = null; this.frontView = null;
+    this.view = this.back.createView();
     this.nextRow = 0;
+    this.needsReproject = true;
   }
 
   private compile(e: EscapeLayerData) {
@@ -373,14 +408,56 @@ export class EscapeRenderer {
     this.device.queue.writeBuffer(this.palBuf, 0, pal);
     this.writeUniforms(this.uBuf, e, { x: 0, y: 0, w: this.w, h: this.h, fullW: this.w, fullH: this.h });
     this.nextRow = 0;
+    this.needsReproject = true;
     if (sig !== this.lastSigForRows) { this.rows = 0; this.lastSigForRows = sig; }
+  }
+
+  /** Display update after bands were drawn into `back`: on the first band of a new render the old picture is warped
+   *  into the new view, then the finished rows [0, nextRow) are copied over it; a complete render becomes the new front. */
+  private encodeDisplay(enc: GPUCommandEncoder) {
+    if (!this.tex || !this.back || !this.data) return;
+    if (this.needsReproject) {
+      this.needsReproject = false;
+      if (this.front && this.frontView) {
+        const e = this.data, fv = this.frontView;
+        const ppuNew = 0.25 * Math.min(this.w, this.h) * e.zoom, ppuOld = 0.25 * Math.min(this.w, this.h) * fv.zoom;
+        // offset of the new centre from the old one, in world units (exact-centre safe: differences of decimal strings)
+        let dx = e.centerX - fv.cx, dy = e.centerY - fv.cy;
+        if (e.centerHi || fv.hi) {
+          const P = bitsForZoom(Math.max(e.zoom, fv.zoom));
+          const [nx, ny] = centreFixed(e.centerX, e.centerY, e.centerHi, P), [ox, oy] = centreFixed(fv.cx, fv.cy, fv.hi, P);
+          dx = toNumber(fxSub(nx, ox)); dy = toNumber(fxSub(ny, oy));
+        }
+        // new-view pixel → world offset r/ppuNew (rotated by newRot) → old-view pixel: R(−oldRot)·(w + dcentre)·ppuOld
+        const drot = e.rotation - fv.rot;
+        const cs = Math.cos(drot), sn = Math.sin(drot);
+        const oc = Math.cos(-fv.rot), os = Math.sin(-fv.rot);
+        // shift (old pixels, y down): the new centre seen from the old centre
+        const sx = (oc * dx - os * dy) * ppuOld, sy = -(os * dx + oc * dy) * ppuOld;
+        const f = new Float32Array(8);
+        f.set([this.w, this.h, sx, sy, ppuOld / ppuNew, cs, -sn, 0], 0); // y-down pixel frame: rotation sign flips
+        this.device.queue.writeBuffer(this.reprojBuf, 0, f);
+        const bg = this.device.createBindGroup({ layout: this.reprojPipe.getBindGroupLayout(0), entries: [{ binding: 0, resource: { buffer: this.reprojBuf } }, { binding: 1, resource: this.front.createView() }, { binding: 2, resource: this.reprojSampler }] });
+        const pass = enc.beginRenderPass({ colorAttachments: [{ view: this.tex.createView(), loadOp: 'clear', clearValue: { r: 0, g: 0, b: 0, a: 0 }, storeOp: 'store' }] });
+        pass.setPipeline(this.reprojPipe); pass.setBindGroup(0, bg); pass.draw(3); pass.end();
+      }
+      // (no previous picture: the display keeps whatever it shows until the bands arrive)
+    }
+    if (this.nextRow > 0) enc.copyTextureToTexture({ texture: this.back }, { texture: this.tex }, { width: this.w, height: this.nextRow });
+    if (this.nextRow >= this.h) {
+      // complete: remember it as the front picture for the next view change
+      if (!this.front) this.front = this.device.createTexture({ size: [this.w, this.h], format: 'rgba16float', usage: GPUTextureUsage.RENDER_ATTACHMENT | GPUTextureUsage.TEXTURE_BINDING | GPUTextureUsage.COPY_SRC | GPUTextureUsage.COPY_DST });
+      enc.copyTextureToTexture({ texture: this.back }, { texture: this.front }, { width: this.w, height: this.h });
+      const e = this.data;
+      this.frontView = { cx: e.centerX, cy: e.centerY, hi: e.centerHi ? [e.centerHi[0], e.centerHi[1]] : undefined, zoom: e.zoom, rot: e.rotation };
+    }
   }
   setFlame(_f: unknown) { /* not a flame renderer */ }
 
   private encodeBands(enc: GPUCommandEncoder, rows: number) {
     if (!this.pipe || !this.bg || !this.view || this.nextRow >= this.h) return false;
     const y0 = this.nextRow, y1 = Math.min(this.h, y0 + rows);
-    const pass = enc.beginRenderPass({ colorAttachments: [{ view: this.view, loadOp: y0 === 0 ? 'clear' : 'load', clearValue: { r: 0, g: 0, b: 0, a: 0 }, storeOp: 'store' }] });
+    const pass = enc.beginRenderPass({ colorAttachments: [{ view: this.view, loadOp: 'load', storeOp: 'store' }] });
     pass.setPipeline(this.pipe);
     pass.setBindGroup(0, this.bg);
     pass.setScissorRect(0, y0, this.w, y1 - y0);
@@ -414,6 +491,7 @@ export class EscapeRenderer {
       const rows = this.rowsPerTick();
       const enc = this.device.createCommandEncoder();
       this.encodeBands(enc, rows);
+      this.encodeDisplay(enc);
       this.device.queue.submit([enc.finish()]);
       this.presented = true;
       this.bandInFlight = true;
@@ -432,9 +510,10 @@ export class EscapeRenderer {
 
   /** Finish the picture now (capture paths). */
   presentNow() {
-    if (!this.data || !this.pipe || this.nextRow >= this.h) return;
+    if (!this.data || !this.pipe || (this.nextRow >= this.h && !this.needsReproject)) return;
     const enc = this.device.createCommandEncoder();
     this.encodeBands(enc, this.h);
+    this.encodeDisplay(enc);
     this.device.queue.submit([enc.finish()]);
     this.presented = true;
   }
@@ -477,6 +556,8 @@ export class EscapeRenderer {
 
   destroy() {
     this.tex?.destroy(); this.tex = null;
+    this.back?.destroy(); this.back = null;
+    this.front?.destroy(); this.front = null;
     this.offTex?.destroy(); this.offTex = null;
     this.data = null;
   }
