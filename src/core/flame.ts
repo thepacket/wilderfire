@@ -39,6 +39,62 @@ export function defaultWeightingField(type = 'SIMPLEX_NOISE'): WeightingField {
   return { type, input: 'AFFINE', varAmount: 0, color: 0, jitter: 0, seed: 1337, frequency: 1, fractalType: 'FBM', octaves: 3, gain: 0.5, lacunarity: 2, cellReturn: 'DISTANCE2', cellDistance: 'EUCLIDIAN', params: [] };
 }
 
+/** JWildfire solid rendering: a distant light (direction from altitude/azimuth in degrees). */
+export interface SolidLight {
+  altitude: number;
+  azimuth: number;
+  intensity: number;
+  color: RGB;
+  castShadows: boolean;
+  shadowIntensity: number;
+}
+
+export type LightDiffFunc = 'COSA' | 'COSA_SQUARE' | 'COSA_HALVE' | 'COSA_HALVE_SQUARE';
+export const LIGHT_DIFF_FUNCS: LightDiffFunc[] = ['COSA', 'COSA_SQUARE', 'COSA_HALVE', 'COSA_HALVE_SQUARE'];
+
+/** JWildfire solid rendering material (Phong model). */
+export interface SolidMaterial {
+  diffuse: number;
+  ambient: number;
+  phong: number;
+  phongSize: number;
+  phongColor: RGB;
+  diffFunc: LightDiffFunc;
+  /** reflection map (image) intensity + mapping — kept for round-tripping, not rendered */
+  reflMapIntensity: number;
+  reflMapping: 'BLINN_NEWELL' | 'SPHERICAL';
+}
+
+/** JWildfire solid rendering settings (`sld_render_*`). Absent on a flame = off. */
+export interface SolidRender {
+  enabled: boolean;
+  lights: SolidLight[];
+  materials: SolidMaterial[];
+  /** ambient occlusion from the z-buffer neighbourhood */
+  ao: { enabled: boolean; intensity: number; searchRadius: number; blurRadius: number; radiusSamples: number; azimuthSamples: number; falloff: number; affectDiffuse: number };
+  /** shadow maps per light */
+  shadows: { type: 'OFF' | 'FAST' | 'SMOOTH'; smoothRadius: number; mapSize: number; bias: number };
+}
+
+export function defaultSolidLight(i = 0): SolidLight {
+  return i === 0
+    ? { altitude: 55, azimuth: -22, intensity: 0.8, color: [1, 1, 1], castShadows: true, shadowIntensity: 0.8 }
+    : { altitude: 64, azimuth: 55, intensity: 0.6, color: [1, 1, 1], castShadows: false, shadowIntensity: 0.7 };
+}
+export function defaultSolidMaterial(): SolidMaterial {
+  return { diffuse: 0.7, ambient: 0.5, phong: 0.6, phongSize: 24, phongColor: [1, 1, 1], diffFunc: 'COSA', reflMapIntensity: 0.5, reflMapping: 'BLINN_NEWELL' };
+}
+/** JWildfire's `SolidRenderSettings.setupDefaults()`: two lights, one material, AO on, shadows off. */
+export function defaultSolidRender(enabled = false): SolidRender {
+  return {
+    enabled,
+    lights: [defaultSolidLight(0), defaultSolidLight(1)],
+    materials: [defaultSolidMaterial()],
+    ao: { enabled: true, intensity: 0.6, searchRadius: 4, blurRadius: 1.5, radiusSamples: 6, azimuthSamples: 7, falloff: 0.5, affectDiffuse: 0.1 },
+    shadows: { type: 'OFF', smoothRadius: 1, mapSize: 2048, bias: 0.01 },
+  };
+}
+
 export interface XForm {
   affine: Affine;
   post: Affine;
@@ -62,6 +118,10 @@ export interface XForm {
    *  scales the variation amounts (`varAmount`), up to three named variation params (`params`), the colour
    *  (`color`, ×0.1) and jitters the output (`jitter`, ×0.1). Absent = none. */
   wfield?: WeightingField;
+  /** JWildfire solid-rendering material index carried by the point, blended per transform like the
+   *  colour (m' = m·(1+speed)/2 + material·(1−speed)/2). Absent = 0 (the first material). */
+  material?: number;
+  materialSpeed?: number;
   opacity: number;     // 0..1 plot opacity
   variations: VarInstance[];
   /** Optional variation stages evaluated BEFORE the main sum (transforming the
@@ -143,6 +203,8 @@ export interface Flame {
    *  (0 = off), deCurve = acceptance falloff with distance (0.8 default). */
   deRadius: number;
   deCurve: number;
+  /** JWildfire solid rendering (z-buffer surface shading instead of density accumulation). Absent = off. */
+  solid?: SolidRender;
 }
 
 export const IDENTITY: Affine = [1, 0, 0, 0, 1, 0];
@@ -221,7 +283,13 @@ export function flameSignature(f: Flame): string {
   const sig = (x: XForm) => `${names(x.preVariations)}<${names(x.variations)}>${names(x.postVariations)}` + (x.wfield ? `~wf(${x.wfield.params.map((p) => p.varName + '.' + p.paramName).join(',')})` : '');
   return visibleLayers(f)
     .map((l) => l.xforms.map(sig).join('|') + '#' + [l.final, ...l.moreFinals].map((x) => (x ? sig(x) : '-')).join('#'))
-    .join('@@') + (visibleLayers(f).some((l) => [...l.xforms, l.final, ...l.moreFinals].some((x) => x?.colorMods?.some((v) => v !== 0))) ? '~mods' : '');
+    .join('@@') + (visibleLayers(f).some((l) => [...l.xforms, l.final, ...l.moreFinals].some((x) => x?.colorMods?.some((v) => v !== 0))) ? '~mods' : '')
+    + (f.solid?.enabled ? '~solid' : '') + (usesMaterials(f) ? '~mat' : '');
+}
+
+/** True when any transform carries a non-default material blend (the kernel then tracks a per-point material). */
+export function usesMaterials(f: Flame): boolean {
+  return visibleLayers(f).some((l) => [...l.xforms, l.final, ...l.moreFinals].some((x) => x && ((x.material ?? 0) !== 0 || (x.materialSpeed ?? 0) !== 0)));
 }
 
 /** Rotate the linear part of an affine (rotates the triangle in world space). */
@@ -273,6 +341,8 @@ function normXForm(x: any): XForm {
     opacity: clamp01(num(x?.opacity, 1)),
     variations: vars.length ? vars : d.variations,
   };
+  if (num(x?.material, 0) !== 0) out.material = num(x.material, 0);
+  if (num(x?.materialSpeed, 0) !== 0) out.materialSpeed = Math.min(1, Math.max(-1, num(x.materialSpeed, 0)));
   for (const k of ['yz', 'zx', 'yzPost', 'zxPost'] as const) {
     if (Array.isArray(x?.[k]) && x[k].length === 6) {
       const a = normAffine(x[k], IDENTITY);
@@ -392,6 +462,48 @@ export function normalizeFlame(obj: any, fallbackPalette: RGB[]): Flame {
     antialiasRadius: Math.max(0, num(obj?.antialiasRadius, 0.5)),
     deRadius: Math.min(2, Math.max(0, num(obj?.deRadius, 1))),
     deCurve: Math.min(1, Math.max(0.01, num(obj?.deCurve, 0.8))),
+    ...(obj?.solid && typeof obj.solid === 'object' ? { solid: normSolid(obj.solid) } : {}),
+  };
+}
+
+const rgb = (v: unknown, d: RGB): RGB => (Array.isArray(v) && v.length === 3 ? v.map((c) => clamp01(num(c, 0))) as RGB : [...d] as RGB);
+
+/** Coerce a loosely-shaped solid-render block (JSON import / AI) into a valid one. */
+export function normSolid(s: any): SolidRender {
+  const d = defaultSolidRender(!!s?.enabled);
+  const lights: SolidLight[] = Array.isArray(s?.lights) ? s.lights.slice(0, 4).map((l: any, i: number) => {
+    const dl = defaultSolidLight(i);
+    return {
+      altitude: num(l?.altitude, dl.altitude), azimuth: num(l?.azimuth, dl.azimuth), intensity: Math.max(0, num(l?.intensity, dl.intensity)),
+      color: rgb(l?.color, dl.color), castShadows: l?.castShadows === undefined ? dl.castShadows : !!l.castShadows,
+      shadowIntensity: clamp01(num(l?.shadowIntensity, dl.shadowIntensity)),
+    };
+  }) : d.lights;
+  const materials: SolidMaterial[] = Array.isArray(s?.materials) ? s.materials.slice(0, 8).map((m: any) => {
+    const dm = defaultSolidMaterial();
+    return {
+      diffuse: Math.max(0, num(m?.diffuse, dm.diffuse)), ambient: Math.max(0, num(m?.ambient, dm.ambient)),
+      phong: Math.max(0, num(m?.phong, dm.phong)), phongSize: Math.max(0, num(m?.phongSize, dm.phongSize)),
+      phongColor: rgb(m?.phongColor, dm.phongColor),
+      diffFunc: LIGHT_DIFF_FUNCS.includes(m?.diffFunc) ? m.diffFunc : 'COSA',
+      reflMapIntensity: Math.max(0, num(m?.reflMapIntensity, dm.reflMapIntensity)),
+      reflMapping: m?.reflMapping === 'SPHERICAL' ? 'SPHERICAL' : 'BLINN_NEWELL',
+    };
+  }) : d.materials;
+  const a = s?.ao ?? {}, sh = s?.shadows ?? {};
+  return {
+    enabled: !!s?.enabled,
+    lights, materials,
+    ao: {
+      enabled: a.enabled === undefined ? d.ao.enabled : !!a.enabled, intensity: Math.max(0, num(a.intensity, d.ao.intensity)),
+      searchRadius: Math.max(0, num(a.searchRadius, d.ao.searchRadius)), blurRadius: Math.max(0, num(a.blurRadius, d.ao.blurRadius)),
+      radiusSamples: Math.max(1, Math.round(num(a.radiusSamples, d.ao.radiusSamples))), azimuthSamples: Math.max(1, Math.round(num(a.azimuthSamples, d.ao.azimuthSamples))),
+      falloff: Math.max(0, num(a.falloff, d.ao.falloff)), affectDiffuse: Math.max(0, num(a.affectDiffuse, d.ao.affectDiffuse)),
+    },
+    shadows: {
+      type: sh.type === 'FAST' || sh.type === 'SMOOTH' ? sh.type : 'OFF', smoothRadius: Math.max(0, num(sh.smoothRadius, d.shadows.smoothRadius)),
+      mapSize: Math.max(64, Math.round(num(sh.mapSize, d.shadows.mapSize))), bias: num(sh.bias, d.shadows.bias),
+    },
   };
 }
 

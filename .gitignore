@@ -3,3 +3,5 @@ dist/
 .DS_Store
 *.local
 compare-out/
+# scratch fixture variants for flameCompare (never committed)
+scripts/jwf-port/testflames/_*

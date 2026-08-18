@@ -54,6 +54,32 @@ export function kernelWeights(radius: number, kernel: FilterKernel): { n: number
   return { n, w };
 }
 
+/** JWildfire FilterHolder kernel in RASTER cells for an oversampled raster (solid rendering applies it
+ *  cell by cell): N = int(2·os·support·r)+1 made odd, weights normalised to sum os² (LogDensityFilter
+ *  divides by os² again). n = 0 when the radius is 0. */
+export function solidFilterWeights(radius: number, kernel: FilterKernel, os: number): { n: number; w: Float32Array<ArrayBuffer> } {
+  if (radius < 1e-6) return { n: 0, w: new Float32Array(new ArrayBuffer(0)) };
+  const support = kernelSupport(kernel);
+  const fw = Math.floor(2 * os * support * radius);
+  let n = fw + 1;
+  if (n % 2 === 0) n++;
+  n = Math.min(n, 25);
+  const adjust = fw > 0 ? (support * n) / fw : 0;
+  const w = new Float32Array(new ArrayBuffer(n * n * 4));
+  let sum = 0;
+  for (let i = 0; i < n; i++) {
+    for (let j = 0; j < n; j++) {
+      const ii = ((2 * i + 1) / n - 1) * adjust;
+      const jj = ((2 * j + 1) / n - 1) * adjust;
+      const v = kernelCoeff(kernel, Math.sqrt(ii * ii + jj * jj));
+      w[i * n + j] = v;
+      sum += v;
+    }
+  }
+  if (sum > 0) for (let k = 0; k < n * n; k++) w[k] = (w[k] / sum) * os * os;
+  return { n, w };
+}
+
 /** Both kernels packed for the tonemap's `sfilt` buffer. */
 export function buildSpatialFilters(radius: number, kernel: FilterKernel): { weights: Float32Array<ArrayBuffer>; nc: number; ni: number; key: string } {
   const weights = new Float32Array(new ArrayBuffer(FILT_FLOATS * 4));

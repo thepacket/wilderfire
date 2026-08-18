@@ -1033,6 +1033,7 @@ class Emitter {
   prog: Program;
   env: Env;
   usedNames = new Set<string>();
+  sincosN = 0;                         // sincosf temporaries
   declsUsed = new Set<string>();       // binding declarations to prepend to the snippet
   fnDeps: Set<string> | null = null;   // deps of the function currently being emitted
   flags: Set<string>;
@@ -1614,7 +1615,9 @@ class Emitter {
       const c = this.expr(e.args[2].t === 'unary' && e.args[2].op === '&' ? e.args[2].e : e.args[2], sc);
       const ac = this.toF32(a);
       const sl = s.ty.k === 'ptr' ? `(*${s.c})` : s.c, cl = c.ty.k === 'ptr' ? `(*${c.c})` : c.c;
-      return `${ind}${sl} = sin(${ac});\n${ind}${cl} = cos(${ac});\n`;
+      // the angle is evaluated once: it may draw randoms (julia3D: atan2 + 2π·(int)(rnd·n)) or be costly
+      const tmp = `sc_${this.sincosN++}`;
+      return `${ind}let ${tmp} = ${ac};\n${ind}${sl} = sin(${tmp});\n${ind}${cl} = cos(${tmp});\n`;
     }
     if (e.t === 'call') {
       const r = this.expr(e, sc);

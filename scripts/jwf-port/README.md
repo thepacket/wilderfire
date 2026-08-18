@@ -244,6 +244,45 @@ Verified against headless JWildfire on the `wfield_*` fixtures (all match to ≤
 (`isValidVariationForWeightingFields`). Model: `XForm.wfield` (`WeightingField`); the transform editor
 has a collapsible "Weighting field" section; keyframe morphs interpolate the numeric knobs of same-type fields.
 
+### Solid rendering — stage 1 (2026-08-18)
+
+JWildfire's **solid rendering** (`sld_render_enabled="1"`; 29 % of the 1 615 flames in four public
+collections use it) is ported from `RasterFloatIntForSolidRendering` / `NormalsCalculator` /
+`LogDensityFilter.addSolidColors` / `GammaCorrectionFilter` (`src/gpu/solid.wgsl.ts`):
+
+* **Kernel** — no density: `solidSplat` does `atomicMax` on an order-preserving key of the camera-space
+  depth (`cz`, before the perspective divide; JWildfire's `prj.z`) and, when it raised it, writes the
+  payload (untransformed x/y/z as f32 — JWildfire's `originX/Y/ZBuf`, world space —, palette colour ×
+  layer weight × 200/256 as f16 pairs, material). OPAQUE draw mode drops a point with probability
+  1−opacity, hidden points never plot, colour modifiers do not apply, and — a `FlameRenderer` constructor
+  detail that cost an evening — **antialiasing is switched off for solid flames** (with it on we covered
+  28 % more cells than JWildfire). Materials: `p.material` blends per transform like the colour
+  (`material1/2`), starts at `random()`, and the plotted value is the pre-final one; the per-point state
+  is only allocated when a transform has a non-zero material/speed (`usesMaterials`).
+* **Post pass** (compute, per cell): re-derives the key from the payload (a payload can land one step
+  behind a concurrent, higher key — self-heals every pass) and computes the normal from up to 8 of the
+  16 `NNEIGHBOURS_COARSE` pairs (cross products of origin differences, `refreshAllNormals` order), packed
+  as 3×10-bit snorm.
+* **Tonemap** (`fs`): per output pixel JWildfire's kernel *in raster cells* — `FilterHolder` sizes
+  `int(2·os·support·r)+1`, weights normalised to os², and `noiseFilterSizeHalve = N/2 − 1` (the kernel is
+  applied off-centre by one cell exactly like `LogDensityFilter`) — or the os×os block mean without a
+  filter; a cell contributes when it has a normal: `raw = obj·ambient + Σ_lights (light + obj·ambient/3)·
+  f(cosa)·diffuse·I + phong·f(−r.z)^size·I` with `lightDir = aᵀ·(0,0,−1)` from `LightViewCalculator`,
+  `getInterpolatedMaterial` incl. `morphMaterial`'s quirk (the morphed diffuse is the refl-map blend);
+  then `alpha = coverage^(1 + 1/gamma)`, `round(solid·255) + ((255−alphaInt)·bg) >> 8`.
+* Verified on 8 solid flames from the collections (AO/shadows switched off in the copies, since those are
+  not ported yet) + the two authored fixtures `Solid_0/1`: 9 match at luma ratio 1.00–1.03, block MAE
+  ≤ 1.8, hist ≥ 0.97, corr ≥ 0.99; the tenth uses a JWildfire **background gradient** (`background_type=
+  GRADIENT_2X2_C`, not modelled). One flame's remaining 0.98 was traced to the point distribution itself
+  (its density render differs the same way).
+* Found on the way: the transpiler expanded `sincosf(expr, &s, &c)` into `sin(expr)`/`cos(expr)`, so an
+  argument that draws a random (`julia3D`: `atan2 + 2π·(int)(rnd·n)`, `blur3D`, `circleblur`,
+  `farblur`) drew *two* — the (cos, sin) pair was off the unit circle. `cwgsl.ts` now hoists the angle;
+  those four re-verified, `TINA0019` moved closer to JWildfire, baseline updated.
+* Not yet: **AO** (`AOCalculator`), **shadow maps** (`ShadowCalculator`, light-space splats), the
+  reflection map, JWildfire's post-process DOF for solid flames (`PostDOFCalculator`), `receiveOnlyShadows`
+  (`plane_wf`/`obj_mesh_*`), light motion curves. Their attributes round-trip untouched.
+
 ## Semantics worth knowing
 
 * **Snippet scope** (`variations.ts` header): `t` (input point, mutable), `r2 r th=atan2(x,y) ph=atan2(y,x)`, `v` (output accumulator), `rs` rng, `cp` palette-coordinate pointer, `hd` hide-flag pointer, `A(i)` affine coefficients. JWildfire's `__phi` is our `th` and `__theta` our `ph`.

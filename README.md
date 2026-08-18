@@ -54,6 +54,17 @@ in the stack.
   camera (pitch / yaw / bank, perspective, position, `preserve_z`),
   **depth of field** (focus point or focus plane, area, fade) and
   **dimish-z** depth fade; all of it round-trips through `.flame`
+- **Solid rendering** (Render → Solid) — instead of accumulating density, every
+  raster cell keeps its nearest point (a GPU z-buffer on the camera depth) and the
+  surface is shaded from screen-space normals with up to 4 **distant lights**
+  (altitude / azimuth / intensity / colour) and up to 8 **materials** (ambient,
+  diffuse, specular + shininess + colour, diffuse falloff curve; a transform can
+  carry a material index that blends along the orbit like the colour). The
+  JWildfire model ported literally — its shading, its filter-in-raster-cells,
+  its coverage alpha — and verified against headless JWildfire on solid flames
+  from public collections (mean-luma ratio 1.00–1.03, block MAE ≤ 2, structure
+  correlation 1.00); `sld_render_*` attributes import/export. Ambient occlusion
+  and shadow maps are not rendered yet (their settings round-trip)
 - **Layers** (up to 8) — each with its own transforms, final transform,
   gradient, density weight, and visibility, blended in one histogram; walker
   threads are partitioned across layers on the GPU

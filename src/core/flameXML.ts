@@ -11,8 +11,8 @@
 //  - palettes come in three flavors: <palette count format>hex</palette>,
 //    <colors count data="…"/>, or 256 × <color index rgb="r g b"/>.
 
-import type { Flame, XForm, Layer, Affine, RGB, WeightingField } from './flame';
-import { defaultXForm, defaultFlame, normalizeFlame, MAX_LAYERS, MAX_XFORMS, WFIELD_TYPES, defaultWeightingField } from './flame';
+import type { Flame, XForm, Layer, Affine, RGB, WeightingField, LightDiffFunc } from './flame';
+import { defaultXForm, defaultFlame, normalizeFlame, MAX_LAYERS, MAX_XFORMS, WFIELD_TYPES, defaultWeightingField, defaultSolidRender, defaultSolidMaterial, LIGHT_DIFF_FUNCS } from './flame';
 import { VARIATIONS } from './variations';
 import type { MotionCurve, CurvePoint, CurveInterp } from './motion';
 
@@ -153,6 +153,11 @@ function parseXFormEl(elm: Element, ctx?: CurveCtx): XForm {
   if (ctype === 'NONE' || ctype === 'TARGET' || ctype === 'DISTANCE' || ctype === 'CYCLIC' || (elm.tagName.toLowerCase() === 'finalxform' && ctype !== 'DIFFUSION' && ctype !== 'TARGETG')) x.colorSpeed = 0;
   const chaos = nums(elm.getAttribute('chaos'));
   if (chaos.length) x.xaos = chaos.map((v) => Math.max(0, v));
+  // JWildfire solid-rendering material index (+ blend speed), like colour/color_speed
+  const matA = parseFloat(elm.getAttribute('material') ?? '');
+  if (isFinite(matA) && matA !== 0) x.material = matA;
+  const matS = parseFloat(elm.getAttribute('material_speed') ?? '');
+  if (isFinite(matS) && matS !== 0) x.materialSpeed = Math.min(1, Math.max(-1, matS));
   // JWildfire colour modifiers (transform "Color" tab): gamma/contrast/saturation/hue with blend speeds
   const mods = ['mod_gamma', 'mod_gamma_speed', 'mod_contrast', 'mod_contrast_speed', 'mod_saturation', 'mod_saturation_speed', 'mod_hue', 'mod_hue_speed']
     .map((a) => { const v = parseFloat(elm.getAttribute(a) ?? ''); return isFinite(v) ? v : 0; });
@@ -445,6 +450,51 @@ export function parseFlameXML(text: string, fallbackPalette: RGB[]): Flame[] {
       const mx = Math.max(...bg);
       f.background = bg.map((v) => (mx > 1 ? v / 255 : v)) as RGB;
     }
+    // JWildfire solid rendering (sld_render_* — attribute names as JWildfire writes them, typos included)
+    if (numAttr('sld_render_enabled') === 1) {
+      const s = defaultSolidRender(true);
+      const strA = (n: string, d: string) => (fe.getAttribute(n) ?? d).toUpperCase();
+      s.ao.enabled = fe.hasAttribute('sld_render_ao_enabled') ? numAttr('sld_render_ao_enabled') === 1 : s.ao.enabled;
+      s.ao.intensity = numOr('sld_render_ao_intensity', s.ao.intensity);
+      s.ao.searchRadius = numOr('sld_render_ao_search_radius', s.ao.searchRadius);
+      s.ao.blurRadius = numOr('sld_render_ao_blur_radius', s.ao.blurRadius);
+      s.ao.radiusSamples = Math.round(numOr('sld_render_ao_radius_samples', s.ao.radiusSamples));
+      s.ao.azimuthSamples = Math.round(numOr('sld_render_ao_azimuth_samples', s.ao.azimuthSamples));
+      s.ao.falloff = numOr('sld_render_ao_falloff', s.ao.falloff);
+      s.ao.affectDiffuse = numOr('sld_render_ao_affect_diffuse', s.ao.affectDiffuse);
+      const st = strA('sld_render_shadow_type', 'OFF');
+      s.shadows.type = st === 'FAST' || st === 'SMOOTH' ? st : 'OFF';
+      s.shadows.smoothRadius = numOr('sld_render_shadow_smooth_radius', s.shadows.smoothRadius);
+      s.shadows.mapSize = Math.round(numOr('sld_render_shadowmap_size', s.shadows.mapSize));
+      s.shadows.bias = numOr('sld_render_shadowmap_bias', s.shadows.bias);
+      if (fe.hasAttribute('sld_render_material_count')) {
+        const n = Math.max(0, Math.min(8, Math.round(numAttr('sld_render_material_count'))));
+        s.materials = Array.from({ length: n }, (_, i) => {
+          const m = defaultSolidMaterial();
+          // JWildfire's MaterialSettings field defaults differ from setupDefaultMaterials(): a listed material starts from the field defaults
+          m.diffuse = numOr(`sld_render_material_diffuse${i}`, 0.5); m.ambient = numOr(`sld_render_material_ambient${i}`, 1);
+          m.phong = numOr(`sld_render_material_phong${i}`, 1); m.phongSize = numOr(`sld_render_material_phong_size${i}`, 24);
+          m.phongColor = [numOr(`sld_render_material_phong_red${i}`, 0), numOr(`sld_render_material_phong_green${i}`, 0), numOr(`sld_render_material_phong_blue${i}`, 0)];
+          const df = strA(`sld_render_material_light_diif_func${i}`, 'COSA');
+          m.diffFunc = LIGHT_DIFF_FUNCS.includes(df as LightDiffFunc) ? df as LightDiffFunc : 'COSA';
+          m.reflMapIntensity = numOr(`sld_render_material_refl_map_intensity${i}`, 0.5);
+          m.reflMapping = strA(`sld_render_material_refl_mappping${i}`, 'BLINN_NEWELL') === 'SPHERICAL' ? 'SPHERICAL' : 'BLINN_NEWELL';
+          return m;
+        });
+      }
+      if (fe.hasAttribute('sld_render_ligtht_count')) {
+        const n = Math.max(0, Math.min(4, Math.round(numAttr('sld_render_ligtht_count'))));
+        s.lights = Array.from({ length: n }, (_, i) => ({
+          // DistantLight field defaults: altitude/azimuth 0, intensity 0.5, black, shadows on, shadow intensity 0.8
+          altitude: numOr(`sld_render_light_altitude${i}`, 0), azimuth: numOr(`sld_render_light_azimuth${i}`, 0),
+          intensity: numOr(`sld_render_light_intensity${i}`, 0.5),
+          color: [numOr(`sld_render_light_red${i}`, 0), numOr(`sld_render_light_green${i}`, 0), numOr(`sld_render_light_blue${i}`, 0)] as RGB,
+          castShadows: fe.hasAttribute(`sld_render_light_shadows${i}`) ? numAttr(`sld_render_light_shadows${i}`) === 1 : true,
+          shadowIntensity: numOr(`sld_render_light_shadow_intensity${i}`, 0.8),
+        }));
+      }
+      f.solid = s;
+    }
     // Motion curves (only the first flame's curves are surfaced)
     const fpsA = parseFloat(fe.getAttribute('fps') ?? '');
     const fps = isFinite(fpsA) && fpsA > 0 ? fpsA : 25;
@@ -603,6 +653,7 @@ function xformToXML(x: XForm, tag: string, nXForms: number, extraAttrs: string[]
       .forEach((a, i) => attrs.push(`${a}="${fmt(x.colorMods![i] ?? 0)}"`));
   }
   attrs.push(`opacity="${fmt(x.opacity)}"`);
+  if (x.material || x.materialSpeed) attrs.push(`material="${fmt(x.material ?? 0)}"`, `material_speed="${fmt(x.materialSpeed ?? 0)}"`);
   const pushVars = (list: typeof x.variations | undefined, prefix: string) => {
     for (const vi of list ?? []) {
       if (!VARIATIONS[vi.name]) continue;
@@ -641,6 +692,37 @@ function paletteToXML(palette: RGB[], indent: string): string {
   return `${indent}<palette count="256" format="RGB">\n${indent}   ${hex.trimEnd()}\n${indent}</palette>`;
 }
 
+/** JWildfire `sld_render_*` attributes (written only when solid rendering is on; names as JWildfire spells them). */
+function solidAttrs(f: Flame): string {
+  const s = f.solid;
+  if (!s?.enabled) return '';
+  const a: string[] = [
+    'sld_render_enabled="1"',
+    `sld_render_ao_enabled="${s.ao.enabled ? 1 : 0}"`, `sld_render_ao_intensity="${fmt(s.ao.intensity)}"`,
+    `sld_render_ao_search_radius="${fmt(s.ao.searchRadius)}"`, `sld_render_ao_blur_radius="${fmt(s.ao.blurRadius)}"`,
+    `sld_render_ao_radius_samples="${s.ao.radiusSamples}"`, `sld_render_ao_azimuth_samples="${s.ao.azimuthSamples}"`,
+    `sld_render_ao_falloff="${fmt(s.ao.falloff)}"`, `sld_render_ao_affect_diffuse="${fmt(s.ao.affectDiffuse)}"`,
+    `sld_render_shadow_type="${s.shadows.type}"`, `sld_render_shadow_smooth_radius="${fmt(s.shadows.smoothRadius)}"`,
+    `sld_render_shadowmap_size="${s.shadows.mapSize}"`, `sld_render_shadowmap_bias="${fmt(s.shadows.bias)}"`,
+    `sld_render_material_count="${s.materials.length}"`,
+  ];
+  s.materials.forEach((m, i) => a.push(
+    `sld_render_material_diffuse${i}="${fmt(m.diffuse)}"`, `sld_render_material_ambient${i}="${fmt(m.ambient)}"`,
+    `sld_render_material_phong${i}="${fmt(m.phong)}"`, `sld_render_material_phong_size${i}="${fmt(m.phongSize)}"`,
+    `sld_render_material_phong_red${i}="${fmt(m.phongColor[0])}"`, `sld_render_material_phong_green${i}="${fmt(m.phongColor[1])}"`, `sld_render_material_phong_blue${i}="${fmt(m.phongColor[2])}"`,
+    `sld_render_material_light_diif_func${i}="${m.diffFunc}"`, `sld_render_material_refl_map_intensity${i}="${fmt(m.reflMapIntensity)}"`,
+    `sld_render_material_refl_mappping${i}="${m.reflMapping}"`,
+  ));
+  a.push(`sld_render_ligtht_count="${s.lights.length}"`);
+  s.lights.forEach((l, i) => a.push(
+    `sld_render_light_altitude${i}="${fmt(l.altitude)}"`, `sld_render_light_azimuth${i}="${fmt(l.azimuth)}"`,
+    `sld_render_light_intensity${i}="${fmt(l.intensity)}"`, `sld_render_light_shadow_intensity${i}="${fmt(l.shadowIntensity)}"`,
+    `sld_render_light_red${i}="${fmt(l.color[0])}"`, `sld_render_light_green${i}="${fmt(l.color[1])}"`, `sld_render_light_blue${i}="${fmt(l.color[2])}"`,
+    `sld_render_light_shadows${i}="${l.castShadows ? 1 : 0}"`,
+  ));
+  return ' ' + a.join(' ');
+}
+
 export function flameToXML(f: Flame, opts: XMLExportOpts = {}): string {
   const size = 1024;
   const scale = 0.25 * size * f.zoom;
@@ -676,7 +758,7 @@ export function flameToXML(f: Flame, opts: XMLExportOpts = {}): string {
     `quality="200" brightness="${fmt(f.brightness)}" gamma="${fmt(f.gamma)}" gamma_threshold="${fmt(f.gammaThreshold)}" ` +
     `contrast="${fmt(f.contrast ?? 1)}" white_level="${fmt(f.whiteLevel ?? 220)}" low_density_brightness="${fmt(f.lowDensityBrightness ?? 0.24)}" ` +
     `vibrancy="${fmt(f.vibrancy)}" background="${fmt(f.background[0])} ${fmt(f.background[1])} ${fmt(f.background[2])}"` +
-    timeAttrs + (flameCurveAttrs.length ? ' ' + flameCurveAttrs.join(' ') : '') + '>',
+    solidAttrs(f) + timeAttrs + (flameCurveAttrs.length ? ' ' + flameCurveAttrs.join(' ') : '') + '>',
   );
   const writeLayerBody = (ly: Layer, li: number, indent: string) => {
     ly.xforms.forEach((x, xi) => {

@@ -3,11 +3,18 @@
 // accumulating into an atomic RGBA histogram; a fullscreen pass tonemaps it.
 
 import type { Flame } from '../core/flame';
-import { flameSignature, visibleLayers, MAX_LAYERS } from '../core/flame';
+import { flameSignature, visibleLayers, MAX_LAYERS, LIGHT_DIFF_FUNCS } from '../core/flame';
 import { compileFlame, TONEMAP_WGSL, type CompiledFlame } from './codegen';
-import { buildSpatialFilters, FILT_FLOATS } from './filters';
+import { buildSpatialFilters, solidFilterWeights, FILT_FLOATS } from './filters';
+import { SOLID_POST_WGSL, SOLID_TONEMAP_WGSL, SOLID_PAY_WORDS, SOLID_MAX_LIGHTS, SOLID_MAX_MATS, SOLID_FILT_FLOATS } from './solid.wgsl';
 
 const XD_FLOATS = 8192;
+/** bytes per raster cell: density histogram (rgba u32) vs solid z-buffer (key + payload + normal) */
+const HIST_CELL_BYTES = 16;
+const SOLID_CELL_BYTES = 4 + SOLID_PAY_WORDS * 4 + 4;
+
+/** Solid-rendering z-buffer set for one raster (live view or an offscreen tile). */
+interface SolidBufs { key: GPUBuffer; pay: GPUBuffer; nrm: GPUBuffer; cells: number }
 
 export interface RenderStats {
   spp: number;           // samples per pixel accumulated
@@ -48,6 +55,21 @@ export class FlameRenderer {
   private bgBExport: GPUBindGroup | null = null; // pass B for rgba8 export
   private computeBG: GPUBindGroup | null = null;
   private renderBG: GPUBindGroup | null = null;
+
+  // ---- JWildfire solid rendering (z-buffer + shading; see solid.wgsl.ts) ----
+  private matsBuf!: GPUBuffer;      // per-point material index (bound when the compiled flame tracks materials)
+  private solidLive: SolidBufs | null = null;
+  private solidOff: SolidBufs | null = null;
+  private solidPostPipe!: GPUComputePipeline;
+  private solidPipe!: GPURenderPipeline;        // → canvas format
+  private solidExportPipe!: GPURenderPipeline; // → rgba8
+  private solidTmLayout!: GPUBindGroupLayout;
+  private sppBuf!: GPUBuffer;       // post-pass params
+  private spBuf!: GPUBuffer;        // solid tonemap params
+  private lightsBuf!: GPUBuffer;    // lights + materials
+  private sfiltBuf!: GPUBuffer;     // JWildfire raster-cell filter kernel
+  private sfiltKey = '';
+  private solidBGs = new WeakMap<GPUBuffer, { post: GPUBindGroup; tm: GPUBindGroup }>();
 
   private compiled: CompiledFlame | null = null;
   private sig = '';
@@ -129,6 +151,38 @@ export class FlameRenderer {
     this.paramsBuf = d.createBuffer({ size: 256, usage: GPUBufferUsage.UNIFORM | GPUBufferUsage.COPY_DST });
     this.tmBuf = d.createBuffer({ size: 128, usage: GPUBufferUsage.UNIFORM | GPUBufferUsage.COPY_DST });
     this.filtBuf = d.createBuffer({ size: FILT_FLOATS * 4, usage: GPUBufferUsage.STORAGE | GPUBufferUsage.COPY_DST });
+    this.matsBuf = d.createBuffer({ size: this.nPoints * 4, usage: GPUBufferUsage.STORAGE | GPUBufferUsage.COPY_DST });
+    this.sppBuf = d.createBuffer({ size: 32, usage: GPUBufferUsage.UNIFORM | GPUBufferUsage.COPY_DST });
+    this.spBuf = d.createBuffer({ size: 48, usage: GPUBufferUsage.UNIFORM | GPUBufferUsage.COPY_DST });
+    this.lightsBuf = d.createBuffer({ size: (SOLID_MAX_LIGHTS * 2 + SOLID_MAX_MATS * 3) * 16, usage: GPUBufferUsage.UNIFORM | GPUBufferUsage.COPY_DST });
+    this.sfiltBuf = d.createBuffer({ size: SOLID_FILT_FLOATS * 4, usage: GPUBufferUsage.STORAGE | GPUBufferUsage.COPY_DST });
+    this.solidPostPipe = d.createComputePipeline({ layout: 'auto', compute: { module: d.createShaderModule({ code: SOLID_POST_WGSL }), entryPoint: 'main' } });
+    const solidModule = d.createShaderModule({ code: SOLID_TONEMAP_WGSL });
+    // explicit layout so one bind group serves both the canvas and the rgba8 export pipeline
+    const F = GPUShaderStage.FRAGMENT;
+    this.solidTmLayout = d.createBindGroupLayout({
+      entries: [
+        { binding: 0, visibility: F, buffer: { type: 'uniform' } },
+        { binding: 1, visibility: F, buffer: { type: 'read-only-storage' } },
+        { binding: 2, visibility: F, buffer: { type: 'read-only-storage' } },
+        { binding: 3, visibility: F, buffer: { type: 'read-only-storage' } },
+        { binding: 4, visibility: F, buffer: { type: 'read-only-storage' } },
+        { binding: 5, visibility: F, buffer: { type: 'uniform' } },
+      ],
+    });
+    const solidLayout = d.createPipelineLayout({ bindGroupLayouts: [this.solidTmLayout] });
+    this.solidPipe = d.createRenderPipeline({
+      layout: solidLayout,
+      vertex: { module: solidModule, entryPoint: 'vs' },
+      fragment: { module: solidModule, entryPoint: 'fs', targets: [{ format: this.format }] },
+      primitive: { topology: 'triangle-list' },
+    });
+    this.solidExportPipe = d.createRenderPipeline({
+      layout: solidLayout,
+      vertex: { module: solidModule, entryPoint: 'vs' },
+      fragment: { module: solidModule, entryPoint: 'fs', targets: [{ format: 'rgba8unorm' }] },
+      primitive: { topology: 'triangle-list' },
+    });
 
     const tmModule = d.createShaderModule({ code: TONEMAP_WGSL });
     this.tmModule = tmModule;
@@ -156,22 +210,42 @@ export class FlameRenderer {
   /** Change the oversample factor (recreates the histogram). Returns the factor actually applied. */
   setOversample(os: number): number {
     const wanted = os === 2 ? 2 : 1;
-    const bytes = this.width * wanted * this.height * wanted * 16;
+    const bytes = this.width * wanted * this.height * wanted * this.cellBytes;
     this.oversample = bytes <= this.maxHistBytes ? wanted : 1;
     this.allocHistogram();
     this.resetAccumulation();
     return this.oversample;
   }
 
+  /** The current flame renders solid (JWildfire z-buffer shading instead of density). */
+  get solid(): boolean { return !!this.compiled?.solid; }
+  private get cellBytes(): number { return this.solid ? SOLID_CELL_BYTES : HIST_CELL_BYTES; }
+
+  private makeSolidBufs(cells: number): SolidBufs {
+    const d = this.device;
+    const usage = GPUBufferUsage.STORAGE | GPUBufferUsage.COPY_DST;
+    return {
+      key: d.createBuffer({ size: cells * 4, usage }),
+      pay: d.createBuffer({ size: cells * SOLID_PAY_WORDS * 4, usage }),
+      nrm: d.createBuffer({ size: cells * 4, usage }),
+      cells,
+    };
+  }
+  private destroySolidBufs(b: SolidBufs | null) { if (b) { b.key.destroy(); b.pay.destroy(); b.nrm.destroy(); } }
+
   private allocHistogram() {
     const os = this.oversample;
-    if (this.width * os * this.height * os * 16 > this.maxHistBytes) this.oversample = 1;
-    const size = Math.max(this.width * this.oversample * this.height * this.oversample, 1) * 16;
+    if (this.width * os * this.height * os * this.cellBytes > this.maxHistBytes) this.oversample = 1;
+    const cells = Math.max(this.width * this.oversample * this.height * this.oversample, 1);
+    // solid mode: the histogram is not written (a 1-cell stub stays bound), the z-buffer set takes its place
+    const size = (this.solid ? 1 : cells) * HIST_CELL_BYTES;
     this.histBuf?.destroy();
     this.histBuf = this.device.createBuffer({
       size,
       usage: GPUBufferUsage.STORAGE | GPUBufferUsage.COPY_DST | GPUBufferUsage.COPY_SRC,
     });
+    this.destroySolidBufs(this.solidLive);
+    this.solidLive = this.solid ? this.makeSolidBufs(cells) : null;
     this.renderBG = this.device.createBindGroup({
       layout: this.pipeA.getBindGroupLayout(0),
       entries: [
@@ -182,20 +256,58 @@ export class FlameRenderer {
     this.rebuildComputeBG();
   }
 
+  private computeEntries(hist: GPUBuffer, solid: SolidBufs | null): GPUBindGroupEntry[] {
+    return [
+      { binding: 0, resource: { buffer: this.paramsBuf } },
+      { binding: 1, resource: { buffer: this.xdBuf } },
+      { binding: 2, resource: { buffer: this.ptsBuf } },
+      { binding: 3, resource: { buffer: this.rngBuf } },
+      ...(this.compiled?.solid ? [] : [{ binding: 4, resource: { buffer: hist } }]), // the solid kernel never touches the histogram (an 'auto' layout drops it)
+      { binding: 5, resource: { buffer: this.palBuf } },
+      ...(this.compiled?.usesMods ? [{ binding: 6, resource: { buffer: this.modsBuf } }] : []),
+      ...(this.compiled?.solid && solid ? [{ binding: 7, resource: { buffer: solid.key } }, { binding: 8, resource: { buffer: solid.pay } }] : []),
+      ...(this.compiled?.usesMat ? [{ binding: 9, resource: { buffer: this.matsBuf } }] : []),
+    ];
+  }
+
   private rebuildComputeBG() {
     if (!this.computePipeline) return;
+    if (this.solid && !this.solidLive) { this.allocHistogram(); return; } // allocHistogram calls back into here
     this.computeBG = this.device.createBindGroup({
       layout: this.computePipeline.getBindGroupLayout(0),
-      entries: [
-        { binding: 0, resource: { buffer: this.paramsBuf } },
-        { binding: 1, resource: { buffer: this.xdBuf } },
-        { binding: 2, resource: { buffer: this.ptsBuf } },
-        { binding: 3, resource: { buffer: this.rngBuf } },
-        { binding: 4, resource: { buffer: this.histBuf } },
-        { binding: 5, resource: { buffer: this.palBuf } },
-        ...(this.compiled?.usesMods ? [{ binding: 6, resource: { buffer: this.modsBuf } }] : []),
-      ],
+      entries: this.computeEntries(this.histBuf, this.solidLive),
     });
+  }
+
+  /** Bind groups of the solid post pass and tonemap for one z-buffer set (cached per set). */
+  private solidBindGroups(b: SolidBufs): { post: GPUBindGroup; tm: GPUBindGroup } {
+    let bg = this.solidBGs.get(b.key);
+    if (bg) return bg;
+    const d = this.device;
+    bg = {
+      post: d.createBindGroup({
+        layout: this.solidPostPipe.getBindGroupLayout(0),
+        entries: [
+          { binding: 0, resource: { buffer: this.sppBuf } },
+          { binding: 1, resource: { buffer: b.key } },
+          { binding: 2, resource: { buffer: b.pay } },
+          { binding: 3, resource: { buffer: b.nrm } },
+        ],
+      }),
+      tm: d.createBindGroup({
+        layout: this.solidTmLayout,
+        entries: [
+          { binding: 0, resource: { buffer: this.spBuf } },
+          { binding: 1, resource: { buffer: b.key } },
+          { binding: 2, resource: { buffer: b.pay } },
+          { binding: 3, resource: { buffer: b.nrm } },
+          { binding: 4, resource: { buffer: this.sfiltBuf } },
+          { binding: 5, resource: { buffer: this.lightsBuf } },
+        ],
+      }),
+    };
+    this.solidBGs.set(b.key, bg);
+    return bg;
   }
 
   resize(w: number, h: number) {
@@ -214,6 +326,7 @@ export class FlameRenderer {
     const sig = flameSignature(flame);
     if (sig !== this.sig || !this.compiled) {
       this.sig = sig;
+      const wasSolid = this.solid;
       this.compiled = compileFlame(flame, this.nPoints);
       if (this.compiled.dataSize > XD_FLOATS) {
         this.onError?.('Flame too complex for parameter buffer.');
@@ -232,7 +345,8 @@ export class FlameRenderer {
         layout: 'auto',
         compute: { module, entryPoint: 'main' },
       });
-      this.rebuildComputeBG();
+      if (this.compiled.solid !== wasSolid) this.allocHistogram(); // histogram ↔ z-buffer set (rebuilds the bind group)
+      else this.rebuildComputeBG();
     }
     this.compiled.writeData(flame, this.xdData);
     this.device.queue.writeBuffer(this.xdBuf, 0, this.xdData, 0, this.compiled.dataSize);
@@ -283,6 +397,7 @@ export class FlameRenderer {
     this.device.queue.writeBuffer(this.ptsBuf, 0, pts);
     this.device.queue.writeBuffer(this.rngBuf, 0, rng);
     if (this.compiled?.usesMods) this.device.queue.writeBuffer(this.modsBuf, 0, new Float32Array(this.nPoints * 4)); // JWildfire starts every point with zero modifiers
+    if (this.compiled?.usesMat) this.device.queue.writeBuffer(this.matsBuf, 0, Float32Array.from({ length: this.nPoints }, () => Math.random())); // JWildfire: p.material = random()
   }
 
   /** Something tone-related changed (or the view): redraw even when the
@@ -297,6 +412,7 @@ export class FlameRenderer {
     this.reseedPoints(100); // live: a shorter fuse keeps drags snappy (exports use the full 200)
     const enc = this.device.createCommandEncoder();
     enc.clearBuffer(this.histBuf);
+    if (this.solidLive) enc.clearBuffer(this.solidLive.key); // key 0 = empty cell; payload/normals are ignored until a key is set
     this.device.queue.submit([enc.finish()]);
   }
 
@@ -321,7 +437,8 @@ export class FlameRenderer {
     const dofOn = Math.abs(f.camDOF ?? 0) > 1e-9;
     const dimOn = (f.dimishZ ?? 0) > 1e-9;
     const cam3d = Math.abs(f.camPitch) > 1e-9 || Math.abs(f.camYaw) > 1e-9 || Math.abs(f.camBank) > 1e-9 || Math.abs(f.camPersp) > 1e-9
-      || Math.abs(f.camPosX) > 1e-9 || Math.abs(f.camPosY) > 1e-9 || Math.abs(f.camPosZ) > 1e-9 || dofOn || dimOn;
+      || Math.abs(f.camPosX) > 1e-9 || Math.abs(f.camPosY) > 1e-9 || Math.abs(f.camPosZ) > 1e-9 || dofOn || dimOn
+      || this.solid; // JWildfire: solid rendering always projects through the 3D camera (its depth is the z-buffer key)
     pu32[0] = w; pu32[1] = h; pu32[2] = iters; pu32[3] = (f.preserveZ ? 1 : 0) | (cam3d ? 2 : 0);
     pf32[4] = f.centerX; pf32[5] = f.centerY; pf32[6] = ppu; pf32[7] = f.rotation;
     pf32[8] = tile ? tile.tileX : 0; pf32[9] = tile ? tile.tileY : 0;
@@ -350,9 +467,12 @@ export class FlameRenderer {
     pf32.set([f.focusX ?? 0, f.focusY ?? 0, f.focusZ ?? 0, f.camDOFArea ?? 0.5], 32);
     pf32.set([dofOn ? 0.1 * f.camDOF * (f.camDOFScale ?? 1) : 0, f.camDOFExponent ?? 2, f.camDOFFade ?? 1, f.newDOF ? 1 : 0], 36);
     pf32.set([f.dimishZ ?? 0, f.dimZDist ?? 0, 0, 0], 40);
+    // JWildfire mixes the dimish-z colour (0..255) with palette colours held on its 200/256 scale (RenderColor),
+    // so on our palette-relative scale the dim colour is ×256/200
     const dc = f.dimZColor ?? [0, 0, 0];
-    pf32.set([dc[0], dc[1], dc[2], 0], 44);
-    pf32.set([f.antialiasAmount ?? 0.25, f.antialiasRadius ?? 0.5, 0, 0], 48);
+    pf32.set([dc[0] * 1.28, dc[1] * 1.28, dc[2] * 1.28, 0], 44);
+    // JWildfire's FlameRenderer switches antialiasing off for solid flames (the z-buffer keeps every jittered hit)
+    pf32.set([this.solid ? 0 : f.antialiasAmount ?? 0.25, this.solid ? 0 : f.antialiasRadius ?? 0.5, 0, 0], 48);
     this.device.queue.writeBuffer(this.paramsBuf, 0, pu32);
 
     const tu32 = new Uint32Array(24);
@@ -382,6 +502,50 @@ export class FlameRenderer {
     tf32[12] = f.background[0]; tf32[13] = f.background[1]; tf32[14] = f.background[2];
     tf32[15] = f.gammaThreshold ?? 0.04; // packed into bg.w
     this.device.queue.writeBuffer(this.tmBuf, 0, tu32);
+
+    if (this.solid) this.writeSolidUniforms(f, w, h, os, transparent, [m02, m12, m22]);
+  }
+
+  /** Solid rendering: post-pass params, tonemap params, lights/materials, raster-cell filter kernel. */
+  private writeSolidUniforms(f: Flame, rasterW: number, rasterH: number, os: number, transparent: boolean, m2: number[]) {
+    const s = f.solid!;
+    const q = new Uint32Array(8);
+    const qf = new Float32Array(q.buffer);
+    q[0] = rasterW; q[1] = rasterH;
+    qf.set([m2[0], m2[1], m2[2], f.camPosZ], 4);
+    this.device.queue.writeBuffer(this.sppBuf, 0, q);
+
+    const { n, w: fw } = solidFilterWeights(f.filterRadius ?? 0, f.filterKernel ?? 'mitchell', os);
+    const fkey = `${f.filterKernel}:${(f.filterRadius ?? 0).toFixed(4)}:${os}`;
+    if (n && fkey !== this.sfiltKey) { this.sfiltKey = fkey; this.device.queue.writeBuffer(this.sfiltBuf, 0, fw); }
+
+    const p = new Uint32Array(12);
+    const pf = new Float32Array(p.buffer);
+    p[0] = rasterW / os; p[1] = rasterH / os; p[2] = os; p[3] = n;
+    pf[4] = f.gamma; pf[5] = transparent ? 1 : 0;
+    const nL = Math.min(s.lights.length, SOLID_MAX_LIGHTS), nM = Math.min(s.materials.length, SOLID_MAX_MATS);
+    p[6] = nL; p[7] = nM;
+    pf.set([f.background[0], f.background[1], f.background[2], 0], 8);
+    this.device.queue.writeBuffer(this.spBuf, 0, p);
+
+    // LightViewCalculator: lightDir = aᵀ·(0,0,−1) with a = rotation from alpha = −altitude, beta = −azimuth
+    const lm = new Float32Array((SOLID_MAX_LIGHTS * 2 + SOLID_MAX_MATS * 3) * 4);
+    for (let i = 0; i < nL; i++) {
+      const l = s.lights[i];
+      const al = (-l.altitude * Math.PI) / 180, be = (-l.azimuth * Math.PI) / 180;
+      const sa = Math.sin(al), ca = Math.cos(al), sb = Math.sin(be), cb = Math.cos(be);
+      // aᵀ·(0,0,−1) = −(row 2 of a) = −(−ca·sb, sa, ca·cb)
+      lm.set([ca * sb, -sa, -ca * cb, l.intensity], i * 8);
+      lm.set([l.color[0], l.color[1], l.color[2], l.castShadows ? 1 : 0], i * 8 + 4);
+    }
+    const mo = SOLID_MAX_LIGHTS * 8;
+    for (let i = 0; i < nM; i++) {
+      const m = s.materials[i];
+      lm.set([m.diffuse, m.ambient, m.phong, m.phongSize], mo + i * 12);
+      lm.set([m.phongColor[0], m.phongColor[1], m.phongColor[2], Math.max(0, LIGHT_DIFF_FUNCS.indexOf(m.diffFunc))], mo + i * 12 + 4);
+      lm.set([m.reflMapIntensity, 0, 0, 0], mo + i * 12 + 8);
+    }
+    this.device.queue.writeBuffer(this.lightsBuf, 0, lm);
   }
 
   /** Intermediate rgba16float texture for the two-pass tonemap, sized to the target. */
@@ -426,6 +590,21 @@ export class FlameRenderer {
     rpB.setBindGroup(0, bgB);
     rpB.draw(3);
     rpB.end();
+  }
+
+  /** Solid rendering: post pass (key repair + normals) over the raster, then the shading/filter/composite pass to `target`. */
+  private encodeSolid(enc: GPUCommandEncoder, bufs: SolidBufs, rasterW: number, rasterH: number, pipe: GPURenderPipeline, target: GPUTextureView, clear: GPUColor) {
+    const bg = this.solidBindGroups(bufs);
+    const cp = enc.beginComputePass();
+    cp.setPipeline(this.solidPostPipe);
+    cp.setBindGroup(0, bg.post);
+    cp.dispatchWorkgroups(Math.ceil(rasterW / 16), Math.ceil(rasterH / 16));
+    cp.end();
+    const rp = enc.beginRenderPass({ colorAttachments: [{ view: target, loadOp: 'clear', clearValue: clear, storeOp: 'store' }] });
+    rp.setPipeline(pipe);
+    rp.setBindGroup(0, bg.tm);
+    rp.draw(3);
+    rp.end();
   }
 
   /** Upload the JWildfire spatial-filter kernels for the flame's settings; returns [Ncolour, Nintensity]. */
@@ -482,23 +661,21 @@ export class FlameRenderer {
     const d = this.device;
     if (!this.flame || !this.computePipeline) throw new Error('No compiled flame.');
 
-    const need = o.tileW * o.tileH * 16;
+    const solid = this.solid;
+    const cells = o.tileW * o.tileH;
+    const need = (solid ? 1 : cells) * HIST_CELL_BYTES;
     if (!this.offHist || this.offHistSize < need) {
       this.offHist?.destroy();
       this.offHist = d.createBuffer({ size: need, usage: GPUBufferUsage.STORAGE | GPUBufferUsage.COPY_DST });
       this.offHistSize = need;
     }
+    if (solid && (!this.solidOff || this.solidOff.cells < cells)) {
+      this.destroySolidBufs(this.solidOff);
+      this.solidOff = this.makeSolidBufs(cells);
+    }
     const computeBG = d.createBindGroup({
       layout: this.computePipeline.getBindGroupLayout(0),
-      entries: [
-        { binding: 0, resource: { buffer: this.paramsBuf } },
-        { binding: 1, resource: { buffer: this.xdBuf } },
-        { binding: 2, resource: { buffer: this.ptsBuf } },
-        { binding: 3, resource: { buffer: this.rngBuf } },
-        { binding: 4, resource: { buffer: this.offHist } },
-        { binding: 5, resource: { buffer: this.palBuf } },
-        ...(this.compiled?.usesMods ? [{ binding: 6, resource: { buffer: this.modsBuf } }] : []),
-      ],
+      entries: this.computeEntries(this.offHist, this.solidOff),
     });
     if (!this.exportPipeline) {
       this.exportPipeline = d.createRenderPipeline({
@@ -540,7 +717,7 @@ export class FlameRenderer {
       done += this.countIters(nowP * perPass);
       this.writeUniforms(done / (o.fullW * o.fullH), tile, o.transparent);
       const enc = d.createCommandEncoder();
-      if (first) { enc.clearBuffer(this.offHist); first = false; }
+      if (first) { enc.clearBuffer(this.offHist); if (solid && this.solidOff) enc.clearBuffer(this.solidOff.key); first = false; }
       const cp = enc.beginComputePass();
       cp.setPipeline(this.computePipeline);
       cp.setBindGroup(0, computeBG);
@@ -555,7 +732,8 @@ export class FlameRenderer {
     const bpr = Math.ceil((o.tileW * 4) / 256) * 256;
     const rb = d.createBuffer({ size: bpr * o.tileH, usage: GPUBufferUsage.COPY_DST | GPUBufferUsage.MAP_READ });
     const enc = d.createCommandEncoder();
-    this.encodeTonemap(enc, renderBG, this.exportPipeline, this.offTex.createView(), o.tileW, o.tileH, true, { r: 0, g: 0, b: 0, a: 0 });
+    if (solid && this.solidOff) this.encodeSolid(enc, this.solidOff, o.tileW, o.tileH, this.solidExportPipe, this.offTex.createView(), { r: 0, g: 0, b: 0, a: 0 });
+    else this.encodeTonemap(enc, renderBG, this.exportPipeline, this.offTex.createView(), o.tileW, o.tileH, true, { r: 0, g: 0, b: 0, a: 0 });
     enc.copyTextureToBuffer(
       { texture: this.offTex },
       { buffer: rb, bytesPerRow: bpr, rowsPerImage: o.tileH },
@@ -573,6 +751,13 @@ export class FlameRenderer {
     return out;
   }
 
+  /** Encode the live view's tonemap (density or solid) to `view`. */
+  private presentTo(enc: GPUCommandEncoder, view: GPUTextureView) {
+    const os = this.oversample;
+    if (this.solid && this.solidLive) this.encodeSolid(enc, this.solidLive, this.width * os, this.height * os, this.solidPipe, view, { r: 0, g: 0, b: 0, a: 1 });
+    else this.encodeTonemap(enc, this.renderBG!, this.renderPipeline, view, this.width, this.height, false, { r: 0, g: 0, b: 0, a: 1 });
+  }
+
   /** Draw the tonemap pass and hand the canvas to `fn` synchronously, in the
    *  same task as the submit — a WebGPU canvas is cleared once the task ends,
    *  so captures (VideoFrame, toBlob, drawImage) must not happen after an
@@ -581,7 +766,7 @@ export class FlameRenderer {
     this.writeUniforms(this.samples / Math.max(this.width * this.height, 1));
     const enc = this.device.createCommandEncoder();
     const view = this.context.getCurrentTexture().createView();
-    this.encodeTonemap(enc, this.renderBG!, this.renderPipeline, view, this.width, this.height, false, { r: 0, g: 0, b: 0, a: 1 });
+    this.presentTo(enc, view);
     this.device.queue.submit([enc.finish()]);
     return fn(this.canvas);
   }
@@ -670,7 +855,7 @@ export class FlameRenderer {
     const present = !accumulate || sppAfter >= this.minDisplaySpp || !this.hasPresented;
     if (present) {
       const view = this.context.getCurrentTexture().createView();
-      this.encodeTonemap(enc, this.renderBG, this.renderPipeline, view, w, h, false, { r: 0, g: 0, b: 0, a: 1 });
+      this.presentTo(enc, view);
       this.hasPresented = true;
       this.needsPresent = false;
     }
@@ -686,6 +871,7 @@ export class FlameRenderer {
   /** Dev diagnostic: total opacity-weighted hits in the live histogram and the count at a pixel. */
   async debugHistStats(px = -1, py = -1): Promise<{ hits: number; atPixel: number; cells: number }> {
     const os = this.oversample;
+    if (this.solid) return { hits: 0, atPixel: -1, cells: 0 };
     const cells = this.width * os * this.height * os;
     const staging = this.device.createBuffer({ size: cells * 16, usage: GPUBufferUsage.COPY_DST | GPUBufferUsage.MAP_READ });
     const enc = this.device.createCommandEncoder();

@@ -65,8 +65,9 @@ v.y += (${w} * (t.y + (${A(4)} * sin((t.x / ((${A(5)} * ${A(5)}) + 1.0e-20))))))
     code: (w, _p) => `{
 var c1: f32;
 var s1: f32;
-s1 = sin(r2);
-c1 = cos(r2);
+let sc_1 = r2;
+s1 = sin(sc_1);
+c1 = cos(sc_1);
 v.x += (${w} * ((t.x * s1) - (t.y * c1)));
 v.y += (${w} * ((t.x * c1) + (t.y * s1)));
 }`,
@@ -253,8 +254,9 @@ v.y += (((${w} * t.y) * rinv_) * sin(r));
 var r_: f32 = (rnd(rs) * (PI + PI));
 var sina: f32;
 var cosa: f32;
-sina = sin(r_);
-cosa = cos(r_);
+let sc_1 = r_;
+sina = sin(sc_1);
+cosa = cos(sc_1);
 var r2_: f32 = (${w} * rnd(rs));
 v.x += (r2_ * cosa);
 v.y += (r2_ * sina);
@@ -487,12 +489,14 @@ pz_ += (${w} * ((((rnd(rs) + rnd(rs)) + rnd(rs)) + rnd(rs)) - 2.0));
     code: (w, _p) => `{
 var cosa: f32;
 var sina: f32;
-sina = sin(((rnd(rs) * 2.0) * PI));
-cosa = cos(((rnd(rs) * 2.0) * PI));
+let sc_2 = ((rnd(rs) * 2.0) * PI);
+sina = sin(sc_2);
+cosa = cos(sc_2);
 var cosb: f32;
 var sinb: f32;
-sinb = sin((rnd(rs) * PI));
-cosb = cos((rnd(rs) * PI));
+let sc_3 = (rnd(rs) * PI);
+sinb = sin(sc_3);
+cosb = cos(sc_3);
 var rndG: f32 = (${w} * ((((rnd(rs) + rnd(rs)) + rnd(rs)) + rnd(rs)) - 2.0));
 v.x += ((rndG * sinb) * cosa);
 v.y += ((rndG * sinb) * sina);
@@ -526,8 +530,9 @@ z_ += ${w};
 var rinv_: f32 = 1.0 / r;
 var rx_cos: f32;
 var rx_sin: f32;
-rx_sin = sin((${w} * (PI * 0.5)));
-rx_cos = cos((${w} * (PI * 0.5)));
+let sc_1 = (${w} * (PI * 0.5));
+rx_sin = sin(sc_1);
+rx_cos = cos(sc_1);
 var _z: f32 = ((rx_cos * z_) - (rx_sin * t.y));
 t.y = ((rx_sin * z_) + (rx_cos * t.y));
 z_ = _z;
@@ -550,8 +555,9 @@ if ((ph > PI)) {
 var rinv_: f32 = 1.0 / r;
 var ry_cos: f32;
 var ry_sin: f32;
-ry_sin = sin((${w} * (PI * 0.5)));
-ry_cos = cos((${w} * (PI * 0.5)));
+let sc_1 = (${w} * (PI * 0.5));
+ry_sin = sin(sc_1);
+ry_cos = cos(sc_1);
 var x: f32 = ((ry_cos * t.x) - (ry_sin * z_));
 z_ = ((ry_sin * t.x) + (ry_cos * z_));
 t.x = x;
@@ -573,8 +579,9 @@ if ((ph > PI)) {
     code: (w, _p) => `{
 var px_cos: f32;
 var px_sin: f32;
-px_sin = sin((${w} * (PI * 0.5)));
-px_cos = cos((${w} * (PI * 0.5)));
+let sc_1 = (${w} * (PI * 0.5));
+px_sin = sin(sc_1);
+px_cos = cos(sc_1);
 var _z: f32 = ((px_cos * pz_) - (px_sin * v.y));
 v.y = ((px_sin * pz_) + (px_cos * v.y));
 pz_ = _z;
@@ -588,8 +595,9 @@ pz_ = _z;
     code: (w, _p) => `{
 var py_cos: f32;
 var py_sin: f32;
-py_sin = sin((${w} * (PI * 0.5)));
-py_cos = cos((${w} * (PI * 0.5)));
+let sc_1 = (${w} * (PI * 0.5));
+py_sin = sin(sc_1);
+py_cos = cos(sc_1);
 var x: f32 = ((py_cos * v.x) - (py_sin * pz_));
 pz_ = ((py_sin * v.x) + (py_cos * pz_));
 v.x = x;
@@ -847,8 +855,9 @@ var r_: f32 = (${w} * powc((r2 + (_z * _z)), cn));
 var tmp: f32 = (r_ * r);
 var cosa: f32;
 var sina: f32;
-sina = sin(((atan2j(t.y, t.x) + ((2.0 * PI) * f32(i32(roundc(((rnd(rs) * absn) - 0.5)))))) / n));
-cosa = cos(((atan2j(t.y, t.x) + ((2.0 * PI) * f32(i32(roundc(((rnd(rs) * absn) - 0.5)))))) / n));
+let sc_1 = ((atan2j(t.y, t.x) + ((2.0 * PI) * f32(i32(roundc(((rnd(rs) * absn) - 0.5)))))) / n);
+sina = sin(sc_1);
+cosa = cos(sc_1);
 v.x += (tmp * cosa);
 v.y += (tmp * sina);
 pz_ += (r_ * _z);
@@ -922,14 +931,16 @@ v.y += ((${w} * r_) * cos(a));
 var rndG: f32 = ((((rnd(rs) + rnd(rs)) + rnd(rs)) + rnd(rs)) - 2.0);
 var sina: f32;
 var cosa: f32;
-sina = sin(((${p[0]} * PI) * 0.5));
-cosa = cos(((${p[0]} * PI) * 0.5));
+let sc_2 = ((${p[0]} * PI) * 0.5);
+sina = sin(sc_2);
+cosa = cos(sc_2);
 var spin: f32 = (${w} * sina);
 var zoom: f32 = (${w} * cosa);
 var ra: f32 = sqrt(((t.x * t.x) + (t.y * t.y)));
 var alpha: f32 = (atan2j(t.y, t.x) + (spin * rndG));
-sina = sin(alpha);
-cosa = cos(alpha);
+let sc_3 = alpha;
+sina = sin(sc_3);
+cosa = cos(sc_3);
 var rz: f32 = ((zoom * rndG) - 1.0);
 v.x += ((ra * cosa) + (rz * t.x));
 v.y += ((ra * sina) + (rz * t.y));
@@ -1016,8 +1027,9 @@ var a: f32 = (${p[1]} + (((2.0 * PI) * (f32(sl) + (rnd(rs) * ${p[2]}))) / slices
 var r_: f32 = (${w} * rnd(rs));
 var sina: f32;
 var cosa: f32;
-sina = sin(a);
-cosa = cos(a);
+let sc_1 = a;
+sina = sin(sc_1);
+cosa = cos(sc_1);
 v.x += (r_ * cosa);
 v.y += (r_ * sina);
 pz_ += (r_ * sin(r_));
@@ -1130,8 +1142,9 @@ v.y += ((v_ * t.x) * (cos(((rn * r) * v_)) - sin(((rn * r) * v_))));
 var r_: f32 = ((rnd(rs) * ${w}) * r);
 var cosr: f32;
 var sinr: f32;
-sinr = sin(r_);
-cosr = cos(r_);
+let sc_1 = r_;
+sinr = sin(sc_1);
+cosr = cos(sc_1);
 v.x += ((${w} * t.x) * (cosr + sinr));
 v.y += ((${w} * t.x) * (cosr - sinr));
 pz_ += ((${w} * t.y) * (sinr - cosr));
@@ -1269,8 +1282,9 @@ if ((d != 0.0)) {
   var r_: f32 = (0.5 / d);
   var sina: f32;
   var cosa: f32;
-  sina = sin(th);
-  cosa = cos(th);
+  let sc_1 = th;
+  sina = sin(sc_1);
+  cosa = cos(sc_1);
   var nx: f32 = (sina * r_);
   var ny: f32 = (cosa * r_);
   v.x += (${w} * nx);
@@ -1347,8 +1361,9 @@ v.y += (tmp * sin(t.y));
     code: (w, p) => `{
 var sinadd: f32;
 var cosadd: f32;
-sinadd = sin(${p[1]});
-cosadd = cos(${p[1]});
+let sc_1 = ${p[1]};
+sinadd = sin(sc_1);
+cosadd = cos(sc_1);
 cosadd -= 1.0;
 if ((abs(${p[1]}) > (2.0 * PI))) {
   var sign_: f32 = select(-1.0, 1.0, (${p[1]} >= 0.0));
@@ -1979,8 +1994,9 @@ if ((absx >= absy)) {
 }
 var r_: f32 = ((weight_4_pi * side) + ${p[0]});
 var sina: f32;
-sina = sin(((((PI * 0.25) * perimeter) / side) - (PI * 0.25)));
-cosa = cos(((((PI * 0.25) * perimeter) / side) - (PI * 0.25)));
+let sc_1 = ((((PI * 0.25) * perimeter) / side) - (PI * 0.25));
+sina = sin(sc_1);
+cosa = cos(sc_1);
 v.x += (r_ * cosa);
 v.y += (r_ * sina);
 }`,
@@ -2183,8 +2199,9 @@ v.y += (${w} * ny);
 var ang: f32 = ((PI * 0.25) + ((0.5 * (PI * 0.25)) * ${p[0]}));
 var cosa: f32;
 var sina: f32;
-sina = sin(ang);
-cosa = cos(ang);
+let sc_1 = ang;
+sina = sin(sc_1);
+cosa = cos(sc_1);
 var r_: f32 = (6.0 + (2.0 * ${p[1]}));
 var r2_4: f32 = (((t.x * t.x) + (t.y * t.y)) + 4.0);
 r2_4 = select(r2_4, 1.0, (r2_4 == 0.0));
@@ -4145,10 +4162,12 @@ var dx: f32 = (v.x - ${p[3]});
 var dy: f32 = (v.y - ${p[4]});
 var dz: f32 = (pz_ - ${p[5]});
 var r_: f32 = ((${w} * (((dx * dx) + (dy * dy)) + (dz * dz))) * rn1);
-su = sin(((rnd(rs) * 2.0) * PI));
-cu = cos(((rnd(rs) * 2.0) * PI));
-sv = sin(((rnd(rs) * 2.0) * PI));
-cv = cos(((rnd(rs) * 2.0) * PI));
+let sc_2 = ((rnd(rs) * 2.0) * PI);
+su = sin(sc_2);
+cu = cos(sc_2);
+let sc_3 = ((rnd(rs) * 2.0) * PI);
+sv = sin(sc_3);
+cv = cos(sc_3);
 v.x += (((${p[0]} * r_) * sv) * cu);
 v.y += (((${p[1]} * r_) * sv) * su);
 pz_ += ((${p[2]} * r_) * cv);
@@ -4457,8 +4476,9 @@ var a: f32 = (t.x * ${p[0]});
 var t_: f32 = (((t.x * t.x) + (t.y * t.y)) + 1.0e-20);
 var c: f32;
 var s: f32;
-s = sin(t_);
-c = cos(t_);
+let sc_1 = t_;
+s = sin(sc_1);
+c = cos(sc_1);
 v.x += ((${w} * a) * c);
 v.y += ((${w} * a) * s);
 }`,
@@ -4493,8 +4513,9 @@ if ((a >= 0.0)) {
 }
 var s: f32;
 var c: f32;
-s = sin(a);
-c = cos(a);
+let sc_1 = a;
+s = sin(sc_1);
+c = cos(sc_1);
 v.x += (r_ * c);
 v.y += (r_ * s);
 }`,
@@ -4515,8 +4536,9 @@ if ((r_ > 0.0)) {
 }
 var cosa: f32;
 var sina: f32;
-sina = sin((${p[2]} * pa));
-cosa = cos((${p[2]} * pa));
+let sc_1 = (${p[2]} * pa);
+sina = sin(sc_1);
+cosa = cos(sc_1);
 var re: f32 = (r_ * cosa);
 var im: f32 = (r_ * sina);
 var a: f32 = (t.x + re);
@@ -9328,8 +9350,9 @@ if ((post_scrop_radial != 0)) {
 var rad: f32 = sqrt(rnd(rs));
 var c: f32;
 var s: f32;
-s = sin(((rnd(rs) * 2.0) * PI));
-c = cos(((rnd(rs) * 2.0) * PI));
+let sc_1 = ((rnd(rs) * 2.0) * PI);
+s = sin(sc_1);
+c = cos(sc_1);
 v.x += ((${w} * rad) * c);
 v.y += ((${w} * rad) * s);
 }`,
@@ -11463,8 +11486,9 @@ var p2: f32 = (0.5 * murl_power);
 var vp: f32 = (${w} * (${p[0]} + 1.0));
 var cosa: f32;
 var sina: f32;
-sina = sin((atan2j(t.y, t.x) * murl_power));
-cosa = cos((atan2j(t.y, t.x) * murl_power));
+let sc_1 = (atan2j(t.y, t.x) * murl_power);
+sina = sin(sc_1);
+cosa = cos(sc_1);
 var r_: f32 = (c * powc(r2, p2));
 var re: f32 = ((r_ * cosa) + 1.0);
 var im: f32 = (r_ * sina);
@@ -13870,8 +13894,9 @@ var i: i32 = (i32(roundc((${p[0]} * rnd(rs)))) + 1);
 var a: f32 = ((f32(i) * 2.0) * M_2PI_PHI2);
 var sina: f32;
 var cosa: f32;
-sina = sin(a);
-cosa = cos(a);
+let sc_1 = a;
+sina = sin(sc_1);
+cosa = cos(sc_1);
 var r_: f32 = (${w} * (r + sqrt(f32(i))));
 v.x += (r_ * (cosa + (${p[1]} * t.x)));
 v.y += (r_ * (sina + (${p[1]} * t.y)));
@@ -14813,8 +14838,9 @@ if ((absx >= absy)) {
 }
 var r_: f32 = (${w} * side);
 var sina: f32;
-sina = sin(((((PI * 0.25) * perimeter) / side) - (PI * 0.25)));
-cosa = cos(((((PI * 0.25) * perimeter) / side) - (PI * 0.25)));
+let sc_1 = ((((PI * 0.25) * perimeter) / side) - (PI * 0.25));
+sina = sin(sc_1);
+cosa = cos(sc_1);
 v.x += (r_ * cosa);
 v.y += (r_ * sina);
 }`,
@@ -15016,8 +15042,9 @@ var a: f32 = (PI / (r + 1.0));
 var r_: f32 = ((atan2j(t.y, t.x) * ${w}) * (1.0 / PI));
 var c: f32;
 var s: f32;
-s = sin(a);
-c = cos(a);
+let sc_1 = a;
+s = sin(sc_1);
+c = cos(sc_1);
 v.x += (r_ * c);
 v.y += (r_ * s);
 }`,
@@ -15032,8 +15059,9 @@ var avgr: f32 = ((${w} * sqrt(((t.y * t.y) + ((t.x + 1.0) * (t.x + 1.0))))) / sq
 var avga: f32 = ((atan2j(t.y, (t.x - 1.0)) - atan2j(t.y, (t.x + 1.0))) / 2.0);
 var c: f32;
 var s: f32;
-s = sin(avga);
-c = cos(avga);
+let sc_1 = avga;
+s = sin(sc_1);
+c = cos(sc_1);
 v.x += (avgr * c);
 v.y += (avgr * s);
 }`,
@@ -15051,8 +15079,9 @@ if ((r_ > 0.0)) {
 }
 var c: f32;
 var s: f32;
-s = sin(a);
-c = cos(a);
+let sc_1 = a;
+s = sin(sc_1);
+c = cos(sc_1);
 v.x += ((${w} * r_) * c);
 v.y += ((${w} * r_) * s);
 }`,
@@ -17127,8 +17156,9 @@ if ((y <= 0.0)) {
     code: (w, p) => `{
 var cosa: f32;
 var sina: f32;
-sina = sin(${p[1]});
-cosa = cos(${p[1]});
+let sc_1 = ${p[1]};
+sina = sin(sc_1);
+cosa = cos(sc_1);
 var r_: f32 = (${p[0]} * rnd(rs));
 v.x += (${w} * (t.x + (r_ * cosa)));
 v.y += (${w} * (t.y + (r_ * sina)));
@@ -18423,8 +18453,9 @@ var a: f32 = atan2j(t.y, t.x);
 var r_: f32 = (${w} * sqrt(((((t.x * t.x) + (t.y * t.y)) + sin((a * ${p[0]}))) + 1.0)));
 var c: f32;
 var s: f32;
-s = sin(atan2j(t.y, t.x));
-c = cos(atan2j(t.y, t.x));
+let sc_1 = atan2j(t.y, t.x);
+s = sin(sc_1);
+c = cos(sc_1);
 v.x += (r_ * c);
 v.y += (r_ * s);
 }`,
@@ -18444,8 +18475,9 @@ var xang: f32 = (((ang + 9.42477796077) + (sa / 2.0)) / sa);
 var zang: f32 = ((((((xang - f32(i32(xang))) * sw) + f32(i32(xang))) * sa) - PI) - ((sa / 2.0) * sw));
 var s: f32;
 var c: f32;
-s = sin(zang);
-c = cos(zang);
+let sc_1 = zang;
+s = sin(sc_1);
+c = cos(sc_1);
 v.x += ((vv * rad) * c);
 v.y += ((vv * rad) * s);
 }`,
@@ -44375,8 +44407,9 @@ if ((hole_inside != 0)) {
 }
 var c: f32;
 var s: f32;
-s = sin(alpha);
-c = cos(alpha);
+let sc_1 = alpha;
+s = sin(sc_1);
+c = cos(sc_1);
 v.x += (r_ * c);
 v.y += (r_ * s);
 }`,
@@ -44428,8 +44461,9 @@ if ((ph > PI)) {
     code: (w, _p) => `{
 var cosa: f32;
 var sina: f32;
-sina = sin((${w} * (PI * 0.5)));
-cosa = cos((${w} * (PI * 0.5)));
+let sc_1 = (${w} * (PI * 0.5));
+sina = sin(sc_1);
+cosa = cos(sc_1);
 var y: f32 = ((cosa * v.y) - (sina * v.x));
 v.x = ((sina * v.y) + (cosa * v.x));
 v.y = y;

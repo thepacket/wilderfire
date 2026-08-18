@@ -20,6 +20,8 @@ export const FIXTURES = [
   'yflip', // hand-made Sierpinski with the wide base at +y: must render base-down like flam3/JWildfire
   // Sierpinsky_0 with a JWildfire weighting field on one xform (amount / jitter / int+amount param modulation / cellular colour / value-fractal jitter)
   'wfield_amount', 'wfield_jitter', 'wfield_ppow', 'wfield_cell', 'wfield_value',
+  // JWildfire solid rendering (z-buffer + lights/materials): two materials, a per-xform material index, coloured lights, filter on/off
+  'Solid_0', 'Solid_1',
 ];
 
 export async function runFlameTest(device: GPUDevice, palette: RGB[], opts: { files?: string[]; verbose?: boolean } = {}): Promise<FlameTestResult[]> {

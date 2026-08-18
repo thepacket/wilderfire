@@ -160,7 +160,7 @@ async function boot() {
       Specific, clearly delimited parts derive from
       <a href="https://github.com/thargor6/JWildfire" target="_blank" rel="noopener">JWildfire</a>
       (© Andreas Maschke and contributors, LGPL 2.1+): the mathematical formulas of the ported variations,
-      the GPU helper library they use, the tone-mapping formulas, and the sample flames in the Tests menu.
+      the GPU helper library they use, the tone-mapping and solid-rendering (lighting) formulas, and the sample flames in the Tests menu.
       That is why the whole project carries the LGPL. The full list of third-party material is in
       <a href="https://github.com/thepacket/wilderfire/blob/main/NOTICE.md" target="_blank" rel="noopener">NOTICE.md</a>.</p>`;
   };

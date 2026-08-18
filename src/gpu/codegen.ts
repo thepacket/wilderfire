@@ -16,15 +16,17 @@
 //   per visible layer:  CDF table ((n+1) rows × 16) then xform blocks
 //   per-xform block:    6 affine, 6 post, color, colorSpeed, opacity, pad,
 //                       6 yz, 6 zx, 6 yzPost, 6 zxPost (JWildfire 3D affines),
-//                       then per variation: weight + params
+//                       8 colour modifiers, 16 weighting field, material + materialSpeed (solid rendering),
+//                       6 spare, then per variation: weight + params
 
 import type { Flame, XForm, VarInstance } from '../core/flame';
-import { visibleLayers } from '../core/flame';
+import { visibleLayers, usesMaterials } from '../core/flame';
 import { VARIATIONS } from '../core/variations';
 import { WFIELD_WGSL } from './wfield.wgsl';
+import { SOLID_KERNEL_WGSL, SOLID_PAY_WORDS } from './solid.wgsl';
 
 const CDF_ROW = 16;
-const HEADER = 64;    // floats per xform block header (6 affine, 6 post, color, colorSpeed, opacity, pad, 24 3D affines, 8 colour modifiers, 16 weighting field)
+const HEADER = 72;    // floats per xform block header (6 affine, 6 post, color, colorSpeed, opacity, pad, 24 3D affines, 8 colour modifiers, 16 weighting field, material, materialSpeed, 6 spare)
 const XD_HEADER = 16; // floats reserved at the front of xd
 
 export interface CompiledFlame {
@@ -33,6 +35,10 @@ export interface CompiledFlame {
   writeData(flame: Flame, out: Float32Array): void;
   /** The kernel carries per-point colour modifiers (JWildfire mod_gamma/…): binding 6 `mods` must be bound. */
   usesMods: boolean;
+  /** JWildfire solid rendering: the kernel splats into a z-buffer (bindings 7 `zkey` + 8 `zpay`) instead of the histogram. */
+  solid: boolean;
+  /** The kernel carries a per-point material index (binding 9 `mats`). */
+  usesMat: boolean;
 }
 
 /** All variation lists of an xform in serialized order: pre, main, post. */
@@ -297,6 +303,8 @@ fn applyColorMods(col: vec3f, m: vec4f) -> vec3f {
 export function compileFlame(flame: Flame, nPoints: number): CompiledFlame {
   const layers = visibleLayers(flame);
   const usesMods = layers.some((ly) => [...ly.xforms, ...(ly.final ? [ly.final] : []), ...ly.moreFinals].some((x) => x.colorMods?.some((v) => v !== 0)));
+  const solid = !!flame.solid?.enabled;
+  const usesMat = solid && usesMaterials(flame);
   const L = layers.length;
 
   // ---- Layout ----
@@ -334,7 +342,7 @@ export function compileFlame(flame: Flame, nPoints: number): CompiledFlame {
       return `      case ${i}u: {
         let cs = xd[${b + 13}u];
         c = c * (1.0 - cs) + xd[${b + 12}u] * cs;
-        op = xd[${b + 14}u];${usesMods ? `\n        m = modBlend(m, ${b}u);` : ''}
+        op = xd[${b + 14}u];${usesMods ? `\n        m = modBlend(m, ${b}u);` : ''}${usesMat ? `\n        mt = mt * (1.0 + xd[${b + 65}u]) * 0.5 + xd[${b + 64}u] * (1.0 - xd[${b + 65}u]) * 0.5;` : ''}
         np = applyX${li}_${i}(p, &c, &rs, &hide, &rgbo);
       }`;
     }).join('\n');
@@ -355,7 +363,7 @@ fn iterLayer${li}(idx: u32) {
   var prev = min(rngs[idx].y & 255u, ${info.n - 1}u);
   var fuse = f32(rngs[idx].y >> 8u);
   var p = pt.xyz;
-  var c = pt.w;${usesMods ? '\n  var m = mods[idx];' : ''}
+  var c = pt.w;${usesMods ? '\n  var m = mods[idx];' : ''}${usesMat ? '\n  var mt = mats[idx];' : ''}
   let ca = cos(P.rotation);
   let sa = sin(P.rotation);
   let offX = P.fullW * 0.5 - P.tileX;
@@ -403,12 +411,13 @@ ${cases}
     var ry: f32;
     var visible = true;
     var dz = 1.0; // dimish-z intensity
+    var cz = 0.0; // camera-space depth (solid rendering's z-buffer key)
     if (cam3d) {
       // JWildfire 3D camera: rotate by the camera matrix (yaw/pitch/roll), offset,
       // then perspective-divide; the centre offset applies after projection.
       let cx = P.m0.x * dp.x + P.m0.y * dp.y + P.m0.z * dp.z + P.camPos.x;
       let cy = P.m1.x * dp.x + P.m1.y * dp.y + P.m1.z * dp.z + P.camPos.y;
-      let cz = P.m2.x * dp.x + P.m2.y * dp.y + P.m2.z * dp.z + P.camPos.z;
+      cz = P.m2.x * dp.x + P.m2.y * dp.y + P.m2.z * dp.z + P.camPos.z;
       let zr = 1.0 - P.camPersp * cz + P.camPos.z;
       visible = zr >= 1e-9;
       // dimish-z: fade points beyond dimZDist toward the dim colour
@@ -459,7 +468,16 @@ ${cases}
       fx = fx + dr * cos(da);
       fy = fy + dr * sin(da);
     }
-    if (visible && fx >= 0.0 && fy >= 0.0 && fx < f32(P.width) && fy < f32(P.height)) {
+${solid ? `    // JWildfire solid rendering: no density — the nearest point per raster cell wins (z-buffer on the camera-space
+    // depth), carrying its untransformed position (for the normals), palette colour × layer weight and material.
+    // OPAQUE draw mode drops a point with probability 1−opacity; hidden points never plot; colour modifiers do not apply.
+    if (visible && fx >= 0.0 && fy >= 0.0 && fx < f32(P.width) && fy < f32(P.height) && !hide && (op >= 1.0 || rnd(&rs) <= op)) {
+      var col = pal[${li * 256}u + min(u32(clamp(dc, 0.0, 1.0) * 255.99), 255u)];
+      if (rgbo.w > 0.5) { col = vec4f(clamp(rgbo.xyz, vec3f(0.0), vec3f(1.0)), 1.0); }
+      if (dz < 1.0) { col = vec4f(mix(P.dimColor.xyz, col.xyz, dz), col.w); }
+      let lw = xd[${8 + li}u] * (200.0 / 256.0); // JWildfire RenderColor scale: the shading sees palette·200/256/255
+      solidSplat(u32(fy) * P.width + u32(fx), cz, dp, col.xyz * lw, ${usesMat ? 'mt' : '0.0'});
+    }` : `    if (visible && fx >= 0.0 && fy >= 0.0 && fx < f32(P.width) && fy < f32(P.height)) {
       let hi = (u32(fy) * P.width + u32(fx)) * 4u;
       var col = pal[${li * 256}u + min(u32(clamp(dc, 0.0, 1.0) * 255.99), 255u)];
       if (rgbo.w > 0.5) { col = vec4f(clamp(rgbo.xyz, vec3f(0.0), vec3f(1.0)), 1.0); }${usesMods ? '\n      col = vec4f(applyColorMods(col.xyz, dm), col.w);' : ''}
@@ -471,10 +489,10 @@ ${cases}
       atomicAdd(&hist[hi + 1u], u32(col.y * lw * 255.0 + dth));
       atomicAdd(&hist[hi + 2u], u32(col.z * lw * 255.0 + dth));
       atomicAdd(&hist[hi + 3u], u32(op * 256.0));
-    }
+    }`}
   }
 
-  pts[idx] = vec4f(p, c);${usesMods ? '\n  mods[idx] = m;' : ''}
+  pts[idx] = vec4f(p, c);${usesMods ? '\n  mods[idx] = m;' : ''}${usesMat ? '\n  mats[idx] = mt;' : ''}
   rngs[idx] = vec2u(rs, prev | (u32(fuse) << 8u));
 }
 `;
@@ -524,7 +542,7 @@ struct Params {
 @group(0) @binding(3) var<storage, read_write> rngs: array<vec2u>; // x: rng state, y: prev xform
 @group(0) @binding(4) var<storage, read_write> hist: array<atomic<u32>>;
 @group(0) @binding(5) var<storage, read> pal: array<vec4f>;
-${usesMods ? MODS_WGSL : ''}
+${usesMods ? MODS_WGSL : ''}${solid ? SOLID_KERNEL_WGSL : ''}${usesMat ? '\n@group(0) @binding(9) var<storage, read_write> mats: array<f32>; // per-point material index (JWildfire p.material)\n' : ''}
 
 fn rnd(state: ptr<function, u32>) -> f32 {
   var x = *state;
@@ -610,6 +628,8 @@ ${lcases}
         for (let i = 0; i < 6; i++) out[B + 34 + i] = x.zxPost?.[i] ?? I[i];
         for (let i = 0; i < 8; i++) out[B + 40 + i] = x.colorMods?.[i] ?? 0;
         for (let i = 0; i < 16; i++) out[B + 48 + i] = 0;
+        out[B + 64] = x.material ?? 0;
+        out[B + 65] = x.materialSpeed ?? 0;
         if (x.wfield && WFIELD_TYPE_ORD[x.wfield.type]) {
           const w = x.wfield;
           out[B + 48] = WFIELD_TYPE_ORD[w.type]; out[B + 49] = w.input === 'POSITION' ? 1 : 0;
@@ -639,7 +659,7 @@ ${lcases}
     });
   };
 
-  return { wgsl, dataSize, writeData, usesMods };
+  return { wgsl, dataSize, writeData, usesMods, solid, usesMat };
 }
 
 export const TONEMAP_WGSL = `// WilderFire tonemap: density-estimation filter + log-density + gamma/vibrancy

@@ -5,6 +5,7 @@ import { flameToXML, importFlameText } from '../core/flameXML';
 import { pickSave, saveBlob, saveText } from './saveFile';
 import { renderHiRes, resolveSize, SIZE_OPTIONS, QUALITY_OPTIONS } from './hiresExport';
 import { openBatchExport } from './batchExport';
+import { buildSolidSection } from './solidPanel';
 
 const SRC = 'render';
 
@@ -398,7 +399,8 @@ export function buildRenderPanel(app: App, root: HTMLElement) {
     }
   };
 
-  root.append(cam, dof, tone, perf, io);
+  const solidSec = buildSolidSection(app);
+  root.append(cam, dof, solidSec, tone, perf, io);
 
   app.on('flame', (src) => {
     if (src === SRC) return;

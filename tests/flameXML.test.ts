@@ -127,3 +127,53 @@ describe('JWildfire fixtures', () => {
     }
   });
 });
+
+describe('JWildfire solid rendering (sld_render_*)', () => {
+  // attribute names as JWildfire writes them (incl. its typos ligtht/diif/mappping), values non-default throughout
+  const jwf = `<flame name="solid" size="200 200" center="0 0" scale="50" sld_render_enabled="1" sld_render_ao_enabled="0" sld_render_ao_intensity="0.3" sld_render_ao_search_radius="5.0" sld_render_ao_blur_radius="2.5" sld_render_ao_radius_samples="4" sld_render_ao_azimuth_samples="9" sld_render_ao_falloff="0.7" sld_render_ao_affect_diffuse="0.2" sld_render_shadow_type="SMOOTH" sld_render_shadow_smooth_radius="1.5" sld_render_shadowmap_size="1024" sld_render_shadowmap_bias="0.02" sld_render_material_count="2" sld_render_material_diffuse0="0.4" sld_render_material_ambient0="0.6" sld_render_material_phong0="0.0794" sld_render_material_phong_size0="12.0" sld_render_material_phong_red0="1.0" sld_render_material_phong_green0="0.5" sld_render_material_phong_blue0="0.25" sld_render_material_refl_map_intensity0="0.5" sld_render_material_refl_map_filename0="" sld_render_material_refl_mappping0="BLINN_NEWELL" sld_render_material_light_diif_func0="COSA_HALVE" sld_render_material_diffuse1="0.1" sld_render_material_ambient1="0.8" sld_render_material_phong1="0.6" sld_render_material_phong_size1="15.0" sld_render_material_phong_red1="1.0" sld_render_material_phong_green1="1.0" sld_render_material_phong_blue1="1.0" sld_render_material_refl_map_intensity1="0.5" sld_render_material_refl_map_filename1="" sld_render_material_refl_mappping1="SPHERICAL" sld_render_material_light_diif_func1="COSA" sld_render_ligtht_count="2" sld_render_light_altitude0="-123.8096" sld_render_light_altitude0_enabled="false" sld_render_light_altitude0_point_count="1" sld_render_light_altitude0_x0="1" sld_render_light_altitude0_y0="-123.8096" sld_render_light_azimuth0="-85.7142" sld_render_light_intensity0="0.9" sld_render_light_shadow_intensity0="0.7" sld_render_light_red0="1.0" sld_render_light_green0="0.9" sld_render_light_blue0="0.8" sld_render_light_shadows0="1" sld_render_light_altitude1="64.0" sld_render_light_azimuth1="55.0" sld_render_light_intensity1="0.6" sld_render_light_shadow_intensity1="0.7" sld_render_light_red1="1.0" sld_render_light_green1="1.0" sld_render_light_blue1="1.0" sld_render_light_shadows1="0">
+  <xform weight="0.5" color="0.0" material="0.3" material_speed="0.0" linear3D="1.0" coefs="1.0 0.0 0.0 1.0 0.0 0.0"/>
+  <xform weight="0.5" color="1.0" spherical3D="1.0" coefs="0.5 0.0 0.0 0.5 0.5 0.0"/>
+</flame>`;
+
+  it('imports the JWildfire attribute set (lights, materials, AO, shadows, per-xform material)', () => {
+    const { flame: f, unknown } = importFlameText(jwf, GREY);
+    expect(unknown).toEqual([]);
+    const s = f.solid!;
+    expect(s.enabled).toBe(true);
+    expect(s.ao).toEqual({ enabled: false, intensity: 0.3, searchRadius: 5, blurRadius: 2.5, radiusSamples: 4, azimuthSamples: 9, falloff: 0.7, affectDiffuse: 0.2 });
+    expect(s.shadows).toEqual({ type: 'SMOOTH', smoothRadius: 1.5, mapSize: 1024, bias: 0.02 });
+    expect(s.materials.length).toBe(2);
+    expect(s.materials[0]).toMatchObject({ diffuse: 0.4, ambient: 0.6, phong: 0.0794, phongSize: 12, phongColor: [1, 0.5, 0.25], diffFunc: 'COSA_HALVE', reflMapping: 'BLINN_NEWELL' });
+    expect(s.materials[1]).toMatchObject({ diffuse: 0.1, ambient: 0.8, phong: 0.6, phongSize: 15, diffFunc: 'COSA', reflMapping: 'SPHERICAL' });
+    expect(s.lights.length).toBe(2);
+    expect(s.lights[0]).toMatchObject({ altitude: -123.8096, azimuth: -85.7142, intensity: 0.9, color: [1, 0.9, 0.8], castShadows: true, shadowIntensity: 0.7 });
+    expect(s.lights[1]).toMatchObject({ altitude: 64, azimuth: 55, intensity: 0.6, castShadows: false });
+    expect(f.layers[0].xforms[0].material).toBe(0.3);
+    expect(f.layers[0].xforms[1].material).toBeUndefined();
+  });
+
+  it('enabled without counts falls back to JWildfire\'s default lights/material; absent = off', () => {
+    const { flame: f } = importFlameText('<flame name="s" size="10 10" scale="5" sld_render_enabled="1"><xform weight="1" linear="1" coefs="1 0 0 1 0 0"/></flame>', GREY);
+    expect(f.solid?.enabled).toBe(true);
+    expect(f.solid?.lights.map((l) => [l.altitude, l.azimuth, l.intensity, l.castShadows])).toEqual([[55, -22, 0.8, true], [64, 55, 0.6, false]]);
+    expect(f.solid?.materials.length).toBe(1);
+    expect(f.solid?.materials[0]).toMatchObject({ ambient: 0.5, diffuse: 0.7, phong: 0.6, phongSize: 24 });
+    expect(f.solid?.ao.enabled).toBe(true);
+    expect(f.solid?.shadows.type).toBe('OFF');
+    const { flame: g } = importFlameText('<flame name="s" size="10 10" scale="5"><xform weight="1" linear="1" coefs="1 0 0 1 0 0"/></flame>', GREY);
+    expect(g.solid).toBeUndefined();
+  });
+
+  it('round-trips through our writer and JSON', () => {
+    const { flame: f } = importFlameText(jwf, GREY);
+    const { flame: back, unknown } = roundTrip(f);
+    expect(unknown).toEqual([]);
+    expect(back.solid).toEqual(f.solid);
+    expect(back.layers[0].xforms[0].material).toBe(0.3);
+    expect(normalizeFlame(JSON.parse(flameToJSON(f)), GREY).solid).toEqual(f.solid);
+    // solid off → nothing written
+    const off = { ...f, solid: { ...f.solid!, enabled: false } };
+    expect(flameToXML(off)).not.toContain('sld_render');
+    expect(roundTrip(off).flame.solid).toBeUndefined();
+  });
+});

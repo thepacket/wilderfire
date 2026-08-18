@@ -31,6 +31,7 @@ licence rather than a permissive one.
 | `Dump.java`, `Oracle.java` | `scripts/jwf-port/` | link against JWildfire classes at build time (JWildfire itself is not redistributed here) | LGPL-2.1-or-later |
 | The 70 hand-written "classic" variations | `src/core/variations.ts` | written from the published flam3 / Apophysis formulas (Draves & Reckase, *The Fractal Flame Algorithm*) | original code, LGPL-2.1-or-later as part of WilderFire |
 | Tonemap (log-density, gamma threshold, vibrancy) and density-estimation filter | `src/gpu/` | reimplemented from the flam3 paper / algorithm description; no flam3 code copied | original code |
+| Solid rendering (z-buffer surface shading: normals from the origin neighbourhood, distant lights, Phong materials, filter-in-raster-cells, coverage alpha) | `src/gpu/solid.wgsl.ts`, `src/gpu/filters.ts` (`solidFilterWeights`) | ported from JWildfire `base/raster/RasterFloatIntForSolidRendering`, `NormalsCalculator`, `render/LogDensityFilter.addSolidColors`, `GammaCorrectionFilter`, `LightViewCalculator`, `FilterHolder` (WGSL/TypeScript rewrite of the algorithms) | LGPL-2.1-or-later |
 | `mp4-muxer`, `webm-muxer` | npm dependencies (bundled at build) | Vanilagy | MIT |
 | `vite`, `typescript`, `@webgpu/types` | dev dependencies (not shipped) | — | MIT / Apache-2.0 / BSD-3-Clause |
 
