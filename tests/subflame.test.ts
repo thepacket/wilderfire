@@ -1,4 +1,4 @@
-import { describe, it, expect } from 'vitest';
+import { describe, it, expect, vi } from 'vitest';
 import { compileFlame, parseSubFlame } from '../src/gpu/codegen';
 import { importFlameText, flameToXML } from '../src/core/flameXML';
 import { DFLT_SUBFLAME_XML } from '../src/core/variations';
@@ -14,7 +14,9 @@ describe('subflame_wf (nested flame compiled into the kernel)', () => {
     expect(d.layer.final).toBeNull();
     const withFinal = parseSubFlame('<flame name="s" size="10 10" scale="10"><xform weight="1" linear="1" coefs="1 0 0 1 0 0"/><finalxform color="0.5" symmetry="0" linear="1" coefs="1 0 0 1 0 0"/></flame>', GREY)!;
     expect(withFinal.layer.final?.colorSpeed).toBeCloseTo(0.5, 9); // (1 − symmetry)/2, kept because the sub-flame final recolours
+    const warn = vi.spyOn(console, 'warn').mockImplementation(() => {}); // the broken XML is meant to be rejected
     expect(parseSubFlame('<nonsense', GREY)).toBeNull();
+    warn.mockRestore();
   });
 
   it('imports the hex flame resource untouched, keeps the default out of the model, exports it back and compiles the nested kernel', () => {

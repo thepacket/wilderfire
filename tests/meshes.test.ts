@@ -16,7 +16,11 @@ describe('mesh primitives (obj_mesh_primitive_wf)', () => {
       expect(m.pos.length % 3, n).toBe(0);
       expect(m.idx.length % 3, n).toBe(0);
       expect(m.idx.length, n).toBeGreaterThan(0);
-      for (const i of m.idx) expect(i, n).toBeLessThan(m.pos.length / 3);
+      // (a plain loop: the mandelbulb has 373k indices — one expect per index times out on a cold CI box)
+      const nV = m.pos.length / 3;
+      let bad = 0;
+      for (let k = 0; k < m.idx.length; k++) if (m.idx[k] >= nV) bad++;
+      expect(bad, n).toBe(0);
     }
     const ball = bin('ball');
     expect(ball.pos.length / 3).toBe(642); // SimpleMesh.addVertex de-dupes the 3840 OBJ corners at 1e-4
@@ -24,7 +28,7 @@ describe('mesh primitives (obj_mesh_primitive_wf)', () => {
     let r = 0; for (let i = 0; i < ball.pos.length; i += 3) r = Math.max(r, Math.hypot(ball.pos[i], ball.pos[i + 1], ball.pos[i + 2]));
     expect(r).toBeCloseTo(0.5, 5); // JWildfire's ball has radius 0.5
     expect(bin('box').idx.length / 3).toBe(12); // 6 quads → 12 triangles
-  });
+  }, 20000);
 
   it('subdivide quadruples the faces (shared midpoints de-duplicated); Taubin smoothing keeps the vertex count', () => {
     const cube = defaultMesh();
