@@ -3,7 +3,7 @@
 // See LICENSE and NOTICE.md (third-party material, notably JWildfire-derived code).
 import './style.css';
 import { App, el, openModal } from './ui/common';
-import { Composer } from './gpu/composer';
+import { FlameRenderer } from './gpu/renderer';
 import { PRESETS } from './core/presets';
 import { randomFlame } from './core/random';
 import { buildTransformsPanel } from './ui/transformsPanel';
@@ -11,10 +11,7 @@ import { buildRenderPanel } from './ui/renderPanel';
 import { buildPalettePanel } from './ui/palettePanel';
 import { buildAIPanel } from './ui/aiPanel';
 import { buildAnimPanel, type AnimState } from './ui/animPanel';
-import { buildLibrary, loadAutosave, restoreComposition } from './ui/library';
-import { wrapFlame } from './core/composition';
-import { buildComposePanel } from './ui/composePanel';
-import { buildEscapePanel } from './ui/escapePanel';
+import { buildLibrary, loadAutosave, restoreFlame } from './ui/library';
 import { buildMutate } from './ui/mutate';
 import { buildOverlay } from './ui/overlay';
 import { loadJwfVariations } from './core/variations';
@@ -220,7 +217,7 @@ async function boot() {
 
   // ---------- Right panel tabs ----------
   const tabs = el('div', 'tabs');
-  const tabDefs = ['Render', 'Escape', 'Gradient', 'Anim', 'AI'] as const;
+  const tabDefs = ['Render', 'Gradient', 'Anim', 'AI'] as const;
   const bodies: HTMLElement[] = [];
   tabDefs.forEach((name, i) => {
     const b = el('button', i === 0 ? 'active' : '', name);
@@ -235,10 +232,10 @@ async function boot() {
   right.append(tabs, ...bodies);
 
   // ---------- Renderer ----------
-  const renderer = new Composer(canvas);
+  const renderer = new FlameRenderer(canvas);
   app.renderer = renderer;
   const saved = loadAutosave();
-  app.comp = saved ? restoreComposition(saved as { flame: unknown }, PRESETS[0].make()) : wrapFlame(PRESETS[0].make());
+  app.flame = saved ? restoreFlame(saved as { flame: unknown }, PRESETS[0].make()) : PRESETS[0].make();
 
   try {
     await renderer.init();
@@ -270,7 +267,6 @@ async function boot() {
   renderer.onError = (msg) => { status.textContent = '⚠ ' + msg; };
   renderer.onFrame = (s) => {
     const mps = s.samplesPerSec / 1e6;
-    if (s.note) { status.textContent = swNote + s.note + (s.converged ? ' · done' : ' · rendering') + ` · ${renderer.width}×${renderer.height}`; return; }
     status.textContent = swNote +
       `quality ${s.spp.toFixed(0)} spp` +
       (s.converged ? ' · done' : s.paused ? ' · paused' : ` · ${mps.toFixed(0)} M iters/s`) +
@@ -280,16 +276,11 @@ async function boot() {
 
   // ---------- Panels ----------
   const overlay = buildOverlay(app, overlayCanvas, wrap);
-  buildComposePanel(app, left);
   buildTransformsPanel(app, left);
   buildRenderPanel(app, bodies[0]);
-  buildEscapePanel(app, bodies[1]);
-  buildPalettePanel(app, bodies[2]);
-  const anim = buildAnimPanel(app, bodies[3], overlay);
-  buildAIPanel(app, bodies[4]);
-  // selecting an escape-time layer opens its tab
-  const showTab = (i: number) => { tabs.querySelectorAll('button').forEach((x, k) => x.classList.toggle('active', k === i)); bodies.forEach((x, k) => x.classList.toggle('active', k === i)); };
-  app.on('comp', () => { if (app.escapeLayer && !bodies[1].classList.contains('active')) showTab(1); });
+  buildPalettePanel(app, bodies[1]);
+  const anim = buildAnimPanel(app, bodies[2], overlay);
+  buildAIPanel(app, bodies[3]);
   if (saved?.anim) anim.setState(saved.anim as AnimState);
   const library = buildLibrary(app, anim);
   saveBtn.onclick = () => {
@@ -309,7 +300,7 @@ async function boot() {
 
   new ResizeObserver(fit).observe(wrap);
   fit();
-  app.setComposition(app.comp);
+  app.setFlame(app.flame);
 
   // Offline: the build ships a service worker (vite.config.ts) that precaches this build's assets;
   // production only, so the dev server's modules are never cached. A newer build waiting to

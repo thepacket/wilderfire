@@ -6,15 +6,7 @@
 import { Muxer as WebMMuxer, ArrayBufferTarget as WebMTarget } from 'webm-muxer';
 import { Muxer as Mp4Muxer, ArrayBufferTarget as Mp4Target } from 'mp4-muxer';
 import type { Flame } from '../core/flame';
-
-/** What the frame loop needs from the renderer — the Composer (layer stack) or a single FlameRenderer. */
-export interface VideoSource {
-  width: number; height: number; nPoints: number; itersPerPass: number;
-  setFlame(f: Flame): void;
-  stepExport(passes: number): Promise<void>;
-  captureSync<T>(fn: (canvas: HTMLCanvasElement) => T): T;
-  renderRegion(o: { fullW: number; fullH: number; tileX: number; tileY: number; tileW: number; tileH: number; spp: number; transparent?: boolean }): Promise<Uint8ClampedArray<ArrayBuffer>>;
-}
+import type { FlameRenderer } from '../gpu/renderer';
 
 /** What the Anim panel exposes for rendering: the timeline's span and the flame at a time. */
 export interface Timeline {
@@ -56,7 +48,7 @@ export const videoMime = (f: VideoFormat) => (f === 'mp4' ? 'video/mp4' : 'video
  * Render + encode. The caller owns the renderer state: set `renderer.exporting = true`
  * before and restore the flame (`renderer.setFlame(app.flame)`) after.
  */
-export async function renderVideo(renderer: VideoSource, tl: Timeline, o: VideoOpts): Promise<Blob> {
+export async function renderVideo(renderer: FlameRenderer, tl: Timeline, o: VideoOpts): Promise<Blob> {
   if (!('VideoEncoder' in window)) throw new Error('WebCodecs (VideoEncoder) is not available in this browser.');
   const { fps, passes, format } = o;
   const nFrames = Math.max(2, Math.round(Math.max(tl.total, 0.01) * fps) + 1);

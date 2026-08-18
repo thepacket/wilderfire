@@ -37,29 +37,13 @@ export interface RenderStats {
   budgetScale: number;
   /** measured GPU time per preview frame (ms, smoothed) */
   gpuMs: number;
-  /** free-form status of a non-flame layer (escape: tier, reference length, frame cost) */
-  note?: string;
 }
 
 export class FlameRenderer {
   private device!: GPUDevice;
-  private context: GPUCanvasContext | null = null;
+  private context!: GPUCanvasContext;
   private format!: GPUTextureFormat;
-  /** the canvas this renderer presents to — null for an offscreen (composition layer) renderer */
-  private canvas: HTMLCanvasElement | null;
-  /** offscreen mode: the layer texture (rgba16float, straight alpha) the live view presents into */
-  private layerTex: GPUTexture | null = null;
-  private layerView: GPUTextureView | null = null;
-  private w0 = 2;
-  private h0 = 2;
-  /** driven mode: no own rAF loop — an external composer calls `tick()` */
-  driven = false;
-  /** live output with straight alpha (transparent where nothing is plotted) — composition layers above the bottom */
-  transparentBg = false;
-  /** set after every present of the live view (the composer re-blends the layers when any of them changed) */
-  presented = false;
-  /** (driven) skip this tick's accumulation — the composer hands the GPU to another layer for a frame */
-  holdOnce = false;
+  private canvas: HTMLCanvasElement;
 
   private histBuf!: GPUBuffer;
   private ptsBuf!: GPUBuffer;
@@ -158,29 +142,22 @@ export class FlameRenderer {
   onError: ((msg: string) => void) | null = null;
   onFrame: ((stats: RenderStats) => void) | null = null;
 
-  /** `canvas` = the canvas to present to; null = an offscreen layer renderer (call `setOffscreen()`; it presents into `layerTexture`). */
-  constructor(canvas: HTMLCanvasElement | null) {
+  constructor(canvas: HTMLCanvasElement) {
     this.canvas = canvas;
-    if (canvas) { this.w0 = canvas.width; this.h0 = canvas.height; }
   }
-  /** the layer texture of an offscreen renderer (recreated on resize — re-fetch after `resize()`) */
-  get layerTexture(): GPUTexture | null { return this.layerTex; }
 
   /** The GPU device (available after init). Used by dev tooling. */
   get gpuDevice(): GPUDevice { return this.device; }
 
-  /** The one GPU device of the page (every renderer shares it). */
-  static async createDevice(): Promise<GPUDevice> {
+  async init(): Promise<void> {
     if (!navigator.gpu) throw new Error('WebGPU is not available in this browser.');
     const adapter = await navigator.gpu.requestAdapter({ powerPreference: 'high-performance' });
     if (!adapter) throw new Error('No WebGPU adapter found.');
     // Raise storage limits so 2× oversampled histograms fit on capable GPUs.
     const wantBind = Math.min(adapter.limits.maxStorageBufferBindingSize, 1 << 30);
     const wantBuf = Math.min(adapter.limits.maxBufferSize, 1 << 30);
-    return adapter.requestDevice({
-      // GPU timestamps (when the adapter has them) let the escape-time layers meter their own band cost instead of
-      // guessing from queue completion (which includes every other layer's work)
-      requiredFeatures: adapter.features.has('timestamp-query') ? ['timestamp-query'] : [],
+    this.maxHistBytes = Math.min(wantBind, wantBuf);
+    this.device = await adapter.requestDevice({
       requiredLimits: {
         maxStorageBufferBindingSize: wantBind,
         maxBufferSize: wantBuf,
@@ -188,27 +165,14 @@ export class FlameRenderer {
         maxStorageBuffersPerShaderStage: Math.min(Math.max(adapter.limits.maxStorageBuffersPerShaderStage, 8), 10),
       },
     });
-  }
+    this.device.addEventListener('uncapturederror', (e) => {
+      console.error('WebGPU error:', (e as GPUUncapturedErrorEvent).error.message);
+      this.onError?.((e as GPUUncapturedErrorEvent).error.message);
+    });
 
-  /** `device`: share the page's device (compositions run one renderer per layer); omitted = create one. */
-  async init(device?: GPUDevice): Promise<void> {
-    this.device = device ?? await FlameRenderer.createDevice();
-    this.maxHistBytes = Math.min(this.device.limits.maxStorageBufferBindingSize, this.device.limits.maxBufferSize);
-    if (!device) {
-      this.device.addEventListener('uncapturederror', (e) => {
-        console.error('WebGPU error:', (e as GPUUncapturedErrorEvent).error.message);
-        this.onError?.((e as GPUUncapturedErrorEvent).error.message);
-      });
-    }
-
-    if (this.canvas) {
-      this.context = this.canvas.getContext('webgpu')!;
-      this.format = navigator.gpu.getPreferredCanvasFormat();
-      this.context.configure({ device: this.device, format: this.format, alphaMode: 'opaque' });
-    } else {
-      this.format = 'rgba16float';
-      this.setOffscreen(this.w0, this.h0);
-    }
+    this.context = this.canvas.getContext('webgpu')!;
+    this.format = navigator.gpu.getPreferredCanvasFormat();
+    this.context.configure({ device: this.device, format: this.format, alphaMode: 'opaque' });
 
     const d = this.device;
     this.ptsBuf = d.createBuffer({ size: this.nPoints * 16, usage: GPUBufferUsage.STORAGE | GPUBufferUsage.COPY_DST });
@@ -305,23 +269,11 @@ export class FlameRenderer {
     });
 
     this.allocHistogram();
-    if (!this.driven) this.raf = requestAnimationFrame(this.frame);
+    this.raf = requestAnimationFrame(this.frame);
   }
 
-  get width() { return this.canvas ? this.canvas.width : this.w0; }
-  get height() { return this.canvas ? this.canvas.height : this.h0; }
-
-  /** (offscreen renderer) create/replace the layer texture at w×h */
-  private setOffscreen(w: number, h: number) {
-    this.w0 = Math.max(2, w); this.h0 = Math.max(2, h);
-    this.layerTex?.destroy();
-    this.layerTex = this.device.createTexture({ size: [this.w0, this.h0], format: 'rgba16float', usage: GPUTextureUsage.RENDER_ATTACHMENT | GPUTextureUsage.TEXTURE_BINDING | GPUTextureUsage.COPY_SRC });
-    this.layerView = this.layerTex.createView();
-  }
-  /** the view the live tonemap presents into (canvas or layer texture) */
-  private targetView(): GPUTextureView {
-    return this.context ? this.context.getCurrentTexture().createView() : this.layerView!;
-  }
+  get width() { return this.canvas.width; }
+  get height() { return this.canvas.height; }
 
   /** Change the oversample factor (recreates the histogram). Returns the factor actually applied. */
   setOversample(os: number): number {
@@ -537,9 +489,8 @@ export class FlameRenderer {
 
   resize(w: number, h: number) {
     if (w === this.width && h === this.height) return;
-    if (!this.device) { this.w0 = Math.max(2, w); this.h0 = Math.max(2, h); return; } // before init(): just the initial offscreen size
-    if (this.canvas) { this.canvas.width = Math.max(2, w); this.canvas.height = Math.max(2, h); }
-    else this.setOffscreen(w, h);
+    this.canvas.width = Math.max(2, w);
+    this.canvas.height = Math.max(2, h);
     this.allocHistogram();
     this.resetAccumulation();
     this.hasPresented = false; // canvas was cleared by the resize: present right away
@@ -1108,19 +1059,8 @@ export class FlameRenderer {
     // live view: the AO passes (the costliest part of a solid present) refresh every third presented frame while
     // accumulating — the z-buffer changes slowly once the surface is in; captures/exports always refresh
     const refreshAO = !live || (this.aoTick++ % 3) === 0;
-    const clear = { r: 0, g: 0, b: 0, a: this.transparentBg ? 0 : 1 };
-    if (this.solid && this.solidLive) this.encodeSolid(enc, this.solidLive, this.width * os, this.height * os, this.solidPipe, view, clear, refreshAO);
-    else this.encodeTonemap(enc, this.renderBG!, this.renderPipeline, view, this.width, this.height, false, clear);
-    this.presented = true;
-  }
-
-  /** (driven renderer) present the current accumulation into the layer texture now — the composer's capture path */
-  presentNow() {
-    if (!this.flame || !this.computePipeline || !this.renderBG) return;
-    this.writeUniforms(this.samples / Math.max(this.width * this.height, 1), undefined, this.transparentBg);
-    const enc = this.device.createCommandEncoder();
-    this.presentTo(enc, this.targetView());
-    this.device.queue.submit([enc.finish()]);
+    if (this.solid && this.solidLive) this.encodeSolid(enc, this.solidLive, this.width * os, this.height * os, this.solidPipe, view, { r: 0, g: 0, b: 0, a: 1 }, refreshAO);
+    else this.encodeTonemap(enc, this.renderBG!, this.renderPipeline, view, this.width, this.height, false, { r: 0, g: 0, b: 0, a: 1 });
   }
 
   /** Draw the tonemap pass and hand the canvas to `fn` synchronously, in the
@@ -1128,32 +1068,25 @@ export class FlameRenderer {
    *  so captures (VideoFrame, toBlob, drawImage) must not happen after an
    *  await. Queue ordering guarantees `fn` sees the finished image. */
   captureSync<T>(fn: (canvas: HTMLCanvasElement) => T): T {
-    if (!this.canvas) throw new Error('captureSync: offscreen renderer (capture through the composer)');
-    this.writeUniforms(this.samples / Math.max(this.width * this.height, 1), undefined, this.transparentBg);
+    this.writeUniforms(this.samples / Math.max(this.width * this.height, 1));
     const enc = this.device.createCommandEncoder();
-    this.presentTo(enc, this.targetView());
+    const view = this.context.getCurrentTexture().createView();
+    this.presentTo(enc, view);
     this.device.queue.submit([enc.finish()]);
     return fn(this.canvas);
   }
 
   private frame = (t: number) => {
     this.raf = requestAnimationFrame(this.frame);
-    this.tick(t);
-  };
-
-  /** One live-view step: accumulate (unless converged/paused) and present when due. Returns the stats
-   *  (also handed to `onFrame`). A driven renderer's composer calls this from its own loop. */
-  tick(t: number): RenderStats | null {
-    if (this.exporting) return null;
+    if (this.exporting) return;
     const f = this.flame;
-    if (!f || !this.computePipeline || !this.computeBG || !this.renderBG) return null;
+    if (!f || !this.computePipeline || !this.computeBG || !this.renderBG) return;
 
     const w = this.width, h = this.height;
     const os2 = this.oversample * this.oversample;
     const spp = this.samples / Math.max(w * h * os2, 1);
     const converged = spp >= this.targetQuality;
-    const hold = this.holdOnce; this.holdOnce = false;
-    const accumulate = !this.paused && !converged && !hold;
+    const accumulate = !this.paused && !converged;
 
     const dt = this.lastT ? (t - this.lastT) / 1000 : 0;
     this.lastT = t;
@@ -1163,9 +1096,8 @@ export class FlameRenderer {
     // Idle: converged (or paused) and nothing to redraw → do no GPU work at all.
     // The canvas keeps its last presented frame. invalidate() wakes us up.
     if (!accumulate && !this.needsPresent) {
-      const st = { spp, samplesPerSec: 0, paused: this.paused, converged, budgetScale: this.budgetScale, gpuMs: this.gpuMs };
-      this.onFrame?.(st);
-      return st;
+      this.onFrame?.({ spp, samplesPerSec: 0, paused: this.paused, converged, budgetScale: this.budgetScale, gpuMs: this.gpuMs });
+      return;
     }
 
     // Adaptive budget: shrink the iterations per preview pass while the GPU time per frame overshoots the
@@ -1195,7 +1127,7 @@ export class FlameRenderer {
     }
     this.shadowMode = this.samples >= this.nPoints * FlameRenderer.SHADOW_BOUNDS_ITERS ? 2 : 1; // bounds from the points plotted so far
     if (accumulate) this.samples += this.countIters(perPass * passes);
-    this.writeUniforms(this.samples / Math.max(w * h, 1), undefined, this.transparentBg, iters); // tonemap spp is per output pixel
+    this.writeUniforms(this.samples / Math.max(w * h, 1), undefined, false, iters); // tonemap spp is per output pixel
 
     if (accumulate) {
       // the compute passes go in their own submission so the budget probe measures them (plus any
@@ -1228,7 +1160,8 @@ export class FlameRenderer {
     const sppAfter = this.samples / Math.max(w * h, 1);
     const present = !accumulate || sppAfter >= this.minDisplaySpp || !this.hasPresented;
     if (present) {
-      this.presentTo(enc, this.targetView(), accumulate);
+      const view = this.context.getCurrentTexture().createView();
+      this.presentTo(enc, view, accumulate);
       this.hasPresented = true;
       this.needsPresent = false;
     }
@@ -1238,10 +1171,8 @@ export class FlameRenderer {
       const sps = (perPass * passes) / dt;
       this.emaSps = this.emaSps ? this.emaSps * 0.95 + sps * 0.05 : sps;
     }
-    const st = { spp, samplesPerSec: this.emaSps, paused: this.paused, converged, budgetScale: this.budgetScale, gpuMs: this.gpuMs };
-    this.onFrame?.(st);
-    return st;
-  }
+    this.onFrame?.({ spp, samplesPerSec: this.emaSps, paused: this.paused, converged, budgetScale: this.budgetScale, gpuMs: this.gpuMs });
+  };
 
   /** Dev diagnostic: total opacity-weighted hits in the live histogram and the count at a pixel. */
   async debugHistStats(px = -1, py = -1): Promise<{ hits: number; atPixel: number; cells: number }> {
@@ -1269,9 +1200,5 @@ export class FlameRenderer {
 
   destroy() {
     cancelAnimationFrame(this.raf);
-    this.layerTex?.destroy();
-    this.layerTex = null;
-    this.flame = null;
-    this.compiled = null;
   }
 }

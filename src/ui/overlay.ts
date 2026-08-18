@@ -2,13 +2,12 @@
 // Each triangle visualizes an xform's affine: O = translation (c,f),
 // X = O + (a,d), Y = O + (b,e). Dragging a handle edits the affine directly.
 import { App, XFORM_COLORS } from './common';
-import { escapeMoveCentre } from '../core/escape';
 
 const HANDLE_R = 14; // hit radius in CSS px
 
 type DragState =
   | { kind: 'handle'; xi: number; vertex: 0 | 1 | 2 }
-  | { kind: 'pan'; startX: number; startY: number; startCX: number; startCY: number; lastX?: number; lastY?: number }
+  | { kind: 'pan'; startX: number; startY: number; startCX: number; startCY: number }
   | null;
 
 export function buildOverlay(app: App, overlay: HTMLCanvasElement, wrap: HTMLElement) {
@@ -18,13 +17,10 @@ export function buildOverlay(app: App, overlay: HTMLCanvasElement, wrap: HTMLEle
   let dpr = window.devicePixelRatio || 1;
 
   const flameOf = () => app.flame;
-  /** the selected escape-time layer (its view is navigated instead of the flame's; no triangles) */
-  const esc = () => app.escapeLayer?.escape ?? null;
-  /** what pan/zoom edit: the escape layer's view or the flame camera (same field names) */
-  const viewOf = () => esc() ?? flameOf();
 
   function ppu(): number {
-    return 0.25 * Math.min(overlay.width, overlay.height) * viewOf().zoom;
+    const f = flameOf();
+    return 0.25 * Math.min(overlay.width, overlay.height) * f.zoom;
   }
 
   // world -> device px
@@ -41,13 +37,6 @@ export function buildOverlay(app: App, overlay: HTMLCanvasElement, wrap: HTMLEle
 
   // device px -> world
   function s2w(px: number, py: number): [number, number] {
-    const e = esc();
-    if (e) {
-      // escape layers: +y up, world = centre + R(rotation)·screen offset (escapeRenderer.ts)
-      const dx = (px - overlay.width / 2) / ppu(), dy = (overlay.height / 2 - py) / ppu();
-      const cs = Math.cos(e.rotation), sn = Math.sin(e.rotation);
-      return [e.centerX + cs * dx - sn * dy, e.centerY + sn * dx + cs * dy];
-    }
     const f = flameOf();
     const rx = (px - overlay.width / 2) / ppu();
     const ry = (py - overlay.height / 2) / ppu();
@@ -69,7 +58,7 @@ export function buildOverlay(app: App, overlay: HTMLCanvasElement, wrap: HTMLEle
 
   function draw() {
     ctx.clearRect(0, 0, overlay.width, overlay.height);
-    if (!visible || esc()) return;
+    if (!visible) return;
     const ly = app.activeLayer;
     const items: number[] = ly.xforms.map((_, i) => i);
     if (ly.final) items.push(-1);
@@ -140,14 +129,14 @@ export function buildOverlay(app: App, overlay: HTMLCanvasElement, wrap: HTMLEle
 
   overlay.addEventListener('pointerdown', (e) => {
     const [px, py] = evPos(e);
-    const hit = visible && !esc() ? hitTest(px, py) : null;
+    const hit = visible ? hitTest(px, py) : null;
     if (hit) {
       if (app.selected !== hit.xi) app.select(hit.xi);
       drag = { kind: 'handle', xi: hit.xi, vertex: hit.vertex };
     } else {
       drag = {
         kind: 'pan', startX: px, startY: py,
-        startCX: viewOf().centerX, startCY: viewOf().centerY,
+        startCX: flameOf().centerX, startCY: flameOf().centerY,
       };
     }
     overlay.setPointerCapture(e.pointerId);
@@ -156,26 +145,17 @@ export function buildOverlay(app: App, overlay: HTMLCanvasElement, wrap: HTMLEle
   overlay.addEventListener('pointermove', (e) => {
     const [px, py] = evPos(e);
     if (!drag) {
-      overlay.style.cursor = visible && !esc() && hitTest(px, py) ? 'grab' : 'crosshair';
+      overlay.style.cursor = visible && hitTest(px, py) ? 'grab' : 'crosshair';
       return;
     }
     if (drag.kind === 'pan') {
-      const e = esc();
+      const f = flameOf();
       const scale = ppu();
       const dx = (px - drag.startX) / scale;
       const dy = (py - drag.startY) / scale;
-      if (e) {
-        // incremental world deltas (deep views keep the exact centre in decimal strings — see escapeMoveCentre)
-        const ddx = (px - (drag.lastX ?? drag.startX)) / scale, ddy = (py - (drag.lastY ?? drag.startY)) / scale;
-        drag.lastX = px; drag.lastY = py;
-        const cs = Math.cos(e.rotation), sn = Math.sin(e.rotation);
-        escapeMoveCentre(e, -(cs * ddx + sn * ddy), -(sn * ddx - cs * ddy));
-      } else {
-        const f = flameOf();
-        const ca = Math.cos(-f.rotation), sa = Math.sin(-f.rotation);
-        f.centerX = drag.startCX - (dx * ca - dy * sa);
-        f.centerY = drag.startCY - (dx * sa + dy * ca);
-      }
+      const ca = Math.cos(-f.rotation), sa = Math.sin(-f.rotation);
+      f.centerX = drag.startCX - (dx * ca - dy * sa);
+      f.centerY = drag.startCY - (dx * sa + dy * ca);
       app.commit('overlay-view');
       draw();
       return;
@@ -208,24 +188,10 @@ export function buildOverlay(app: App, overlay: HTMLCanvasElement, wrap: HTMLEle
 
   overlay.addEventListener('wheel', (e) => {
     e.preventDefault();
+    const f = flameOf();
     const [px, py] = evPos(e as unknown as PointerEvent);
-    const factor = Math.pow(1.0016, -e.deltaY);
-    const es = esc();
-    if (es) {
-      // zoom about the pointer: the world offset under the pointer before/after, as offsets (exact-centre safe)
-      const dx = px - overlay.width / 2, dy = overlay.height / 2 - py;
-      const cs = Math.cos(es.rotation), sn = Math.sin(es.rotation);
-      const rx = cs * dx - sn * dy, ry = sn * dx + cs * dy;
-      const p0 = ppu();
-      es.zoom = Math.min(1e300, Math.max(0.02, es.zoom * factor));
-      const p1 = ppu();
-      escapeMoveCentre(es, rx / p0 - rx / p1, ry / p0 - ry / p1);
-      app.commit('overlay-view');
-      draw();
-      return;
-    }
-    const f = viewOf();
     const [wxBefore, wyBefore] = s2w(px, py);
+    const factor = Math.pow(1.0016, -e.deltaY);
     f.zoom = Math.min(64, Math.max(0.02, f.zoom * factor));
     const [wxAfter, wyAfter] = s2w(px, py);
     f.centerX += wxBefore - wxAfter;
@@ -242,7 +208,6 @@ export function buildOverlay(app: App, overlay: HTMLCanvasElement, wrap: HTMLEle
   };
 
   app.on('flame', draw);
-  app.on('comp', draw);
   app.on('select', draw);
   app.on('tone', draw);
   app.on('preview', draw);

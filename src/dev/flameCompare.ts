@@ -60,8 +60,8 @@ export async function runFlameCompare(app: App, opts: CompareOpts = {}): Promise
       const H = Math.max(16, Math.round(W * fh / fw));
       const { flame } = importFlameText(it.xml, app.activeLayer.palette);
       app.setFlame(flame);
-      app.renderer.layerRenderer.setFlame(app.flame);
-      const px = await app.renderer.layerRenderer.renderRegion({ fullW: W, fullH: H, tileX: 0, tileY: 0, tileW: W, tileH: H, spp: quality });
+      app.renderer.setFlame(app.flame);
+      const px = await app.renderer.renderRegion({ fullW: W, fullH: H, tileX: 0, tileY: 0, tileW: W, tileH: H, spp: quality });
       const cv = document.createElement('canvas'); cv.width = W; cv.height = H;
       cv.getContext('2d')!.putImageData(new ImageData(px, W, H), 0, 0);
       const blob = await new Promise<Blob | null>((res) => cv.toBlob(res, 'image/png'));
@@ -78,7 +78,7 @@ export async function runFlameCompare(app: App, opts: CompareOpts = {}): Promise
   // partial runs (only/files) keep the full manifest intact
   await save(opts.prefix ? `manifest.${opts.prefix}json` : opts.only || opts.files ? 'manifest.part.json' : 'manifest.json', JSON.stringify(manifest, null, 1));
   app.setFlame(saved);
-  app.renderer.restore();
+  app.renderer.setFlame(app.flame);
   console.log('flameCompare:', out.filter((o) => o.ok).length, 'ok,', out.filter((o) => !o.ok).map((o) => `${o.id}: ${o.msg}`).join('; '));
   return out;
 }

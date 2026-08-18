@@ -2,12 +2,7 @@
 // filter does not seam), into a PNG blob. Shared by the Render tab's "Hi-res PNG" button and
 // the batch export queue.
 import type { Flame } from '../core/flame';
-
-/** What the tile loop needs: a FlameRenderer (one flame) or the Composer (the whole layer stack). */
-export interface RegionSource {
-  setFlame(f: Flame): void;
-  renderRegion(o: { fullW: number; fullH: number; tileX: number; tileY: number; tileW: number; tileH: number; spp: number; transparent?: boolean }): Promise<Uint8ClampedArray<ArrayBuffer>>;
-}
+import type { FlameRenderer } from '../gpu/renderer';
 
 /** Output-size choices: a multiple of the canvas or a fixed 16:9 frame (value `WxH`). */
 export const SIZE_OPTIONS: { label: string; value: string }[] = [
@@ -40,15 +35,14 @@ export interface HiResOpts {
 }
 
 /**
- * Render `flame` (or, with `flame` null, whatever the source currently holds — the composer's layer stack)
- * at w×h and return the PNG. The renderer must already be in export mode (`renderer.exporting = true`,
- * restored by the caller together with `setFlame(app.flame)`); this sets the flame on the renderer, so it
- * compiles the kernel for it.
+ * Render `flame` at w×h and return the PNG. The renderer must already be in export mode
+ * (`renderer.exporting = true`, restored by the caller together with `setFlame(app.flame)`);
+ * this sets the flame on the renderer, so it compiles the kernel for it.
  */
-export async function renderHiRes(renderer: RegionSource, flame: Flame | null, o: HiResOpts): Promise<Blob> {
+export async function renderHiRes(renderer: FlameRenderer, flame: Flame, o: HiResOpts): Promise<Blob> {
   const TILE = 1024, PAD = 8;
   const { w: fullW, h: fullH } = o;
-  if (flame) renderer.setFlame(flame);
+  renderer.setFlame(flame);
   const out = document.createElement('canvas');
   out.width = fullW;
   out.height = fullH;

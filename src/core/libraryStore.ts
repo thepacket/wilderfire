@@ -1,8 +1,7 @@
 // Flame library storage on IndexedDB (no practical size cap, unlike the ~5 MB localStorage
 // budget it replaces). Entries carry the flame JSON and a JPEG thumbnail. The old
 // localStorage library (`wilderfire.library`, ≤48 entries) is migrated on first use.
-// The same database keeps the user's meshes for obj_mesh_wf (store `meshes`: file name → mesh binary) and the
-// images of image layers (store `images`: content hash → Blob).
+// The same database keeps the user's meshes for obj_mesh_wf (store `meshes`: file name → mesh binary).
 
 export interface LibEntry {
   id: string;
@@ -21,12 +20,11 @@ let dbp: Promise<IDBDatabase> | null = null;
 function db(): Promise<IDBDatabase> {
   if (dbp) return dbp;
   dbp = new Promise((res, rej) => {
-    const req = indexedDB.open(DB, 3);
+    const req = indexedDB.open(DB, 2);
     req.onupgradeneeded = () => {
       const d = req.result;
       if (!d.objectStoreNames.contains(STORE)) d.createObjectStore(STORE, { keyPath: 'id' }).createIndex('date', 'date');
       if (!d.objectStoreNames.contains(MESHES)) d.createObjectStore(MESHES);
-      if (!d.objectStoreNames.contains('images')) d.createObjectStore('images');
     };
     req.onsuccess = () => res(req.result);
     req.onerror = () => rej(req.error ?? new Error('IndexedDB unavailable'));
@@ -93,23 +91,4 @@ export async function meshDelete(name: string): Promise<void> {
   const tx = d.transaction(MESHES, 'readwrite');
   tx.objectStore(MESHES).delete(name);
   await done(tx);
-}
-
-// ---- images (image layers): key = content hash → { blob, type } ----
-const IMAGES = 'images';
-export async function imagePut(key: string, blob: Blob): Promise<void> {
-  const d = await db();
-  const tx = d.transaction(IMAGES, 'readwrite');
-  tx.objectStore(IMAGES).put(blob, key);
-  await done(tx);
-}
-export async function imageGet(key: string): Promise<Blob | undefined> {
-  const d = await db();
-  const tx = d.transaction(IMAGES, 'readonly');
-  return new Promise((res, rej) => { const r = tx.objectStore(IMAGES).get(key); r.onsuccess = () => res(r.result as Blob | undefined); r.onerror = () => rej(r.error); });
-}
-export async function imageKeys(): Promise<string[]> {
-  const d = await db();
-  const tx = d.transaction(IMAGES, 'readonly');
-  return new Promise((res, rej) => { const r = tx.objectStore(IMAGES).getAllKeys(); r.onsuccess = () => res((r.result as IDBValidKey[]).map(String)); r.onerror = () => rej(r.error); });
 }

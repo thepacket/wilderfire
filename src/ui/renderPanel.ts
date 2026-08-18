@@ -4,8 +4,6 @@ import { flameToJSON } from '../core/flame';
 import { flameToXML, importFlameText } from '../core/flameXML';
 import { pickSave, saveBlob, saveText } from './saveFile';
 import { renderHiRes, resolveSize, SIZE_OPTIONS, QUALITY_OPTIONS } from './hiresExport';
-import { isSingleFlame, normalizeComposition } from '../core/composition';
-import { compositionFileJSON, importCompositionAssets } from '../core/images';
 import { openBatchExport } from './batchExport';
 import { buildSolidSection } from './solidPanel';
 import { FILTER_KERNELS, normFilterKernel, type FilterKernel } from '../gpu/filters';
@@ -310,11 +308,8 @@ export function buildRenderPanel(app: App, root: HTMLElement) {
     if (blob) await target.write(blob);
   };
   const jsonBtn = el('button', '', '⬇ JSON');
-  jsonBtn.title = 'WilderFire JSON: the flame — or, for a layer stack, the whole composition';
   jsonBtn.onclick = () =>
-    isSingleFlame(app.comp)
-      ? saveText(flameToJSON(app.flame), { suggestedName: `${baseName()}.json`, description: 'WilderFire flame (JSON)', mime: 'application/json', ext: '.json' })
-      : compositionFileJSON(app.comp).then((json) => saveText(json, { suggestedName: `${(app.comp.name || 'composition').replace(/[\\/:*?"<>|]+/g, '_')}.json`, description: 'WilderFire composition (JSON)', mime: 'application/json', ext: '.json' }));
+    saveText(flameToJSON(app.flame), { suggestedName: `${baseName()}.json`, description: 'WilderFire flame (JSON)', mime: 'application/json', ext: '.json' });
   const xmlBtn = el('button', '', '⬇ .flame');
   xmlBtn.title = 'Export as .flame XML (flam3 / Apophysis compatible)';
   xmlBtn.onclick = () =>
@@ -329,13 +324,7 @@ export function buildRenderPanel(app: App, root: HTMLElement) {
     const f = fileInp.files?.[0];
     if (!f) return;
     try {
-      const text = await f.text();
-      // a WilderFire composition (layer stack) JSON
-      if (text.trim().startsWith('{')) {
-        const obj = JSON.parse(text);
-        if (obj?.layers?.[0]?.kind) { await importCompositionAssets(obj); app.setComposition(normalizeComposition(obj, app.activeLayer.palette)); return; }
-      }
-      const { flame, count, unknown, curves } = importFlameText(text, app.activeLayer.palette);
+      const { flame, count, unknown, curves } = importFlameText(await f.text(), app.activeLayer.palette);
       app.setFlame(flame);
       if (curves.length) {
         app.setCurves(curves);
@@ -403,7 +392,7 @@ export function buildRenderPanel(app: App, root: HTMLElement) {
     if (app.solo) app.setSolo(false); // exports always render the whole flame
     r.exporting = true;
     try {
-      const blob = await renderHiRes(r, null, { // the whole composition (the composer holds it)
+      const blob = await renderHiRes(r, app.flame, {
         w: fullW, h: fullH, spp, transparent,
         onTile: (n, total) => { hiStatus.textContent = `Hi-res: tile ${n}/${total} (${fullW}×${fullH})…`; },
       });
@@ -414,7 +403,7 @@ export function buildRenderPanel(app: App, root: HTMLElement) {
       hiStatus.textContent = '⚠ ' + (e as Error).message;
     } finally {
       r.exporting = false;
-      app.pushRender();
+      r.setFlame(app.flame);
       hiBtn.disabled = false;
     }
   };

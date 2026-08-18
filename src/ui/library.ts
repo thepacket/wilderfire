@@ -1,7 +1,6 @@
 // Flame library (IndexedDB, see ../core/libraryStore.ts) + session autosave (localStorage).
 import { App, el, openModal } from './common';
-import type { Flame } from '../core/flame';
-import { normalizeComposition, isSingleFlame, type Composition } from '../core/composition';
+import { normalizeFlame, type Flame } from '../core/flame';
 import { libAll, libPut, libDelete, type LibEntry } from '../core/libraryStore';
 import { saveText } from './saveFile';
 import type { AnimAPI } from './animPanel';
@@ -27,13 +26,11 @@ export function buildLibrary(app: App, anim: AnimAPI) {
   }
 
   function save() {
-    // a single flame is stored as the flame (older builds read it); a stack as the composition
-    const single = isSingleFlame(app.comp);
     const entry: LibEntry = {
       id: Math.random().toString(36).slice(2),
-      name: (single ? app.flame.name : app.comp.name) || 'untitled',
+      name: app.flame.name || 'untitled',
       date: Date.now(),
-      flame: JSON.parse(JSON.stringify(single ? app.flame : app.comp)),
+      flame: JSON.parse(JSON.stringify(app.flame)),
       thumb: thumbnail(),
     };
     libPut(entry).catch((e) => alert('Could not save to the library: ' + (e as Error).message));
@@ -86,7 +83,7 @@ export function buildLibrary(app: App, anim: AnimAPI) {
       };
       item.append(img, meta, del);
       item.onclick = () => {
-        app.setComposition(normalizeComposition(e.flame, app.activeLayer.palette));
+        app.setFlame(normalizeFlame(e.flame, app.activeLayer.palette));
         close();
       };
       grid.append(item);
@@ -101,7 +98,7 @@ export function buildLibrary(app: App, anim: AnimAPI) {
     timer = window.setTimeout(() => {
       try {
         localStorage.setItem(LS_AUTOSAVE, JSON.stringify({
-          flame: isSingleFlame(app.comp) ? app.flame : app.comp,
+          flame: app.flame,
           anim: anim.getState(),
         }));
       } catch { /* storage full — non-fatal */ }
@@ -110,7 +107,6 @@ export function buildLibrary(app: App, anim: AnimAPI) {
   app.on('flame', autosave);
   app.on('tone', autosave);
   app.on('history', autosave);
-  app.on('comp', autosave);
 
   return { save, open };
 }
@@ -125,9 +121,8 @@ export function loadAutosave(): { flame: unknown; anim?: unknown } | null {
   } catch { return null; }
 }
 
-/** The autosaved document (a flame or a composition) as a composition. */
-export function restoreComposition(saved: { flame: unknown }, fallback: Flame): Composition {
+export function restoreFlame(saved: { flame: unknown }, fallback: Flame): Flame {
   try {
-    return normalizeComposition(saved.flame, fallback.layers[0].palette);
-  } catch { return normalizeComposition(fallback, fallback.layers[0].palette); }
+    return normalizeFlame(saved.flame, fallback.layers[0].palette);
+  } catch { return fallback; }
 }

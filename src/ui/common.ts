@@ -1,11 +1,7 @@
 // Tiny DOM helpers + the shared App context that panels talk to.
 import type { Flame, Layer, XForm } from '../core/flame';
-import type { Composer } from '../gpu/composer';
+import type { FlameRenderer } from '../gpu/renderer';
 import type { MotionCurve } from '../core/motion';
-import type { Composition, CompLayer, FlameCompLayer, EscapeCompLayer } from '../core/composition';
-import { wrapFlame, flameLayer, escapeLayer, imageLayer, MAX_COMP_LAYERS, type ImageLayerData } from '../core/composition';
-import type { EscapeLayerData } from '../core/escape';
-import type { RGB } from '../core/flame';
 
 export function el<K extends keyof HTMLElementTagNameMap>(
   tag: K, cls?: string, text?: string,
@@ -66,19 +62,16 @@ export function formatNum(v: number): string {
   return String(Math.round(v * 10000) / 10000);
 }
 
-export type AppEvent = 'flame' | 'select' | 'tone' | 'history' | 'preview' | 'solo' | 'comp';
+export type AppEvent = 'flame' | 'select' | 'tone' | 'history' | 'preview' | 'solo';
 
 const HISTORY_MAX = 100;
 const COALESCE_MS = 700;
 
-/** Central app state; panels mutate app.flame (the active composition layer's flame) then call commit().
- *  The document is a Composition (an image stack); a plain flame is a one-layer composition. */
+/** Central app state; panels mutate app.flame then call commit(). */
 export class App {
-  comp!: Composition;
-  /** active composition layer (the one the panels edit and the overlay shows) */
-  compIdx = 0;
-  renderer!: Composer;
-  layerIdx = 0; // active flame layer (inside the active composition layer's flame)
+  flame!: Flame;
+  renderer!: FlameRenderer;
+  layerIdx = 0; // active layer
   selected = 0; // xform index within the active layer; -1 => final xform
   xformClipboard: XForm | null = null; // survives flame switches
   /** Motion-curve bridge, registered by the Anim panel (used by .flame export/import). */
@@ -88,41 +81,11 @@ export class App {
   timeline: () => { t0: number; total: number; evalAt: (t: number) => Flame } | null = () => null;
   private listeners: { ev: AppEvent; fn: (source: string) => void }[] = [];
 
-  // Undo/redo: JSON snapshots (of the whole composition) with slider-gesture coalescing.
+  // Undo/redo: JSON snapshots with slider-gesture coalescing.
   private hist: string[] = [];
   private hp = -1;
   private lastSnapSrc = '';
   private lastSnapTime = 0;
-
-  /** the selected composition layer (stack operations; an escape layer edited by the Escape tab) */
-  get compLayer(): CompLayer { return this.comp.layers[this.compIdx] ?? this.comp.layers[0]; }
-  /** the flame layer being edited by the flame panels: the selected layer when it is a flame, else the last flame
-   *  layer that was selected (there is always at least one flame layer in a document) */
-  flameIdx = 0;
-  get flameLayer(): FlameCompLayer {
-    const l = this.comp.layers[this.flameIdx];
-    if (l?.kind === 'flame') return l;
-    const i = this.comp.layers.findIndex((x) => x.kind === 'flame');
-    this.flameIdx = Math.max(0, i);
-    return this.comp.layers[this.flameIdx] as FlameCompLayer;
-  }
-  /** the flame being edited */
-  get flame(): Flame { return this.flameLayer.flame; }
-  set flame(f: Flame) { this.flameLayer.flame = f; }
-  /** the selected escape layer, if the selection is one */
-  get escapeLayer(): EscapeCompLayer | null { const l = this.compLayer; return l.kind === 'escape' ? l : null; }
-  /** the palette the Gradient tab edits: the selected escape layer's, else the active flame layer's */
-  get editPalette(): RGB[] { return this.escapeLayer?.escape.palette ?? this.activeLayer.palette; }
-  setEditPalette(p: RGB[]) { const e = this.escapeLayer; if (e) e.escape.palette = p; else this.activeLayer.palette = p; }
-  /** replace the document by a single flame (what setFlame does) */
-  private wrap(f: Flame) {
-    // keep the edited flame layer's id: the composer then reuses that layer's renderer instead of building a new one
-    const keepId = this.comp?.layers[this.flameIdx]?.kind === 'flame' ? this.comp.layers[this.flameIdx].id : undefined;
-    this.comp = wrapFlame(f);
-    if (keepId) this.comp.layers[0].id = keepId;
-    this.compIdx = 0;
-    this.flameIdx = 0;
-  }
 
   on(ev: AppEvent, fn: (source: string) => void) {
     this.listeners.push({ ev, fn });
@@ -133,7 +96,7 @@ export class App {
   }
 
   private snapshot(source: string) {
-    const json = JSON.stringify({ comp: this.comp, idx: this.compIdx });
+    const json = JSON.stringify(this.flame);
     if (json === this.hist[this.hp]) return;
     const now = performance.now();
     const coalesce =
@@ -174,9 +137,6 @@ export class App {
   }
 
   private clampSelection() {
-    if (this.compIdx >= this.comp.layers.length) this.compIdx = 0;
-    if (this.comp.layers[this.compIdx].kind === 'flame') this.flameIdx = this.compIdx;
-    void this.flameLayer;
     if (this.layerIdx >= this.flame.layers.length) this.layerIdx = 0;
     const ly = this.activeLayer;
     if (this.selected >= ly.xforms.length) this.selected = 0;
@@ -197,116 +157,46 @@ export class App {
     const f: Flame = { ...this.flame, layers: this.flame.layers.map((ly, li) => li !== this.layerIdx ? ly : { ...ly, xforms: ly.xforms.map((x, i) => (i === this.selected ? x : { ...x, opacity: 0 })) }) };
     return f;
   }
-  /** the composition as rendered (solo applied to the edited flame) */
-  private renderComp(): Composition {
-    const rf = this.renderFlame();
-    if (rf === this.flame) return this.comp;
-    return { ...this.comp, layers: this.comp.layers.map((l, i) => (i === this.flameIdx && l.kind === 'flame' ? { ...l, flame: rf } : l)) };
-  }
-  /** push the document to the renderers (also what exports call to put the document back afterwards) */
-  pushRender() { this.renderer.flameActive = this.flameIdx; void this.renderer.setComposition(this.renderComp(), this.compIdx); }
-  private push() { this.pushRender(); }
-  setSolo(on: boolean) { this.solo = on; this.push(); this.emit('solo'); }
+  setSolo(on: boolean) { this.solo = on; this.renderer.setFlame(this.renderFlame()); this.emit('solo'); }
 
   private restore() {
-    const st = JSON.parse(this.hist[this.hp]) as { comp: Composition; idx: number };
-    this.comp = st.comp;
-    this.compIdx = st.idx ?? 0;
+    this.flame = JSON.parse(this.hist[this.hp]);
     this.clampSelection();
     this.lastSnapSrc = '';
-    this.push();
-    this.emit('comp');
+    this.renderer.setFlame(this.renderFlame());
     this.emit('flame');
     this.emit('select');
     this.emit('history');
   }
 
-  /** Structural or numeric flame change — restarts accumulation (of the layers whose flame changed). */
+  /** Structural or numeric flame change — restarts accumulation. */
   commit(source = '') {
-    this.push();
+    this.renderer.setFlame(this.renderFlame());
     this.emit('flame', source);
     this.snapshot(source);
   }
 
-  /** Tone-only change — no accumulation reset. */
+  /** Tonemap-only change — no accumulation reset. */
   commitTone(source = '') {
     this.renderer.invalidate();
     this.emit('tone', source);
     this.snapshot(source);
   }
 
-  /** Composition-level change (layer added/removed/reordered, blend, opacity, visibility, background). */
-  commitComp(source = '') {
-    this.clampSelection();
-    this.push();
-    this.emit('comp', source);
-    this.emit('flame', source);
-    this.snapshot(source);
-  }
-
-  /** Replace the flame being edited (AI / load / randomize / preset): the whole document when it is a single
-   *  flame, only the edited flame layer in a layer stack (the stack is kept). */
+  /** Replace the whole flame (AI / load / randomize / preset). */
   setFlame(f: Flame, source = '') {
-    if (this.comp && this.comp.layers.length > 1) { const l = this.flameLayer; l.flame = f; l.name = f.name || l.name; }
-    else this.wrap(f);
+    this.flame = f;
     this.layerIdx = 0;
     this.selected = 0;
-    this.push();
-    this.emit('comp', source);
+    this.renderer.setFlame(this.renderFlame());
     this.emit('flame', source);
     this.emit('select', source);
     this.snapshot(''); // never coalesce whole-flame replacements
   }
 
-  /** Replace the whole document by a composition (load / library). */
-  setComposition(c: Composition, source = '') {
-    this.comp = c;
-    this.compIdx = 0;
-    this.flameIdx = 0;
-    this.clampSelection();
-    this.layerIdx = 0;
-    this.selected = 0;
-    this.push();
-    this.emit('comp', source);
-    this.emit('flame', source);
-    this.emit('select', source);
-    this.snapshot('');
-  }
-
-  /** Make composition layer `i` the active one (panels/overlay follow). */
-  selectCompLayer(i: number, source = '') {
-    this.compIdx = Math.max(0, Math.min(i, this.comp.layers.length - 1));
-    if (this.comp.layers[this.compIdx].kind === 'flame') { this.flameIdx = this.compIdx; this.layerIdx = 0; this.selected = 0; }
-    this.solo = false;
-    this.push();
-    this.emit('comp', source);
-    this.emit('flame', source);
-    this.emit('select', source);
-  }
-
-  /** Add a flame (or an escape-time fractal) as a new composition layer above the selected one and select it. */
-  addCompLayer(content: Flame | { escape: EscapeLayerData } | { image: ImageLayerData; name?: string }, source = ''): boolean {
-    if (this.comp.layers.length >= MAX_COMP_LAYERS) return false;
-    const layer: CompLayer = 'escape' in content
-      ? escapeLayer(content.escape, { ownBackground: false, name: `Escape ${this.comp.layers.length + 1}` })
-      : 'image' in content
-        ? imageLayer(content.image, { name: content.name || `Image ${this.comp.layers.length + 1}` })
-        : flameLayer(content, { ownBackground: false, name: content.name || `Layer ${this.comp.layers.length + 1}` });
-    this.comp.layers.splice(this.compIdx + 1, 0, layer);
-    this.compIdx++;
-    if (layer.kind === 'flame') { this.flameIdx = this.compIdx; this.layerIdx = 0; this.selected = 0; }
-    this.solo = false;
-    this.push();
-    this.emit('comp', source);
-    this.emit('flame', source);
-    this.emit('select', source);
-    this.snapshot('');
-    return true;
-  }
-
   select(i: number, source = '') {
     this.selected = i;
-    if (this.solo) this.push(); // solo follows the selection
+    if (this.solo) this.renderer.setFlame(this.renderFlame()); // solo follows the selection
     this.emit('select', source);
   }
 
@@ -315,7 +205,7 @@ export class App {
   applyPreview(f: Flame) {
     this.flame = f;
     this.clampSelection();
-    this.push();
+    this.renderer.setFlame(f);
     this.emit('preview');
   }
 }

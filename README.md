@@ -80,41 +80,7 @@ in the stack.
   for solid scenes — the meshes are sampled on the GPU from a face CDF, loaded on
   demand; JWildfire's **background gradients** (2×2 corners,
   optional centre colour) render in both paths
-- **Composition** (left pane, top) — the picture is a stack of up to 8 image
-  layers, each a complete flame with its own renderer, blended bottom-up with
-  the W3C/Photoshop blend modes (normal, add, multiply, screen, overlay,
-  darken/lighten, dodge/burn, hard/soft light, difference, exclusion), opacity,
-  optional own background, and clipping to what is below; a plain flame is a
-  one-layer composition, so every file and library entry keeps working. Hi-res
-  export, PNG, video and the library thumbnail composite the stack the same way.
-- **Escape-time layers** (Composition → + Escape, Escape tab) — per-pixel
-  fractals in the same stack as the flames: Mandelbrot z^p+c, Burning
-  Ship, Tricorn, Celtic, Perpendicular, Lambda, Phoenix, Magnet, Newton, Nova and
-  **custom formulas** (`z^3 + p1*z + c`, `sin(z) + c`, … — a small complex
-  expression language compiled to WGSL), Mandelbrot or Julia mode, seed/constant,
-  bailout, up to 20 000 iterations, 1–3× supersampling; colourings: smooth
-  iteration, iterations, exponential smoothing, orbit traps (point, cross, lines,
-  circle, square, ring; closest approach or last), distance estimate, angle, solid;
-  inside colourings; gradient density/offset/transfer; inside/outside alpha (a
-  transparent inside lets the flames below show through the set). The layer's
-  gradient is edited in the Gradient tab; pan/zoom on the canvas; the picture
-  refines in bands so heavy settings never freeze the UI. **Deep zoom:** three
-  arithmetic tiers chosen automatically (or forced) — f32 to ~3 000×,
-  double-single (hi/lo float pairs, all formulas incl. custom ones) to ~10¹⁰×, and
-  **perturbation** for z^p + c beyond that: a BigInt reference orbit at the exact
-  centre (kept as decimal strings once past f64) with exponent-scaled deltas and
-  Zhuoran-style rebasing, so 10³⁰× and beyond stay sharp with f32 shader math.
-- **Image layers** — drop a PNG/JPEG/WebP into the stack (kept in the browser's
-  image store, embedded in saved composition files): fit contain/cover/stretch/pixels,
-  scale, offset, rotation, tiling.
-- **Masks and per-layer effects** — mask a layer by what is below it (alpha or
-  luminance) or by any other layer, inverted or not; per-layer gaussian blur,
-  brightness, contrast, saturation, hue, gamma, invert — applied before blending,
-  identically in the live view and in exports.
-- **Motion curves for layers** — escape-time parameters (zoom, centre, c, power,
-  colouring, traps…), image placement, layer opacity and effects animate like flame
-  parameters (Anim tab, video export).
-- **Flame layers** (up to 8 per flame) — each with its own transforms, final transform,
+- **Layers** (up to 8) — each with its own transforms, final transform,
   gradient, density weight, and visibility, blended in one histogram; walker
   threads are partitioned across layers on the GPU
 - **Xaos** (flam3 "chaos") — per-pair transition weight matrix between
@@ -244,23 +210,14 @@ nginx on Fly.io with `fly deploy`.
 
 ```
 src/
-  core/       flame model (flame.ts), composition model + blend/mask/effect maths
-              (composition.ts), escape-time layer model (escape.ts), the
-              custom-formula compiler (formula.ts, f32 + double-single), BigInt
-              fixed point + reference orbits (bigfloat.ts), image store (images.ts),
-              variation registry (variations.ts:
+  core/       flame model (flame.ts), variation registry (variations.ts:
               hand-written WGSL + generated variations.jwf.ts ports, the
               latter a lazily loaded, separately cached ~300 KB gz chunk),
               palettes, presets, randomizer, .flame XML I/O (flameXML.ts),
               keyframe morphing (animate.ts), motion curves (motion.ts)
   gpu/        codegen.ts  — flame → WGSL compute kernel + data layout
               renderer.ts — WebGPU pipelines, atomic histogram, tonemap, camera
-              composer.ts — the canvas owner: one renderer per composition
-              layer (offscreen rgba16f), blend-mode compositor, capture/export
-              escapeRenderer.ts — escape-time layers: generated per-pixel
-              fragment shader (formula, colourings, f32/double-single/perturbation
-              tiers), banded progressive render; imageRenderer.ts — image layers
-  ui/         panels (composition, transforms, render, escape, gradient, anim, AI), triangle
+  ui/         panels (transforms, render, gradient, anim, AI), triangle
               overlay, variation + model pickers, library, mutation grid
   ai/         OpenRouter streaming chat client + model catalogue
   dev/        browser harnesses (variation oracle diff, fixture-flame compile)
