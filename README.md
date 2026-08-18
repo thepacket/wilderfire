@@ -104,6 +104,16 @@ in the stack.
   **perturbation** for z^p + c beyond that: a BigInt reference orbit at the exact
   centre (kept as decimal strings once past f64) with exponent-scaled deltas and
   Zhuoran-style rebasing, so 10³⁰× and beyond stay sharp with f32 shader math.
+- **Image layers** — drop a PNG/JPEG/WebP into the stack (kept in the browser's
+  image store, embedded in saved composition files): fit contain/cover/stretch/pixels,
+  scale, offset, rotation, tiling.
+- **Masks and per-layer effects** — mask a layer by what is below it (alpha or
+  luminance) or by any other layer, inverted or not; per-layer gaussian blur,
+  brightness, contrast, saturation, hue, gamma, invert — applied before blending,
+  identically in the live view and in exports.
+- **Motion curves for layers** — escape-time parameters (zoom, centre, c, power,
+  colouring, traps…), image placement, layer opacity and effects animate like flame
+  parameters (Anim tab, video export).
 - **Flame layers** (up to 8 per flame) — each with its own transforms, final transform,
   gradient, density weight, and visibility, blended in one histogram; walker
   threads are partitioned across layers on the GPU
@@ -234,9 +244,11 @@ nginx on Fly.io with `fly deploy`.
 
 ```
 src/
-  core/       flame model (flame.ts), composition model + blend maths
-              (composition.ts), escape-time layer model (escape.ts) + the
-              custom-formula compiler (formula.ts), variation registry (variations.ts:
+  core/       flame model (flame.ts), composition model + blend/mask/effect maths
+              (composition.ts), escape-time layer model (escape.ts), the
+              custom-formula compiler (formula.ts, f32 + double-single), BigInt
+              fixed point + reference orbits (bigfloat.ts), image store (images.ts),
+              variation registry (variations.ts:
               hand-written WGSL + generated variations.jwf.ts ports, the
               latter a lazily loaded, separately cached ~300 KB gz chunk),
               palettes, presets, randomizer, .flame XML I/O (flameXML.ts),
@@ -246,7 +258,8 @@ src/
               composer.ts — the canvas owner: one renderer per composition
               layer (offscreen rgba16f), blend-mode compositor, capture/export
               escapeRenderer.ts — escape-time layers: generated per-pixel
-              fragment shader (formula, colourings), banded progressive render
+              fragment shader (formula, colourings, f32/double-single/perturbation
+              tiers), banded progressive render; imageRenderer.ts — image layers
   ui/         panels (composition, transforms, render, escape, gradient, anim, AI), triangle
               overlay, variation + model pickers, library, mutation grid
   ai/         OpenRouter streaming chat client + model catalogue

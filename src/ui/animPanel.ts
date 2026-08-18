@@ -6,7 +6,7 @@ import { renderVideo, videoFileExt, videoMime, VIDEO_SIZE_OPTIONS, VIDEO_QUALITY
 import { cloneFlame, normalizeFlame } from '../core/flame';
 import { flameAt, sortKeys, type Keyframe, type Easing } from '../core/animate';
 import { pickSave, saveText, type SaveTarget } from './saveFile';
-import { applyCurves, curvesEnd, evalCurve, getParam, paramPaths, setPoint, INTERPS, type MotionCurve, type CurveInterp, type CurvePoint } from '../core/motion';
+import { applyCurves, applyCompCurves, compParamPaths, getCompParam, isCompPath, curvesEnd, evalCurve, getParam, paramPaths, setPoint, INTERPS, type MotionCurve, type CurveInterp, type CurvePoint } from '../core/motion';
 
 interface OverlayHandle { setVisible(v: boolean): void; readonly visible: boolean; }
 
@@ -113,8 +113,12 @@ export function buildAnimPanel(app: App, root: HTMLElement, overlay: OverlayHand
   const evalAt = (t: number) => {
     const ks = sortKeys(keys);
     const base = ks.length >= 2 ? flameAt(ks, t, easing()) : ks.length === 1 ? cloneFlame(ks[0].flame) : app.flame;
+    applyCompCurves(app.comp, curves, t); // composition-layer curves (escape/image params, opacity, effects) act on the document in place
     return applyCurves(base, curves, t);
   };
+  /** a parameter's current value: flame path or composition-layer path */
+  const readParam = (path: string) => (isCompPath(path) ? getCompParam(app.comp, path) : getParam(app.flame, path));
+  const allParams = () => [...paramPaths(app.flame), ...compParamPaths(app.comp)];
 
   // ---------- Motion curves ----------
   const curveSec = el('div', 'section');
@@ -133,7 +137,7 @@ export function buildAnimPanel(app: App, root: HTMLElement, overlay: OverlayHand
     const cur = paramSel.value;
     paramSel.textContent = '';
     let grp: HTMLOptGroupElement | null = null;
-    for (const p of paramPaths(app.flame)) {
+    for (const p of allParams()) {
       if (!grp || grp.label !== p.group) { grp = el('optgroup') as HTMLOptGroupElement; grp.label = p.group; paramSel.append(grp); }
       const o = el('option', '', p.label) as HTMLOptionElement;
       o.value = p.path;
@@ -146,7 +150,7 @@ export function buildAnimPanel(app: App, root: HTMLElement, overlay: OverlayHand
     if (!path) return;
     let c = curves.find((k) => k.path === path);
     if (!c) { c = { path, points: [], interp: 'spline' }; curves.push(c); }
-    const v = getParam(app.flame, path);
+    const v = readParam(path);
     if (v !== undefined) setPoint(c, curT, v);
     rebuildCurves(); rebuildList(); onChange();
   };
@@ -273,7 +277,7 @@ export function buildAnimPanel(app: App, root: HTMLElement, overlay: OverlayHand
   function rebuildCurves() {
     rebuildParamSel();
     curveList.textContent = '';
-    const labels = new Map(paramPaths(app.flame).map((p) => [p.path, p.label]));
+    const labels = new Map(allParams().map((p) => [p.path, p.label]));
     for (const c of curves) {
       const row = el('div', 'mc-row');
       const head = el('div', 'mc-head');
@@ -288,7 +292,7 @@ export function buildAnimPanel(app: App, root: HTMLElement, overlay: OverlayHand
       interp.onchange = () => { c.interp = interp.value as CurveInterp; drawCurve(cv, c); onChange(); };
       const keyBtn = el('button', 'icon', '+ key');
       keyBtn.title = 'Record the parameter’s current editor value at the scrub time';
-      keyBtn.onclick = () => { const v = getParam(app.flame, c.path); if (v !== undefined) { setPoint(c, curT, v); rebuildCurves(); rebuildList(); onChange(); } };
+      keyBtn.onclick = () => { const v = readParam(c.path); if (v !== undefined) { setPoint(c, curT, v); rebuildCurves(); rebuildList(); onChange(); } };
       const rm = el('button', 'icon danger', '✕');
       rm.onclick = () => { curves = curves.filter((k) => k !== c); rebuildCurves(); rebuildList(); onChange(); };
       head.append(en, nm, interp, keyBtn, rm);

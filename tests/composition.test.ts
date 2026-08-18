@@ -41,3 +41,27 @@ describe('composition model + blend maths', () => {
     expect(c3.layers[0].blend).toBe('normal');
   });
 });
+
+describe('composition-layer motion curves', () => {
+  it('comp: paths read/write escape/image/opacity parameters and applyCompCurves acts in place', async () => {
+    const { getCompParam, setCompParam, applyCompCurves, compParamPaths, isCompPath } = await import('../src/core/motion');
+    const { escapeLayer, defaultEscape } = await import('../src/core/composition');
+    const c = wrapFlame(PRESETS[0].make());
+    const e = escapeLayer(defaultEscape(GREY));
+    e.id = 'E1';
+    c.layers.push(e);
+    expect(isCompPath('comp:E1:escape.zoom')).toBe(true);
+    expect(getCompParam(c, 'comp:E1:escape.zoom')).toBe(1);
+    expect(setCompParam(c, 'comp:E1:escape.c.1', 0.25)).toBe(true);
+    expect(e.escape.c[1]).toBe(0.25);
+    expect(setCompParam(c, 'comp:E1:escape.formula', 3)).toBe(false); // not a number
+    expect(getCompParam(c, 'comp:nope:opacity')).toBeUndefined();
+    applyCompCurves(c, [{ path: 'comp:E1:escape.zoom', points: [{ t: 0, v: 1 }, { t: 2, v: 5 }], interp: 'linear' }, { path: 'comp:E1:opacity', points: [{ t: 0, v: 1 }, { t: 2, v: 0 }], interp: 'linear' }], 1);
+    expect(e.escape.zoom).toBeCloseTo(3, 9);
+    expect(e.opacity).toBeCloseTo(0.5, 9);
+    const paths = compParamPaths(c).map((p) => p.path);
+    expect(paths).toContain('comp:E1:escape.centerX');
+    expect(paths).toContain('comp:E1:opacity');
+    expect(paths.some((p) => p.includes('escape.coloring.density'))).toBe(true);
+  });
+});
