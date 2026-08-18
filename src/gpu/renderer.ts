@@ -174,6 +174,9 @@ export class FlameRenderer {
     const wantBind = Math.min(adapter.limits.maxStorageBufferBindingSize, 1 << 30);
     const wantBuf = Math.min(adapter.limits.maxBufferSize, 1 << 30);
     return adapter.requestDevice({
+      // GPU timestamps (when the adapter has them) let the escape-time layers meter their own band cost instead of
+      // guessing from queue completion (which includes every other layer's work)
+      requiredFeatures: adapter.features.has('timestamp-query') ? ['timestamp-query'] : [],
       requiredLimits: {
         maxStorageBufferBindingSize: wantBind,
         maxBufferSize: wantBuf,

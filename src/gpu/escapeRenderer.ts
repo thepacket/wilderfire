@@ -137,7 +137,7 @@ fn sc_scale(a: SC, s: f32) -> SC { return sc_norm(SC(a.m * s, a.e)); }
 fn sc_to(a: SC) -> vec2f { return ldexp(a.m, vec2i(a.e)); }
 fn sc_from(v: vec2f) -> SC { return sc_norm(SC(v, 0)); }
 fn shade(pixel0: vec2f, dr: vec2f) -> vec4f {
-  let delta0 = sc_norm(SC(dr * P.dscale, P.dexp));      // the pixel's offset from the reference (centre)
+  let delta0 = sc_add(sc_norm(SC(dr * P.dscale, P.dexp)), sc_norm(SC(P.refOff, P.refExp)));  // the pixel's offset from the reference point
   ${mandel ? 'var dl = SC(vec2f(0.0), 0); let dc = delta0;' : 'var dl = delta0;'}
   var m = 0u;                                             // reference index
   var n: f32 = 0.0;
@@ -193,7 +193,8 @@ struct EP {
   outAlpha: f32, dscale: f32, dexp: i32, refN: u32,   // perturbation: pixel offset = dr·dscale·2^dexp; reference length
   centerDS: vec4f,                    // centre as double-single: x hi, x lo, y hi, y lo
   invPpu: vec2f, seedLo: vec2f,       // 1/ppu as double-single; lo words of the seed
-  ccLo: vec2f, pad: vec2f,            // lo words of the Julia constant
+  ccLo: vec2f, refOff: vec2f,         // lo words of the Julia constant; view centre − reference point (mantissa)
+  refExp: i32, pad1: f32, pad2: f32, pad3: f32, // … and its exponent (perturbation: the reference may sit off-centre)
 }
 @group(0) @binding(0) var<uniform> P: EP;
 @group(0) @binding(1) var<storage, read> pal: array<vec4f>;
@@ -233,7 +234,7 @@ ${shade}
   return { code, error: f.error, tier };
 }
 
-const UNIFORM_FLOATS = 56; // 224 bytes
+const UNIFORM_FLOATS = 60; // 240 bytes
 
 // While a new view renders band by band, the display shows the last complete picture warped into the new view
 // (scale/rotate/shift about the centre) — a zoom or pan never flashes; sharp bands then overwrite it top-down.
@@ -270,6 +271,10 @@ export class EscapeRenderer {
   private reprojBuf: GPUBuffer;
   private reprojSampler: GPUSampler;
   private needsReproject = false;
+  // GPU timestamps around a band (when the device has 'timestamp-query'): the only clean measure of the band's own cost
+  private tsQuery: GPUQuerySet | null = null;
+  private tsResolve: GPUBuffer | null = null;
+  private tsRead: GPUBuffer | null = null;
   private sig = '';
   private pipe: GPURenderPipeline | null = null;      // → rgba16float (layer texture)
   private pipeExport: GPURenderPipeline | null = null; // → rgba8unorm (tiles)
@@ -286,6 +291,11 @@ export class EscapeRenderer {
   private refBuf: GPUBuffer;
   private refKey = '';
   private refN = 0;
+  /** where the reference orbit starts (fixed point) and the zoom it was made for; reused while the view stays near */
+  private refCentre: [import('../core/bigfloat').Fixed, import('../core/bigfloat').Fixed] | null = null;
+  private refZoom = 0;
+  /** view centre − reference point, as (mantissa, exponent) for the shader */
+  private refOff: [number, number, number] = [0, 0, 0];
   /** perturbation: the reference orbit's length (0 = none) — the panel shows it */
   get referenceLength() { return this.refN; }
 
@@ -308,6 +318,11 @@ export class EscapeRenderer {
     this.reprojPipe = device.createRenderPipeline({ layout: 'auto', vertex: { module: rm, entryPoint: 'vs' }, fragment: { module: rm, entryPoint: 'fs', targets: [{ format: 'rgba16float' }] }, primitive: { topology: 'triangle-list' } });
     this.reprojBuf = device.createBuffer({ size: 32, usage: GPUBufferUsage.UNIFORM | GPUBufferUsage.COPY_DST });
     this.reprojSampler = device.createSampler({ magFilter: 'linear', minFilter: 'linear' });
+    if (device.features.has('timestamp-query')) {
+      this.tsQuery = device.createQuerySet({ type: 'timestamp', count: 2 });
+      this.tsResolve = device.createBuffer({ size: 16, usage: GPUBufferUsage.QUERY_RESOLVE | GPUBufferUsage.COPY_SRC });
+      this.tsRead = device.createBuffer({ size: 16, usage: GPUBufferUsage.COPY_DST | GPUBufferUsage.MAP_READ });
+    }
   }
 
   get layerTexture(): GPUTexture | null { return this.tex; }
@@ -352,13 +367,26 @@ export class EscapeRenderer {
     this.bgOff = this.device.createBindGroup({ layout: bgl, entries: entries(this.uOff) });
   }
 
-  /** perturbation: the reference orbit at the exact centre (BigInt fixed point on the CPU), cached by its inputs */
+  /** perturbation: the reference orbit (BigInt fixed point on the CPU). It is kept while the view stays within a
+   *  couple of frames of it and the zoom within a wide band — a pan or wheel step then costs nothing on the CPU;
+   *  the shader iterates deltas from the reference point, wherever it sits in the frame (rebasing keeps them sane). */
   private ensureReference(e: EscapeLayerData) {
-    if (escapeTier(e) !== 'perturb') return;
+    if (escapeTier(e) !== 'perturb') { this.refOff = [0, 0, 0]; return; }
     const P = bitsForZoom(e.zoom);
-    const key = JSON.stringify([e.centerHi ?? [e.centerX, e.centerY], e.mode, Math.round(e.power), e.seed, e.c, e.maxIter, e.bailout, P]);
-    if (key === this.refKey) return;
     const [cx, cy] = centreFixed(e.centerX, e.centerY, e.centerHi, P);
+    const dyn = JSON.stringify([e.mode, Math.round(e.power), e.seed, e.c, e.maxIter, e.bailout]);
+    let reuse = false;
+    if (this.refCentre && this.refKey === dyn && this.refZoom > 0) {
+      const dx = toNumber(fxSub(cx, this.refCentre[0])), dy = toNumber(fxSub(cy, this.refCentre[1]));
+      const halfFrame = 2 / e.zoom; // the ±2 frame at zoom 1
+      reuse = Math.hypot(dx, dy) < 2 * halfFrame && e.zoom < this.refZoom * 1e6 && e.zoom > this.refZoom / 1e4;
+      if (reuse) {
+        const m = Math.max(Math.abs(dx), Math.abs(dy));
+        const ex = m > 0 ? Math.floor(Math.log2(m)) : 0;
+        this.refOff = [dx / 2 ** ex, dy / 2 ** ex, ex];
+      }
+    }
+    if (reuse) return;
     const z0: [typeof cx, typeof cy] = e.mode === 'mandelbrot' ? [fromNumber(e.seed[0], P), fromNumber(e.seed[1], P)] : [cx, cy];
     const c: [typeof cx, typeof cy] = e.mode === 'mandelbrot' ? [cx, cy] : [fromNumber(e.c[0], P), fromNumber(e.c[1], P)];
     const t0 = performance.now();
@@ -366,10 +394,12 @@ export class EscapeRenderer {
     if (orb.data.byteLength > this.refBuf.size) { this.refBuf.destroy(); this.refBuf = this.device.createBuffer({ size: Math.max(64, orb.data.byteLength), usage: GPUBufferUsage.STORAGE | GPUBufferUsage.COPY_DST }); this.rebuildBindGroups(); }
     this.device.queue.writeBuffer(this.refBuf, 0, orb.data as Float32Array<ArrayBuffer>);
     this.refN = orb.n;
-    this.refKey = key;
+    this.refKey = dyn;
+    this.refCentre = [cx, cy];
+    this.refZoom = e.zoom;
+    this.refOff = [0, 0, 0];
     if (performance.now() - t0 > 200) console.info(`reference orbit: ${orb.n} steps, ${P} bits, ${(performance.now() - t0).toFixed(0)} ms`);
   }
-
   private writeUniforms(buf: GPUBuffer, e: EscapeLayerData, tile: { x: number; y: number; w: number; h: number; fullW: number; fullH: number }) {
     const f = new Float32Array(UNIFORM_FLOATS);
     const u = new Uint32Array(f.buffer);
@@ -393,7 +423,8 @@ export class EscapeRenderer {
     const cxs = ds(e.centerX), cys = ds(e.centerY);
     f.set([cxs[0], cxs[1], cys[0], cys[1]], 44);
     const invs = ds(inv); const s0 = ds(e.seed[0]), s1 = ds(e.seed[1]), c0 = ds(e.c[0]), c1 = ds(e.c[1]);
-    f.set([invs[0], invs[1], s0[1], s1[1], c0[1], c1[1], 0, 0], 48);
+    f.set([invs[0], invs[1], s0[1], s1[1], c0[1], c1[1], this.refOff[0], this.refOff[1]], 48);
+    i32[56] = this.refOff[2];
     this.device.queue.writeBuffer(buf, 0, f);
   }
 
@@ -454,10 +485,13 @@ export class EscapeRenderer {
   }
   setFlame(_f: unknown) { /* not a flame renderer */ }
 
-  private encodeBands(enc: GPUCommandEncoder, rows: number) {
+  private encodeBands(enc: GPUCommandEncoder, rows: number, timed = false) {
     if (!this.pipe || !this.bg || !this.view || this.nextRow >= this.h) return false;
     const y0 = this.nextRow, y1 = Math.min(this.h, y0 + rows);
-    const pass = enc.beginRenderPass({ colorAttachments: [{ view: this.view, loadOp: 'load', storeOp: 'store' }] });
+    const pass = enc.beginRenderPass({
+      colorAttachments: [{ view: this.view, loadOp: 'load', storeOp: 'store' }],
+      ...(timed && this.tsQuery ? { timestampWrites: { querySet: this.tsQuery, beginningOfPassWriteIndex: 0, endOfPassWriteIndex: 1 } } : {}),
+    });
     pass.setPipeline(this.pipe);
     pass.setBindGroup(0, this.bg);
     pass.setScissorRect(0, y0, this.w, y1 - y0);
@@ -478,7 +512,7 @@ export class EscapeRenderer {
     if (this.rows <= 0) {
       const aa = e.antialias * e.antialias;
       const cost = escapeTier(e) === 'perturb' ? 12 : escapeTier(e) === 'ds' ? 6 : 1; // relative per-iteration cost
-      this.rows = Math.max(4, Math.min(this.h, Math.round(4e8 / Math.max(1, this.w * e.maxIter * aa * cost))));
+      this.rows = Math.max(Math.ceil(this.h / 24), Math.min(this.h, Math.round(4e8 / Math.max(1, this.w * e.maxIter * aa * cost))));
       this.rows0 = this.rows;
     }
     return this.rows;
@@ -490,20 +524,36 @@ export class EscapeRenderer {
     if (this.nextRow < this.h && !this.bandInFlight) {
       const rows = this.rowsPerTick();
       const enc = this.device.createCommandEncoder();
-      this.encodeBands(enc, rows);
+      const timed = !!this.tsQuery && !!this.tsResolve && !!this.tsRead;
+      this.encodeBands(enc, rows, timed);
       this.encodeDisplay(enc);
+      if (timed) { enc.resolveQuerySet(this.tsQuery!, 0, 2, this.tsResolve!, 0); enc.copyBufferToBuffer(this.tsResolve!, 0, this.tsRead!, 0, 16); }
       this.device.queue.submit([enc.finish()]);
       this.presented = true;
       this.bandInFlight = true;
-      const t0 = performance.now();
-      this.device.queue.onSubmittedWorkDone().then(() => {
-        const ms = performance.now() - t0;
-        this.bandInFlight = false;
-        // the wait includes whatever else is queued (flame layers accumulate in the same queue, ~15 ms a frame),
-        // so only a real stall shrinks the band and only a clearly idle queue grows it
-        if (ms > 45) this.rows = Math.max(Math.max(2, this.rows0 >> 2), Math.round(this.rows * Math.max(0.3, 30 / ms)));
-        else if (ms < 8) this.rows = Math.min(this.h, Math.round(this.rows * 1.6));
-      }, () => { this.bandInFlight = false; });
+      const target = 10; // ms of GPU time per band
+      if (timed) {
+        this.tsRead!.mapAsync(GPUMapMode.READ).then(() => {
+          const t = new BigUint64Array(this.tsRead!.getMappedRange());
+          const ms = Number(t[1] - t[0]) / 1e6;
+          this.tsRead!.unmap();
+          this.bandInFlight = false;
+          if (ms > 0 && isFinite(ms)) {
+            // aim at the target with a damped step; the measure is this band's own GPU time, other layers excluded
+            const f = Math.max(0.25, Math.min(3, target / ms));
+            this.rows = Math.max(2, Math.min(this.h, Math.round(this.rows * (0.5 + 0.5 * f))));
+          }
+        }, () => { this.bandInFlight = false; });
+      } else {
+        // no timestamps: the estimate stands (never shrink on queue completion, which includes the flames' work),
+        // grow only when the whole queue was clearly idle
+        const t0 = performance.now();
+        this.device.queue.onSubmittedWorkDone().then(() => {
+          const ms = performance.now() - t0;
+          this.bandInFlight = false;
+          if (ms < 8) this.rows = Math.min(this.h, Math.round(this.rows * 1.6));
+        }, () => { this.bandInFlight = false; });
+      }
     }
     return { spp: 0, samplesPerSec: 0, paused: false, converged: this.nextRow >= this.h, budgetScale: 1, gpuMs: 0 };
   }
@@ -556,6 +606,7 @@ export class EscapeRenderer {
 
   destroy() {
     this.tex?.destroy(); this.tex = null;
+    this.tsQuery?.destroy(); this.tsResolve?.destroy(); this.tsRead?.destroy();
     this.back?.destroy(); this.back = null;
     this.front?.destroy(); this.front = null;
     this.offTex?.destroy(); this.offTex = null;
