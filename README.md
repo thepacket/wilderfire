@@ -98,8 +98,12 @@ in the stack.
   inside colourings; gradient density/offset/transfer; inside/outside alpha (a
   transparent inside lets the flames below show through the set). The layer's
   gradient is edited in the Gradient tab; pan/zoom on the canvas; the picture
-  refines in bands so heavy settings never freeze the UI. Precision is f32
-  (deep zoom beyond ~10⁵× blurs; double-single/perturbation is a later step).
+  refines in bands so heavy settings never freeze the UI. **Deep zoom:** three
+  arithmetic tiers chosen automatically (or forced) — f32 to ~3 000×,
+  double-single (hi/lo float pairs, all formulas incl. custom ones) to ~10¹⁰×, and
+  **perturbation** for z^p + c beyond that: a BigInt reference orbit at the exact
+  centre (kept as decimal strings once past f64) with exponent-scaled deltas and
+  Zhuoran-style rebasing, so 10³⁰× and beyond stay sharp with f32 shader math.
 - **Flame layers** (up to 8 per flame) — each with its own transforms, final transform,
   gradient, density weight, and visibility, blended in one histogram; walker
   threads are partitioned across layers on the GPU

@@ -2,12 +2,13 @@
 // Each triangle visualizes an xform's affine: O = translation (c,f),
 // X = O + (a,d), Y = O + (b,e). Dragging a handle edits the affine directly.
 import { App, XFORM_COLORS } from './common';
+import { escapeMoveCentre } from '../core/escape';
 
 const HANDLE_R = 14; // hit radius in CSS px
 
 type DragState =
   | { kind: 'handle'; xi: number; vertex: 0 | 1 | 2 }
-  | { kind: 'pan'; startX: number; startY: number; startCX: number; startCY: number }
+  | { kind: 'pan'; startX: number; startY: number; startCX: number; startCY: number; lastX?: number; lastY?: number }
   | null;
 
 export function buildOverlay(app: App, overlay: HTMLCanvasElement, wrap: HTMLElement) {
@@ -164,9 +165,11 @@ export function buildOverlay(app: App, overlay: HTMLCanvasElement, wrap: HTMLEle
       const dx = (px - drag.startX) / scale;
       const dy = (py - drag.startY) / scale;
       if (e) {
+        // incremental world deltas (deep views keep the exact centre in decimal strings — see escapeMoveCentre)
+        const ddx = (px - (drag.lastX ?? drag.startX)) / scale, ddy = (py - (drag.lastY ?? drag.startY)) / scale;
+        drag.lastX = px; drag.lastY = py;
         const cs = Math.cos(e.rotation), sn = Math.sin(e.rotation);
-        e.centerX = drag.startCX - (cs * dx + sn * dy);
-        e.centerY = drag.startCY - (sn * dx - cs * dy);
+        escapeMoveCentre(e, -(cs * ddx + sn * ddy), -(sn * ddx - cs * ddy));
       } else {
         const f = flameOf();
         const ca = Math.cos(-f.rotation), sa = Math.sin(-f.rotation);
@@ -205,11 +208,25 @@ export function buildOverlay(app: App, overlay: HTMLCanvasElement, wrap: HTMLEle
 
   overlay.addEventListener('wheel', (e) => {
     e.preventDefault();
-    const f = viewOf();
     const [px, py] = evPos(e as unknown as PointerEvent);
-    const [wxBefore, wyBefore] = s2w(px, py);
     const factor = Math.pow(1.0016, -e.deltaY);
-    f.zoom = Math.min(esc() ? 1e12 : 64, Math.max(0.02, f.zoom * factor)); // escape views zoom deep (f32 blurs past ~1e5)
+    const es = esc();
+    if (es) {
+      // zoom about the pointer: the world offset under the pointer before/after, as offsets (exact-centre safe)
+      const dx = px - overlay.width / 2, dy = overlay.height / 2 - py;
+      const cs = Math.cos(es.rotation), sn = Math.sin(es.rotation);
+      const rx = cs * dx - sn * dy, ry = sn * dx + cs * dy;
+      const p0 = ppu();
+      es.zoom = Math.min(1e300, Math.max(0.02, es.zoom * factor));
+      const p1 = ppu();
+      escapeMoveCentre(es, rx / p0 - rx / p1, ry / p0 - ry / p1);
+      app.commit('overlay-view');
+      draw();
+      return;
+    }
+    const f = viewOf();
+    const [wxBefore, wyBefore] = s2w(px, py);
+    f.zoom = Math.min(64, Math.max(0.02, f.zoom * factor));
     const [wxAfter, wyAfter] = s2w(px, py);
     f.centerX += wxBefore - wxAfter;
     f.centerY += wyBefore - wyAfter;

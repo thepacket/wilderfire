@@ -1,7 +1,7 @@
 // Escape tab: the selected escape-time layer — formula, parameters, view, colouring. The gradient comes from
 // the Gradient tab (it edits the selected escape layer's palette), pan/zoom from the canvas.
 import { App, el, slider, numberInput } from './common';
-import { ESCAPE_FORMULAS, OUTSIDE_COLORINGS, INSIDE_COLORINGS, TRAP_SHAPES, TRANSFERS, defaultEscape, type EscapeFormula, type EscapeLayerData } from '../core/escape';
+import { ESCAPE_FORMULAS, OUTSIDE_COLORINGS, INSIDE_COLORINGS, TRAP_SHAPES, TRANSFERS, PRECISIONS, defaultEscape, escapeTier, perturbable, escapeCentreText, escapeSetCentre, type EscapeFormula, type EscapeLayerData, type Precision } from '../core/escape';
 import { compileFormula, FORMULA_VARS } from '../core/formula';
 
 const SRC = 'escape';
@@ -79,8 +79,29 @@ export function buildEscapePanel(app: App, root: HTMLElement) {
     const vsec = el('div', 'section');
     vsec.append(el('h3', '', 'View'));
     vsec.append(el('div', 'hint', 'Drag the canvas to pan, wheel to zoom.'));
-    vsec.append(row('Centre', num(e.centerX, 0.01, (v) => { e.centerX = v; commit(); }, 're'), num(e.centerY, 0.01, (v) => { e.centerY = v; commit(); }, 'im')));
-    vsec.append(row('Zoom', num(e.zoom, 0.1, (v) => { e.zoom = Math.max(1e-30, v); commit(); }, '1 = the ±2 frame')));
+    {
+      // the centre as text: deep views carry more digits than a number input holds
+      const [cx, cy] = escapeCentreText(e);
+      const mk = (v: string, title: string) => { const i = el('input') as HTMLInputElement; i.type = 'text'; i.value = v; i.title = title; i.style.width = '100%'; i.style.fontFamily = 'monospace'; i.style.fontSize = '11px'; return i; };
+      const ix = mk(cx, 're'), iy = mk(cy, 'im');
+      const apply = () => { try { escapeSetCentre(e, ix.value, iy.value); commit(); } catch { ix.style.color = 'var(--danger, #f55)'; } };
+      ix.addEventListener('change', apply); iy.addEventListener('change', apply);
+      const r1 = el('div', 'row'); r1.append(el('label', '', 'Centre re'), ix);
+      const r2 = el('div', 'row'); r2.append(el('label', '', 'Centre im'), iy);
+      vsec.append(r1, r2);
+    }
+    {
+      const zi = el('input') as HTMLInputElement; zi.type = 'text'; zi.value = e.zoom.toPrecision(6); zi.title = '1 = the ±2 frame; scientific notation welcome (1e30)';
+      zi.addEventListener('change', () => { const v = parseFloat(zi.value); if (isFinite(v) && v > 0) { e.zoom = v; commit(); rebuild(); } });
+      vsec.append(row('Zoom', zi));
+    }
+    {
+      const tier = escapeTier(e);
+      const prec = sel(PRECISIONS.map((p) => ({ value: p, label: p === 'auto' ? `auto (${tier})` : p })), e.precision, 'arithmetic: f32 (fast, sharp to ~3 000×), double-single (~1e10×), perturbation (reference orbit at the exact centre, any depth — z^p + c only)', (v) => { e.precision = v as Precision; commit(); rebuild(); });
+      vsec.append(row('Precision', prec));
+      const note = tier === 'perturb' ? `perturbation · reference orbit at the exact centre${e.centerHi ? ` (${e.centerHi[0].length} digits)` : ''}` : tier === 'ds' ? `double-single (~1e10× useful)${perturbable(e) ? '' : ' — this formula has no perturbation path'}` : 'single precision';
+      vsec.append(el('div', 'hint', note));
+    }
     vsec.append(slider({ label: 'Rotation', min: -180, max: 180, step: 1, value: e.rotation * 180 / Math.PI, fmt: (v) => `${v.toFixed(0)}°`, onInput: (v) => { e.rotation = v * Math.PI / 180; commit(); } }).root);
     const resetBtn = el('button', '', 'Reset view');
     resetBtn.onclick = () => { const d = defaultEscape(e.palette); e.centerX = d.centerX; e.centerY = d.centerY; e.zoom = 1; e.rotation = 0; commit(); rebuild(); };
