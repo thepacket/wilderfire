@@ -464,12 +464,9 @@ export class EscapeRenderer {
     if (this.low) this.writeUniforms(this.uLow, e, { x: 0, y: 0, w: this.low.width, h: this.low.height, fullW: this.low.width, fullH: this.low.height });
     this.nextRow = 0;
     this.needsReproject = true;
-    // a full-resolution frame that would not fit one budget gets a quarter-resolution preview first — unless the last
-    // complete picture warped into the new view is the better stand-in (a small zoom/pan step: it stays sharp)
-    const heavy = this.msPerRow <= 0 || this.msPerRow * this.h > EscapeRenderer.BUDGET_MS * 0.6;
-    const ratio = this.frontView ? e.zoom / this.frontView.zoom : Infinity;
-    const nearFront = this.frontView ? ratio < 1.6 && ratio > 0.6 && this.frontView.rot === e.rotation && Math.hypot(e.centerX - this.frontView.cx, e.centerY - this.frontView.cy) * 0.25 * Math.min(this.w, this.h) * e.zoom < 0.5 * Math.min(this.w, this.h) : false;
-    this.lowPending = heavy && !nearFront;
+    // (the quarter-resolution preview pass is off: alternating blurry/sharp frames while wheeling read as flicker —
+    // the warped last complete picture is the stand-in until the full-resolution rows arrive)
+    this.lowPending = false;
     if (sig !== this.lastSigForRows) { this.msPerRow = 0; this.lastSigForRows = sig; } // a new shader: learn its cost afresh
   }
 
