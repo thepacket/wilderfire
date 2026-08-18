@@ -19,13 +19,20 @@
 //                       8 colour modifiers, 16 weighting field, material + materialSpeed (solid rendering),
 //                       6 spare, then per variation: weight + params
 
-import type { Flame, XForm, VarInstance } from '../core/flame';
+import type { Flame, XForm, VarInstance, Layer } from '../core/flame';
 import { visibleLayers, usesMaterials } from '../core/flame';
-import { VARIATIONS } from '../core/variations';
+import { VARIATIONS, DFLT_SUBFLAME_XML } from '../core/variations';
+import { importFlameText } from '../core/flameXML';
 import { WFIELD_WGSL } from './wfield.wgsl';
 import { SOLID_KERNEL_WGSL, SOLID_PAY_WORDS } from './solid.wgsl';
 import { meshKeyFor, meshLayout } from '../core/meshes';
 
+/** JWildfire pre/post-priority variation classes whose Java transform() ends with the preserve-z clause
+ *  (`pVarTP.z += pAmount * pAffineTP.z`) like a 2D normal-priority one — grep of isPreserveZCoordinate over classes with a
+ *  non-zero getPriority(): the post crop family, post_trig, pre_recip, pre/post_c_symmetry, pre/post_c_var, ringtile. */
+const PREPOST_PRESERVE_Z = new Set(['post_circlecrop', 'post_crop_box', 'post_crop_polygon', 'post_crop_cross', 'post_crop_stars', 'post_crop_triangle',
+  'post_crop_trapezoid', 'post_crop_rhombus', 'post_crop_x', 'post_crosscrop', 'post_crop_vesica', 'post_point_crop', 'post_trig', 'post_c_symmetry',
+  'post_c_var', 'pre_recip', 'pre_c_symmetry', 'pre_c_var', 'ringtile']);
 const CDF_ROW = 16;
 const HEADER = 72;    // floats per xform block header (6 affine, 6 post, color, colorSpeed, opacity, pad, 24 3D affines, 8 colour modifiers, 16 weighting field, material, materialSpeed, 6 spare)
 const XD_HEADER = 16; // floats reserved at the front of xd
@@ -61,10 +68,10 @@ function blockSize(x: XForm): number {
 }
 
 /** Module-scope WGSL (helper fns/consts) required by the variations of a flame, deduped by name. */
-function collectFuncs(flame: Flame): string {
+function collectFuncs(layersAll: Layer[]): string {
   const seen = new Set<string>();
   const parts: string[] = [];
-  for (const ly of visibleLayers(flame)) {
+  for (const ly of layersAll) {
     const xs = [...ly.xforms, ...(ly.final ? [ly.final] : []), ...ly.moreFinals];
     for (const x of xs) {
       for (const list of varLists(x)) {
@@ -86,7 +93,7 @@ function collectFuncs(flame: Flame): string {
     }
   }
   // JWildfire weighting fields: FastNoise + wfieldValue (deduped item by item against the variation helpers)
-  if (visibleLayers(flame).some((ly) => [...ly.xforms, ...(ly.final ? [ly.final] : []), ...ly.moreFinals].some((x) => x.wfield && WFIELD_TYPE_ORD[x.wfield.type]))) {
+  if (layersAll.some((ly) => [...ly.xforms, ...(ly.final ? [ly.final] : []), ...ly.moreFinals].some((x) => x.wfield && WFIELD_TYPE_ORD[x.wfield.type]))) {
     for (const [nm, text] of splitItems(WFIELD_WGSL)) {
       if (seen.has('item:' + nm)) continue;
       seen.add('item:' + nm);
@@ -107,7 +114,7 @@ function splitItems(blob: string): [string, string][] {
   return out;
 }
 
-function genXformFn(name: string, x: XForm, B: number, palBase: number): string {
+function genXformFn(name: string, x: XForm, B: number, palBase: number, pzCond = '(P.flags & 1u) != 0u'): string {
   const A = (i: number) => `xd[${B + i}u]`;
   const [pre, main, post] = varLists(x);
   let off = B + HEADER;
@@ -139,10 +146,18 @@ function genXformFn(name: string, x: XForm, B: number, palBase: number): string 
       for (let k = 0; k < (def.extra ?? 0); k++) p.push(`xd[${off + 1 + nP + k}u]`); // hidden slots (data hook)
       off += 1 + nP + (def.extra ?? 0);
       const dprio = def.priority ?? 0;
-      // JWildfire per-instance override: only a normal variation forced to pre/post has a distinct meaning
-      // (EnforcedPre/PostVariationTransformationStep: the point becomes p + w·f(p)); other combinations keep the definition
-      const forced = vi.priority !== undefined && vi.priority !== dprio && dprio === 0 && (vi.priority === -1 || vi.priority === 1) ? vi.priority : 0;
-      return { def, w, p, prio: forced !== 0 ? forced : dprio, forced };
+      // JWildfire per-instance priority override (`<var>_fx_priority`):
+      //  · a normal variation forced to pre/post — EnforcedPre/PostVariationTransformationStep: the input/output point becomes
+      //    p + w·f(p) (its preserve-z clause included, so z grows by w·z too);
+      //  · a pre/post-definition variation forced to 0 — EnforcedVariationTransformationStep: transform(tmp = copy of the
+      //    output, output): a pre-priority function (writes its "affine" argument = the copy) has NO effect and is dropped,
+      //    a post-priority one rewrites the output at its place in the normal list (`forcedZero`);
+      //  · anything else keeps the definition.
+      const ovr = vi.priority !== undefined && vi.priority !== dprio ? vi.priority : undefined;
+      if (ovr === 0 && dprio === -1) return null;
+      const forced = ovr !== undefined && dprio === 0 && (ovr === -1 || ovr === 1) ? ovr : 0;
+      const forcedZero = ovr === 0 && dprio === 1;
+      return { def, name: vi.name, w, p, prio: forced !== 0 ? forced : forcedZero ? 0 : dprio, forced, forcedZero };
     }).filter((b): b is NonNullable<typeof b> => b !== null);
     // …then emit in priority order.
     let snips = '';
@@ -152,20 +167,29 @@ function genXformFn(name: string, x: XForm, B: number, palBase: number): string 
         // prepost variations: their inverse snippet rewrites the input first (prio -2), the forward one runs last (prio 2)
         if (prio === -2 && b.def.preCode) { snips += '    ' + b.def.preCode(b.w, b.p, A) + '\n'; continue; }
         if (b.prio !== prio) continue;
+        // a 2D variation's preserve-z clause (JWildfire adds w·z of its input point to its output z)
+        const snippet = b.def.code(b.w, b.p, A);
+        const pzLine = zOut && !(b.def.flags ?? []).includes('z') ? `    if ${pzCond} { pz_ += ${b.w} * z_; }\n` : '';
+        // the few pre/post-priority JWildfire functions that carry the clause too (their input is the affine point, the
+        // output the accumulator, so it is the same line) — unless the port already writes pz_ itself
+        const pzPrePost = zOut && prio !== 0 && PREPOST_PRESERVE_Z.has(b.name) && !/\bpz_\b/.test(snippet) ? `    if ${pzCond} { pz_ += ${b.w} * z_; }\n` : '';
         if (b.forced === -1) {
           // enforced pre: input ← input + w·f(input) (the snippet adds into v; v is borrowed and restored)
-          snips += `    {\n      let v_keep = v; let pz_keep = pz_; v = t; pz_ = z_;\n    ${b.def.code(b.w, b.p, A)}\n      t = v; z_ = pz_; v = v_keep; pz_ = pz_keep;\n    }\n` + precalc;
+          snips += `    {\n      let v_keep = v; let pz_keep = pz_; v = t; pz_ = z_;\n    ${b.def.code(b.w, b.p, A)}\n${pzLine}      t = v; z_ = pz_; v = v_keep; pz_ = pz_keep;\n    }\n` + precalc;
           continue;
         }
         if (b.forced === 1) {
           // enforced post: output ← output + w·f(output) (the snippet reads t; t is borrowed and restored)
+          snips += `    {\n      let t_keep = t; let z_keep = z_; t = v; z_ = pz_;\n` + precalc + `    ${b.def.code(b.w, b.p, A)}\n${pzLine}      t = t_keep; z_ = z_keep;\n    }\n` + precalc;
+          continue;
+        }
+        if (b.forcedZero) {
+          // a post-priority function at normal priority: it rewrites the output; its "affine" argument is a copy of the output
           snips += `    {\n      let t_keep = t; let z_keep = z_; t = v; z_ = pz_;\n` + precalc + `    ${b.def.code(b.w, b.p, A)}\n      t = t_keep; z_ = z_keep;\n    }\n` + precalc;
           continue;
         }
-        snips += '    ' + b.def.code(b.w, b.p, A) + '\n';
-        if (prio === 0 && zOut && !(b.def.flags ?? []).includes('z')) {
-          snips += `    if (P.flags & 1u) != 0u { pz_ += ${b.w} * z_; }\n`;
-        }
+        snips += '    ' + snippet + '\n';
+        if (prio === 0) snips += pzLine; else snips += pzPrePost;
       }
     }
     return `  {
@@ -305,6 +329,39 @@ fn applyColorMods(col: vec3f, m: vec4f) -> vec3f {
 }
 `;
 
+// ---- subflame_wf: the nested flame (first layer) an instance renders ----
+interface SubFlame { layer: Layer; preserveZ: boolean }
+const subCache = new Map<string, SubFlame | null>();
+/** Parse a sub-flame XML the way SubFlameWFFunc sees it: first layer, final xforms without a colour type recolour as
+ *  DIFFUSION (JWildfire sets UNSET finals to DIFFUSION there — the opposite of a normal render's NONE); nested
+ *  subflame_wf instances are dropped (no recursion). null when nothing renders. */
+export function parseSubFlame(xml: string | undefined, fallbackPalette: Flame['layers'][number]['palette']): SubFlame | null {
+  const text = xml || DFLT_SUBFLAME_XML;
+  const have = subCache.get(text);
+  if (have !== undefined) return have;
+  let out: SubFlame | null = null;
+  try {
+    const fixed = text.replace(/<finalxform\b([^>]*)>/g, (m, attrs: string) => (/\bcolor_type=/.test(attrs) ? m : `<finalxform color_type="DIFFUSION"${attrs}>`));
+    const { flame } = importFlameText(fixed, fallbackPalette);
+    const layer = flame.layers[0];
+    for (const x of [...layer.xforms, ...(layer.final ? [layer.final] : []), ...layer.moreFinals]) {
+      const strip = (l?: VarInstance[]) => l?.filter((vi) => !VARIATIONS[vi.name]?.flags?.includes('subflame'));
+      x.variations = strip(x.variations) ?? [];
+      if (!x.variations.length) x.variations = [{ name: 'linear', weight: 0, params: {} }];
+      x.preVariations = strip(x.preVariations); x.postVariations = strip(x.postVariations);
+    }
+    if (layer.xforms.length) out = { layer, preserveZ: !!flame.preserveZ };
+  } catch (e) { console.warn('subflame_wf: sub-flame not parsed:', e); }
+  subCache.set(text, out);
+  return out;
+}
+/** subflame_wf instances of a flame in kernel order (layers → xforms → pre/main/post lists) — the data hook's index. */
+function subflameInstances(layers: Layer[]): VarInstance[] {
+  const out: VarInstance[] = [];
+  for (const ly of layers) for (const x of [...ly.xforms, ...(ly.final ? [ly.final] : []), ...ly.moreFinals]) for (const l of varLists(x)) for (const vi of l) if (VARIATIONS[vi.name]?.flags?.includes('subflame')) out.push(vi);
+  return out;
+}
+
 export function compileFlame(flame: Flame, nPoints: number): CompiledFlame {
   const layers = visibleLayers(flame);
   const usesMods = layers.some((ly) => [...ly.xforms, ...(ly.final ? [ly.final] : []), ...ly.moreFinals].some((x) => x.colorMods?.some((v) => v !== 0)));
@@ -324,6 +381,18 @@ export function compileFlame(flame: Flame, nPoints: number): CompiledFlame {
     if (ly.final) { finalBase = off; off += blockSize(ly.final); }
     const moreBases = ly.moreFinals.map((x) => { const b = off; off += blockSize(x); return b; });
     return { n, cdfBase, bases, finalBase, moreBases };
+  });
+  // subflame_wf: every instance's sub-flame gets its own weight table rows, xform blocks and palette (256 RGB) after the layers
+  const subs = subflameInstances(layers).map((vi) => {
+    const sf = parseSubFlame(vi.res?.flame, layers[0].palette);
+    if (!sf) return null;
+    const n = sf.layer.xforms.length;
+    const cdfBase = off; off += CDF_ROW * (n + 1);
+    const bases = sf.layer.xforms.map((x) => { const b = off; off += blockSize(x); return b; });
+    const finals = [...(sf.layer.final ? [sf.layer.final] : []), ...sf.layer.moreFinals];
+    const finalBases = finals.map((x) => { const b = off; off += blockSize(x); return b; });
+    const palBase = off; off += 768;
+    return { sf, n, cdfBase, bases, finals, finalBases, palBase };
   });
   const dataSize = Math.max(off, 64);
 
@@ -526,6 +595,99 @@ ${solid ? `    // JWildfire solid rendering: no density — the nearest point pe
   for (let li = 0; li < L - 1; li++) {
     ldis += `  if (f32(idx) >= xd[${li}u]) { layer = ${li + 1}u; }\n`;
   }
+  // ---- subflame_wf: nested chaos games (SubFlameWFFunc.subflameIter/prefuseIter) ----
+  let subFuncs = '';
+  if (subs.length) {
+    const subFns: string[] = [];
+    subs.forEach((sb, k) => {
+      if (!sb) return;
+      const pz = sb.sf.preserveZ ? 'true' : 'false';
+      const ly = sb.sf.layer;
+      ly.xforms.forEach((x, i) => { funcs += genXformFn(`applyS${k}_${i}`, x, sb.bases[i], sb.palBase, pz) + '\n\n'; });
+      sb.finals.forEach((x, j) => { funcs += genXformFn(`applySF${k}_${j}`, x, sb.finalBases[j], sb.palBase, pz) + '\n\n'; });
+      let sel = `  let cb = ${sb.cdfBase}u + (sub${k}_xi + 1u) * ${CDF_ROW}u;\n  var xi = 0u;\n`;
+      for (let i = 0; i < sb.n - 1; i++) sel += `  if (rw > xd[cb + ${i}u]) { xi = ${i + 1}u; }\n`;
+      const cases = ly.xforms.map((x, i) => {
+        const b = sb.bases[i];
+        const cstep = x.colorType === 'CYCLIC' ? `c = fract(c + (1.0 - 2.0 * xd[${b + 13}u]));` : x.colorType === 'DISTANCE' ? '' : `let cs = xd[${b + 13}u]; c = c * (1.0 - cs) + xd[${b + 12}u] * cs;`;
+        return `    case ${i}u: { ${cstep} op = xd[${b + 14}u]; np = applyS${k}_${i}(sub${k}_p, &c, rs, &hide, &rgbo); }`;
+      }).join('\n');
+      const fsteps = sb.finals.map((fx, j) => {
+        const b = sb.finalBases[j];
+        const cstep = fx.colorType === 'CYCLIC' ? `qc = fract(qc + (1.0 - 2.0 * xd[${b + 13}u]));` : fx.colorType === 'DISTANCE' ? '' : `{ let fcs = xd[${b + 13}u]; qc = qc * (1.0 - fcs) + xd[${b + 12}u] * fcs; }`;
+        return `    ${cstep} q = applySF${k}_${j}(q, &qc, rs, &qhide, &qrgb);`;
+      }).join('\n');
+      subFuncs += `
+var<private> sub${k}_p: vec3f = vec3f(0.0);
+var<private> sub${k}_c: f32 = 0.0;
+var<private> sub${k}_xi: u32 = 0u;
+var<private> sub${k}_init: bool = false;
+// one chaos-game step of sub-flame ${k}: picks the next xform from the current one's weight row, moves the persistent point; false when the xform is hidden/opaque-skipped
+fn sub${k}_step(rs: ptr<function, u32>, hd: ptr<function, bool>, rgb: ptr<function, vec4f>) -> bool {
+  let rw = rnd(rs);
+${sel}  var c = sub${k}_c;
+  var np = sub${k}_p;
+  var op = 1.0;
+  var hide = false;
+  var rgbo = vec4f(0.0);
+  switch xi {
+${cases}
+    default: {}
+  }
+  sub${k}_xi = xi;
+  sub${k}_p = np;
+  sub${k}_c = c;
+  if (abs(op) <= 1e-9) { return false; }                       // DrawMode.HIDDEN
+  if (abs(op - 1.0) > 1e-9 && rnd(rs) > op) { return false; }  // DrawMode.OPAQUE
+  *hd = hide; *rgb = rgbo;
+  return true;
+}
+fn subflame${k}(rs: ptr<function, u32>, cp: ptr<function, f32>, hd: ptr<function, bool>, rgb: ptr<function, vec4f>, scale: f32, angle: f32, ox: f32, oy: f32, oz: f32, cscz: f32, cmode: i32) -> vec3f {
+  var hh = false; var rr = vec4f(0.0);
+  if (!sub${k}_init || any(sub${k}_p != sub${k}_p) || any(abs(sub${k}_p) > vec3f(3.0e38))) {
+    // prefuseIter: a fresh point, 42 unplotted steps
+    sub${k}_p = vec3f(rnd(rs) - 0.5, rnd(rs) - 0.5, 0.0); sub${k}_c = rnd(rs); sub${k}_xi = 0u; sub${k}_init = true;
+    for (var i = 0u; i < 42u; i = i + 1u) { sub${k}_step(rs, &hh, &rr); }
+  }
+  var q = sub${k}_p; var qc = sub${k}_c; var qhide = false; var qrgb = vec4f(0.0);
+  var drawn = false;
+  for (var it = 0u; it < 100u; it = it + 1u) {   // MAX_ITER
+    if (sub${k}_step(rs, &qhide, &qrgb)) { drawn = true; break; }
+  }
+  if (!drawn) { return vec3f(0.0); }
+  q = sub${k}_p; qc = sub${k}_c;
+${fsteps}
+  // colour: the sub-flame's palette entry (GradientColorStep, index·254 + 0.5) unless a direct-colour variation set one.
+  // JWildfire holds palette colours on the RenderColor scale (·200/256) and direct colours on 0..255; our plot scale is the
+  // palette's, so a palette colour passes through unscaled as an RGB colour but reads ·200/256 as a channel value
+  var srgb = qrgb.xyz; var chan = qrgb.xyz;
+  if (qrgb.w < 0.5) { let ci = u32(clamp(i32(qc * 254.0 + 0.5), 0, 255)) * 3u; srgb = vec3f(xd[${sb.palBase}u + ci], xd[${sb.palBase}u + ci + 1u], xd[${sb.palBase}u + ci + 2u]); chan = srgb * (200.0 / 256.0); }
+  *hd = qhide;
+  if (cmode != -1) {
+    if (qrgb.w > 0.5 || cmode == -2) { *rgb = vec4f(srgb, 1.0); *cp = qc; }
+    if (cmode == 0) { *cp = qc; }
+    else if (cmode == 1) { *cp = chan.x; }
+    else if (cmode == 2) { *cp = chan.y; }
+    else if (cmode == 3) { *cp = chan.z; }
+    else if (cmode == 4) { *cp = 0.2990 * chan.x + 0.5880 * chan.y + 0.1130 * chan.z; }
+  }
+  let ca_ = cos(angle * PI / 180.0); let sa_ = sin(angle * PI / 180.0);
+  let x = scale * q.x; let y = scale * q.y;
+  return vec3f(x * ca_ - y * sa_ + ox, x * sa_ + y * ca_ + oy, scale * q.z + oz + cscz * qc);
+}
+`;
+      subFns.push(`    case ${k}u: { return subflame${k}(rs, cp, hd, rgb, scale, angle, ox, oy, oz, cscz, cmode); }`);
+    });
+    subFuncs += `
+fn subflameAny(k: u32, rs: ptr<function, u32>, cp: ptr<function, f32>, hd: ptr<function, bool>, rgb: ptr<function, vec4f>, scale: f32, angle: f32, ox: f32, oy: f32, oz: f32, cscz: f32, cmode: i32) -> vec3f {
+  switch k {
+${subFns.join('\n')}
+    default: { return vec3f(0.0); }
+  }
+}
+`;
+  }
+
   const lcases = layers.map((_, li) => `    case ${li}u: { iterLayer${li}(idx); }`).join('\n');
 
   const wgsl = `// Auto-generated WilderFire iteration kernel (${L} layer${L > 1 ? 's' : ''})
@@ -586,9 +748,9 @@ var<private> df_zero: u32 = 0u;
 // true during a walker's first iterations after a (re)start — JWildfire's "first call" of a variation instance (pre_stabilize)
 var<private> wstart_: bool = false;
 
-${collectFuncs(flame)}
+${collectFuncs([...layers, ...subs.flatMap((sb) => (sb ? [sb.sf.layer] : []))])}
 
-${funcs}${iterFns}
+${funcs}${subFuncs}${iterFns}
 @compute @workgroup_size(256)
 fn main(@builtin(global_invocation_id) gid: vec3u) {
   let idx = gid.x;
@@ -617,12 +779,10 @@ ${lcases}
     if (ls.length) out[ls.length - 1] = nPoints + 1;
     ls.forEach((l, i) => { out[8 + i] = Math.max(l.weight, 0); });
 
-    ls.forEach((ly, li) => {
-      if (li >= infos.length) return;
-      const info = infos[li];
-      const m = Math.min(ly.xforms.length, CDF_ROW);
-      const base = ly.xforms.map((x) => Math.max(x.weight, 1e-6));
-
+    // weight-table rows of an xform list: the plain row, then one row per "previous" xform (xaos)
+    const writeCdf = (xforms: XForm[], cdfBase: number) => {
+      const m = Math.min(xforms.length, CDF_ROW);
+      const base = xforms.map((x) => Math.max(x.weight, 1e-6));
       const writeRow = (rowBase: number, mult: (j: number) => number) => {
         const wj = base.map((bw, j) => bw * Math.max(mult(j), 0));
         let rtot = wj.reduce((a, b) => a + b, 0);
@@ -637,59 +797,82 @@ ${lcases}
         }
         out[rowBase + m - 1] = 1.0001;
       };
-      writeRow(info.cdfBase, () => 1);
+      writeRow(cdfBase, () => 1);
       for (let i = 0; i < m; i++) {
-        writeRow(info.cdfBase + CDF_ROW * (i + 1), (j) => ly.xforms[i].xaos?.[j] ?? 1);
+        writeRow(cdfBase + CDF_ROW * (i + 1), (j) => xforms[i].xaos?.[j] ?? 1);
       }
-
-      const writeBlock = (x: XForm, B: number) => {
-        for (let i = 0; i < 6; i++) out[B + i] = x.affine[i];
-        for (let i = 0; i < 6; i++) out[B + 6 + i] = x.post[i];
-        out[B + 12] = x.color;
-        out[B + 13] = x.colorSpeed;
-        out[B + 14] = x.opacity;
-        const I = [1, 0, 0, 0, 1, 0];
-        for (let i = 0; i < 6; i++) out[B + 16 + i] = x.yz?.[i] ?? I[i];
-        for (let i = 0; i < 6; i++) out[B + 22 + i] = x.zx?.[i] ?? I[i];
-        for (let i = 0; i < 6; i++) out[B + 28 + i] = x.yzPost?.[i] ?? I[i];
-        for (let i = 0; i < 6; i++) out[B + 34 + i] = x.zxPost?.[i] ?? I[i];
-        for (let i = 0; i < 8; i++) out[B + 40 + i] = x.colorMods?.[i] ?? 0;
-        for (let i = 0; i < 16; i++) out[B + 48 + i] = 0;
-        out[B + 64] = x.material ?? 0;
-        out[B + 65] = x.materialSpeed ?? 0;
-        if (x.wfield && WFIELD_TYPE_ORD[x.wfield.type]) {
-          const w = x.wfield;
-          out[B + 48] = WFIELD_TYPE_ORD[w.type]; out[B + 49] = w.input === 'POSITION' ? 1 : 0;
-          out[B + 50] = w.varAmount; out[B + 51] = w.color; out[B + 52] = w.jitter;
-          out[B + 53] = w.seed; out[B + 54] = w.frequency; out[B + 55] = w.octaves; out[B + 56] = w.gain; out[B + 57] = w.lacunarity;
-          out[B + 58] = w.fractalType === 'BILLOW' ? 1 : w.fractalType === 'RIGID_MULTI' ? 2 : 0;
-          out[B + 59] = w.cellDistance === 'MANHATTAN' ? 1 : w.cellDistance === 'NATURAL' ? 2 : 0;
-          out[B + 60] = ['CELL_VALUE', 'DISTANCE', 'DISTANCE2', 'DISTANCE_ADD', 'DISTANCE_SUB', 'DISTANCE_MUL', 'DISTANCE_DIV'].indexOf(w.cellReturn);
-          if (out[B + 60] < 0) out[B + 60] = 2;
-          w.params.slice(0, 3).forEach((pp, k) => { out[B + 61 + k] = pp.intensity; });
-        }
-        let o = B + HEADER;
-        for (const list of varLists(x)) {
-          for (const vi of list) {
-            const def = VARIATIONS[vi.name];
-            if (!def) continue;
-            out[o++] = vi.weight;
-            for (const pd of def.params ?? []) {
-              out[o++] = vi.params[pd.name] ?? pd.def;
-            }
-            if (def.extra) {
+    };
+    let subIndex = 0; // subflame_wf instances in kernel order (matches `subs`)
+    const writeBlock = (x: XForm, B: number) => {
+      for (let i = 0; i < 6; i++) out[B + i] = x.affine[i];
+      for (let i = 0; i < 6; i++) out[B + 6 + i] = x.post[i];
+      out[B + 12] = x.color;
+      out[B + 13] = x.colorSpeed;
+      out[B + 14] = x.opacity;
+      const I = [1, 0, 0, 0, 1, 0];
+      for (let i = 0; i < 6; i++) out[B + 16 + i] = x.yz?.[i] ?? I[i];
+      for (let i = 0; i < 6; i++) out[B + 22 + i] = x.zx?.[i] ?? I[i];
+      for (let i = 0; i < 6; i++) out[B + 28 + i] = x.yzPost?.[i] ?? I[i];
+      for (let i = 0; i < 6; i++) out[B + 34 + i] = x.zxPost?.[i] ?? I[i];
+      for (let i = 0; i < 8; i++) out[B + 40 + i] = x.colorMods?.[i] ?? 0;
+      for (let i = 0; i < 16; i++) out[B + 48 + i] = 0;
+      out[B + 64] = x.material ?? 0;
+      out[B + 65] = x.materialSpeed ?? 0;
+      if (x.wfield && WFIELD_TYPE_ORD[x.wfield.type]) {
+        const w = x.wfield;
+        out[B + 48] = WFIELD_TYPE_ORD[w.type]; out[B + 49] = w.input === 'POSITION' ? 1 : 0;
+        out[B + 50] = w.varAmount; out[B + 51] = w.color; out[B + 52] = w.jitter;
+        out[B + 53] = w.seed; out[B + 54] = w.frequency; out[B + 55] = w.octaves; out[B + 56] = w.gain; out[B + 57] = w.lacunarity;
+        out[B + 58] = w.fractalType === 'BILLOW' ? 1 : w.fractalType === 'RIGID_MULTI' ? 2 : 0;
+        out[B + 59] = w.cellDistance === 'MANHATTAN' ? 1 : w.cellDistance === 'NATURAL' ? 2 : 0;
+        out[B + 60] = ['CELL_VALUE', 'DISTANCE', 'DISTANCE2', 'DISTANCE_ADD', 'DISTANCE_SUB', 'DISTANCE_MUL', 'DISTANCE_DIV'].indexOf(w.cellReturn);
+        if (out[B + 60] < 0) out[B + 60] = 2;
+        w.params.slice(0, 3).forEach((pp, k) => { out[B + 61 + k] = pp.intensity; });
+      }
+      let o = B + HEADER;
+      for (const list of varLists(x)) {
+        for (const vi of list) {
+          const def = VARIATIONS[vi.name];
+          if (!def) continue;
+          out[o++] = vi.weight;
+          for (const pd of def.params ?? []) {
+            out[o++] = vi.params[pd.name] ?? pd.def;
+          }
+          if (def.extra) {
+            let k = 0;
+            if (def.flags?.includes('mesh')) {
               // data hook: obj_mesh_primitive_wf / obj_mesh_wf → [cdf base, face count, triangle base] of its sampler in the mesh buffer (0 faces until loaded)
-              const mk = def.flags?.includes('mesh') ? meshKeyFor(vi) : undefined;
+              const mk = meshKeyFor(vi);
               const lay = mk ? meshLayout.get(mk) : undefined;
-              out[o++] = lay?.cdfBase ?? 0; out[o++] = lay?.faces ?? 0; out[o++] = lay?.triBase ?? 0;
-              for (let k = 3; k < def.extra; k++) out[o++] = 0;
+              out[o++] = lay?.cdfBase ?? 0; out[o++] = lay?.faces ?? 0; out[o++] = lay?.triBase ?? 0; k = 3;
+            } else if (def.flags?.includes('subflame')) {
+              // data hook: subflame_wf → its compiled sub-flame index (a sub-flame that did not parse renders nothing)
+              const si = subIndex++;
+              out[o++] = si < subs.length && subs[si] ? si : 1e9; k = 1;
             }
+            for (; k < def.extra; k++) out[o++] = 0;
           }
         }
-      };
+      }
+    };
+
+    ls.forEach((ly, li) => {
+      if (li >= infos.length) return;
+      const info = infos[li];
+      writeCdf(ly.xforms, info.cdfBase);
       ly.xforms.forEach((x, i) => { if (i < info.bases.length) writeBlock(x, info.bases[i]); });
       if (ly.final && info.finalBase >= 0) writeBlock(ly.final, info.finalBase);
       ly.moreFinals.forEach((x, k) => { if (k < info.moreBases.length) writeBlock(x, info.moreBases[k]); });
+    });
+    // subflame_wf: the sub-flames' tables/blocks/palettes (their structure is fixed at compile time; the sub-flame of an
+    // instance whose XML changed since is a different signature → recompiled, so `subs` still matches)
+    subs.forEach((sb) => {
+      if (!sb) return;
+      const ly = sb.sf.layer;
+      writeCdf(ly.xforms, sb.cdfBase);
+      ly.xforms.forEach((x, i) => writeBlock(x, sb.bases[i]));
+      sb.finals.forEach((x, j) => writeBlock(x, sb.finalBases[j]));
+      for (let i = 0; i < 256; i++) { const c = ly.palette[i] ?? [0, 0, 0]; out[sb.palBase + i * 3] = c[0]; out[sb.palBase + i * 3 + 1] = c[1]; out[sb.palBase + i * 3 + 2] = c[2]; }
     });
   };
 

@@ -603,6 +603,33 @@ export function buildTransformsPanel(app: App, root: HTMLElement) {
           row.append(vp);
           item.append(row);
         }
+        // subflame_wf: the nested flame (a resource) — load a .flame file, or reset to the built-in default
+        if (VARIATIONS[vi.name]?.res?.includes('flame')) {
+          const row = el('div', 'var-params');
+          const vp = el('span', 'vp');
+          const nm = () => { const x = vi.res?.flame; if (!x) return 'default sub-flame'; const m = /<flame[^>]*\sname="([^"]*)"/.exec(x); return m?.[1] || 'sub-flame'; };
+          const lab = el('span', '', nm());
+          const load = el('button', '', '⬆ .flame');
+          load.title = 'Use a .flame file as the sub-flame (its first flame; embedded in this transform, JWildfire-compatible)';
+          const file = el('input') as HTMLInputElement;
+          file.type = 'file'; file.accept = '.flame,.xml'; file.style.display = 'none';
+          load.onclick = () => file.click();
+          file.onchange = async () => {
+            const f = file.files?.[0]; file.value = '';
+            if (!f) return;
+            const text = (await f.text()).trim();
+            if (!text.startsWith('<')) { alert('Not a .flame XML file'); return; }
+            (vi.res ??= {}).flame = text;
+            lab.textContent = nm();
+            app.commit();
+          };
+          const reset = el('button', '', 'default');
+          reset.title = 'Back to the built-in default sub-flame';
+          reset.onclick = () => { if (vi.res) { delete vi.res.flame; if (!Object.keys(vi.res).length) delete vi.res; } lab.textContent = nm(); app.commit(); };
+          vp.append(el('span', '', 'sub-flame'), lab, load, reset, file);
+          row.append(vp);
+          item.append(row);
+        }
         wrap.append(item);
       });
       editorSec.append(wrap);

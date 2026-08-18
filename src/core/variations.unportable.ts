@@ -70,7 +70,6 @@ export const UNPORTABLE: Record<string, string> = {
   "shape_warp": "renders external content (flame, image, mesh, SVG, text)",
   "snowflake_wf": "CPU-built point set",
   "sphtiling3v2": "JWildfire pre+post inverse pair / nested variation",
-  "subflame_wf": "renders external content (flame, image, mesh, SVG, text)",
   "sunflower": "CPU-built point set",
   "sunvoroni": "CPU-built point set",
   "svg_wf": "renders external content (flame, image, mesh, SVG, text)",

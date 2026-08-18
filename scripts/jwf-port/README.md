@@ -97,7 +97,7 @@ points, `dc_gnarly` updates only 2 of its 6 gaussian summands — `& 5` — so i
 blur depends on the render's init randoms). Together with the 70 hand-written
 flam3 entries the app registry has 940 variations.
 
-### What is not ported (85)
+### What is not ported (84)
 
 `data/unportable.json` is the definitive list — every JWildfire variation is
 either in the registry or in that file with a category, and `gen.ts` writes it
@@ -107,7 +107,7 @@ variation was skipped. Categories:
 | category | count | why |
 |---|---|---|
 | user-code | 21 | compiles user-supplied code or a formula at run time (`custom_wf`, `dc_code`, `glsl_code`, `c_var`, `ducks`, `fract_formula_*`, the `yplot2d_wf`… plot family, `colordomain`); the WebGPU kernel has no run-time compiler |
-| external-content | 28 | renders external content that would have to be uploaded to the GPU: sub-flames (`subflame_wf`, `ringsubflame`, `glynns3subfl`), images (`post_bumpmap_wf`, `displacemap_wf`, `colormap_wf`, `kaleidoimg`, `plane_wf`, `wangtiles`), meshes (`terrain3D`, `metaballs3d_wf`, `knots3D`, `sattractor3D`), `svg_wf`, `text_wf`, L-systems, brushes (`obj_mesh_wf` IS ported — the user loads the OBJ file into the browser's mesh store) |
+| external-content | 27 | renders external content that would have to be uploaded to the GPU: sub-flames (`ringsubflame`, `glynns3subfl`), images (`post_bumpmap_wf`, `displacemap_wf`, `colormap_wf`, `kaleidoimg`, `plane_wf`, `wangtiles`), meshes (`terrain3D`, `metaballs3d_wf`, `knots3D`, `sattractor3D`), `svg_wf`, `text_wf`, L-systems, brushes (`obj_mesh_wf` IS ported — the user loads the OBJ file into the browser's mesh store; `subflame_wf` IS ported — the sub-flame is compiled into the kernel) |
 | point-set | 33 | builds a point/segment list on the CPU at init and samples it per point: the `DrawFunc` family (`gpattern`, `mandala`, `nsudoku`, `sunflower`, `szubieta`, `triantruchet`, `curliecue`, `taprats`, `sunvoroni`), turtle/`DynamicArray` `_js` fractals (`dragon_js`, `koch_js`, `hilbert_js`, `tree_js`, …), `dla_wf`/`snowflake_wf` simulations, `inversion`, `maurer_lines`, `klein_group`, `natural_foam`, …; `neuron3D` builds a seed-shuffled 512-entry Perlin permutation table per instance (no per-flame table storage in the kernel) |
 | engine | 2 | needs an engine feature WilderFire lacks: a variation instantiating another (`sphtiling3v2`), `post_dcztransl` (no Java class) |
 | resource-params | 1 | `dc_triantess` keeps its colours as byte-array ressources |
@@ -374,6 +374,35 @@ same sample density and depth distribution as JWildfire's.
   `obj_mesh_primitive_wf`, 0.90 with `blur3D`, 0.88 as a density render and 1.01 with a flat camera — a 3D scene whose z
   is carried through a 2D variation (`waves2`, preserve_z) plus a z-noise variation on one xform and a `juliascope` xform,
   viewed at pitch/yaw ≈ 0.8/1.1; kept as `_zchain.flame` (open engine item, not understood). `_obj4` uses `parplot2d_wf`.
+* **`subflame_wf`** (hand entry + codegen): JWildfire's `SubFlameWFFunc` runs a nested flame's chaos game one step per
+  call (`subflameIter`: next xform from the current one's weight row, hidden/opaque draw modes skipped up to 1000 times,
+  finals applied, the point scaled/rotated/offset, `z += colorscale_z·colour`; `prefuseIter`: 42 unplotted steps from a
+  fresh point; the amount is ignored — `pVarTP += q`). WilderFire compiles the sub-flame (the instance's `flame`
+  resource, hex XML in `subflame_wf_flame`, JWildfire's `DFLT_FLAME_XML` when absent — kept out of the model, written
+  back on export) into the kernel: `parseSubFlame` (first layer, UNSET finals recolour as DIFFUSION like the Java,
+  nested subflame_wf dropped), per-sub `applyS<k>_<i>`/`applySF<k>_<j>` xform functions with the sub-flame's own
+  preserve_z, weight rows + xform blocks + a 256-RGB palette after the outer layers, `var<private>` walker state
+  (point, colour, current xform; re-fused per dispatch), `sub<k>_step`/`subflame<k>`/`subflameAny` dispatcher; the
+  hidden slot is the sub index. Colour modes: −1 off, 0 the sub colour index, 1..4 a channel of the sub palette colour
+  (JWildfire's `redColor/255` on its 200/256 RenderColor scale), −2 the palette colour as a direct RGB colour; a
+  direct-colour sub point passes its RGB through in every mode ≠ −1. Sequences (`flame_is_sequence`) accepted, ignored.
+  The transform editor shows a "sub-flame" row (⬆ .flame / default). Verified: `_sub1` (the importer's example) 1.05 /
+  corr 0.99, `_sub3only` (a collection sub-flame alone) 0.99, `_sub3` (its full flame) 1.12 / corr 0.98 after the two
+  engine fixes below (0.62 / 0.31 before); `Sub_0` fixture 1.08 / corr 1.00 (baseline 95). `_sub2`'s sub-flame uses
+  `wangtiles` (image), `_sub4` mesh primitives inside the sub-flame (mesh keys of sub-flames are not loaded — open).
+* **Two engine fixes found through them (`_zchain`/`_obj2` 0.86–0.90 → 0.98–0.99, `_sub3`):**
+  1. *Enforced-priority preserve-z*: a normal 2D variation forced to pre/post (`<var>_fx_priority="±1"`,
+     `EnforcedPre/PostVariationTransformationStep`) still runs its Java `if (isPreserveZCoordinate) pVarTP.z += amount·pAffineTP.z`
+     — with pAffineTP the copy of the point it rewrites, so z grows by amount·z; the codegen never added the clause for
+     forced variations (466 files carry a forced post, 313 a forced pre in the collections). Also modelled:
+     a pre-definition function forced to 0 has no effect (its "affine" argument is a copy) and is dropped, a
+     post-definition one forced to 0 rewrites the output at its place in the normal list.
+  2. *Pre/post-priority functions with the preserve-z clause* (`PREPOST_PRESERVE_Z` in codegen: post_circlecrop and the
+     post_crop family, post_trig, post_c_symmetry/var, pre_recip, pre_c_symmetry/var, ringtile — the Java classes with
+     `getPriority() ≠ 0` and `isPreserveZCoordinate`): they add amount·z of the affine point to the output z too;
+     `pre_recip="1.0"` in `_sub3` was doubling z's growth factor per step in JWildfire and not in ours.
+  Open: a synthetic `_sub3bub` (bubble instead of the subflame, flat camera) still differs wildly (JWildfire's image is
+  almost empty, ours full) — not investigated.
 * Verified: `inversion` flames `_pv1` 0.99, `_pv2` 1.12, `_pv3` 0.95, `_pv4nc` 0.97 (`_pv4` itself has `curliecue2`, a
   sequential-state variation); `mobius3D_with_inverse` `_pv5` 0.99, `_pv6` 1.09, `_pv7` 1.00; `pre_stabilize` flames are
   attractor scenes whose look depends on the long single trajectory (JWildfire's points diffuse for ~10 k steps

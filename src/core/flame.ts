@@ -288,9 +288,12 @@ export function visibleLayers(f: Flame): Layer[] {
   return vis.length ? vis : [f.layers[0]];
 }
 
+function strHash(s: string): string { let h = 5381; for (let i = 0; i < s.length; i++) h = (Math.imul(h, 33) ^ s.charCodeAt(i)) >>> 0; return h.toString(36) + s.length.toString(36); }
+
 /** Structural signature — when this changes, the WGSL shader must be regenerated. */
 export function flameSignature(f: Flame): string {
-  const names = (l?: VarInstance[]) => (l ?? []).map((v) => v.name + (v.priority !== undefined ? '@' + v.priority : '')).join(',');
+  // (a subflame_wf instance's sub-flame is compiled into the kernel: its XML is part of the structure)
+  const names = (l?: VarInstance[]) => (l ?? []).map((v) => v.name + (v.priority !== undefined ? '@' + v.priority : '') + (v.name === 'subflame_wf' ? '{' + strHash(v.res?.flame ?? '') + '}' : '')).join(',');
   const sig = (x: XForm) => `${names(x.preVariations)}<${names(x.variations)}>${names(x.postVariations)}` + (x.wfield ? `~wf(${x.wfield.params.map((p) => p.varName + '.' + p.paramName).join(',')})` : '');
   return visibleLayers(f)
     .map((l) => l.xforms.map(sig).join('|') + '#' + [l.final, ...l.moreFinals].map((x) => (x ? sig(x) : '-')).join('#'))

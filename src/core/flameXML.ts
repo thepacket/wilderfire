@@ -32,13 +32,15 @@ const isFxPriorityAttr = (n: string) => n.endsWith('_fx_priority');
  *  `VarInstance.res` when the definition lists the name; we store the file's basename (JWildfire writes the
  *  author's full path, useless elsewhere; obj_mesh_wf looks the basename up in the browser's mesh store). */
 const resNameOf = (attrName: string, vname: string): string | undefined => VARIATIONS[vname]?.res?.find((r) => attrName.endsWith('_' + r));
-const decodeRes = (hex: string): string => {
+const decodeRes = (hex: string, name: string): string => {
   const h = hex.trim();
-  if (!/^([0-9a-fA-F]{2})+$/.test(h)) return h; // (a plain string; be lenient)
-  const bytes = new Uint8Array(h.length / 2);
-  for (let i = 0; i < bytes.length; i++) bytes[i] = parseInt(h.slice(2 * i, 2 * i + 2), 16);
-  const s = new TextDecoder().decode(bytes);
-  return s.slice(Math.max(s.lastIndexOf('/'), s.lastIndexOf('\\')) + 1);
+  let s = h;
+  if (/^([0-9a-fA-F]{2})+$/.test(h)) {
+    const bytes = new Uint8Array(h.length / 2);
+    for (let i = 0; i < bytes.length; i++) bytes[i] = parseInt(h.slice(2 * i, 2 * i + 2), 16);
+    s = new TextDecoder().decode(bytes);
+  } // (else a plain string; be lenient)
+  return name.endsWith('_filename') ? s.slice(Math.max(s.lastIndexOf('/'), s.lastIndexOf('\\')) + 1) : s;
 };
 const encodeRes = (s: string): string => Array.from(new TextEncoder().encode(s), (b) => b.toString(16).toUpperCase().padStart(2, '0')).join('');
 
@@ -278,8 +280,8 @@ function parseXFormEl(elm: Element, ctx?: CurveCtx): XForm {
     const fxp = parseFloat(elm.getAttribute(`${raw}_fx_priority`) ?? '');
     if (isFinite(fxp) && Math.round(fxp) !== (VARIATIONS[vname].priority ?? 0)) inst.priority = Math.round(fxp);
     for (const r of VARIATIONS[vname].res ?? []) {
-      const rv = decodeRes(elm.getAttribute(`${raw}_${r}`) ?? '');
-      if (rv) (inst.res ??= {})[r] = rv;
+      const rv = decodeRes(elm.getAttribute(`${raw}_${r}`) ?? '', r);
+      if (rv && rv !== VARIATIONS[vname].resDef?.[r]) (inst.res ??= {})[r] = rv;
     }
     if (stage === 'pre') { (x.preVariations ??= []).push(inst); instByRaw.set(raw, { inst, list: 'preVariations' }); }
     else if (stage === 'post') { (x.postVariations ??= []).push(inst); instByRaw.set(raw, { inst, list: 'postVariations' }); }
@@ -703,7 +705,7 @@ function xformToXML(x: XForm, tag: string, nXForms: number, extraAttrs: string[]
       for (const pd of VARIATIONS[vi.name].params ?? []) {
         attrs.push(`${prefix}${vi.name}_${pd.name}="${fmt(vi.params[pd.name] ?? pd.def)}"`);
       }
-      for (const r of VARIATIONS[vi.name].res ?? []) attrs.push(`${prefix}${vi.name}_${r}="${encodeRes(vi.res?.[r] ?? '')}"`); // JWildfire "ressource" (hex UTF-8)
+      for (const r of VARIATIONS[vi.name].res ?? []) attrs.push(`${prefix}${vi.name}_${r}="${encodeRes(vi.res?.[r] ?? VARIATIONS[vi.name].resDef?.[r] ?? '')}"`); // JWildfire "ressource" (hex UTF-8)
     }
   };
   pushVars(x.variations, '');

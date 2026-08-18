@@ -30,10 +30,43 @@ export interface VariationDef {
   types?: string[];
   /** Hidden numeric slots after the params (filled by codegen's data hook, e.g. mesh buffer offsets); the snippet sees them as p[params.length + i]. */
   extra?: number;
-  /** String resources (JWildfire "ressources") an instance may carry in `VarInstance.res` — file names, imported
-   *  from `<var>_<name>` hex attributes and exported the same way. Only `obj_filename` (obj_mesh_wf) is used. */
+  /** String resources (JWildfire "ressources") an instance may carry in `VarInstance.res` — file names or embedded
+   *  text, imported from `<var>_<name>` hex attributes and exported the same way (`*_filename` names keep the basename).
+   *  Used: `obj_filename` (obj_mesh_wf), `flame` (subflame_wf). */
   res?: string[];
+  /** Default value of a resource when the instance carries none (exported in its place). */
+  resDef?: Record<string, string>;
 }
+
+/** JWildfire's built-in default sub-flame (SubFlameWFFunc.DFLT_FLAME_XML) — what subflame_wf renders until another flame is set. */
+export const DFLT_SUBFLAME_XML = '<flame name="JWildfire" version="0.35 (15.01.2012)" size="581 327" center="0.0 0.0" scale="63.5625" rotate="0.0" oversample="1" color_oversample="1" filter="1.0" quality="50.0" background="0.0 0.0 0.0" brightness="4.0" gamma="4.0" gamma_threshold="0.04" estimator_radius="9" estimator_minimum="0" estimator_curve="0.4" temporal_samples="1.0" cam_zoom="1.0" cam_pitch="0.0" cam_yaw="0.0" cam_persp="0.0" cam_zpos="0.0" cam_dof="0.0" shading_shading="FLAT" >\r\n' +
+  '  <xform weight="37.974195875650885" color="0.0" symmetry="0.6363142683575415" waves2_wf="1.0" waves2_wf_scalex="0.05411632642405888" waves2_wf_scaley="0.07140430473672771" waves2_wf_freqx="5.665411884739101" waves2_wf_freqy="3.5622214535317194" waves2_wf_use_cos_x="0" waves2_wf_use_cos_y="0" waves2_wf_dampx="0.0" waves2_wf_dampy="-0.0749313500620006" popcorn2="1.1747945422649702E-4" popcorn2_x="1.0" popcorn2_y="0.5" popcorn2_c="1.5" coefs="0.29869999951569876 0.9193040710637221 -0.9193040710637221 0.29869999951569876 -1.6842788839099072 2.0224216083110305" chaos="1.0 1.0 1.0" />\r\n' +
+  '  <xform weight="0.5" color="0.0" symmetry="-1.0" spherical3D="0.43660175471191676" coefs="1.0 0.0 0.0 1.0 0.0 0.0" chaos="1.0 1.0 1.0" />\r\n' +
+  '  <xform weight="0.5" color="0.0" symmetry="-1.0" linear3D="1.0" coefs="0.9321767990927353 -0.36200333594211836 0.36200333594211836 0.9321767990927353 -0.1636856703682093 0.5528632251910492" chaos="1.0 1.0 1.0" />\r\n' +
+  '  <palette count="256" format="RGB" >\r\n' +
+  'D45334CF5635CA5936C55C38C05F39BC623AB7653BB2683DAD6B3EA86E3FA371409E7442\r\n' +
+  '997743947A448F7D458B80478683488186497C894A778C4C728F4D6D924E68944F639751\r\n' +
+  '5E9A525A9D5355A05450A3564BA65746A95841AC593CAF5B37B25C32B55D2DB85E29BB5F\r\n' +
+  '24BE611FC1621AC46315C76410CA660BCD6706D06804D26A07D16C0AD06E0DCF710FCE73\r\n' +
+  '12CD7615CC7818CB7A1BCA7D1EC97F21C88124C78427C68629C5882CC48B2FC38D32C28F\r\n' +
+  '35C19238C0943BBF963EBE9941BE9B43BD9D46BCA049BBA24CBAA44FB9A752B8A955B7AB\r\n' +
+  '58B6AE5AB5B05DB4B260B3B563B2B766B1B969B0BC6CAFBE6FAEC172ADC374ACC577ABC8\r\n' +
+  '7AAACA7DA9CC80A9CD82A9CD85A8CD87A8CD8AA8CD8DA7CD8FA7CD92A7CD94A7CD97A6CD\r\n' +
+  '9AA6CD9CA6CD9FA5CDA1A5CDA4A5CDA6A5CDA9A4CDACA4CDAEA4CDB1A3CDB3A3CDB6A3CC\r\n' +
+  'B8A3CCBBA2CCBEA2CCC0A2CCC3A2CCC5A1CCC8A1CCCAA1CCCDA0CCD0A0CCD2A0CCD5A0CC\r\n' +
+  'D79FCCDA9FCCDD9FCCDF9ECCE29ECCE49ECCE79ECCE99DCCEC9DCCEA9BC8E798C4E596C0\r\n' +
+  'E394BCE091B7DE8FB3DB8DAFD98AABD788A7D486A3D2839FD0819BCD7F97CB7C93C87A8E\r\n' +
+  'C6788AC47586C17382BF707EBD6E7ABA6C76B86972B6676EB3656AB16265AE6061AC5E5D\r\n' +
+  'AA5B59A75955A55751A3544DA052499E50459C4D41994B3C97493894463492443090422C\r\n' +
+  '8D3F288B3D24893B2087391E89381F8A37218B36238D35258E34268F332891322A92312B\r\n' +
+  '93302D952F2F962E31972D32992D349A2C369B2B389C2A399E293B9F283DA0273FA22640\r\n' +
+  'A32542A42444A62345A72247A82149AA204BAB1F4CAC1E4EAE1E50AF1D52B01C53B11B55\r\n' +
+  'B31A57B41959B5185AB7175CB8165EB9155FBB1461BC1363BD1265BF1166BE1166BC1066\r\n' +
+  'BA1065B71064B50F63B30F63B10F62AF0E61AD0E60AB0E60A90E5FA70D5EA50D5DA30D5C\r\n' +
+  'A10C5C9F0C5B9D0C5A9B0B59990B59960B58940A57920A56900A558E09558C09548A0953\r\n' +
+  '88085286085284085182075080074F7E074F7C064E7A064D78064C75054B73054B71054A\r\n' +
+  '6F04496D04486B0448690347</palette>\r\n' +
+  '</flame>\r\n';
 
 /** obj_mesh_primitive_wf / obj_mesh_wf shared parameter list (after the primitive index), GPU sampler and snippet. */
 const MESH_PARAMS = [
@@ -701,6 +734,29 @@ fn invMaxCurve(shape: i32, tin: f32, rot: f32, sc: f32, a: f32, b: f32, c: f32, 
     funcNames: ['meshPick'],
     funcs: MESH_FUNCS,
     code: (w, p) => meshCode(w, p, 0),
+  },
+
+  // ---- JWildfire subflame_wf: a nested flame's chaos game (its first layer) run one step per call, the point returned
+  // scaled/rotated/offset. The sub-flame is the instance's `flame` resource (XML; JWildfire's default flame until set);
+  // codegen compiles it into the kernel (sub-xform functions + weight tables + palette, src/gpu/codegen.ts) and the
+  // hidden slot is the compiled instance index. The amount is ignored like JWildfire's (pVarTP += q, no pAmount);
+  // color_mode −1 leaves the colour, 0 takes the sub-flame's colour index, 1..4 a channel of its palette colour, −2 the
+  // palette colour itself as a direct RGB colour. Only sequences (flame_is_sequence) are not modelled (accepted, ignored).
+  subflame_wf: {
+    params: [
+      { name: 'scale', def: 1 }, { name: 'angle', def: 0 }, { name: 'offset_x', def: 0 }, { name: 'offset_y', def: 0 }, { name: 'offset_z', def: 0 },
+      { name: 'colorscale_z', def: 0 }, { name: 'color_mode', def: -1, int: true },
+      { name: 'flame_is_sequence', def: 0, int: true }, { name: 'flame_sequence_start', def: 1, int: true }, { name: 'flame_sequence_end', def: 0, int: true },
+      { name: 'flame_sequence_repeat', def: 1, int: true }, { name: 'flame_sequence_digits', def: 4, int: true },
+    ],
+    extra: 1,
+    res: ['flame', 'flame_filename'],
+    resDef: { flame: DFLT_SUBFLAME_XML },
+    flags: ['3d', 'z', 'dc', 'hide', 'subflame'],
+    types: ['3D', 'BASE_SHAPE'],
+    code: (_w, p) => `{ let sq_ = subflameAny(u32(${p[12]}), rs, cp, hd, rgb, ${p[0]}, ${p[1]}, ${p[2]}, ${p[3]}, ${p[4]}, ${p[5]}, i32(${p[6]}));
+    v += sq_.xy;
+    pz_ += sq_.z; }`,
   },
 };
 
