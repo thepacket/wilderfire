@@ -1,7 +1,8 @@
 import { describe, it, expect } from 'vitest';
 import { readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
-import { parseMeshBin, subdivide, taubinSmooth, faceWeights, buildSampler, defaultMesh, meshKey, prepareMesh, MESH_PRIMITIVES, flameMeshKeys } from '../src/core/meshes';
+import { parseMeshBin, subdivide, taubinSmooth, faceWeights, buildSampler, defaultMesh, meshKey, prepareMesh, MESH_PRIMITIVES, flameMeshKeys, parseObj, meshToBin } from '../src/core/meshes';
+import { flameToXML } from '../src/core/flameXML';
 import { compileFlame } from '../src/gpu/codegen';
 import { importFlameText } from '../src/core/flameXML';
 import { GREY } from './helpers';
@@ -72,5 +73,36 @@ describe('mesh primitives (obj_mesh_primitive_wf)', () => {
     const out = new Float32Array(c.dataSize);
     c.writeData(flame, out); // meshes not loaded in vitest → 0 faces, no throw
     expect(compileFlame(importFlameText('<flame name="n" size="64 64" scale="10"><xform weight="1" linear="1" coefs="1 0 0 1 0 0"/></flame>', GREY).flame, 1024).usesMesh).toBe(false);
+  });
+
+  it('parseObj reads v/f lines like OBJMeshUtil (quads split, negative indices, 1e-4 vertex de-dup) and round-trips through the binary', () => {
+    const obj = 'o q\nv 0 0 0\nv 1 0 0\nv 1 1 0\nv 0 1 0\nv 0.00001 0 0\nvn 0 0 1\nf 1/1/1 2/2/1 3/3/1 4/4/1\nf -5 -4 -3\ng x\n';
+    const m = parseObj(obj);
+    expect(m.pos.length / 3).toBe(4); // the fifth vertex de-dupes onto the first
+    expect(Array.from(m.idx)).toEqual([0, 1, 2, 0, 2, 3, 0, 1, 2]);
+    const back = parseMeshBin(meshToBin(m));
+    expect(Array.from(back.pos)).toEqual(Array.from(m.pos));
+    expect(Array.from(back.idx)).toEqual(Array.from(m.idx));
+  });
+
+  it('obj_mesh_wf: the hex "ressource" file name imports as a basename, exports as hex again, and keys the mesh (default cube when empty)', () => {
+    const hex = Array.from(new TextEncoder().encode('D:\\Pictures\\obj files\\toy horse.obj'), (b) => b.toString(16).toUpperCase().padStart(2, '0')).join('');
+    const xml = `<flame name="m" size="64 64" scale="10"><xform weight="1" obj_mesh_wf="1" obj_mesh_wf_scale_x="2" obj_mesh_wf_obj_filename="${hex}" obj_mesh_wf_colormap_filename="" coefs="1 0 0 1 0 0"/>` +
+      '<xform weight="1" obj_mesh_wf="1" obj_mesh_wf_obj_filename="" coefs="1 0 0 1 0 0"/></flame>';
+    const { flame, unknown } = importFlameText(xml, GREY);
+    expect(unknown).toEqual([]);
+    const v0 = flame.layers[0].xforms[0].variations[0], v1 = flame.layers[0].xforms[1].variations[0];
+    expect(v0.name).toBe('obj_mesh_wf');
+    expect(v0.params.scale_x).toBe(2);
+    expect(v0.res).toEqual({ obj_filename: 'toy horse.obj' });
+    expect(v1.res).toBeUndefined();
+    expect(flameMeshKeys(flame)).toEqual(['obj:toy horse.obj@0#0', 'default#0']);
+    const out = flameToXML(flame);
+    expect(out).toContain(`obj_mesh_wf_obj_filename="${Array.from(new TextEncoder().encode('toy horse.obj'), (b) => b.toString(16).toUpperCase().padStart(2, '0')).join('')}"`);
+    const again = importFlameText(out, GREY).flame;
+    expect(again.layers[0].xforms[0].variations[0].res).toEqual({ obj_filename: 'toy horse.obj' });
+    const c = compileFlame(flame, 1024);
+    expect(c.usesMesh).toBe(true);
+    c.writeData(flame, new Float32Array(c.dataSize));
   });
 });

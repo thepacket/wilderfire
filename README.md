@@ -26,10 +26,11 @@ in the stack.
 
 ## Features
 
-- **944 variations** — 74 hand-written entries (the flam3 classics, JWildfire's
+- **945 variations** — 75 hand-written entries (the flam3 classics, JWildfire's
   `obj_mesh_primitive_wf` — its 26 built-in meshes ship as compact binaries and are
-  subdivided/smoothed exactly like JWildfire —, `inversion`, `mobius3D_with_inverse`
-  and `pre_stabilize`) plus **938 JWildfire
+  subdivided/smoothed exactly like JWildfire — and `obj_mesh_wf` — your own OBJ
+  files, loaded into the browser from the transform editor —, `inversion`,
+  `mobius3D_with_inverse` and `pre_stabilize`) plus **938 JWildfire
   variations ported mechanically**: JWildfire's own GPU snippets and, for
   variations that have none, its Java `transform()` code (attractors, the
   `crop_*` and `glsl_*` shader-art families, `synth`, `nBlur`, `falloff3`,
@@ -73,8 +74,10 @@ in the stack.
   casting light filled by the chaos game itself, hard or smoothed lookups, bias,
   per-light shadow intensity; verified the same way); `sld_render_*` attributes
   import/export. `obj_mesh_primitive_wf` (ball, box, torus, gears, mandelbulb, …)
-  is available for solid scenes — the primitives are sampled on the GPU from a
-  face CDF, loaded on demand; JWildfire's **background gradients** (2×2 corners,
+  and `obj_mesh_wf` (a Wavefront `.obj` of your own, kept in the browser's mesh
+  store under its file name; the default cube until one is chosen) are available
+  for solid scenes — the meshes are sampled on the GPU from a face CDF, loaded on
+  demand; JWildfire's **background gradients** (2×2 corners,
   optional centre colour) render in both paths
 - **Layers** (up to 8) — each with its own transforms, final transform,
   gradient, density weight, and visibility, blended in one histogram; walker

@@ -328,6 +328,8 @@ async function boot() {
       return count;
     },
     exportXML: () => flameToXML(app.flame, { curves: app.getCurves() }),
+    // obj_mesh_wf: put an OBJ file into the browser's mesh store from a script (the transform editor has the file picker)
+    storeMesh: async (name: string, objText: string) => (await import('./core/meshes')).storeUserMesh(name, objText),
     // Variation oracle test (dev only; see scripts/jwf-port/README.md)
     varTest: async (opts?: { only?: string[]; verbose?: boolean; tol?: number }) => {
       const { runVarTest } = await import('./dev/varTest');

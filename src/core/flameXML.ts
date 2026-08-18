@@ -28,6 +28,19 @@ const NON_VARIATION_ATTRS = new Set([
 ]);
 /** JWildfire writes `<var>_fx_priority` per instance (priority override); we keep definition priorities. */
 const isFxPriorityAttr = (n: string) => n.endsWith('_fx_priority');
+/** JWildfire "ressources" (`<var>_<name>`, the value hex-encoded UTF-8): file names of meshes/maps. Kept in
+ *  `VarInstance.res` when the definition lists the name; we store the file's basename (JWildfire writes the
+ *  author's full path, useless elsewhere; obj_mesh_wf looks the basename up in the browser's mesh store). */
+const resNameOf = (attrName: string, vname: string): string | undefined => VARIATIONS[vname]?.res?.find((r) => attrName.endsWith('_' + r));
+const decodeRes = (hex: string): string => {
+  const h = hex.trim();
+  if (!/^([0-9a-fA-F]{2})+$/.test(h)) return h; // (a plain string; be lenient)
+  const bytes = new Uint8Array(h.length / 2);
+  for (let i = 0; i < bytes.length; i++) bytes[i] = parseInt(h.slice(2 * i, 2 * i + 2), 16);
+  const s = new TextDecoder().decode(bytes);
+  return s.slice(Math.max(s.lastIndexOf('/'), s.lastIndexOf('\\')) + 1);
+};
+const encodeRes = (s: string): string => Array.from(new TextEncoder().encode(s), (b) => b.toString(16).toUpperCase().padStart(2, '0')).join('');
 
 /** JWildfire 3D-flavored variation names whose z=0 projections map onto our 2D
  *  set — lets JWildfire's bundled sample flames load with close fidelity. */
@@ -206,12 +219,20 @@ function parseXFormEl(elm: Element, ctx?: CurveCtx): XForm {
   const weights: { raw: string; stage: Stage; vname: string; weight: number }[] = [];
   const unresolved: string[] = [];
   const cprefixes = curvePrefixes(elm);
+  const isResAttr = (n: string): boolean => {
+    for (let us = n.lastIndexOf('_'); us > 0; us = n.lastIndexOf('_', us - 1)) {
+      const r = resolve(n.slice(0, us));
+      if (r && resNameOf(n, r.vname) === n.slice(us + 1)) return true;
+    }
+    return false;
+  };
   for (const attr of Array.from(elm.attributes)) {
     // Duplicate variation instances on one xform were renamed name__dup<k> by
     // the lenient pre-parser; strip the marker to resolve them.
     const name = attr.name.replace(/__dup\d+/, '');
     if (NON_VARIATION_ATTRS.has(name) || isFxPriorityAttr(name) || name.startsWith('wfield_')) continue; // _fx_priority is read below
     if (isCurveAttr(attr.name, cprefixes)) continue;
+    if (isResAttr(name)) continue; // string resources are read per instance below
     const val = parseFloat(attr.value);
     if (!isFinite(val)) continue;
     const direct = resolve(name);
@@ -256,6 +277,10 @@ function parseXFormEl(elm: Element, ctx?: CurveCtx): XForm {
     // JWildfire per-instance priority override (`<var>_fx_priority`), kept only when it differs from the definition
     const fxp = parseFloat(elm.getAttribute(`${raw}_fx_priority`) ?? '');
     if (isFinite(fxp) && Math.round(fxp) !== (VARIATIONS[vname].priority ?? 0)) inst.priority = Math.round(fxp);
+    for (const r of VARIATIONS[vname].res ?? []) {
+      const rv = decodeRes(elm.getAttribute(`${raw}_${r}`) ?? '');
+      if (rv) (inst.res ??= {})[r] = rv;
+    }
     if (stage === 'pre') { (x.preVariations ??= []).push(inst); instByRaw.set(raw, { inst, list: 'preVariations' }); }
     else if (stage === 'post') { (x.postVariations ??= []).push(inst); instByRaw.set(raw, { inst, list: 'postVariations' }); }
     else { x.variations.push(inst); instByRaw.set(raw, { inst, list: 'variations' }); }
@@ -678,6 +703,7 @@ function xformToXML(x: XForm, tag: string, nXForms: number, extraAttrs: string[]
       for (const pd of VARIATIONS[vi.name].params ?? []) {
         attrs.push(`${prefix}${vi.name}_${pd.name}="${fmt(vi.params[pd.name] ?? pd.def)}"`);
       }
+      for (const r of VARIATIONS[vi.name].res ?? []) attrs.push(`${prefix}${vi.name}_${r}="${encodeRes(vi.res?.[r] ?? '')}"`); // JWildfire "ressource" (hex UTF-8)
     }
   };
   pushVars(x.variations, '');

@@ -97,7 +97,7 @@ points, `dc_gnarly` updates only 2 of its 6 gaussian summands — `& 5` — so i
 blur depends on the render's init randoms). Together with the 70 hand-written
 flam3 entries the app registry has 940 variations.
 
-### What is not ported (86)
+### What is not ported (85)
 
 `data/unportable.json` is the definitive list — every JWildfire variation is
 either in the registry or in that file with a category, and `gen.ts` writes it
@@ -107,7 +107,7 @@ variation was skipped. Categories:
 | category | count | why |
 |---|---|---|
 | user-code | 21 | compiles user-supplied code or a formula at run time (`custom_wf`, `dc_code`, `glsl_code`, `c_var`, `ducks`, `fract_formula_*`, the `yplot2d_wf`… plot family, `colordomain`); the WebGPU kernel has no run-time compiler |
-| external-content | 29 | renders external content that would have to be uploaded to the GPU: sub-flames (`subflame_wf`, `ringsubflame`, `glynns3subfl`), images (`post_bumpmap_wf`, `displacemap_wf`, `colormap_wf`, `kaleidoimg`, `plane_wf`, `wangtiles`), meshes (`obj_mesh_wf`, `terrain3D`, `metaballs3d_wf`, `knots3D`, `sattractor3D`), `svg_wf`, `text_wf`, L-systems, brushes |
+| external-content | 28 | renders external content that would have to be uploaded to the GPU: sub-flames (`subflame_wf`, `ringsubflame`, `glynns3subfl`), images (`post_bumpmap_wf`, `displacemap_wf`, `colormap_wf`, `kaleidoimg`, `plane_wf`, `wangtiles`), meshes (`terrain3D`, `metaballs3d_wf`, `knots3D`, `sattractor3D`), `svg_wf`, `text_wf`, L-systems, brushes (`obj_mesh_wf` IS ported — the user loads the OBJ file into the browser's mesh store) |
 | point-set | 33 | builds a point/segment list on the CPU at init and samples it per point: the `DrawFunc` family (`gpattern`, `mandala`, `nsudoku`, `sunflower`, `szubieta`, `triantruchet`, `curliecue`, `taprats`, `sunvoroni`), turtle/`DynamicArray` `_js` fractals (`dragon_js`, `koch_js`, `hilbert_js`, `tree_js`, …), `dla_wf`/`snowflake_wf` simulations, `inversion`, `maurer_lines`, `klein_group`, `natural_foam`, …; `neuron3D` builds a seed-shuffled 512-entry Perlin permutation table per instance (no per-flame table storage in the kernel) |
 | engine | 2 | needs an engine feature WilderFire lacks: a variation instantiating another (`sphtiling3v2`), `post_dcztransl` (no Java class) |
 | resource-params | 1 | `dc_triantess` keeps its colours as byte-array ressources |
@@ -361,6 +361,19 @@ same sample density and depth distribution as JWildfire's.
   `color + |Δposition|·(symmetry+1)` (index `·254 + 0.5`, mod 256) — a plot colour that a following DIFFUSION/CYCLIC
   gradient step replaces, unlike a direct-colour variation's (`rgbo.w` 0.5 vs 1). NONE stays "no recolouring". Verified
   on 4 DISTANCE flames (three at 1.00–1.01; `rhodonea-2` differs for its own reasons) and one CYCLIC (1.00).
+* **`obj_mesh_wf`** (hand-written, shares the sampler/snippet with `obj_mesh_primitive_wf`): JWildfire's `OBJMeshWFFunc`
+  samples the OBJ file named by its `obj_filename` "ressource" and — when the name is empty or the file cannot be loaded —
+  `OBJMeshUtil.createDfltMesh()`, the ±1 cube. 129 of the 151 instances in the collections have an empty file name (people
+  used it as a cube primitive) and the other 22 name files on the author's disk (`D:\Pictures\obj files\…`) that no
+  one else has, so JWildfire itself renders the cube for them. WilderFire keeps the file's *basename* in
+  `VarInstance.res.obj_filename` (`<var>_<name>` attributes are hex-encoded UTF-8; the exporter writes them back), looks it
+  up in the IndexedDB mesh store (`libraryStore.ts` store `meshes`, filled from the transform editor's "mesh file" row —
+  `⬆ .obj` parses v/f lines with the same reader as `mesh2bin.ts`, `parseObj` in `src/core/meshes.ts`) and falls back to
+  the cube. Verified: `_obj1` (cube, no other variations) 1.00, `_obj3` 0.99, `_obj5` (JWildfire's `diamond.obj` loaded
+  into the store vs JWildfire reading the file) 1.01/corr 1.00. `_obj2` (0.86) is NOT a mesh issue: the same 0.86 with
+  `obj_mesh_primitive_wf`, 0.90 with `blur3D`, 0.88 as a density render and 1.01 with a flat camera — a 3D scene whose z
+  is carried through a 2D variation (`waves2`, preserve_z) plus a z-noise variation on one xform and a `juliascope` xform,
+  viewed at pitch/yaw ≈ 0.8/1.1; kept as `_zchain.flame` (open engine item, not understood). `_obj4` uses `parplot2d_wf`.
 * Verified: `inversion` flames `_pv1` 0.99, `_pv2` 1.12, `_pv3` 0.95, `_pv4nc` 0.97 (`_pv4` itself has `curliecue2`, a
   sequential-state variation); `mobius3D_with_inverse` `_pv5` 0.99, `_pv6` 1.09, `_pv7` 1.00; `pre_stabilize` flames are
   attractor scenes whose look depends on the long single trajectory (JWildfire's points diffuse for ~10 k steps

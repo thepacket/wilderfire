@@ -30,7 +30,41 @@ export interface VariationDef {
   types?: string[];
   /** Hidden numeric slots after the params (filled by codegen's data hook, e.g. mesh buffer offsets); the snippet sees them as p[params.length + i]. */
   extra?: number;
+  /** String resources (JWildfire "ressources") an instance may carry in `VarInstance.res` — file names, imported
+   *  from `<var>_<name>` hex attributes and exported the same way. Only `obj_filename` (obj_mesh_wf) is used. */
+  res?: string[];
 }
+
+/** obj_mesh_primitive_wf / obj_mesh_wf shared parameter list (after the primitive index), GPU sampler and snippet. */
+const MESH_PARAMS = [
+  { name: 'scale_x', def: 1 }, { name: 'scale_y', def: 1 }, { name: 'scale_z', def: 1 },
+  { name: 'offset_x', def: 0 }, { name: 'offset_y', def: 0 }, { name: 'offset_z', def: 0 },
+  { name: 'subdiv_level', def: 0, int: true }, { name: 'subdiv_smooth_passes', def: 12, int: true }, { name: 'subdiv_smooth_lambda', def: 0.42 }, { name: 'subdiv_smooth_mu', def: -0.45 },
+  { name: 'blend_colormap', def: 0, int: true }, { name: 'displ_amount', def: 0.1 }, { name: 'blend_displ_map', def: 0, int: true }, { name: 'receive_only_shadows', def: 0, int: true },
+];
+const MESH_FUNCS = `fn meshPick(cdfBase: u32, n: u32, u: f32) -> u32 {
+  // binary search of the face CDF (JWildfire: pContext.random(faceCount) over the area-replicated face list)
+  var lo = 0u; var hi = n - 1u;
+  while (lo < hi) { let mid = (lo + hi) >> 1u; if (mesh[cdfBase + mid] < u) { lo = mid + 1u; } else { hi = mid; } }
+  return lo;
+}`;
+/** `b` = index of scale_x in p (0 for obj_mesh_wf, 1 after `primitive`); the 3 hidden slots follow the 14 params. */
+const meshCode = (w: string, p: string[], b: number) => `{ let mc = u32(${p[b + 15]});
+  if (mc > 0u) {
+    let fi = meshPick(u32(${p[b + 14]}), mc, rnd(rs));
+    let tb = u32(${p[b + 16]}) + fi * 9u;
+    let p1 = vec3f(mesh[tb], mesh[tb + 1u], mesh[tb + 2u]) * vec3f(${p[b]}, ${p[b + 1]}, ${p[b + 2]}) + vec3f(${p[b + 3]}, ${p[b + 4]}, ${p[b + 5]});
+    let p2 = vec3f(mesh[tb + 3u], mesh[tb + 4u], mesh[tb + 5u]) * vec3f(${p[b]}, ${p[b + 1]}, ${p[b + 2]}) + vec3f(${p[b + 3]}, ${p[b + 4]}, ${p[b + 5]});
+    let p3 = vec3f(mesh[tb + 6u], mesh[tb + 7u], mesh[tb + 8u]) * vec3f(${p[b]}, ${p[b + 1]}, ${p[b + 2]}) + vec3f(${p[b + 3]}, ${p[b + 4]}, ${p[b + 5]});
+    let sr1 = sqrt(rnd(rs)); let r2_ = rnd(rs);
+    let b = sr1 * (1.0 - r2_); let c = r2_ * sr1; // a = 1 − sr1
+    // p1 + b·(p2−p1) + c·(p3−p1): a coordinate shared by the three vertices stays EXACTLY that value (JWildfire's
+    // double a·p1+b·p2+c·p3 rounds back to the same float; in f32 the plain sum would jitter by an ulp and the
+    // z-buffer normals of an axis-aligned face would no longer be exact — which the AO relies on)
+    let q = p1 + b * (p2 - p1) + c * (p3 - p1);
+    v += ${w} * q.xy;
+    pz_ += ${w} * q.z;
+  } }`;
 
 const HAND_VARIATIONS: Record<string, VariationDef> = {
   linear: { code: (w) => `v += ${w} * t;` },
@@ -641,43 +675,32 @@ fn invMaxCurve(shape: i32, tin: f32, rot: f32, sc: f32, a: f32, b: f32, c: f32, 
 }`,
   },
 
-  // ---- JWildfire obj_mesh_primitive_wf: a random point on a built-in mesh (src/core/meshes.ts) ----
-  // Params in JWildfire's order; the colour/displacement maps need images (never active here);
-  // receive_only_shadows is accepted but not modelled. Hidden slots: cdf base, face count, triangle base
-  // into the shared mesh buffer (codegen data hook, mesh binding 12).
+  // ---- JWildfire obj_mesh_primitive_wf / obj_mesh_wf: a random point on a mesh (src/core/meshes.ts) ----
+  // Params in JWildfire's order; the colour/displacement maps need images (never active here, their file names
+  // round-trip as resources); receive_only_shadows is accepted but not modelled. Hidden slots: cdf base, face
+  // count, triangle base into the shared mesh buffer (codegen data hook, mesh binding 12).
+  // obj_mesh_wf samples the user's OBJ file named by its `obj_filename` resource (loaded through the transform
+  // editor into the browser's mesh store) and, exactly like JWildfire when the name is empty or the file is
+  // missing, the default ±1 cube otherwise.
   obj_mesh_primitive_wf: {
-    params: [
-      { name: 'primitive', def: 0, int: true }, { name: 'scale_x', def: 1 }, { name: 'scale_y', def: 1 }, { name: 'scale_z', def: 1 },
-      { name: 'offset_x', def: 0 }, { name: 'offset_y', def: 0 }, { name: 'offset_z', def: 0 },
-      { name: 'subdiv_level', def: 0, int: true }, { name: 'subdiv_smooth_passes', def: 12, int: true }, { name: 'subdiv_smooth_lambda', def: 0.42 }, { name: 'subdiv_smooth_mu', def: -0.45 },
-      { name: 'blend_colormap', def: 0, int: true }, { name: 'displ_amount', def: 0.1 }, { name: 'blend_displ_map', def: 0, int: true }, { name: 'receive_only_shadows', def: 0, int: true },
-    ],
+    params: [{ name: 'primitive', def: 0, int: true }, ...MESH_PARAMS],
     extra: 3,
+    res: ['colormap_filename', 'displ_map_filename'],
     flags: ['3d', 'z', 'mesh'],
     types: ['3D', 'BASE_SHAPE'],
     funcNames: ['meshPick'],
-    funcs: `fn meshPick(cdfBase: u32, n: u32, u: f32) -> u32 {
-  // binary search of the face CDF (JWildfire: pContext.random(faceCount) over the area-replicated face list)
-  var lo = 0u; var hi = n - 1u;
-  while (lo < hi) { let mid = (lo + hi) >> 1u; if (mesh[cdfBase + mid] < u) { lo = mid + 1u; } else { hi = mid; } }
-  return lo;
-}`,
-    code: (w, p) => `{ let mc = u32(${p[16]});
-  if (mc > 0u) {
-    let fi = meshPick(u32(${p[15]}), mc, rnd(rs));
-    let tb = u32(${p[17]}) + fi * 9u;
-    let p1 = vec3f(mesh[tb], mesh[tb + 1u], mesh[tb + 2u]) * vec3f(${p[1]}, ${p[2]}, ${p[3]}) + vec3f(${p[4]}, ${p[5]}, ${p[6]});
-    let p2 = vec3f(mesh[tb + 3u], mesh[tb + 4u], mesh[tb + 5u]) * vec3f(${p[1]}, ${p[2]}, ${p[3]}) + vec3f(${p[4]}, ${p[5]}, ${p[6]});
-    let p3 = vec3f(mesh[tb + 6u], mesh[tb + 7u], mesh[tb + 8u]) * vec3f(${p[1]}, ${p[2]}, ${p[3]}) + vec3f(${p[4]}, ${p[5]}, ${p[6]});
-    let sr1 = sqrt(rnd(rs)); let r2_ = rnd(rs);
-    let b = sr1 * (1.0 - r2_); let c = r2_ * sr1; // a = 1 − sr1
-    // p1 + b·(p2−p1) + c·(p3−p1): a coordinate shared by the three vertices stays EXACTLY that value (JWildfire's
-    // double a·p1+b·p2+c·p3 rounds back to the same float; in f32 the plain sum would jitter by an ulp and the
-    // z-buffer normals of an axis-aligned face would no longer be exact — which the AO relies on)
-    let q = p1 + b * (p2 - p1) + c * (p3 - p1);
-    v += ${w} * q.xy;
-    pz_ += ${w} * q.z;
-  } }`,
+    funcs: MESH_FUNCS,
+    code: (w, p) => meshCode(w, p, 1),
+  },
+  obj_mesh_wf: {
+    params: [...MESH_PARAMS],
+    extra: 3,
+    res: ['obj_filename', 'colormap_filename', 'displ_map_filename'],
+    flags: ['3d', 'z', 'mesh'],
+    types: ['3D', 'BASE_SHAPE'],
+    funcNames: ['meshPick'],
+    funcs: MESH_FUNCS,
+    code: (w, p) => meshCode(w, p, 0),
   },
 };
 

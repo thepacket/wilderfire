@@ -55,7 +55,6 @@
   "natural_foam": "point-set",
   "neuron3D": "point-set",
   "nsudoku": "point-set",
-  "obj_mesh_wf": "external-content",
   "parplot2d_wf": "user-code",
   "plane_wf": "external-content",
   "point_mirror_symmetry": "point-set",

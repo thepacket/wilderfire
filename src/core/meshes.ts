@@ -1,9 +1,15 @@
-// Mesh primitives for obj_mesh_primitive_wf (JWildfire OBJMeshPrimitiveWFFunc / AbstractOBJMeshWFFunc /
-// SimpleMesh / OBJMeshUtil, ported): the 26 built-in meshes ship as compact binaries (public/mesh/*.bin,
-// from JWildfire's bundled .obj files, see scripts/jwf-port/mesh2bin.ts). A flame's instance asks for
-// (primitive, subdiv_level, smooth passes/lambda/mu); the mesh is loaded, subdivided + Taubin-smoothed
-// (subdiv_level > 0) or area-distributed (subdiv_level = 0) exactly like JWildfire, and turned into a
-// GPU sampler: a face CDF + flat triangle list the kernel samples uniformly per triangle.
+// Meshes for obj_mesh_primitive_wf and obj_mesh_wf (JWildfire OBJMeshPrimitiveWFFunc / OBJMeshWFFunc /
+// AbstractOBJMeshWFFunc / SimpleMesh / OBJMeshUtil, ported): the 26 built-in primitives ship as compact
+// binaries (public/mesh/*.bin, from JWildfire's bundled .obj files, see scripts/jwf-port/mesh2bin.ts);
+// user OBJ files (obj_mesh_wf) are parsed in the browser (`parseObj`, the same reader) and kept in the
+// IndexedDB mesh store under their file name — a flame's instance names one by its `obj_filename` resource
+// and gets JWildfire's default ±1 cube while the name is empty or no such file was loaded (JWildfire does the
+// same when its file is missing). An instance asks for (mesh, subdiv_level, smooth passes/lambda/mu); the
+// mesh is loaded, subdivided + Taubin-smoothed (subdiv_level > 0) or area-distributed (subdiv_level = 0)
+// exactly like JWildfire, and turned into a GPU sampler: a face CDF + flat triangle list the kernel samples
+// uniformly per triangle.
+
+import { meshGet, meshPut, meshNames, meshDelete } from './libraryStore.ts';
 
 export const MESH_PRIMITIVES = ['ball', 'capsule', 'cone', 'diamond', 'torus', 'box', 'gear15', 'icosahedron', 'tetrahedron', 'octahedron', 'dodecahedron', 'wedge',
   'icosidodecahedron', 'cubeoctahedron', 'gears6a', 'gears6s', 'gears8a', 'gears8s', 'gears12a', 'gears12s', 'gears16a', 'gears16s', 'gears24a', 'gears24s', 'mandelbulb', 'drop'];
@@ -24,6 +30,48 @@ export function defaultMesh(): Mesh {
   const idx: number[] = [];
   for (const [a, b, c, d] of q) idx.push(a, b, c, a, c, d);
   return { pos, idx: Uint32Array.from(idx) };
+}
+
+/** OBJMeshUtil.loadMeshFromFile / SimpleMesh: `v` lines (float positions), `f` triangles + quads (fan of two),
+ *  negative indices relative to the end, vertices de-duplicated at 1e-4 like SimpleMesh.addVertex. */
+export function parseObj(text: string): Mesh {
+  const objV: number[][] = [];
+  const pos: number[] = [];
+  const idx: number[] = [];
+  const map = new Map<string, number>();
+  const addVertex = (x: number, y: number, z: number): number => {
+    const key = `${ftoi(x * 1e4)}#${ftoi(y * 1e4)}#${ftoi(z * 1e4)}`;
+    const e = map.get(key);
+    if (e !== undefined) return e;
+    const i = pos.length / 3;
+    pos.push(Math.fround(x), Math.fround(y), Math.fround(z));
+    map.set(key, i);
+    return i;
+  };
+  for (const line of text.split(/\r?\n/)) {
+    const t = line.trim().split(/\s+/);
+    if (t[0] === 'v') objV.push([+t[1], +t[2], +t[3]]);
+    else if (t[0] === 'f') {
+      const vs = t.slice(1).map((s) => { const i = parseInt(s.split('/')[0]); return objV[i > 0 ? i - 1 : objV.length + i]; });
+      if ((vs.length === 3 || vs.length === 4) && vs.every((v) => v && v.every(Number.isFinite))) {
+        const ids = vs.map((v) => addVertex(v[0], v[1], v[2]));
+        idx.push(ids[0], ids[1], ids[2]);
+        if (vs.length === 4) idx.push(ids[0], ids[2], ids[3]);
+      }
+    }
+  }
+  return { pos: Float32Array.from(pos), idx: Uint32Array.from(idx) };
+}
+
+/** Compact binary of a mesh (the public/mesh/*.bin format; also what the user mesh store keeps). */
+export function meshToBin(m: Mesh): ArrayBuffer {
+  const nV = m.pos.length / 3, nF = m.idx.length / 3;
+  const buf = new ArrayBuffer(12 + nV * 12 + nF * 12);
+  const dv = new DataView(buf);
+  dv.setUint32(0, 0x4d455348, true); dv.setUint32(4, nV, true); dv.setUint32(8, nF, true);
+  new Float32Array(buf, 12, nV * 3).set(m.pos);
+  new Uint32Array(buf, 12 + nV * 12, nF * 3).set(m.idx);
+  return buf;
 }
 
 export function parseMeshBin(buf: ArrayBuffer): Mesh {
@@ -147,31 +195,71 @@ export function prepareMesh(base: Mesh, subdivLevel: number, smoothPasses: numbe
   return buildSampler(m, faceWeights(m));
 }
 
-/** Instance key → sampler cache + async loading. */
+/** Instance key → sampler cache + async loading. Keys: `<source>#<level>[#passes#lambda#mu]` where source is a
+ *  primitive name, `default` (the cube) or `obj:<file name>@<version>` (user mesh; the version bumps on re-load
+ *  so the renderer re-packs). */
 export type MeshKey = string;
 export function meshKey(primitive: number, subdivLevel: number, smoothPasses: number, lambda: number, mu: number): MeshKey {
   const p = Math.round(primitive);
   const name = p >= 0 && p < MESH_PRIMITIVES.length ? MESH_PRIMITIVES[p] : 'default';
+  return meshKeyOf(name, subdivLevel, smoothPasses, lambda, mu);
+}
+function meshKeyOf(source: string, subdivLevel: number, smoothPasses: number, lambda: number, mu: number): MeshKey {
   const level = Math.max(0, Math.min(6, Math.round(subdivLevel)));
-  return level > 0 ? `${name}#${level}#${Math.round(smoothPasses)}#${lambda}#${mu}` : `${name}#0`;
+  return level > 0 ? `${source}#${level}#${Math.round(smoothPasses)}#${lambda}#${mu}` : `${source}#0`;
+}
+/** The key of an obj_mesh_primitive_wf / obj_mesh_wf instance (undefined for anything else). */
+export function meshKeyFor(vi: { name: string; params: Record<string, number>; res?: Record<string, string> }): MeshKey | undefined {
+  const P = vi.params;
+  if (vi.name === 'obj_mesh_primitive_wf') return meshKey(P.primitive ?? 0, P.subdiv_level ?? 0, P.subdiv_smooth_passes ?? 12, P.subdiv_smooth_lambda ?? 0.42, P.subdiv_smooth_mu ?? -0.45);
+  if (vi.name === 'obj_mesh_wf') {
+    const file = vi.res?.obj_filename ?? '';
+    return meshKeyOf(file ? `obj:${file}@${userMeshVersion.get(file) ?? 0}` : 'default', P.subdiv_level ?? 0, P.subdiv_smooth_passes ?? 12, P.subdiv_smooth_lambda ?? 0.42, P.subdiv_smooth_mu ?? -0.45);
+  }
+  return undefined;
 }
 
 const rawCache = new Map<string, Promise<Mesh>>();
 const samplers = new Map<MeshKey, MeshSampler>();
 const pending = new Map<MeshKey, Promise<MeshSampler>>();
+const userMeshVersion = new Map<string, number>();
 
-async function loadRaw(name: string): Promise<Mesh> {
-  if (name === 'default') return defaultMesh();
-  let p = rawCache.get(name);
+async function loadRaw(source: string): Promise<Mesh> {
+  if (source === 'default') return defaultMesh();
+  let p = rawCache.get(source);
   if (!p) {
-    p = fetch(`/mesh/${name}.bin`).then(async (r) => {
-      if (!r.ok) throw new Error(`mesh ${name}: ${r.status}`);
-      return parseMeshBin(await r.arrayBuffer());
-    }).catch((e) => { console.warn(`obj_mesh_primitive_wf: ${e}; using the default cube`); return defaultMesh(); });
-    rawCache.set(name, p);
+    if (source.startsWith('obj:')) {
+      const file = source.slice(4, source.lastIndexOf('@'));
+      p = meshGet(file).then((bin) => {
+        if (!bin) { console.warn(`obj_mesh_wf: no mesh "${file}" in the mesh store (load it in the transform editor); using the default cube`); return defaultMesh(); }
+        return parseMeshBin(bin);
+      }).catch((e) => { console.warn(`obj_mesh_wf: ${e}; using the default cube`); return defaultMesh(); });
+    } else {
+      p = fetch(`/mesh/${source}.bin`).then(async (r) => {
+        if (!r.ok) throw new Error(`mesh ${source}: ${r.status}`);
+        return parseMeshBin(await r.arrayBuffer());
+      }).catch((e) => { console.warn(`obj_mesh_primitive_wf: ${e}; using the default cube`); return defaultMesh(); });
+    }
+    rawCache.set(source, p);
   }
   return p;
 }
+
+/** Parse an OBJ file and keep it in the mesh store under `name` (its file name); flames referring to that name
+ *  pick it up on their next set (the key version bumps so cached samplers/packing are dropped). */
+export async function storeUserMesh(name: string, objText: string): Promise<{ vertices: number; faces: number }> {
+  const m = parseObj(objText);
+  if (!m.idx.length) throw new Error(`"${name}": no triangles found (only v/f lines are read)`);
+  await meshPut(name, meshToBin(m));
+  userMeshVersion.set(name, (userMeshVersion.get(name) ?? 0) + 1);
+  return { vertices: m.pos.length / 3, faces: m.idx.length / 3 };
+}
+export async function removeUserMesh(name: string): Promise<void> {
+  await meshDelete(name);
+  userMeshVersion.set(name, (userMeshVersion.get(name) ?? 0) + 1);
+}
+/** Names in the mesh store. */
+export const userMeshNames = meshNames;
 
 /** The sampler for a key when it is ready (synchronous lookup for the data writer). */
 export function meshSampler(key: MeshKey): MeshSampler | undefined { return samplers.get(key); }
@@ -182,8 +270,8 @@ export function ensureMesh(key: MeshKey): Promise<MeshSampler> {
   if (have) return Promise.resolve(have);
   let p = pending.get(key);
   if (!p) {
-    const [name, level, passes, lambda, mu] = key.split('#');
-    p = loadRaw(name).then((raw) => {
+    const [source, level, passes, lambda, mu] = key.split('#');
+    p = loadRaw(source).then((raw) => {
       const s = prepareMesh(raw, +level, +(passes ?? 12), +(lambda ?? 0.42), +(mu ?? -0.45));
       samplers.set(key, s);
       pending.delete(key);
@@ -197,16 +285,17 @@ export function ensureMesh(key: MeshKey): Promise<MeshSampler> {
 /** Where each prepared sampler sits in the renderer's shared mesh buffer (set by the renderer when it packs it). */
 export const meshLayout = new Map<MeshKey, { cdfBase: number; triBase: number; faces: number }>();
 
-/** Every mesh key a flame needs (obj_mesh_primitive_wf instances). */
+/** Every mesh key a flame needs (obj_mesh_primitive_wf / obj_mesh_wf instances). */
 export function flameMeshKeys(flame: { layers: { xforms: XFormLike[]; final: XFormLike | null; moreFinals: XFormLike[] }[] }): MeshKey[] {
   const keys = new Set<MeshKey>();
   for (const ly of flame.layers) {
     for (const x of [...ly.xforms, ...(ly.final ? [ly.final] : []), ...ly.moreFinals]) {
       for (const list of [x.preVariations ?? [], x.variations, x.postVariations ?? []]) {
-        for (const vi of list) if (vi.name === 'obj_mesh_primitive_wf') { const P = vi.params; keys.add(meshKey(P.primitive ?? 0, P.subdiv_level ?? 0, P.subdiv_smooth_passes ?? 12, P.subdiv_smooth_lambda ?? 0.42, P.subdiv_smooth_mu ?? -0.45)); }
+        for (const vi of list) { const k = meshKeyFor(vi); if (k) keys.add(k); }
       }
     }
   }
   return [...keys];
 }
-interface XFormLike { variations: { name: string; params: Record<string, number> }[]; preVariations?: { name: string; params: Record<string, number> }[]; postVariations?: { name: string; params: Record<string, number> }[] }
+type VarLike = { name: string; params: Record<string, number>; res?: Record<string, string> };
+interface XFormLike { variations: VarLike[]; preVariations?: VarLike[]; postVariations?: VarLike[] }

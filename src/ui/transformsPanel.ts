@@ -8,6 +8,7 @@ import {
 } from '../core/flame';
 import { randomPalette } from '../core/palette';
 import { VARIATIONS, defaultParams } from '../core/variations';
+import { storeUserMesh, userMeshNames } from '../core/meshes';
 import { createVariationPicker } from './variationPicker';
 
 const SRC = 'transforms';
@@ -559,6 +560,48 @@ export function buildTransformsPanel(app: App, root: HTMLElement) {
             pw.append(vp);
           }
           item.append(pw);
+        }
+        // obj_mesh_wf: the mesh file (a resource, not a number) — pick one from the browser's mesh store or load an .obj into it
+        if (VARIATIONS[vi.name]?.res?.includes('obj_filename')) {
+          const row = el('div', 'var-params');
+          const vp = el('span', 'vp');
+          vp.append(el('span', '', 'mesh file'));
+          const sel = el('select') as HTMLSelectElement;
+          sel.title = 'OBJ mesh this variation samples; "default cube" while none is chosen or the file is not in this browser\'s mesh store';
+          const fill = async () => {
+            const names = await userMeshNames().catch(() => [] as string[]);
+            const cur = vi.res?.obj_filename ?? '';
+            if (cur && !names.includes(cur)) names.push(cur);
+            sel.textContent = '';
+            const o0 = el('option', '', 'default cube') as HTMLOptionElement; o0.value = ''; sel.append(o0);
+            for (const n of names) { const o = el('option', '', n) as HTMLOptionElement; o.value = n; sel.append(o); }
+            sel.value = cur;
+          };
+          void fill();
+          sel.onchange = () => {
+            if (sel.value) (vi.res ??= {}).obj_filename = sel.value;
+            else if (vi.res) { delete vi.res.obj_filename; if (!Object.keys(vi.res).length) delete vi.res; }
+            app.commit();
+          };
+          const load = el('button', '', '⬆ .obj');
+          load.title = 'Load a Wavefront OBJ file (v/f lines; quads are split) into the mesh store and use it here. Stored in your browser only — a shared .flame names the file, the other side needs the same file loaded.';
+          const file = el('input') as HTMLInputElement;
+          file.type = 'file'; file.accept = '.obj'; file.style.display = 'none';
+          load.onclick = () => file.click();
+          file.onchange = async () => {
+            const f = file.files?.[0]; file.value = '';
+            if (!f) return;
+            try {
+              const info = await storeUserMesh(f.name, await f.text());
+              (vi.res ??= {}).obj_filename = f.name;
+              await fill();
+              app.commit();
+              load.title = `${f.name}: ${info.vertices} vertices, ${info.faces} triangles`;
+            } catch (e) { alert('Mesh load failed: ' + (e as Error).message); }
+          };
+          vp.append(sel, load, file);
+          row.append(vp);
+          item.append(row);
         }
         wrap.append(item);
       });

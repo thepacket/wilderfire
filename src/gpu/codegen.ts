@@ -24,7 +24,7 @@ import { visibleLayers, usesMaterials } from '../core/flame';
 import { VARIATIONS } from '../core/variations';
 import { WFIELD_WGSL } from './wfield.wgsl';
 import { SOLID_KERNEL_WGSL, SOLID_PAY_WORDS } from './solid.wgsl';
-import { meshKey, meshLayout } from '../core/meshes';
+import { meshKeyFor, meshLayout } from '../core/meshes';
 
 const CDF_ROW = 16;
 const HEADER = 72;    // floats per xform block header (6 affine, 6 post, color, colorSpeed, opacity, pad, 24 3D affines, 8 colour modifiers, 16 weighting field, material, materialSpeed, 6 spare)
@@ -678,9 +678,9 @@ ${lcases}
               out[o++] = vi.params[pd.name] ?? pd.def;
             }
             if (def.extra) {
-              // data hook: obj_mesh_primitive_wf → [cdf base, face count, triangle base] of its sampler in the mesh buffer (0 faces until loaded)
-              const P = vi.params;
-              const lay = def.flags?.includes('mesh') ? meshLayout.get(meshKey(P.primitive ?? 0, P.subdiv_level ?? 0, P.subdiv_smooth_passes ?? 12, P.subdiv_smooth_lambda ?? 0.42, P.subdiv_smooth_mu ?? -0.45)) : undefined;
+              // data hook: obj_mesh_primitive_wf / obj_mesh_wf → [cdf base, face count, triangle base] of its sampler in the mesh buffer (0 faces until loaded)
+              const mk = def.flags?.includes('mesh') ? meshKeyFor(vi) : undefined;
+              const lay = mk ? meshLayout.get(mk) : undefined;
               out[o++] = lay?.cdfBase ?? 0; out[o++] = lay?.faces ?? 0; out[o++] = lay?.triBase ?? 0;
               for (let k = 3; k < def.extra; k++) out[o++] = 0;
             }

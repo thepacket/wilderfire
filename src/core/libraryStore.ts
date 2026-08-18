@@ -1,6 +1,7 @@
 // Flame library storage on IndexedDB (no practical size cap, unlike the ~5 MB localStorage
 // budget it replaces). Entries carry the flame JSON and a JPEG thumbnail. The old
 // localStorage library (`wilderfire.library`, ≤48 entries) is migrated on first use.
+// The same database keeps the user's meshes for obj_mesh_wf (store `meshes`: file name → mesh binary).
 
 export interface LibEntry {
   id: string;
@@ -12,16 +13,18 @@ export interface LibEntry {
 
 const DB = 'wilderfire';
 const STORE = 'library';
+const MESHES = 'meshes';
 const LS_LEGACY = 'wilderfire.library';
 
 let dbp: Promise<IDBDatabase> | null = null;
 function db(): Promise<IDBDatabase> {
   if (dbp) return dbp;
   dbp = new Promise((res, rej) => {
-    const req = indexedDB.open(DB, 1);
+    const req = indexedDB.open(DB, 2);
     req.onupgradeneeded = () => {
       const d = req.result;
       if (!d.objectStoreNames.contains(STORE)) d.createObjectStore(STORE, { keyPath: 'id' }).createIndex('date', 'date');
+      if (!d.objectStoreNames.contains(MESHES)) d.createObjectStore(MESHES);
     };
     req.onsuccess = () => res(req.result);
     req.onerror = () => rej(req.error ?? new Error('IndexedDB unavailable'));
@@ -64,4 +67,28 @@ async function migrateLegacy(d: IDBDatabase): Promise<void> {
   for (const e of legacy) if (e && typeof e.id === 'string') tx.objectStore(STORE).put(e);
   await done(tx);
   localStorage.removeItem(LS_LEGACY);
+}
+
+// ---- user meshes (obj_mesh_wf) ----
+export async function meshPut(name: string, bin: ArrayBuffer): Promise<void> {
+  const d = await db();
+  const tx = d.transaction(MESHES, 'readwrite');
+  tx.objectStore(MESHES).put(bin, name);
+  await done(tx);
+}
+export async function meshGet(name: string): Promise<ArrayBuffer | undefined> {
+  const d = await db();
+  const tx = d.transaction(MESHES, 'readonly');
+  return new Promise((res, rej) => { const r = tx.objectStore(MESHES).get(name); r.onsuccess = () => res(r.result as ArrayBuffer | undefined); r.onerror = () => rej(r.error); });
+}
+export async function meshNames(): Promise<string[]> {
+  const d = await db();
+  const tx = d.transaction(MESHES, 'readonly');
+  return new Promise((res, rej) => { const r = tx.objectStore(MESHES).getAllKeys(); r.onsuccess = () => res((r.result as IDBValidKey[]).map(String).sort()); r.onerror = () => rej(r.error); });
+}
+export async function meshDelete(name: string): Promise<void> {
+  const d = await db();
+  const tx = d.transaction(MESHES, 'readwrite');
+  tx.objectStore(MESHES).delete(name);
+  await done(tx);
 }

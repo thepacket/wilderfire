@@ -15,6 +15,9 @@ export interface VarInstance {
   /** JWildfire per-instance priority override (`<var>_fx_priority`): a normal variation forced to run as a
    *  pre step (-1: input ← input + w·f(input)) or a post step (1: output ← output + w·f(output)). Absent = the definition's priority. */
   priority?: number;
+  /** String resources (JWildfire "ressources"): file names such as `obj_mesh_wf`'s `obj_filename` (basename of the
+   *  user-loaded mesh, see src/core/meshes.ts) or the colour/displacement map names — kept for round-tripping. */
+  res?: Record<string, string>;
 }
 
 export interface WeightingField {
@@ -333,6 +336,7 @@ function normVarList(list: any): VarInstance[] | null {
         Object.entries(v.params).map(([k, val]) => [k, num(val, 0)])
       ) : {},
       ...(v.priority === -1 || v.priority === 1 ? { priority: v.priority } : {}),
+      ...(typeof v.res === 'object' && v.res && Object.values(v.res).some((r) => typeof r === 'string' && r) ? { res: Object.fromEntries(Object.entries(v.res).filter(([, r]) => typeof r === 'string' && r) as [string, string][]) } : {}),
     }));
 }
 
