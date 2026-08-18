@@ -42,7 +42,7 @@ in the stack.
   JWildfire's own GPU≠CPU snippet bugs are patched back to the Java, and
   shader hashes on cell ids run in double-float so cut/worley patterns
   match — see [`scripts/jwf-port/README.md`](scripts/jwf-port/README.md)).
-  The 82 JWildfire variations that are *not* implemented are listed with
+  The 80 JWildfire variations that are *not* implemented are listed with
   their reason in `scripts/jwf-port/data/unportable.json` (user code compiled
   at run time, external content such as sub-flames/images/meshes/SVG/text,
   CPU-built point sets, …); the importer names the reason when a flame uses one.
