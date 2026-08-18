@@ -1,0 +1,13 @@
+{
+  "name": "WilderFire — GPU Fractal Flames",
+  "short_name": "WilderFire",
+  "description": "GPU-native fractal flame editor for the browser (WebGPU).",
+  "start_url": "/",
+  "scope": "/",
+  "display": "standalone",
+  "background_color": "#12111a",
+  "theme_color": "#12111a",
+  "icons": [
+    { "src": "/icon.svg", "sizes": "any", "type": "image/svg+xml", "purpose": "any" }
+  ]
+}

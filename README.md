@@ -129,6 +129,11 @@ in the stack.
   `cam_zoom` folded into zoom; unsupported variations are skipped and
   reported). Exports open a real **Save as… dialog** where the browser
   supports it (Chrome/Edge), falling back to a download elsewhere
+- **Installable & offline** — a web-app manifest and a build-generated service
+  worker precache the app (incl. the variation registry and the sample flames),
+  so it opens without a network after the first visit; the page itself is
+  network-first, so a new deploy lands on the next load and the status bar
+  announces it. Never touches AI requests (OpenRouter or a local server)
 - **Dark & light themes**
 - **AI assistant** via [OpenRouter.ai](https://openrouter.ai) — bring your own
   key and pick any model from a **live, searchable model picker** (provider

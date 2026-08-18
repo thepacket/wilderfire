@@ -66,6 +66,7 @@ export class FlameRenderer {
   frameBudgetMs = 14;
   private budgetScale = 1;
   private gpuMs = 0;
+  private dtMs = 0; // smoothed rAF interval — the UI-stall symptom the budget reacts to
   private gpuProbeInFlight = false;
   passesPerFrame = 2;
   targetQuality = 4000; // spp cap
@@ -599,7 +600,8 @@ export class FlameRenderer {
 
     const dt = this.lastT ? (t - this.lastT) / 1000 : 0;
     this.lastT = t;
-    if (dt > 0.5) this.gpuMs = 0; // we were away (hidden tab, stall): the last probe says nothing about the GPU load
+    if (dt > 0.5) { this.gpuMs = 0; this.dtMs = 0; } // we were away (hidden tab, stall): the last probe says nothing about the GPU load
+    else if (dt > 0) this.dtMs = this.dtMs ? this.dtMs * 0.8 + dt * 1000 * 0.2 : dt * 1000;
 
     // Idle: converged (or paused) and nothing to redraw → do no GPU work at all.
     // The canvas keeps its last presented frame. invalidate() wakes us up.
@@ -611,9 +613,12 @@ export class FlameRenderer {
     // Adaptive budget: shrink the iterations per preview pass while the GPU time per frame overshoots the
     // budget, grow them back (up to the configured count) when there is headroom. Measured with
     // onSubmittedWorkDone on the frame's own submission (queue backlog included — exactly the stall we avoid).
+    // Throttle only when both say so — the GPU probe overshoots the budget AND the frame interval has
+    // stretched past ~60 fps (a healthy vsync-paced loop never throttles, whatever the probe reads);
+    // recover as soon as either shows headroom.
     if (this.adaptiveBudget && accumulate && this.gpuMs > 0) {
-      if (this.gpuMs > this.frameBudgetMs * 1.3) this.budgetScale = Math.max(1 / 16, this.budgetScale * 0.7);
-      else if (this.gpuMs < this.frameBudgetMs * 0.6 && this.budgetScale < 1) this.budgetScale = Math.min(1, this.budgetScale * 1.2);
+      if (this.gpuMs > this.frameBudgetMs * 1.3 && this.dtMs > 20) this.budgetScale = Math.max(1 / 16, this.budgetScale * 0.7);
+      else if ((this.gpuMs < this.frameBudgetMs * 0.6 || this.dtMs < 17.5) && this.budgetScale < 1) this.budgetScale = Math.min(1, this.budgetScale * 1.2);
     } else if (!this.adaptiveBudget) this.budgetScale = 1;
     const iters = Math.max(4, Math.round(this.itersPerPass * this.budgetScale));
 
@@ -633,16 +638,29 @@ export class FlameRenderer {
     if (accumulate) this.samples += this.countIters(perPass * passes);
     this.writeUniforms(this.samples / Math.max(w * h, 1), undefined, false, iters); // tonemap spp is per output pixel
 
-    const enc = this.device.createCommandEncoder();
     if (accumulate) {
-      const pass = enc.beginComputePass();
+      // the compute passes go in their own submission so the budget probe measures them (plus any
+      // backlog) without the presentation that follows
+      const cenc = this.device.createCommandEncoder();
+      const pass = cenc.beginComputePass();
       pass.setPipeline(this.computePipeline);
       pass.setBindGroup(0, this.computeBG);
       for (let i = 0; i < passes; i++) {
         pass.dispatchWorkgroups(Math.ceil(this.nPoints / 256));
       }
       pass.end();
+      this.device.queue.submit([cenc.finish()]);
+      if (!this.gpuProbeInFlight) {
+        this.gpuProbeInFlight = true;
+        const t0 = performance.now();
+        this.device.queue.onSubmittedWorkDone().then(() => {
+          const ms = Math.min(performance.now() - t0, 200); // capped: one stall must not poison the average for long
+          this.gpuMs = this.gpuMs ? this.gpuMs * 0.8 + ms * 0.2 : ms;
+          this.gpuProbeInFlight = false;
+        }, () => { this.gpuProbeInFlight = false; });
+      }
     }
+    const enc = this.device.createCommandEncoder();
     // Present gate: after a reset (every frame while a triangle is dragged) the
     // first few frames are too sparse to look like anything. Keep accumulating
     // in the background and leave the last presented image on the canvas until
@@ -656,17 +674,7 @@ export class FlameRenderer {
       this.hasPresented = true;
       this.needsPresent = false;
     }
-    this.device.queue.submit([enc.finish()]);
-    if (accumulate && !this.gpuProbeInFlight) {
-      // one probe at a time: how long until this frame's work (and whatever was queued before it) is done
-      this.gpuProbeInFlight = true;
-      const t0 = performance.now();
-      this.device.queue.onSubmittedWorkDone().then(() => {
-        const ms = Math.min(performance.now() - t0, 200); // capped: one stall must not poison the average for long
-        this.gpuMs = this.gpuMs ? this.gpuMs * 0.8 + ms * 0.2 : ms;
-        this.gpuProbeInFlight = false;
-      }, () => { this.gpuProbeInFlight = false; });
-    }
+    if (present) this.device.queue.submit([enc.finish()]);
 
     if (accumulate && dt > 0 && dt < 0.5) {
       const sps = (perPass * passes) / dt;

@@ -263,10 +263,11 @@ async function boot() {
     overlay.sync();
   };
 
+  let swNote = ''; // sticky: a newer build is installed and takes over on the next load
   renderer.onError = (msg) => { status.textContent = '⚠ ' + msg; };
   renderer.onFrame = (s) => {
     const mps = s.samplesPerSec / 1e6;
-    status.textContent =
+    status.textContent = swNote +
       `quality ${s.spp.toFixed(0)} spp` +
       (s.converged ? ' · done' : s.paused ? ' · paused' : ` · ${mps.toFixed(0)} M iters/s`) +
       (s.budgetScale < 1 && !s.converged && !s.paused ? ` · budget ${Math.round(s.budgetScale * 100)}%` : '') +
@@ -300,6 +301,20 @@ async function boot() {
   new ResizeObserver(fit).observe(wrap);
   fit();
   app.setFlame(app.flame);
+
+  // Offline: the build ships a service worker (vite.config.ts) that precaches this build's assets;
+  // production only, so the dev server's modules are never cached. A newer build waiting to
+  // take over is announced in the status bar (it takes effect on the next load).
+  if (import.meta.env.PROD && 'serviceWorker' in navigator) {
+    navigator.serviceWorker.register('/sw.js').then((reg) => {
+      reg.addEventListener('updatefound', () => {
+        const nw = reg.installing;
+        nw?.addEventListener('statechange', () => {
+          if (nw.state === 'installed' && navigator.serviceWorker.controller) { swNote = '⬆ new version ready — reload · '; status.textContent = swNote + status.textContent; }
+        });
+      });
+    }).catch((e) => console.warn('service worker:', e));
+  }
 
   // Scripting / testing hook
   const { importFlameText, flameToXML } = await import('./core/flameXML');
