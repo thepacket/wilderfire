@@ -21,7 +21,7 @@ export const FIXTURES = [
   // Sierpinsky_0 with a JWildfire weighting field on one xform (amount / jitter / int+amount param modulation / cellular colour / value-fractal jitter)
   'wfield_amount', 'wfield_jitter', 'wfield_ppow', 'wfield_cell', 'wfield_value',
   // JWildfire solid rendering (z-buffer + lights/materials): two materials, a per-xform material index, coloured lights, filter on/off
-  'Solid_0', 'Solid_1', 'Solid_2', // Solid_2 = Solid_0 with ambient occlusion
+  'Solid_0', 'Solid_1', 'Solid_2', 'Solid_3', // Solid_2 = Solid_0 with ambient occlusion, Solid_3 = + smooth shadow maps from both lights
 ];
 
 export async function runFlameTest(device: GPUDevice, palette: RGB[], opts: { files?: string[]; verbose?: boolean } = {}): Promise<FlameTestResult[]> {

@@ -361,7 +361,7 @@ fn iterLayer${li}(idx: u32) {
   var pt = pts[idx];
   var rs = rngs[idx].x;
   var prev = min(rngs[idx].y & 255u, ${info.n - 1}u);
-  var fuse = f32(rngs[idx].y >> 8u);
+  var fuse = f32((rngs[idx].y >> 8u) & 0x7FFFFFu);${solid ? '\n  var bdone = (rngs[idx].y & 0x80000000u) != 0u; // shadow maps: this walker already contributed its light-space bounds sample' : ''}
   var p = pt.xyz;
   var c = pt.w;${usesMods ? '\n  var m = mods[idx];' : ''}${usesMat ? '\n  var mt = mats[idx];' : ''}
   let ca = cos(P.rotation);
@@ -471,7 +471,13 @@ ${cases}
 ${solid ? `    // JWildfire solid rendering: no density — the nearest point per raster cell wins (z-buffer on the camera-space
     // depth), carrying its untransformed position (for the normals), palette colour × layer weight and material.
     // OPAQUE draw mode drops a point with probability 1−opacity; hidden points never plot; colour modifiers do not apply.
-    if (visible && fx >= 0.0 && fy >= 0.0 && fx < f32(P.width) && fy < f32(P.height) && !hide && (op >= 1.0 || rnd(&rs) <= op)) {
+    // Every drawn point also splats into the shadow maps (light-space z, whether or not the camera sees it).
+    let drawn = !hide && (op >= 1.0 || rnd(&rs) <= op);
+    // mode 1 takes ONE bounds sample per walker (its first plotted point after the fuse: ~65k samples, like
+    // JWildfire's first 40960); more would let rare far points stretch the map
+    if (drawn && P.shadow.x == 2u) { shadowSplat(dp); }
+    else if (drawn && P.shadow.x == 1u && !bdone) { bdone = true; shadowSplat(dp); }
+    if (visible && fx >= 0.0 && fy >= 0.0 && fx < f32(P.width) && fy < f32(P.height) && drawn) {
       var col = pal[${li * 256}u + min(u32(clamp(dc, 0.0, 1.0) * 255.99), 255u)];
       if (rgbo.w > 0.5) { col = vec4f(clamp(rgbo.xyz, vec3f(0.0), vec3f(1.0)), 1.0); }
       if (dz < 1.0) { col = vec4f(mix(P.dimColor.xyz, col.xyz, dz), col.w); }
@@ -493,7 +499,7 @@ ${solid ? `    // JWildfire solid rendering: no density — the nearest point pe
   }
 
   pts[idx] = vec4f(p, c);${usesMods ? '\n  mods[idx] = m;' : ''}${usesMat ? '\n  mats[idx] = mt;' : ''}
-  rngs[idx] = vec2u(rs, prev | (u32(fuse) << 8u));
+  rngs[idx] = vec2u(rs, prev | (u32(fuse) << 8u)${solid ? ' | select(0u, 0x80000000u, bdone)' : ''});
 }
 `;
   });
@@ -534,6 +540,8 @@ struct Params {
   dimZ: vec4f,   // x: dimishZ, y: dimZDist
   dimColor: vec4f,
   aa: vec4f,     // x: antialias amount, y: antialias radius
+  shadow: vec4u, // solid rendering shadow maps — x: mode (0 off, 1 collect light-space bounds, 2 splat), y: map size, z: casting light count
+  lm: array<vec4f, 12>, // light-space projection rows (3 per casting light; LightViewCalculator matrix a)
 };
 
 @group(0) @binding(0) var<uniform> P: Params;

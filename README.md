@@ -66,8 +66,10 @@ in the stack.
   correlation 1.00), plus **ambient occlusion** from the depth buffer (JWildfire's
   `AOCalculator`: search radius, radius/direction samples, falloff, gaussian
   smoothing — separable on the GPU —, intensity, diffuse influence; verified the
-  same way); `sld_render_*` attributes import/export. Shadow maps are not rendered
-  yet (their settings round-trip)
+  same way) and **shadow maps** (`ShadowCalculator`: a light-space depth map per
+  casting light filled by the chaos game itself, hard or smoothed lookups, bias,
+  per-light shadow intensity; verified the same way); `sld_render_*` attributes
+  import/export
 - **Layers** (up to 8) — each with its own transforms, final transform,
   gradient, density weight, and visibility, blended in one histogram; walker
   threads are partitioned across layers on the GPU

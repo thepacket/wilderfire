@@ -30,6 +30,42 @@ fn zkeyOf(z: f32) -> u32 {
   return select(b | 0x80000000u, ~b, (b & 0x80000000u) != 0u);
 }
 
+// ---- shadow maps (ShadowCalculator.addShadowMapSamples) ----
+// Per casting light a shadowMapSize² map of the largest light-space z (ordered key, 0 = empty). The map's extent is
+// the light-space bounding box of the flame (JWildfire: of its first 40960 samples, +3 % safety): mode 1 collects
+// it as atomic min/max keys of x and y, mode 2 splats with the frozen bounds.
+// one buffer: 16 bounds words (4 per casting light: xmin, xmax, ymin, ymax keys) followed by the maps (light i at 16 + i·size²)
+@group(0) @binding(10) var<storage, read_write> smaps: array<atomic<u32>>;
+
+fn zkeyInv(k: u32) -> f32 {
+  return bitcast<f32>(select(~k, k & 0x7FFFFFFFu, (k & 0x80000000u) != 0u));
+}
+
+fn shadowSplat(p: vec3f) {
+  let size = P.shadow.y;
+  for (var i = 0u; i < P.shadow.z; i = i + 1u) {
+    let lx = dot(P.lm[i * 3u].xyz, p);
+    let ly = dot(P.lm[i * 3u + 1u].xyz, p);
+    if (P.shadow.x == 1u) {
+      atomicMin(&smaps[i * 4u], zkeyOf(lx)); atomicMax(&smaps[i * 4u + 1u], zkeyOf(lx));
+      atomicMin(&smaps[i * 4u + 2u], zkeyOf(ly)); atomicMax(&smaps[i * 4u + 3u], zkeyOf(ly));
+      continue;
+    }
+    var xmin = zkeyInv(atomicLoad(&smaps[i * 4u])); var xmax = zkeyInv(atomicLoad(&smaps[i * 4u + 1u]));
+    var ymin = zkeyInv(atomicLoad(&smaps[i * 4u + 2u])); var ymax = zkeyInv(atomicLoad(&smaps[i * 4u + 3u]));
+    let sdx = xmax - xmin; let sdy = ymax - ymin;
+    xmin -= 0.03 * sdx; xmax += 0.03 * sdx; ymin -= 0.03 * sdy; ymax += 0.03 * sdy;
+    let dx = max(xmax - xmin, 0.001); let dy = max(ymax - ymin, 0.001);
+    let xs = f32(size) / dx; let ys = f32(size) / dy;
+    // (int)(scale·v + centre + 0.5): Java truncates toward zero, so (−1, 0) lands on column 0 too
+    let xi = i32(xs * lx - xmin * xs + 0.5); let yi = i32(ys * ly - ymin * ys + 0.5);
+    if (xi < 0 || yi < 0 || xi >= i32(size) || yi >= i32(size)) { continue; }
+    let x = u32(xi); let y = u32(yi);
+    let lz = dot(P.lm[i * 3u + 2u].xyz, p);
+    atomicMax(&smaps[16u + i * size * size + y * size + x], zkeyOf(lz));
+  }
+}
+
 fn solidSplat(cell: u32, z: f32, origin: vec3f, col: vec3f, mat: f32) {
   let zk = zkeyOf(z);
   let old = atomicMax(&zkey[cell], zk);
@@ -140,8 +176,9 @@ struct SP {
   nMats: u32,
   bg: vec4f,
   ao: vec4f,      // x: AO enabled, y: aoIntensity (0..4), z: aoAffectDiffuse
+  sh: vec4u,      // x: shadows on, y: cells per light in svis, z: casting light count
 };
-struct Light { dir: vec4f, col: vec4f };          // dir.xyz = direction (LightViewCalculator), dir.w = intensity
+struct Light { dir: vec4f, col: vec4f, sh: vec4f }; // dir.xyz = direction (LightViewCalculator), dir.w = intensity; sh.x = casting index (−1 = none), sh.y = 1 − shadowIntensity
 struct Mat { a: vec4f, b: vec4f, c: vec4f };      // a: diffuse, ambient, phong, phongSize; b: phong rgb, diffFunc; c: reflMapIntensity
 struct SolidLights { lights: array<Light, ${SOLID_MAX_LIGHTS}>, mats: array<Mat, ${SOLID_MAX_MATS}> };
 
@@ -152,6 +189,7 @@ struct SolidLights { lights: array<Light, ${SOLID_MAX_LIGHTS}>, mats: array<Mat,
 @group(0) @binding(4) var<storage, read> sfilt: array<f32>;
 @group(0) @binding(5) var<uniform> L: SolidLights;
 @group(0) @binding(6) var<storage, read> aoBuf: array<f32>; // AOCalculator result per cell (zeros when AO is off)
+@group(0) @binding(7) var<storage, read> svis: array<f32>;  // ShadowCalculator visibility per casting light × cell
 
 @vertex
 fn vs(@builtin(vertex_index) vi: u32) -> @builtin(position) vec4f {
@@ -219,10 +257,28 @@ fn shadeCell(cell: u32, out: ptr<function, vec3f>) -> bool {
   let bm = unpack2x16float(zpay[b + 4u]);
   let obj = vec3f(rg, bm.x);
   let m = materialAt(bm.y);
+  // ShadowCalculator: per-light visibility (clamp(vis + 1 − shadowIntensity) for casting lights, 1 otherwise);
+  // avgVisibility over ALL lights lights the ambient term and the non-casting lights
+  var visL: array<f32, ${SOLID_MAX_LIGHTS}>;
+  var avgVis = 1.0;
+  if (S.sh.x != 0u) {
+    var sum = 0.0;
+    for (var i = 0u; i < S.nLights; i = i + 1u) {
+      let lt = L.lights[i];
+      var v = 1.0;
+      if (lt.sh.x >= 0.0) { v = clamp(svis[u32(lt.sh.x) * S.sh.y + cell] + lt.sh.y, 0.0, 1.0); }
+      visL[i] = v; sum += v;
+    }
+    avgVis = select(1.0, sum / f32(S.nLights), S.nLights > 0u);
+  } else {
+    for (var i = 0u; i < ${SOLID_MAX_LIGHTS}u; i = i + 1u) { visL[i] = 1.0; }
+  }
   var raw: vec3f;
   if (!m.valid) {
-    // no material for this index: the background lit by the lights' visibility (1 each)
-    raw = S.bg.xyz * clamp(f32(S.nLights), 0.0, 1.0);
+    // no material for this index: the background lit by the lights' visibility
+    var vsum = 0.0;
+    for (var i = 0u; i < S.nLights; i = i + 1u) { vsum += select(avgVis, visL[i], L.lights[i].sh.x >= 0.0 && S.sh.x != 0u); }
+    raw = S.bg.xyz * clamp(vsum, 0.0, 1.0);
   } else {
     // SSAO darkens the ambient term and, by aoAffectDiffuse, the diffuse term
     var ambient = m.ambient;
@@ -232,19 +288,20 @@ fn shadeCell(cell: u32, out: ptr<function, vec3f>) -> bool {
       ambient = max(0.0, ambient - ao * S.ao.y);
       diffuse = max(0.0, diffuse - ao * S.ao.y * S.ao.z);
     }
-    raw = obj * ambient;
+    raw = obj * ambient * avgVis;
     for (var i = 0u; i < S.nLights; i = i + 1u) {
       let lt = L.lights[i];
       let ld = lt.dir.xyz;
+      let vis = select(avgVis, visL[i], lt.sh.x >= 0.0 && S.sh.x != 0u);
       let cosa = dot(ld, normal);
       if (cosa > 1e-8) {
-        raw += (lt.col.xyz + obj * ambient / 3.0) * (diffResp(m, cosa) * diffuse * lt.dir.w);
+        raw += (lt.col.xyz + obj * ambient / 3.0) * (vis * diffResp(m, cosa) * diffuse * lt.dir.w);
       }
       if (m.phong > 1e-8) {
         let r = ld - 2.0 * dot(ld, normal) * normal;
         let vr = r.z; // viewDir (0, 0, 1) · r
         if (vr < 1e-8) {
-          raw += m.phongCol * (pow(diffResp(m, -vr), m.phongSize) * m.phong * lt.dir.w);
+          raw += m.phongCol * (vis * pow(diffResp(m, -vr), m.phongSize) * m.phong * lt.dir.w);
         }
       }
     }
@@ -427,5 +484,100 @@ fn aoBlurV(@builtin(global_invocation_id) gid: vec3u) {
     v += aoTmp[u32(py * W + x)] * bfilt[u32(l)];
   }
   aoOut[u32(y * W + x)] = v * 0.1;
+}
+`;
+
+/** ShadowCalculator lookups: accelerateShadows (per cell, per casting light: step(map − bias, lightZ) or ZBUF_ZMIN when
+ *  the cell is empty / outside the map) and, for SMOOTH shadows, the strided gaussian average of that buffer. */
+export const SOLID_SHADOW_WGSL = `
+struct SHP {
+  width: u32,
+  height: u32,
+  mapSize: u32,
+  nCast: u32,
+  bias: f32,
+  smoothR: i32,   // FTOI(shadowSmoothRadius · 6 · imgSize / 1000), ≤ 128; < 1 = FAST
+  _p0: u32,
+  _p1: u32,
+  lm: array<vec4f, 12>, // light-space rows, 3 per casting light
+};
+const ZBUF_ZMIN: f32 = -3.0e38;
+@group(0) @binding(0) var<uniform> H: SHP;
+@group(0) @binding(1) var<storage, read> zkey: array<u32>;
+@group(0) @binding(2) var<storage, read> zpay: array<u32>;
+@group(0) @binding(3) var<storage, read> smaps: array<u32>; // 16 bounds words, then the maps
+@group(0) @binding(4) var<storage, read_write> sacc: array<f32>;
+@group(0) @binding(5) var<storage, read_write> svis: array<f32>;
+
+fn zkeyInv(k: u32) -> f32 {
+  return bitcast<f32>(select(~k, k & 0x7FFFFFFFu, (k & 0x80000000u) != 0u));
+}
+
+@compute @workgroup_size(16, 16)
+fn accPass(@builtin(global_invocation_id) gid: vec3u) {
+  let x = gid.x; let y = gid.y;
+  if (x >= H.width || y >= H.height) { return; }
+  let cell = y * H.width + x;
+  let cells = H.width * H.height;
+  let size = H.mapSize;
+  let empty = zkey[cell] == 0u;
+  let b = cell * ${SOLID_PAY_WORDS}u;
+  let o = vec3f(bitcast<f32>(zpay[b]), bitcast<f32>(zpay[b + 1u]), bitcast<f32>(zpay[b + 2u]));
+  for (var i = 0u; i < H.nCast; i = i + 1u) {
+    var acc = ZBUF_ZMIN;
+    if (!empty) {
+      var xmin = zkeyInv(smaps[i * 4u]); var xmax = zkeyInv(smaps[i * 4u + 1u]);
+      var ymin = zkeyInv(smaps[i * 4u + 2u]); var ymax = zkeyInv(smaps[i * 4u + 3u]);
+      let sdx = xmax - xmin; let sdy = ymax - ymin;
+      xmin -= 0.03 * sdx; xmax += 0.03 * sdx; ymin -= 0.03 * sdy; ymax += 0.03 * sdy;
+      let dx = max(xmax - xmin, 0.001); let dy = max(ymax - ymin, 0.001);
+      let xs = f32(size) / dx; let ys = f32(size) / dy;
+      let lx = dot(H.lm[i * 3u].xyz, o); let ly = dot(H.lm[i * 3u + 1u].xyz, o);
+      let xi = i32(xs * lx - xmin * xs + 0.5); let yi = i32(ys * ly - ymin * ys + 0.5);
+      if (xi >= 0 && yi >= 0 && xi < i32(size) && yi < i32(size)) {
+        let mk = smaps[16u + i * size * size + u32(yi) * size + u32(xi)];
+        let mz = select(zkeyInv(mk), ZBUF_ZMIN, mk == 0u);
+        let lz = dot(H.lm[i * 3u + 2u].xyz, o);
+        acc = select(0.0, 1.0, lz >= mz - H.bias); // GfxMathLib.step(map − bias, lightZ)
+      }
+    }
+    sacc[i * cells + cell] = acc;
+    if (H.smoothR < 1) { svis[i * cells + cell] = select(1.0, acc, acc > ZBUF_ZMIN); }
+  }
+}
+
+// calcSmoothShadowIntensity over the acc buffer: stride dl = r/8 + 1, gaussian exp(−2·(d·1.5/r)²) weights,
+// (1 + Σ acc·w) / Σ w — the initial 1 is divided as well, as in JWildfire
+@compute @workgroup_size(16, 16)
+fn smoothPass(@builtin(global_invocation_id) gid: vec3u) {
+  let x = i32(gid.x); let y = i32(gid.y);
+  let W = i32(H.width); let Hh = i32(H.height);
+  if (x >= W || y >= Hh) { return; }
+  let cells = u32(W * Hh);
+  let r = H.smoothR;
+  let dl = r / 8 + 1;
+  let s = 1.5 / f32(r);
+  for (var i = 0u; i < H.nCast; i = i + 1u) {
+    var v = 1.0;
+    var total = 0.0;
+    for (var k = -r; k <= r; k = k + dl) {
+      let px = x + k;
+      if (px < 0 || px >= W) { continue; }
+      let ks = f32(k) * s;
+      for (var l = -r; l <= r; l = l + dl) {
+        let py = y + l;
+        if (py < 0 || py >= Hh) { continue; }
+        let a = sacc[i * cells + u32(py * W + px)];
+        if (a > ZBUF_ZMIN) {
+          let ls = f32(l) * s;
+          let w = exp(-2.0 * (ks * ks + ls * ls));
+          total += w;
+          v += a * w;
+        }
+      }
+    }
+    if (total > 1e-8) { v = v / total; }
+    svis[i * cells + u32(y * W + x)] = v;
+  }
 }
 `;

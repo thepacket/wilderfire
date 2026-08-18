@@ -19,6 +19,11 @@ describe('solid rendering codegen', () => {
     expect(c.wgsl).toContain('@binding(7) var<storage, read_write> zkey');
     expect(c.wgsl).not.toContain('atomicAdd(&hist');
     expect(c.wgsl).not.toContain('applyColorMods('); // JWildfire: colour modifiers are skipped in solid mode
+    // shadow maps: light-space splat + one bounds sample per walker (bit 31 of the rng word)
+    expect(c.wgsl).toContain('shadowSplat(dp)');
+    expect(c.wgsl).toContain('var bdone = (rngs[idx].y & 0x80000000u) != 0u');
+    expect(c.wgsl).toContain('@binding(10) var<storage, read_write> smaps');
+    expect(plain.wgsl).not.toContain('bdone');
     expect(flameSignature(f)).toContain('~solid');
     // a transform with a material index → per-point material state
     f.layers[0].xforms[0].material = 1;

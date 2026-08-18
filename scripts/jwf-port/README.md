@@ -279,9 +279,8 @@ collections use it) is ported from `RasterFloatIntForSolidRendering` / `NormalsC
   argument that draws a random (`julia3D`: `atan2 + 2π·(int)(rnd·n)`, `blur3D`, `circleblur`,
   `farblur`) drew *two* — the (cos, sin) pair was off the unit circle. `cwgsl.ts` now hoists the angle;
   those four re-verified, `TINA0019` moved closer to JWildfire, baseline updated.
-* Not yet: **shadow maps** (`ShadowCalculator`, light-space splats), the reflection map, JWildfire's
-  post-process DOF for solid flames (`PostDOFCalculator`), `receiveOnlyShadows` (`plane_wf`/`obj_mesh_*`),
-  light motion curves. Their attributes round-trip untouched.
+* Not yet: the reflection map, JWildfire's post-process DOF for solid flames (`PostDOFCalculator`),
+  `receiveOnlyShadows` (`plane_wf`/`obj_mesh_*`), light motion curves. Their attributes round-trip untouched.
 
 ### Solid rendering — stage 2: ambient occlusion (2026-08-18)
 
@@ -302,6 +301,32 @@ Verified on the same 8 collection flames with their own AO settings restored + `
 1.00–1.03 / blkMAE ≤ 2 / corr 1.00 (AO visibly darkens both engines alike: `_solid5` 188 → 184,
 `_solid8` 99 → 94), the lacy `_ao2` at 0.95 (its z-buffer holes differ by the point-distribution noise
 already seen without AO). UI: Solid → Ambient occlusion knobs.
+
+### Solid rendering — stage 3: shadow maps (2026-08-18)
+
+`ShadowCalculator` + `LightViewCalculator.project` ported: every drawn point (camera-visible or not, like
+JWildfire's `plotShadowMapPoint` before the `insideView` test) splats its light-space depth `a₂·q` into a
+`shadowmapSize²` map per casting light with `atomicMax` on the ordered key (`SOLID_KERNEL_WGSL
+shadowSplat`; maps + the 16 bounds words share one storage buffer to stay under the 8-storage-buffer
+default — the device also asks for up to 10 for the mods+material+solid combination). The map's extent
+is JWildfire's light-space bounding box of the flame's *first 40960 samples* (+3 % safety): the kernel runs
+in **mode 1** after every reseed, where each walker contributes exactly ONE bounds sample (its first plotted
+point after the fuse, flagged in bit 31 of its rng word — ~65k samples; taking every early sample instead
+let rare far points stretch the map 3× and darken everything), then **mode 2** splats with the frozen
+bounds. `accPass` = `accelerateShadows` per cell (`step(map − bias, lightZ)`, `ZBUF_ZMIN` outside the map
+or on empty cells), `smoothPass` = `calcSmoothShadowIntensity` for SMOOTH (radius `FTOI(r·6·imgSize/1000)`
+≤ 128, stride `r/8+1`, gaussian weights, `(1 + Σ acc·w)/Σ w` — the leading 1 is divided too, as in
+JWildfire); shading takes `clamp(vis + 1 − shadowIntensity)` per casting light, `avgVisibility` over ALL
+lights for the ambient term and the non-casting lights (`addSolidColors`). Hi-res tiles of one export share
+the maps (light space is view independent); the live view refreshes the lookups with the AO cadence. Map
+size capped at 4096² here (one collection flame asks for 9600²).
+Verified: `_sh2`, `_sh3` (FAST) and the authored `Solid_3` (SMOOTH, two casting lights + AO) at ratio
+0.99–1.00 / blkMAE ≤ 1.5 / corr 1.00, `_sh7` (SMOOTH) 1.00. The remaining collection flames with shadows
+differ exactly as much as they already did with shadows OFF (`_sh4` 0.93 both ways, `_sh8` 0.97 → 0.91:
+its point cloud sits ~0.5 light-units off JWildfire's — a `checkerboard_wf`/`truchet` geometry item, not a
+shadow one; `_sh5` uses the 9600² map). A JWildfire-side probe (`scratchpad/diff/ShProbe.java`: reflection
+into `ShadowCalculator` — map fill, bounds, per-cell `lz − map` percentiles) confirmed our maps have the
+same sample density and depth distribution as JWildfire's.
 
 ## Semantics worth knowing
 

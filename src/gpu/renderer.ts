@@ -6,7 +6,7 @@ import type { Flame } from '../core/flame';
 import { flameSignature, visibleLayers, MAX_LAYERS, LIGHT_DIFF_FUNCS } from '../core/flame';
 import { compileFlame, TONEMAP_WGSL, type CompiledFlame } from './codegen';
 import { buildSpatialFilters, solidFilterWeights, gaussianFilter1D, FILT_FLOATS } from './filters';
-import { SOLID_POST_WGSL, SOLID_TONEMAP_WGSL, SOLID_AO_WGSL, SOLID_PAY_WORDS, SOLID_MAX_LIGHTS, SOLID_MAX_MATS, SOLID_FILT_FLOATS } from './solid.wgsl';
+import { SOLID_POST_WGSL, SOLID_TONEMAP_WGSL, SOLID_AO_WGSL, SOLID_SHADOW_WGSL, SOLID_PAY_WORDS, SOLID_MAX_LIGHTS, SOLID_MAX_MATS, SOLID_FILT_FLOATS } from './solid.wgsl';
 
 const XD_FLOATS = 8192;
 /** bytes per raster cell: density histogram (rgba u32) vs solid z-buffer (key + payload + normal) */
@@ -16,7 +16,16 @@ const SOLID_CELL_BYTES = 4 + SOLID_PAY_WORDS * 4 + 4 + 4 + 4 + 4 + 4; // key, pa
 const AO_FILT_MAX_N = 45;
 
 /** Solid-rendering z-buffer set for one raster (live view or an offscreen tile). */
-interface SolidBufs { key: GPUBuffer; pay: GPUBuffer; nrm: GPUBuffer; zr: GPUBuffer; ao: GPUBuffer; aoRaw: GPUBuffer | null; aoTmp: GPUBuffer | null; aoValid: boolean; cells: number }
+interface SolidBufs {
+  key: GPUBuffer; pay: GPUBuffer; nrm: GPUBuffer; zr: GPUBuffer;
+  ao: GPUBuffer; aoRaw: GPUBuffer | null; aoTmp: GPUBuffer | null; aoValid: boolean;
+  /** shadow maps: light-space bounds (4 keys per light), maps (nCast × size²), per-cell step results + visibility (nCast × cells) */
+  smaps: GPUBuffer | null; sacc: GPUBuffer | null; svis: GPUBuffer | null; shKey: string;
+  bg: { post: GPUBindGroup; tm: GPUBindGroup; ao: GPUBindGroup | null; sh: GPUBindGroup } | null;
+  /** the shadow visibility buffer reflects the current z-buffer (live view refreshes it every few presents) */
+  shValid: boolean;
+  cells: number;
+}
 
 export interface RenderStats {
   spp: number;           // samples per pixel accumulated
@@ -79,7 +88,15 @@ export class FlameRenderer {
   private aoFiltKey = '';
   private aoBlurN = 0;
   private aoOn = false;
-  private solidBGs = new WeakMap<GPUBuffer, { post: GPUBindGroup; tm: GPUBindGroup; ao: GPUBindGroup | null }>();
+  private shAccPipe!: GPUComputePipeline;
+  private shSmoothPipe!: GPUComputePipeline;
+  private shpBuf!: GPUBuffer;       // shadow lookup params
+  private shOn = false;             // shadows on for the current flame (casting lights > 0)
+  private shSmoothR = 0;            // SMOOTH radius in raster cells (< 1 = FAST)
+  /** shadow maps: kernel mode for the next dispatches — 1 collects the light-space bounds until enough points have
+   *  plotted since the reseed (`SHADOW_BOUNDS_SAMPLES` per walker), 2 splats with the frozen bounds */
+  private shadowMode = 1;
+  private static readonly SHADOW_BOUNDS_ITERS = 32;
 
   private compiled: CompiledFlame | null = null;
   private sig = '';
@@ -141,6 +158,8 @@ export class FlameRenderer {
       requiredLimits: {
         maxStorageBufferBindingSize: wantBind,
         maxBufferSize: wantBuf,
+        // the solid kernel binds up to 9 storage buffers (xd, pts, rngs, pal, zkey, zpay, shadow maps + optional mods, mats)
+        maxStorageBuffersPerShaderStage: Math.min(Math.max(adapter.limits.maxStorageBuffersPerShaderStage, 8), 10),
       },
     });
     this.device.addEventListener('uncapturederror', (e) => {
@@ -158,13 +177,28 @@ export class FlameRenderer {
     this.modsBuf = d.createBuffer({ size: this.nPoints * 16, usage: GPUBufferUsage.STORAGE | GPUBufferUsage.COPY_DST });
     this.xdBuf = d.createBuffer({ size: XD_FLOATS * 4, usage: GPUBufferUsage.STORAGE | GPUBufferUsage.COPY_DST });
     this.palBuf = d.createBuffer({ size: MAX_LAYERS * 256 * 16, usage: GPUBufferUsage.STORAGE | GPUBufferUsage.COPY_DST });
-    this.paramsBuf = d.createBuffer({ size: 256, usage: GPUBufferUsage.UNIFORM | GPUBufferUsage.COPY_DST });
+    this.paramsBuf = d.createBuffer({ size: 512, usage: GPUBufferUsage.UNIFORM | GPUBufferUsage.COPY_DST });
     this.tmBuf = d.createBuffer({ size: 128, usage: GPUBufferUsage.UNIFORM | GPUBufferUsage.COPY_DST });
     this.filtBuf = d.createBuffer({ size: FILT_FLOATS * 4, usage: GPUBufferUsage.STORAGE | GPUBufferUsage.COPY_DST });
     this.matsBuf = d.createBuffer({ size: this.nPoints * 4, usage: GPUBufferUsage.STORAGE | GPUBufferUsage.COPY_DST });
     this.sppBuf = d.createBuffer({ size: 32, usage: GPUBufferUsage.UNIFORM | GPUBufferUsage.COPY_DST });
-    this.spBuf = d.createBuffer({ size: 64, usage: GPUBufferUsage.UNIFORM | GPUBufferUsage.COPY_DST });
-    this.lightsBuf = d.createBuffer({ size: (SOLID_MAX_LIGHTS * 2 + SOLID_MAX_MATS * 3) * 16, usage: GPUBufferUsage.UNIFORM | GPUBufferUsage.COPY_DST });
+    this.spBuf = d.createBuffer({ size: 80, usage: GPUBufferUsage.UNIFORM | GPUBufferUsage.COPY_DST });
+    this.lightsBuf = d.createBuffer({ size: (SOLID_MAX_LIGHTS * 3 + SOLID_MAX_MATS * 3) * 16, usage: GPUBufferUsage.UNIFORM | GPUBufferUsage.COPY_DST });
+    this.shpBuf = d.createBuffer({ size: 32 + 12 * 16, usage: GPUBufferUsage.UNIFORM | GPUBufferUsage.COPY_DST });
+    {
+      const shModule = d.createShaderModule({ code: SOLID_SHADOW_WGSL });
+      const C = GPUShaderStage.COMPUTE;
+      const shLayout = d.createPipelineLayout({ bindGroupLayouts: [d.createBindGroupLayout({ entries: [
+        { binding: 0, visibility: C, buffer: { type: 'uniform' } },
+        { binding: 1, visibility: C, buffer: { type: 'read-only-storage' } },
+        { binding: 2, visibility: C, buffer: { type: 'read-only-storage' } },
+        { binding: 3, visibility: C, buffer: { type: 'read-only-storage' } },
+        { binding: 4, visibility: C, buffer: { type: 'storage' } },
+        { binding: 5, visibility: C, buffer: { type: 'storage' } },
+      ] })] });
+      this.shAccPipe = d.createComputePipeline({ layout: shLayout, compute: { module: shModule, entryPoint: 'accPass' } });
+      this.shSmoothPipe = d.createComputePipeline({ layout: shLayout, compute: { module: shModule, entryPoint: 'smoothPass' } });
+    }
     this.sfiltBuf = d.createBuffer({ size: SOLID_FILT_FLOATS * 4, usage: GPUBufferUsage.STORAGE | GPUBufferUsage.COPY_DST });
     this.solidPostPipe = d.createComputePipeline({ layout: 'auto', compute: { module: d.createShaderModule({ code: SOLID_POST_WGSL }), entryPoint: 'main' } });
     this.aopBuf = d.createBuffer({ size: 48, usage: GPUBufferUsage.UNIFORM | GPUBufferUsage.COPY_DST });
@@ -197,6 +231,7 @@ export class FlameRenderer {
         { binding: 4, visibility: F, buffer: { type: 'read-only-storage' } },
         { binding: 5, visibility: F, buffer: { type: 'uniform' } },
         { binding: 6, visibility: F, buffer: { type: 'read-only-storage' } },
+        { binding: 7, visibility: F, buffer: { type: 'read-only-storage' } },
       ],
     });
     const solidLayout = d.createPipelineLayout({ bindGroupLayouts: [this.solidTmLayout] });
@@ -252,7 +287,7 @@ export class FlameRenderer {
 
   private makeSolidBufs(cells: number): SolidBufs {
     const d = this.device;
-    const usage = GPUBufferUsage.STORAGE | GPUBufferUsage.COPY_DST;
+    const usage = GPUBufferUsage.STORAGE | GPUBufferUsage.COPY_DST | GPUBufferUsage.COPY_SRC; // COPY_SRC: dev readbacks
     return {
       key: d.createBuffer({ size: cells * 4, usage }),
       pay: d.createBuffer({ size: cells * SOLID_PAY_WORDS * 4, usage }),
@@ -262,10 +297,41 @@ export class FlameRenderer {
       aoRaw: null, // allocated the first time AO runs on this set
       aoTmp: null,
       aoValid: false,
+      smaps: null, sacc: null, svis: null, shKey: '',
+      bg: null,
+      shValid: false,
       cells,
     };
   }
-  private destroySolidBufs(b: SolidBufs | null) { if (b) { b.key.destroy(); b.pay.destroy(); b.nrm.destroy(); b.zr.destroy(); b.ao.destroy(); b.aoRaw?.destroy(); b.aoTmp?.destroy(); } }
+  private destroySolidBufs(b: SolidBufs | null) {
+    if (!b) return;
+    for (const buf of [b.key, b.pay, b.nrm, b.zr, b.ao, b.aoRaw, b.aoTmp, b.smaps, b.sacc, b.svis]) buf?.destroy();
+  }
+  /** Shadow-map storage for `nCast` casting lights of `size²` cells (re-created when either changes). Returns true when re-created. */
+  private ensureShadowBufs(b: SolidBufs, nCast: number, size: number): boolean {
+    const key = `${nCast}x${size}`;
+    if (b.shKey === key) return false;
+    const d = this.device;
+    const usage = GPUBufferUsage.STORAGE | GPUBufferUsage.COPY_DST | GPUBufferUsage.COPY_SRC;
+    b.smaps?.destroy(); b.sacc?.destroy(); b.svis?.destroy();
+    b.smaps = d.createBuffer({ size: SOLID_MAX_LIGHTS * 16 + nCast * size * size * 4, usage }); // 16 bounds words + maps
+    b.sacc = d.createBuffer({ size: Math.max(16, nCast * b.cells * 4), usage });
+    b.svis = d.createBuffer({ size: Math.max(16, nCast * b.cells * 4), usage });
+    b.shKey = key;
+    b.bg = null;
+    b.shValid = false;
+    return true;
+  }
+  /** Clear the shadow maps + light-space bounds (min keys to 0xFFFFFFFF, max to 0) of a set. */
+  private clearShadowBufs(enc: GPUCommandEncoder, b: SolidBufs) {
+    if (!b.smaps) return;
+    // the maps are cleared by the encoder (runs at submit); the bounds words are written now — a queue write
+    // executes before the later submit, so it must not overlap the clear
+    enc.clearBuffer(b.smaps, SOLID_MAX_LIGHTS * 16);
+    const init = new Uint32Array(SOLID_MAX_LIGHTS * 4);
+    for (let i = 0; i < SOLID_MAX_LIGHTS; i++) { init[i * 4] = 0xffffffff; init[i * 4 + 2] = 0xffffffff; }
+    this.device.queue.writeBuffer(b.smaps, 0, init);
+  }
 
   private allocHistogram() {
     const os = this.oversample;
@@ -280,6 +346,7 @@ export class FlameRenderer {
     });
     this.destroySolidBufs(this.solidLive);
     this.solidLive = this.solid ? this.makeSolidBufs(cells) : null;
+    if (this.solidLive) this.ensureShadowBufs(this.solidLive, this.shadowCasters(), this.shadowMapSize());
     this.renderBG = this.device.createBindGroup({
       layout: this.pipeA.getBindGroupLayout(0),
       entries: [
@@ -290,6 +357,15 @@ export class FlameRenderer {
     this.rebuildComputeBG();
   }
 
+  /** Shadow-casting lights of the current flame (0 when shadows are off). */
+  private shadowCasters(): number {
+    const s = this.flame?.solid;
+    if (!s?.enabled || s.shadows.type === 'OFF') return 0;
+    return Math.min(s.lights.filter((l) => l.castShadows).length, SOLID_MAX_LIGHTS);
+  }
+  /** JWildfire: FTOI(shadowmapSize · pixelsPerUnitScale), ≥ 64; capped at 4096² (64 MB per light) here. */
+  private shadowMapSize(): number { return Math.min(4096, Math.max(64, Math.round(this.flame?.solid?.shadows.mapSize ?? 2048))); }
+
   private computeEntries(hist: GPUBuffer, solid: SolidBufs | null): GPUBindGroupEntry[] {
     return [
       { binding: 0, resource: { buffer: this.paramsBuf } },
@@ -299,7 +375,10 @@ export class FlameRenderer {
       ...(this.compiled?.solid ? [] : [{ binding: 4, resource: { buffer: hist } }]), // the solid kernel never touches the histogram (an 'auto' layout drops it)
       { binding: 5, resource: { buffer: this.palBuf } },
       ...(this.compiled?.usesMods ? [{ binding: 6, resource: { buffer: this.modsBuf } }] : []),
-      ...(this.compiled?.solid && solid ? [{ binding: 7, resource: { buffer: solid.key } }, { binding: 8, resource: { buffer: solid.pay } }] : []),
+      ...(this.compiled?.solid && solid ? [
+        { binding: 7, resource: { buffer: solid.key } }, { binding: 8, resource: { buffer: solid.pay } },
+        { binding: 10, resource: { buffer: solid.smaps! } },
+      ] : []),
       ...(this.compiled?.usesMat ? [{ binding: 9, resource: { buffer: this.matsBuf } }] : []),
     ];
   }
@@ -313,14 +392,13 @@ export class FlameRenderer {
     });
   }
 
-  /** Bind groups of the solid post pass and tonemap for one z-buffer set (cached per set). */
-  private solidBindGroups(b: SolidBufs, withAO: boolean): { post: GPUBindGroup; tm: GPUBindGroup; ao: GPUBindGroup | null } {
-    let bg = this.solidBGs.get(b.key);
-    if (bg && (!withAO || bg.ao)) return bg;
+  /** Bind groups of the solid passes for one z-buffer set (cached on the set; dropped when a buffer is re-created). */
+  private solidBindGroups(b: SolidBufs, withAO: boolean): NonNullable<SolidBufs['bg']> {
+    if (b.bg && (!withAO || b.bg.ao)) return b.bg;
     const d = this.device;
-    if (withAO && !b.aoRaw) { b.aoRaw = d.createBuffer({ size: b.cells * 4, usage: GPUBufferUsage.STORAGE | GPUBufferUsage.COPY_DST }); b.aoTmp = d.createBuffer({ size: b.cells * 4, usage: GPUBufferUsage.STORAGE | GPUBufferUsage.COPY_DST }); }
-    bg = {
-      post: bg?.post ?? d.createBindGroup({
+    if (withAO && !b.aoRaw) { const usage = GPUBufferUsage.STORAGE | GPUBufferUsage.COPY_DST | GPUBufferUsage.COPY_SRC; b.aoRaw = d.createBuffer({ size: b.cells * 4, usage }); b.aoTmp = d.createBuffer({ size: b.cells * 4, usage }); }
+    b.bg = {
+      post: b.bg?.post ?? d.createBindGroup({
         layout: this.solidPostPipe.getBindGroupLayout(0),
         entries: [
           { binding: 0, resource: { buffer: this.sppBuf } },
@@ -342,7 +420,18 @@ export class FlameRenderer {
           { binding: 6, resource: { buffer: b.aoTmp! } },
         ],
       }) : null,
-      tm: d.createBindGroup({
+      sh: b.bg?.sh ?? d.createBindGroup({
+        layout: this.shAccPipe.getBindGroupLayout(0),
+        entries: [
+          { binding: 0, resource: { buffer: this.shpBuf } },
+          { binding: 1, resource: { buffer: b.key } },
+          { binding: 2, resource: { buffer: b.pay } },
+          { binding: 3, resource: { buffer: b.smaps! } },
+          { binding: 4, resource: { buffer: b.sacc! } },
+          { binding: 5, resource: { buffer: b.svis! } },
+        ],
+      }),
+      tm: b.bg?.tm ?? d.createBindGroup({
         layout: this.solidTmLayout,
         entries: [
           { binding: 0, resource: { buffer: this.spBuf } },
@@ -352,11 +441,11 @@ export class FlameRenderer {
           { binding: 4, resource: { buffer: this.sfiltBuf } },
           { binding: 5, resource: { buffer: this.lightsBuf } },
           { binding: 6, resource: { buffer: b.ao } },
+          { binding: 7, resource: { buffer: b.svis! } },
         ],
       }),
     };
-    this.solidBGs.set(b.key, bg);
-    return bg;
+    return b.bg;
   }
 
   resize(w: number, h: number) {
@@ -411,6 +500,7 @@ export class FlameRenderer {
       }
     });
     this.device.queue.writeBuffer(this.palBuf, 0, this.palData);
+    if (this.solidLive && this.ensureShadowBufs(this.solidLive, this.shadowCasters(), this.shadowMapSize())) this.rebuildComputeBG();
     this.resetAccumulation();
   }
 
@@ -454,14 +544,18 @@ export class FlameRenderer {
   invalidate() { this.needsPresent = true; }
   private needsPresent = true;
 
+  /** offscreen shadow maps hold the current flame's light-space depth (tiles of one export share them) */
+  private offShadowsReady = false;
+
   resetAccumulation() {
     this.samples = 0;
+    this.offShadowsReady = false;
     this.emaSps = 0;
     this.needsPresent = true;
     this.reseedPoints(100); // live: a shorter fuse keeps drags snappy (exports use the full 200)
     const enc = this.device.createCommandEncoder();
     enc.clearBuffer(this.histBuf);
-    if (this.solidLive) { enc.clearBuffer(this.solidLive.key); this.solidLive.aoValid = false; } // key 0 = empty cell; payload/normals are ignored until a key is set
+    if (this.solidLive) { enc.clearBuffer(this.solidLive.key); this.solidLive.aoValid = false; this.solidLive.shValid = false; this.clearShadowBufs(enc, this.solidLive); } // key 0 = empty cell; payload/normals are ignored until a key is set
     this.device.queue.submit([enc.finish()]);
   }
 
@@ -481,7 +575,7 @@ export class FlameRenderer {
     const fullW = tile ? tile.fullW : w;
     const fullH = tile ? tile.fullH : h;
     const ppu = 0.25 * Math.min(fullW, fullH) * f.zoom;
-    const pu32 = new Uint32Array(52);
+    const pu32 = new Uint32Array(104);
     const pf32 = new Float32Array(pu32.buffer);
     const dofOn = Math.abs(f.camDOF ?? 0) > 1e-9;
     const dimOn = (f.dimishZ ?? 0) > 1e-9;
@@ -592,27 +686,37 @@ export class FlameRenderer {
     const fkey = `${f.filterKernel}:${(f.filterRadius ?? 0).toFixed(4)}:${os}`;
     if (n && fkey !== this.sfiltKey) { this.sfiltKey = fkey; this.device.queue.writeBuffer(this.sfiltBuf, 0, fw); }
 
-    const p = new Uint32Array(16);
+    const p = new Uint32Array(20);
     const pf = new Float32Array(p.buffer);
     p[0] = rasterW / os; p[1] = rasterH / os; p[2] = os; p[3] = n;
     pf[4] = f.gamma; pf[5] = transparent ? 1 : 0;
     const nL = Math.min(s.lights.length, SOLID_MAX_LIGHTS), nM = Math.min(s.materials.length, SOLID_MAX_MATS);
     p[6] = nL; p[7] = nM;
     pf.set([f.background[0], f.background[1], f.background[2], 0], 8);
-    pf.set([this.aoOn ? 1 : 0, Math.min(4, Math.max(0, s.ao.intensity)), Math.max(0, s.ao.affectDiffuse), 0], 12);
-    this.device.queue.writeBuffer(this.spBuf, 0, p);
 
-    // LightViewCalculator: lightDir = aᵀ·(0,0,−1) with a = rotation from alpha = −altitude, beta = −azimuth
-    const lm = new Float32Array((SOLID_MAX_LIGHTS * 2 + SOLID_MAX_MATS * 3) * 4);
+    // LightViewCalculator: lightDir = aᵀ·(0,0,−1) with a = rotation from alpha = −altitude, beta = −azimuth;
+    // a's rows are the light-space projection (x, y → shadow map, z → depth toward the light)
+    const lm = new Float32Array((SOLID_MAX_LIGHTS * 3 + SOLID_MAX_MATS * 3) * 4);
+    const rows = new Float32Array(12 * 4); // casting lights' rows for the kernel splat + lookups
+    const shOn = this.shOn = s.shadows.type !== 'OFF' && s.lights.some((l) => l.castShadows);
+    let nCast = 0;
     for (let i = 0; i < nL; i++) {
       const l = s.lights[i];
       const al = (-l.altitude * Math.PI) / 180, be = (-l.azimuth * Math.PI) / 180;
       const sa = Math.sin(al), ca = Math.cos(al), sb = Math.sin(be), cb = Math.cos(be);
       // aᵀ·(0,0,−1) = −(row 2 of a) = −(−ca·sb, sa, ca·cb)
-      lm.set([ca * sb, -sa, -ca * cb, l.intensity], i * 8);
-      lm.set([l.color[0], l.color[1], l.color[2], l.castShadows ? 1 : 0], i * 8 + 4);
+      lm.set([ca * sb, -sa, -ca * cb, l.intensity], i * 12);
+      lm.set([l.color[0], l.color[1], l.color[2], l.castShadows ? 1 : 0], i * 12 + 4);
+      const casts = shOn && l.castShadows && nCast < SOLID_MAX_LIGHTS;
+      lm.set([casts ? nCast : -1, 1 - Math.min(1, Math.max(0, l.shadowIntensity)), 0, 0], i * 12 + 8);
+      if (casts) {
+        rows.set([cb, 0, sb, 0], nCast * 12);
+        rows.set([sa * sb, ca, -sa * cb, 0], nCast * 12 + 4);
+        rows.set([-ca * sb, sa, ca * cb, 0], nCast * 12 + 8);
+        nCast++;
+      }
     }
-    const mo = SOLID_MAX_LIGHTS * 8;
+    const mo = SOLID_MAX_LIGHTS * 12;
     for (let i = 0; i < nM; i++) {
       const m = s.materials[i];
       lm.set([m.diffuse, m.ambient, m.phong, m.phongSize], mo + i * 12);
@@ -620,6 +724,31 @@ export class FlameRenderer {
       lm.set([m.reflMapIntensity, 0, 0, 0], mo + i * 12 + 8);
     }
     this.device.queue.writeBuffer(this.lightsBuf, 0, lm);
+
+    // ShadowCalculator: map size (FTOI(shadowmapSize · pixelsPerUnitScale), ≥ 64), bias, SMOOTH radius
+    // FTOI(smoothRadius · 6 · imgSize / 1000) capped 128 (< 1 → FAST); shadow maps + bounds live on the z-buffer set
+    const size = this.shadowMapSize();
+    let smoothR = 0;
+    if (s.shadows.type === 'SMOOTH') {
+      const raw = s.shadows.smoothRadius < 1e-8 ? 0 : s.shadows.smoothRadius;
+      smoothR = Math.min(128, Math.round(raw * 6 * imgSize / 1000));
+    }
+    this.shSmoothR = smoothR;
+    pf.set([this.aoOn ? 1 : 0, Math.min(4, Math.max(0, s.ao.intensity)), Math.max(0, s.ao.affectDiffuse), 0], 12);
+    p[16] = shOn ? 1 : 0; p[17] = rasterW * rasterH; p[18] = nCast; p[19] = 0;
+    this.device.queue.writeBuffer(this.spBuf, 0, p);
+    const hp = new Uint32Array(8 + 12 * 4);
+    const hf = new Float32Array(hp.buffer);
+    hp[0] = rasterW; hp[1] = rasterH; hp[2] = size; hp[3] = nCast;
+    hf[4] = s.shadows.bias; hp[5] = smoothR >>> 0; // i32 in the shader; smoothR ≥ 0
+    hf.set(rows, 8);
+    this.device.queue.writeBuffer(this.shpBuf, 0, hp);
+    // kernel: shadow mode + rows (Params.shadow at u32 52, Params.lm at 56)
+    const ku = new Uint32Array(4 + 12 * 4);
+    const kf = new Float32Array(ku.buffer);
+    ku[0] = shOn ? this.shadowMode : 0; ku[1] = size; ku[2] = nCast;
+    kf.set(rows, 4);
+    this.device.queue.writeBuffer(this.paramsBuf, 52 * 4, ku);
   }
 
   /** Intermediate rgba16float texture for the two-pass tonemap, sized to the target. */
@@ -687,6 +816,17 @@ export class FlameRenderer {
         cp.dispatchWorkgroups(gx, gy);
       }
     }
+    if (this.shOn && (refreshAO || !bufs.shValid)) {
+      // ShadowCalculator: accelerateShadows per cell (+ smoothing for SMOOTH shadows); refreshed with the AO cadence live
+      bufs.shValid = true;
+      cp.setPipeline(this.shAccPipe);
+      cp.setBindGroup(0, bg.sh);
+      cp.dispatchWorkgroups(gx, gy);
+      if (this.shSmoothR >= 1) {
+        cp.setPipeline(this.shSmoothPipe);
+        cp.dispatchWorkgroups(gx, gy);
+      }
+    }
     cp.end();
     const rp = enc.beginRenderPass({ colorAttachments: [{ view: target, loadOp: 'clear', clearValue: clear, storeOp: 'store' }] });
     rp.setPipeline(pipe);
@@ -713,7 +853,8 @@ export class FlameRenderer {
     const CHUNK = 24; // keep single submissions short to stay watchdog-friendly
     let done = 0;
     while (done < passes) {
-      const nowPasses = Math.min(CHUNK, passes - done);
+      const nowPasses = Math.min(this.shadowCasters() > 0 && this.samples < this.nPoints * FlameRenderer.SHADOW_BOUNDS_ITERS ? 2 : CHUNK, passes - done);
+      this.shadowMode = this.samples >= this.nPoints * FlameRenderer.SHADOW_BOUNDS_ITERS ? 2 : 1;
       this.samples += this.countIters(this.nPoints * this.itersPerPass * nowPasses);
       this.writeUniforms(this.samples / Math.max(this.width * this.height, 1));
       const enc = this.device.createCommandEncoder();
@@ -760,7 +901,9 @@ export class FlameRenderer {
     if (solid && (!this.solidOff || this.solidOff.cells < cells)) {
       this.destroySolidBufs(this.solidOff);
       this.solidOff = this.makeSolidBufs(cells);
+      this.offShadowsReady = false;
     }
+    if (solid && this.solidOff && this.ensureShadowBufs(this.solidOff, this.shadowCasters(), this.shadowMapSize())) this.offShadowsReady = false;
     const computeBG = d.createBindGroup({
       layout: this.computePipeline.getBindGroupLayout(0),
       entries: this.computeEntries(this.offHist, this.solidOff),
@@ -800,12 +943,18 @@ export class FlameRenderer {
     const CHUNK = 32;
     let first = true;
     while (passes > 0) {
-      const nowP = Math.min(CHUNK, passes);
+      // solid shadows: until enough points have plotted (fuse + SHADOW_BOUNDS_ITERS per walker) the kernel only
+      // collects the light-space bounds (mode 1) — short chunks so little is lost to that phase
+      const collecting = this.shadowCasters() > 0 && !this.offShadowsReady && done < this.nPoints * FlameRenderer.SHADOW_BOUNDS_ITERS;
+      this.shadowMode = collecting ? 1 : 2;
+      const nowP = Math.min(collecting ? 2 : CHUNK, passes);
       passes -= nowP;
       done += this.countIters(nowP * perPass);
       this.writeUniforms(done / (o.fullW * o.fullH), tile, o.transparent);
       const enc = d.createCommandEncoder();
-      if (first) { enc.clearBuffer(this.offHist); if (solid && this.solidOff) enc.clearBuffer(this.solidOff.key); first = false; }
+      // the shadow maps are light-space (view independent): the tiles of one export share them — cleared only when
+      // the flame changed (setFlame) or the buffers were re-created
+      if (first) { enc.clearBuffer(this.offHist); if (solid && this.solidOff) { enc.clearBuffer(this.solidOff.key); if (!this.offShadowsReady) this.clearShadowBufs(enc, this.solidOff); } first = false; }
       const cp = enc.beginComputePass();
       cp.setPipeline(this.computePipeline);
       cp.setBindGroup(0, computeBG);
@@ -816,6 +965,7 @@ export class FlameRenderer {
       await d.queue.onSubmittedWorkDone();
     }
 
+    if (solid && this.shadowCasters() > 0) this.offShadowsReady = true;
     this.writeUniforms(done / (o.fullW * o.fullH), tile, o.transparent);
     const bpr = Math.ceil((o.tileW * 4) / 256) * 256;
     const rb = d.createBuffer({ size: bpr * o.tileH, usage: GPUBufferUsage.COPY_DST | GPUBufferUsage.MAP_READ });
@@ -912,6 +1062,7 @@ export class FlameRenderer {
       const need = Math.ceil((this.minDisplaySpp * w * h - this.samples) / perPass);
       if (need > passes) passes = Math.min(need, this.passesPerFrame * 4);
     }
+    this.shadowMode = this.samples >= this.nPoints * FlameRenderer.SHADOW_BOUNDS_ITERS ? 2 : 1; // bounds from the points plotted so far
     if (accumulate) this.samples += this.countIters(perPass * passes);
     this.writeUniforms(this.samples / Math.max(w * h, 1), undefined, false, iters); // tonemap spp is per output pixel
 

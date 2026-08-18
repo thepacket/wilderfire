@@ -48,8 +48,17 @@ export function buildSolidSection(app: App): HTMLElement {
   lCol.type = 'color';
   lCol.addEventListener('input', () => { if (light()) { light().color = fromHex(lCol.value); app.commitTone(SRC); } });
   lColRow.append(lCol);
+  const lShRow = el('div', 'row');
+  const lShChk = el('input') as HTMLInputElement;
+  lShChk.type = 'checkbox';
+  const lShLab = el('label', 'check', ' Casts shadows');
+  lShLab.prepend(lShChk);
+  lShChk.onchange = () => { if (light()) { light().castShadows = lShChk.checked; app.commit(SRC); } }; // shadow maps are re-allocated: restart
+  lShRow.append(lShLab);
+  const lShIntS = slider({ label: 'Shadow', min: 0, max: 1, step: 0.01, value: 0.8, onInput: (v) => { if (light()) { light().shadowIntensity = v; app.commitTone(SRC); } } });
+  lShIntS.root.title = 'How dark this light\'s shadow is (1 = black)';
   const lightBox = el('div');
-  lightBox.append(altS.root, aziS.root, lIntS.root, lColRow);
+  lightBox.append(altS.root, aziS.root, lIntS.root, lColRow, lShRow, lShIntS.root);
 
   const refreshLight = () => {
     const s = solid();
@@ -60,7 +69,7 @@ export function buildSolidSection(app: App): HTMLElement {
     lightBox.style.display = l ? '' : 'none';
     lDel.disabled = !l;
     lAdd.disabled = s.lights.length >= MAX_LIGHTS;
-    if (l) { altS.set(l.altitude); aziS.set(l.azimuth); lIntS.set(l.intensity); lCol.value = toHex(l.color); }
+    if (l) { altS.set(l.altitude); aziS.set(l.azimuth); lIntS.set(l.intensity); lCol.value = toHex(l.color); lShChk.checked = l.castShadows; lShIntS.set(l.shadowIntensity); }
   };
   lSel.onchange = () => { li = parseInt(lSel.value); refreshLight(); };
   lAdd.onclick = () => { const s = solid(); if (s.lights.length >= MAX_LIGHTS) return; s.lights.push(defaultSolidLight(s.lights.length)); li = s.lights.length - 1; refreshLight(); app.commitTone(SRC); };
@@ -140,14 +149,41 @@ export function buildSolidSection(app: App): HTMLElement {
     aoIntS.set(a.intensity); aoRadS.set(a.searchRadius); aoBlurS.set(a.blurRadius); aoRsS.set(a.radiusSamples); aoAsS.set(a.azimuthSamples); aoFallS.set(a.falloff); aoDifS.set(a.affectDiffuse);
   };
 
-  body.append(lHead, lightBox, mHead, matBox, aoRow, aoBox);
-  body.append(el('div', 'hint', 'Surfaces are lit by ambient + per-light diffuse and specular terms; each transform can carry a material index (files keep it). Ambient occlusion darkens the ambient term (and, by "On diffuse", the diffuse term) where the depth buffer shows nearby occluders. Shadows are not rendered yet.'));
+  // ---- shadows ----
+  const shRow = el('div', 'row');
+  shRow.append(el('label', '', 'Shadows'));
+  const shSel = el('select') as HTMLSelectElement;
+  for (const [k, label] of [['OFF', 'Off'], ['FAST', 'Fast'], ['SMOOTH', 'Smooth']] as const) { const o = el('option', '', label) as HTMLOptionElement; o.value = k; shSel.append(o); }
+  shSel.title = 'Shadow maps from the lights that cast shadows: Fast = hard, Smooth = softened over the smooth radius';
+  shSel.onchange = () => { solid().shadows.type = shSel.value as 'OFF' | 'FAST' | 'SMOOTH'; shBox.style.display = shSel.value === 'OFF' ? 'none' : ''; app.commit(SRC); }; // (re)allocates the shadow maps: restart
+  shRow.append(shSel);
+  const sh = () => solid().shadows;
+  const shSmS = slider({ label: 'Smooth radius', min: 0, max: 5, step: 0.05, value: 1, onInput: (v) => { sh().smoothRadius = v; app.commitTone(SRC); } });
+  const shBiasS = slider({ label: 'Bias', min: 0, max: 0.2, step: 0.001, value: 0.01, fmt: (v) => v.toFixed(3), onInput: (v) => { sh().bias = v; app.commitTone(SRC); } });
+  const shSizeRow = el('div', 'row');
+  shSizeRow.append(el('label', '', 'Map size'));
+  const shSizeSel = el('select') as HTMLSelectElement;
+  for (const n of [512, 1024, 2048, 4096]) { const o = el('option', '', String(n)) as HTMLOptionElement; o.value = String(n); shSizeSel.append(o); }
+  shSizeSel.onchange = () => { sh().mapSize = parseInt(shSizeSel.value); app.commit(SRC); };
+  shSizeRow.append(shSizeSel);
+  const shBox = el('div');
+  shBox.append(shSmS.root, shBiasS.root, shSizeRow);
+  const refreshSh = () => {
+    const t = solid().shadows;
+    shSel.value = t.type;
+    shBox.style.display = t.type === 'OFF' ? 'none' : '';
+    shSmS.set(t.smoothRadius); shBiasS.set(t.bias);
+    shSizeSel.value = String([512, 1024, 2048, 4096].reduce((a, b) => (Math.abs(b - t.mapSize) < Math.abs(a - t.mapSize) ? b : a)));
+  };
+
+  body.append(lHead, lightBox, mHead, matBox, aoRow, aoBox, shRow, shBox);
+  body.append(el('div', 'hint', 'Surfaces are lit by ambient + per-light diffuse and specular terms; each transform can carry a material index (files keep it). Ambient occlusion darkens the ambient term (and, by "On diffuse", the diffuse term) where the depth buffer shows nearby occluders. Shadows come from a depth map per casting light (map size × map size); Smooth averages the shadow test over the smooth radius.'));
 
   const refresh = () => {
     const on = !!app.flame.solid?.enabled;
     enChk.checked = on;
     body.style.display = on ? '' : 'none';
-    if (on) { refreshLight(); refreshMat(); refreshAO(); }
+    if (on) { refreshLight(); refreshMat(); refreshAO(); refreshSh(); }
   };
   refresh();
   app.on('flame', (src) => { if (src !== SRC) refresh(); });
