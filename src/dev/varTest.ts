@@ -61,6 +61,9 @@ function buildShader(def: VariationDef, funcs: string, priority: number, seq = f
   return `${PRELUDE}
 var<private> pal: array<vec4f, 256>; // palette stand-in for direct-colour variations
 var<private> df_zero: u32 = 0u; // runtime 0 (opaque) for the double-float helpers
+struct P_ { flags: u32 }
+var<private> P: P_ = P_(0u); // kernel Params stand-in (snippets read P.flags for preserve_z; the oracle runs without it)
+var<private> wstart_: bool = false; // walker-start flag stand-in (never the first call here)
 ${funcs}
 @group(0) @binding(0) var<storage, read> inp: array<vec4f>;
 @group(0) @binding(1) var<storage, read_write> outp: array<vec4f>;
@@ -171,7 +174,7 @@ async function run(device: GPUDevice, pipeline: GPUComputePipeline, points: numb
 export function shaderFor(name: string, source: 'hand' | 'jwf' = 'jwf'): string {
   const def = source === 'hand' ? VARIATIONS[name] : JWF_VARIATIONS[name];
   const jdef = source === 'jwf' ? (def as JwfVariationDef) : null;
-  return buildShader(def, jdef?.funcs ?? '', jdef?.priority ?? 0);
+  return buildShader(def, def.funcs ?? '', def.priority ?? 0);
 }
 
 export async function runVarTest(device: GPUDevice, opts: { only?: string[]; verbose?: boolean; tol?: number; save?: boolean } = {}): Promise<VarTestResult[]> {
@@ -200,14 +203,14 @@ export async function runVarTest(device: GPUDevice, opts: { only?: string[]; ver
       const jdef = source === 'jwf' ? (def0 as JwfVariationDef) : null;
       if (inv && !jdef?.preCode) continue;
       const def: VariationDef | JwfVariationDef = inv ? { ...def0, code: jdef!.preCode! } : def0;
-      const priority = inv ? -1 : (jdef?.priority ?? e.priority);
+      const priority = inv ? -1 : (def0.priority ?? e.priority);
       const res: VarTestResult = { name: e.name, source, status: 'pass', random: false, passFrac: 1, maxErr: 0, flags: jdef?.flags };
       results.push(res);
       if (!rows) { res.status = 'oracle-missing'; continue; }
       if (rows.every((r) => r.error && !r.out)) { res.status = 'oracle-error'; res.msg = rows[0].error; continue; }
       let shader: string;
       try {
-        shader = buildShader(def, jdef?.funcs ?? '', priority, !!(jdef?.flags?.includes('state') || jdef?.flags?.includes('stateful')));
+        shader = buildShader(def, def.funcs ?? '', priority, !!(def.flags?.includes('state') || def.flags?.includes('stateful')));
       } catch (err) { res.status = 'compile-error'; res.msg = 'build: ' + String(err); continue; }
       const c = await compile(device, shader);
       if ('error' in c) { res.status = 'compile-error'; res.msg = c.error; continue; }

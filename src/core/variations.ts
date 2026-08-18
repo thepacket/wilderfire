@@ -414,6 +414,233 @@ const HAND_VARIATIONS: Record<string, VariationDef> = {
   *cp = fract(dcb * ${p[0]} + ${p[1]}); }`,
   },
 
+  // ---- JWildfire mobius3D_with_inverse (Mobius3DWithInverseFunc): quaternion Möbius transform, or its inverse
+  // (50/50 per point); the matrix is normalised by det² unless normalize = 0 ----
+  mobius3D_with_inverse: {
+    params: [
+      { name: 'a_re', def: 2 }, { name: 'a_im', def: 0 }, { name: 'aj', def: 0 }, { name: 'ak', def: 0 },
+      { name: 'b_re', def: 0 }, { name: 'b_im', def: -1 }, { name: 'bj', def: 0 }, { name: 'bk', def: 0 },
+      { name: 'c_re', def: 0 }, { name: 'c_im', def: -1 }, { name: 'cj', def: 0 }, { name: 'ck', def: 0 },
+      { name: 'd_re', def: 0 }, { name: 'd_im', def: 0 }, { name: 'dj', def: 0 }, { name: 'dk', def: 0 },
+      { name: 'normalize', def: 1, int: true },
+    ],
+    flags: ['3d', 'z'],
+    types: ['3D'],
+    funcNames: ['qmul', 'qrecip'],
+    funcs: `fn qmul(a: vec4f, b: vec4f) -> vec4f {
+  return vec4f(a.x * b.x - a.y * b.y - a.z * b.z - a.w * b.w, a.x * b.y + a.y * b.x + a.z * b.w - a.w * b.z, a.x * b.z - a.y * b.w + a.z * b.x + a.w * b.y, a.x * b.w + a.y * b.z - a.z * b.y + a.w * b.x);
+}
+
+fn qrecip(q: vec4f) -> vec4f {
+  let n2 = dot(q, q);
+  return vec4f(q.x, -q.y, -q.z, -q.w) / n2;
+}`,
+    code: (w, p) => `{
+  var qa = vec4f(${p[0]}, ${p[1]}, ${p[2]}, ${p[3]}); var qb = vec4f(${p[4]}, ${p[5]}, ${p[6]}, ${p[7]});
+  var qc = vec4f(${p[8]}, ${p[9]}, ${p[10]}, ${p[11]}); var qd = vec4f(${p[12]}, ${p[13]}, ${p[14]}, ${p[15]});
+  if (${p[16]} != 0.0) {
+    let det = qmul(qa, qd) - qmul(qb, qc);
+    let rden = qrecip(qmul(det, det)); // div1(x, denom) = recip(denom)·x
+    qa = qmul(rden, qa); qb = qmul(rden, qb); qc = qmul(rden, qc); qd = qmul(rden, qd);
+  }
+  if (rnd(rs) >= 0.5) { let ta = qa; qa = qd; qd = ta; qb = -qb; qc = -qc; } // the inverse matrix [d, −b, −c, a]
+  let zin = vec4f(t.x, t.y, z_, 0.0);
+  let zout = qmul(qrecip(qmul(zin, qc) + qd), qmul(zin, qa) + qb);
+  v += ${w} * zout.xy;
+  pz_ += ${w} * zout.z;
+}`,
+  },
+
+  // ---- JWildfire pre_stabilize (Rick Sidwell): with probability p/1000 the input point jumps to one of n
+  // seeded random points (java.util.Random(seed) stream: x, y pairs; colours 0.5, 0.25, 0.75, 0.125, …) ----
+  pre_stabilize: {
+    params: [{ name: 'n', def: 4, int: true }, { name: 'seed', def: 12345, int: true }, { name: 'p', def: 0.1 }, { name: 'dc', def: 0, int: true }],
+    priority: -1,
+    flags: ['dc'],
+    types: ['ZTRANSFORM', 'DC', 'PRE'],
+    funcNames: ['jrand_', 'jrand_make', 'jrand_next', 'jrand_nextDouble'],
+    funcs: `struct jrand_ {
+  s0: i32,
+  s1: i32,
+  s2: i32,
+}
+
+fn jrand_make(seed: i32) -> jrand_ {
+  var r_: jrand_;
+  r_.s0 = ((seed & 65535) ^ 58989);
+  r_.s1 = (((seed >> 16) & 65535) ^ 57068);
+  r_.s2 = (select(0, 65535, (seed < 0)) ^ 5);
+  return r_;
+}
+
+fn jrand_next(r_: ptr<function, jrand_>, bits: i32) -> i32 {
+  var a0: u32 = u32((*r_).s0);
+  var a1: u32 = u32((*r_).s1);
+  var a2: u32 = u32((*r_).s2);
+  var t0: u32 = ((a0 * 58989) + 11);
+  var r0: u32 = (t0 & 65535);
+  var c0: u32 = (t0 >> 16);
+  var t1a: u32 = ((a0 * 57068) + c0);
+  var c1a: u32 = (t1a >> 16);
+  var t1b: u32 = ((a1 * 58989) + (t1a & 65535));
+  var r1: u32 = (t1b & 65535);
+  var c1: u32 = (c1a + (t1b >> 16));
+  var r2_: u32 = (((((a0 * 5) + (a1 * 57068)) + (a2 * 58989)) + c1) & 65535);
+  (*r_).s0 = i32(r0);
+  (*r_).s1 = i32(r1);
+  (*r_).s2 = i32(r2_);
+  var hi: u32 = ((r2_ << 16) | r1);
+  return i32((hi >> u32((32 - bits))));
+}
+
+fn jrand_nextDouble(r_: ptr<function, jrand_>) -> f32 {
+  return ((f32(jrand_next(r_, 26)) * (1.0 / 67108864.0)) + (f32(jrand_next(r_, 27)) * (1.0 / 9007199254740992.0)));
+}`,
+    code: (_w, p) => `{
+  let ps_n = max(i32(${p[0]}), 1);
+  if (wstart_ || rnd(rs) < ${p[2]} / 1000.0) { // JWildfire: on the instance's first call, then with probability p/1000
+    let ps_i = min(i32(rnd(rs) * f32(ps_n)), ps_n - 1);
+    var ps_r = jrand_make(i32(${p[1]}));
+    var ps_x = 0.0; var ps_y = 0.0; var ps_c = 0.5; var ps_next = 0.5; var ps_delta = 1.0;
+    for (var k = 0; k <= ps_i; k = k + 1) {
+      ps_x = jrand_nextDouble(&ps_r) * 2.0 - 1.0;
+      ps_y = jrand_nextDouble(&ps_r) * 2.0 - 1.0;
+      ps_c = ps_next;
+      ps_next += ps_delta;
+      if (ps_next >= 1.0) { ps_delta /= 2.0; ps_next = ps_delta / 2.0; }
+    }
+    t = vec2f(ps_x, ps_y); z_ = 0.0;
+    if (${p[3]} != 0.0) { *cp = ps_c; }
+    r2 = max(dot(t, t), 1e-12); r = sqrt(r2); th = atan2(t.x, t.y); ph = atan2(t.y, t.x);
+  }
+}`,
+  },
+
+  // ---- JWildfire inversion (InversionFunc): generalised circle inversion in a parametric shape (circle, ellipse,
+  // hyperbola, regular polygon, rhodonea, superellipse, supershape) with p-norms, ring constraints, pass-through,
+  // shape drawing and direct-colour measures; guides are an editor-only feature ----
+  inversion: {
+    params: [
+      { name: 'scale', def: 1 }, { name: 'rotation', def: 0 }, { name: 'shape', def: 0, int: true },
+      { name: 'imode', def: 0, int: true }, { name: 'hide_uninverted', def: 0, int: true },
+      { name: 'a', def: 1 }, { name: 'b', def: 1 }, { name: 'c', def: 0 }, { name: 'd', def: 0 }, { name: 'e', def: 0 }, { name: 'f', def: 0 },
+      { name: 'ring_mode', def: 0, int: true }, { name: 'ring_scale', def: 1 },
+      { name: 'pnorm_point', def: 2 }, { name: 'pnorm_shape', def: 2 }, { name: 'pnorm_pmod', def: 1 }, { name: 'pnorm_smod', def: 1 },
+      { name: 'draw_shape', def: 0 }, { name: 'shape_thickness', def: 0 }, { name: 'passthrough', def: 0 }, { name: 'guides_enabled', def: 1, int: true },
+      { name: 'color_measure', def: 0, int: true }, { name: 'color_gradient', def: 1, int: true }, { name: 'color_low_threshold', def: 0 }, { name: 'color_high_threshold', def: 1 },
+    ],
+    flags: ['dc', 'hide', 'z'],
+    types: ['2D', 'DC'],
+    funcNames: ['invCurve', 'invPeriod', 'invMaxCurve'],
+    funcs: `fn invCurve(shape: i32, tin: f32, rot: f32, sc: f32, a: f32, b: f32, c: f32, d: f32, e: f32, f: f32) -> vec3f {
+  // InversionFunc.ParametricShape.getCurvePoint: (x, y, r) of the shape at polar angle tin (params a..f, scale, rotation)
+  let t = tin - rot;
+  var r = sc;
+  switch shape {
+    case 1: { r = (a * b) / sqrt((b * cos(t)) * (b * cos(t)) + (a * sin(t)) * (a * sin(t))) * sc; }
+    case 2: { r = sqrt((a * a * b * b) / ((b * b * cos(t) * cos(t)) - (a * a * sin(t) * sin(t)))) * sc; }
+    case 3: { let th_ = abs(t % (2.0 * PI)); let n = floor(a); r = cos(PI / n) / cos(th_ % (2.0 * PI / n) - PI / n) * sc; }
+    case 4: { r = (cos((a / b) * t) + c) * sc; }
+    case 5: { r = (a * b) / pow(pow(abs(a * sin(t)), c) + pow(abs(b * cos(t)), c), 1.0 / c) * sc; }
+    case 6: { r = pow(pow(abs(cos(c * t / 4.0) / a), e) + pow(abs(sin(c * t / 4.0) / b), f), -1.0 / d) * sc; }
+    default: { r = sc; }
+  }
+  return vec3f(r * cos(tin), r * sin(tin), r);
+}
+
+fn invPeriod(shape: i32, a: f32, b: f32, c: f32) -> f32 {
+  // Rhodonea.calcPeriod (the other shapes have period 2π)
+  if (shape != 4) { return 2.0 * PI; }
+  let k = a / b;
+  if (k % 1.0 == 0.0) {
+    if (k % 2.0 == 0.0) { return 2.0 * PI; }
+    return select(PI, 2.0 * PI, c != 0.0);
+  }
+  if (a % 1.0 == 0.0 && b % 1.0 == 0.0) {
+    var kn = i32(abs(a)); var kd = i32(abs(b));
+    var x = kn; var y = kd;
+    while (y != 0) { let tmp = x % y; x = y; y = tmp; }
+    let g = max(x, 1);
+    if (g != 1) { kn = kn / g; kd = kd / g; }
+    return select(f32(kd) * PI, f32(kd) * 2.0 * PI, kn % 2 == 0 || kd % 2 == 0);
+  }
+  return 2.0 * PI;
+}
+
+fn invMaxCurve(shape: i32, tin: f32, rot: f32, sc: f32, a: f32, b: f32, c: f32, d: f32, e: f32, f: f32) -> vec3f {
+  // ParametricShape.getMaxCurvePoint: rhodonea can cross a ray several times — take the farthest of period/2π samples spaced π apart
+  if (shape != 4) { return invCurve(shape, tin, rot, sc, a, b, c, d, e, f); }
+  var out = vec3f(0.0, 0.0, -0.0001);
+  let cnt = i32(invPeriod(shape, a, b, c) / (2.0 * PI));
+  for (var i = 0; i < cnt; i = i + 1) {
+    let q = invCurve(shape, tin + f32(i) * PI, rot, sc, a, b, c, d, e, f);
+    if (abs(q.z) > out.z) { out = vec3f(q.xy, abs(q.z)); }
+  }
+  return out;
+}`,
+    code: (w, p) => `{
+  let iv_shape = i32(${p[2]}); let iv_rot = PI * ${p[1]}; let iv_sc = ${p[0]};
+  let iv_a = ${p[5]}; let iv_b = ${p[6]}; let iv_c = ${p[7]}; let iv_d = ${p[8]}; let iv_e = ${p[9]}; let iv_f = ${p[10]};
+  var iv_done = false;
+  if (${p[17]} > 0.0 && rnd(rs) < ${p[17]}) {
+    let cpnt = invCurve(iv_shape, rnd(rs) * invPeriod(iv_shape, iv_a, iv_b, iv_c), iv_rot, iv_sc, iv_a, iv_b, iv_c, iv_d, iv_e, iv_f);
+    v += cpnt.xy;
+    if (${p[18]} != 0.0) { v += 0.01 * (vec2f(rnd(rs), rnd(rs)) - 0.5) * ${p[18]}; }
+    iv_done = true;
+  }
+  if (!iv_done && ${p[19]} > 0.0 && rnd(rs) < ${p[19]}) { v += t; iv_done = true; }
+  if (!iv_done) {
+    let tin = atan2(t.y, t.x);
+    let rin = length(t);
+    let cur = invMaxCurve(iv_shape, tin, iv_rot, iv_sc, iv_a, iv_b, iv_c, iv_d, iv_e, iv_f);
+    let rcurve = cur.z;
+    var doInv = true;
+    let imode = i32(${p[3]});
+    if (imode == 1) { doInv = rin > rcurve; } else if (imode == 2) { doInv = rin < rcurve; }
+    let ring_mode = i32(${p[11]}); let ring_scale = ${p[12]};
+    if (doInv && ring_mode != 0 && ring_scale != 1.0) {
+      var rmin = ring_scale * iv_sc; var rmax = (iv_sc * iv_sc) / rmin;
+      if (ring_scale > iv_sc) { rmax = ring_scale * iv_sc; rmin = (iv_sc * iv_sc) / rmax; }
+      if (ring_mode == 1) { doInv = rin >= rmin && rin <= rmax; } else if (ring_mode == 2) { doInv = rin <= rmin || rin >= rmax; }
+    }
+    if (doInv) {
+      var num_scale = rcurve * rcurve;
+      if (!(${p[14]} == 2.0 && ${p[16]} == 1.0)) { num_scale = pow(pow(abs(cur.x), ${p[14]}) + pow(abs(cur.y), ${p[14]}), 2.0 / (${p[14]} * ${p[16]})); }
+      var denom_scale = dot(t, t);
+      if (!(${p[13]} == 2.0 && ${p[15]} == 1.0)) { denom_scale = pow(pow(abs(t.x), ${p[13]}) + pow(abs(t.y), ${p[13]}), 2.0 / (${p[13]} * ${p[15]})); }
+      let iscale = num_scale / denom_scale;
+      v += ${w} * iscale * t;
+      if ((P.flags & 1u) != 0u) { pz_ += ${w} * z_; }
+      *hd = false;
+      let cm = i32(${p[21]});
+      if (cm != 0) {
+        var val = 0.0;
+        if (cm == 1) { val = length(v - cur.xy); }
+        else if (cm == 2) { val = length(t - cur.xy); }
+        else if (cm == 3) { val = length(v - t); }
+        else if (cm == 4) { let ci = (iv_sc * iv_sc) / dot(t, t) * ${w}; val = length(v) / length(ci * t); }
+        if (cm >= 1 && cm <= 4) {
+          var lo = ${p[23]}; var hi = ${p[24]};
+          if (lo > hi) { let tmp = lo; lo = hi; hi = tmp; }
+          var col: f32;
+          if (i32(${p[22]}) == 2) {
+            if (val < lo) { val = hi - ((lo - val) % (hi - lo)); } else if (val > hi) { val = lo + ((val - lo) % (hi - lo)); }
+            col = (val - lo) / (hi - lo);
+          } else {
+            col = select(select((val - lo) / (hi - lo), 1.0, val >= hi), 0.0, val < lo);
+          }
+          *cp = clamp(col, 0.0, 1.0);
+        }
+      }
+    } else {
+      v += t;
+      if ((P.flags & 1u) != 0u) { pz_ += z_; }
+      *hd = ${p[4]} != 0.0;
+    }
+  }
+}`,
+  },
+
   // ---- JWildfire obj_mesh_primitive_wf: a random point on a built-in mesh (src/core/meshes.ts) ----
   // Params in JWildfire's order; the colour/displacement maps need images (never active here);
   // receive_only_shadows is accepted but not modelled. Hidden slots: cdf base, face count, triangle base

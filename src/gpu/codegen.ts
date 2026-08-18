@@ -367,7 +367,10 @@ fn iterLayer${li}(idx: u32) {
   var pt = pts[idx];
   var rs = rngs[idx].x;
   var prev = min(rngs[idx].y & 255u, ${info.n - 1}u);
-  var fuse = f32((rngs[idx].y >> 8u) & 0x7FFFFFu);${solid ? '\n  var bdone = (rngs[idx].y & 0x80000000u) != 0u; // shadow maps: this walker already contributed its light-space bounds sample' : ''}
+  var fuse = f32((rngs[idx].y >> 8u) & 0xFFFFFu);
+  // walker age since (re)start, saturating at 7 (bits 28..30): its first few iterations count as JWildfire's "first call" of a
+  // variation instance (pre_stabilize resets there) — a few iterations, so an xform with a small weight is reached too
+  var age = (rngs[idx].y >> 28u) & 7u;${solid ? '\n  var bdone = (rngs[idx].y & 0x80000000u) != 0u; // shadow maps: this walker already contributed its light-space bounds sample' : ''}
   var p = pt.xyz;
   var c = pt.w;${usesMods ? '\n  var m = mods[idx];' : ''}${usesMat ? '\n  var mt = mats[idx];' : ''}
   let ca = cos(P.rotation);
@@ -377,6 +380,8 @@ fn iterLayer${li}(idx: u32) {
   let cam3d = (P.flags & 2u) != 0u;
 
   for (var it = 0u; it < P.iters; it = it + 1u) {
+    wstart_ = age < 7u;
+    age = min(age + 1u, 7u);
     let rw = rnd(&rs);
 ${sel}
     var np = p;
@@ -400,6 +405,7 @@ ${cases}
       p = vec3f(rnd(&rs) * 2.0 - 1.0, rnd(&rs) * 2.0 - 1.0, 0.0);
       c = rnd(&rs);${usesMods ? '\n      m = vec4f(0.0);' : ''}
       fuse = 21.0 + floor(rnd(&rs) * 1000.0);
+      age = 0u;
       continue;
     }
     if (p.z != p.z) { p.z = 0.0; }
@@ -505,7 +511,7 @@ ${solid ? `    // JWildfire solid rendering: no density — the nearest point pe
   }
 
   pts[idx] = vec4f(p, c);${usesMods ? '\n  mods[idx] = m;' : ''}${usesMat ? '\n  mats[idx] = mt;' : ''}
-  rngs[idx] = vec2u(rs, prev | (u32(fuse) << 8u)${solid ? ' | select(0u, 0x80000000u, bdone)' : ''});
+  rngs[idx] = vec2u(rs, prev | (u32(fuse) << 8u) | (age << 28u)${solid ? ' | select(0u, 0x80000000u, bdone)' : ''});
 }
 `;
   });
@@ -572,6 +578,8 @@ fn mmod(a: f32, b: f32) -> f32 { return a - b * floor(a / b); }
 // runtime 0u (set opaquely in main): the double-float helpers (hsin_) route intermediates through an
 // integer add of it so the shader compiler's fast-math reassociation cannot fold their error terms
 var<private> df_zero: u32 = 0u;
+// true during a walker's first iterations after a (re)start — JWildfire's "first call" of a variation instance (pre_stabilize)
+var<private> wstart_: bool = false;
 
 ${collectFuncs(flame)}
 

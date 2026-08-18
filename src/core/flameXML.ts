@@ -242,7 +242,11 @@ function parseXFormEl(elm: Element, ctx?: CurveCtx): XForm {
   }
   const instByRaw = new Map<string, { inst: XForm['variations'][number]; list: 'variations' | 'preVariations' | 'postVariations' }>();
   for (const { raw, stage, vname, weight } of weights) {
-    if (weight === 0) continue;
+    // JWildfire applies a variation whatever its amount; a zero amount only matters for variations whose effect does
+    // not scale with it (pre/post steps that rewrite the point, hide/direct-colour/stateful ones — e.g. `pre_stabilize="0"`,
+    // `post_mirror_wf="0"` in the wild) — plain sums contribute nothing and are dropped to keep flames tidy
+    const vdef = VARIATIONS[vname];
+    if (weight === 0 && (vdef.priority ?? 0) === 0 && !vdef.flags?.some((f) => f === 'hide' || f === 'dc' || f === 'state' || f === 'stateful')) continue;
     const p: Record<string, number> = {};
     for (const pd of VARIATIONS[vname].params ?? []) {
       p[pd.name] = params[raw]?.[pd.name] ?? pd.def;
@@ -428,7 +432,7 @@ export function parseFlameXML(text: string, fallbackPalette: RGB[]): Flame[] {
     const dzc = nums(fe.getAttribute('cam_zdimcolor'));
     if (dzc.length === 3) f.dimZColor = dzc.map((v) => Math.min(1, Math.max(0, v))) as RGB;
     const br = parseFloat(fe.getAttribute('brightness') ?? '');
-    if (isFinite(br) && br > 0) f.brightness = Math.min(br, 6);
+    if (isFinite(br) && br > 0) f.brightness = Math.min(br, 1000); // JWildfire allows any value (files with 150 exist); the slider covers 0.1–8
     const ga = parseFloat(fe.getAttribute('gamma') ?? '');
     if (isFinite(ga) && ga > 0) f.gamma = Math.min(ga, 8);
     const gt = parseFloat(fe.getAttribute('gamma_threshold') ?? '');

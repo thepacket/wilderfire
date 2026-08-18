@@ -328,6 +328,34 @@ shadow one; `_sh5` uses the 9600² map). A JWildfire-side probe (`scratchpad/dif
 into `ShadowCalculator` — map fill, bounds, per-cell `lz − map` percentiles) confirmed our maps have the
 same sample density and depth distribution as JWildfire's.
 
+### Parity stretch (2026-08-18)
+
+* **All 18 `FilterKernelType` kernels** (`src/gpu/filters.ts`: SinePow5/10/15 — `acos(4·x^p − 1)/π`, the collections'
+  favourite —, plain Mitchell (b = c = ⅓), B-spline, Bell, Blackman, Box, Catmull-Rom, Hamming, Hanning, Hermite,
+  Lanczos2/3, Quadratic, Triangle; `MITCHELL_SINEPOW` = JWildfire's adaptive mode, treated as Mitchell-smooth) with
+  their spatial supports and the sharpening set (colour kernel + gaussian 0.75 for the intensity). The flame keeps
+  JWildfire's kernel name; old `'mitchell'`/`'gaussian'` values normalise.
+* **Hand-written ports** of the three portable "point-set" variations: `inversion` (InversionFunc: the seven parametric
+  shapes incl. Rhodonea's period/gcd logic and `getMaxCurvePoint`, p-norms, ring modes, pass-through, shape drawing,
+  the four direct-colour measures with clamp/wrap, `hide_uninverted`; preserve-z handled inside the snippet because the
+  uninverted branch adds `zin` unweighted), `mobius3D_with_inverse` (quaternion Möbius map or its inverse per point,
+  det²-normalised), `pre_stabilize` (Rick Sidwell's glitch repellent: on the instance's first call and with probability
+  p/1000 the input jumps to one of n `java.util.Random(seed)` points, colours 0.5, 0.25, 0.75, 0.125, …). All three pass
+  the oracle harness (`varTest`); the harness now includes hand entries' `funcs`/priority and stands in `P.flags` and
+  `wstart_`. The kernel gained a per-walker **age** (bits 28..30 of the rng word, saturating at 7): `wstart_` is true
+  for a walker's first iterations after a (re)start — JWildfire's "first call" of a variation instance, which its ~8
+  long-lived walkers see once and our 65k short-lived ones must see each (`pre_stabilize` without it left a haze of
+  never-reset walkers).
+* **Zero-amount variations are applied by JWildfire** (`XForm.transformPoint` never checks the amount): the importer
+  now keeps `name="0.0"` instances of pre/post-priority, hide, direct-colour and stateful variations (`pre_stabilize="0"`,
+  `post_mirror_wf="0"`, `post_axis_symmetry_wf="0"` are common in the collections) and still drops plain sums.
+  `Bokeh_1` — the worst-matching random-generator fixture — went from 0.80 / hist 0.89 to 0.91 / 0.97 because of it.
+* Importer clamp lifted: `brightness` up to 1000 (JWildfire files carry 50 and 150; ours stopped at 6).
+* Verified: `inversion` flames `_pv1` 0.99, `_pv2` 1.12, `_pv3` 0.95, `_pv4nc` 0.97 (`_pv4` itself has `curliecue2`, a
+  sequential-state variation); `mobius3D_with_inverse` `_pv5` 0.99, `_pv6` 1.09, `_pv7` 1.00; `pre_stabilize` flames are
+  attractor scenes whose look depends on the long single trajectory (JWildfire's points diffuse for ~10 k steps
+  between resets; ours live ~600) — the same inherent class as `Julians_0`.
+
 ## Semantics worth knowing
 
 * **Snippet scope** (`variations.ts` header): `t` (input point, mutable), `r2 r th=atan2(x,y) ph=atan2(y,x)`, `v` (output accumulator), `rs` rng, `cp` palette-coordinate pointer, `hd` hide-flag pointer, `A(i)` affine coefficients. JWildfire's `__phi` is our `th` and `__theta` our `ph`.

@@ -177,3 +177,19 @@ describe('JWildfire solid rendering (sld_render_*)', () => {
     expect(roundTrip(off).flame.solid).toBeUndefined();
   });
 });
+
+describe('zero-amount variations (JWildfire applies them)', () => {
+  it('keeps pre/post/hide/dc/state variations with amount 0 and drops plain sums', () => {
+    const xml = '<flame name="z" size="64 64" scale="10"><xform weight="1" linear="1" spherical="0.0" pre_stabilize="0.0" pre_stabilize_n="10" post_mirror_wf="0.0" post_mirror_wf_zaxis="1" coefs="1 0 0 1 0 0"/></flame>';
+    const { flame } = importFlameText(xml, GREY);
+    const names = flame.layers[0].xforms[0].variations.map((v) => `${v.name}:${v.weight}`);
+    expect(names).toContain('pre_stabilize:0');
+    expect(names).toContain('post_mirror_wf:0');
+    expect(names).not.toContain('spherical:0');
+    expect(names).toContain('linear:1');
+  });
+  it('imports brightness beyond the slider range (JWildfire files carry 50, 150)', () => {
+    const { flame } = importFlameText('<flame name="b" size="64 64" scale="10" brightness="150"><xform weight="1" linear="1" coefs="1 0 0 1 0 0"/></flame>', GREY);
+    expect(flame.brightness).toBe(150);
+  });
+});
