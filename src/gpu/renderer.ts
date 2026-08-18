@@ -7,6 +7,7 @@ import { flameSignature, visibleLayers, MAX_LAYERS, LIGHT_DIFF_FUNCS } from '../
 import { compileFlame, TONEMAP_WGSL, type CompiledFlame } from './codegen';
 import { buildSpatialFilters, solidFilterWeights, gaussianFilter1D, FILT_FLOATS } from './filters';
 import { SOLID_POST_WGSL, SOLID_TONEMAP_WGSL, SOLID_AO_WGSL, SOLID_SHADOW_WGSL, SOLID_PAY_WORDS, SOLID_MAX_LIGHTS, SOLID_MAX_MATS, SOLID_FILT_FLOATS } from './solid.wgsl';
+import { flameMeshKeys, ensureMesh, meshSampler, meshLayout } from '../core/meshes';
 
 const XD_FLOATS = 8192;
 /** bytes per raster cell: density histogram (rgba u32) vs solid z-buffer (key + payload + normal) */
@@ -69,6 +70,8 @@ export class FlameRenderer {
 
   // ---- JWildfire solid rendering (z-buffer + shading; see solid.wgsl.ts) ----
   private matsBuf!: GPUBuffer;      // per-point material index (bound when the compiled flame tracks materials)
+  private meshBuf!: GPUBuffer;      // obj_mesh_primitive_wf samplers (face CDFs + triangles), packed per flame
+  private meshPacked = '';          // keys packed into meshBuf
   private solidLive: SolidBufs | null = null;
   private solidOff: SolidBufs | null = null;
   private solidPostPipe!: GPUComputePipeline;
@@ -181,6 +184,7 @@ export class FlameRenderer {
     this.tmBuf = d.createBuffer({ size: 128, usage: GPUBufferUsage.UNIFORM | GPUBufferUsage.COPY_DST });
     this.filtBuf = d.createBuffer({ size: FILT_FLOATS * 4, usage: GPUBufferUsage.STORAGE | GPUBufferUsage.COPY_DST });
     this.matsBuf = d.createBuffer({ size: this.nPoints * 4, usage: GPUBufferUsage.STORAGE | GPUBufferUsage.COPY_DST });
+    this.meshBuf = d.createBuffer({ size: 16, usage: GPUBufferUsage.STORAGE | GPUBufferUsage.COPY_DST });
     this.sppBuf = d.createBuffer({ size: 32, usage: GPUBufferUsage.UNIFORM | GPUBufferUsage.COPY_DST });
     this.spBuf = d.createBuffer({ size: 80, usage: GPUBufferUsage.UNIFORM | GPUBufferUsage.COPY_DST });
     this.lightsBuf = d.createBuffer({ size: (SOLID_MAX_LIGHTS * 3 + SOLID_MAX_MATS * 3) * 16, usage: GPUBufferUsage.UNIFORM | GPUBufferUsage.COPY_DST });
@@ -380,7 +384,42 @@ export class FlameRenderer {
         { binding: 10, resource: { buffer: solid.smaps! } },
       ] : []),
       ...(this.compiled?.usesMat ? [{ binding: 9, resource: { buffer: this.matsBuf } }] : []),
+      ...(this.compiled?.usesMesh ? [{ binding: 12, resource: { buffer: this.meshBuf } }] : []),
     ];
+  }
+
+  /** obj_mesh_primitive_wf: make sure every mesh the flame uses is prepared and packed into `meshBuf`
+   *  (cdf + triangles per key, offsets in `meshLayout` for the data writer). Returns false when something is
+   *  still loading — the flame is re-set once it is. */
+  private ensureMeshes(flame: Flame): boolean {
+    const keys = flameMeshKeys(flame);
+    if (!keys.length) return true;
+    const packKey = keys.join('|');
+    if (keys.every((k) => meshSampler(k))) {
+      if (packKey !== this.meshPacked) {
+        let total = 0;
+        for (const k of keys) { const sm = meshSampler(k)!; total += sm.cdf.length + sm.tris.length; }
+        const data = new Float32Array(Math.max(total, 4));
+        let o = 0;
+        meshLayout.clear();
+        for (const k of keys) {
+          const sm = meshSampler(k)!;
+          data.set(sm.cdf, o); const cdfBase = o; o += sm.cdf.length;
+          data.set(sm.tris, o); const triBase = o; o += sm.tris.length;
+          meshLayout.set(k, { cdfBase, triBase, faces: sm.faces });
+        }
+        if (this.meshBuf.size < data.byteLength) {
+          this.meshBuf.destroy();
+          this.meshBuf = this.device.createBuffer({ size: data.byteLength, usage: GPUBufferUsage.STORAGE | GPUBufferUsage.COPY_DST });
+          this.rebuildComputeBG();
+        }
+        this.device.queue.writeBuffer(this.meshBuf, 0, data);
+        this.meshPacked = packKey;
+      }
+      return true;
+    }
+    Promise.all(keys.map(ensureMesh)).then(() => { if (this.flame && flameMeshKeys(this.flame).join('|') === packKey) this.setFlame(this.flame); }).catch((e) => this.onError?.(String(e)));
+    return false;
   }
 
   private rebuildComputeBG() {
@@ -486,6 +525,7 @@ export class FlameRenderer {
       if (this.compiled.solid !== wasSolid) this.allocHistogram(); // histogram ↔ z-buffer set (rebuilds the bind group)
       else this.rebuildComputeBG();
     }
+    if (this.compiled.usesMesh) this.ensureMeshes(flame); // (writeData sees 0 faces for meshes still loading)
     this.compiled.writeData(flame, this.xdData);
     this.device.queue.writeBuffer(this.xdBuf, 0, this.xdData, 0, this.compiled.dataSize);
     visibleLayers(flame).forEach((ly, li) => {
@@ -846,9 +886,19 @@ export class FlameRenderer {
     return [nc, ni];
   }
 
+  /** Resolves once everything the current flame needs is on the GPU (mesh primitives load asynchronously;
+   *  the live view simply shows them when they arrive, exports wait here). */
+  async ready(): Promise<void> {
+    if (!this.flame || !this.compiled?.usesMesh) return;
+    const keys = flameMeshKeys(this.flame);
+    await Promise.all(keys.map(ensureMesh));
+    if (!keys.every((k) => meshLayout.has(k)) || keys.join('|') !== this.meshPacked) this.setFlame(this.flame);
+  }
+
   /** Offline stepping for video export: accumulate `passes` compute dispatches
    *  and resolve when the GPU is done. Pair with captureSync() to grab pixels. */
   async stepExport(passes: number): Promise<void> {
+    await this.ready();
     if (!this.flame || !this.computePipeline || !this.computeBG) return;
     const CHUNK = 24; // keep single submissions short to stay watchdog-friendly
     let done = 0;
@@ -889,6 +939,7 @@ export class FlameRenderer {
   }): Promise<Uint8ClampedArray<ArrayBuffer>> {
     const d = this.device;
     if (!this.flame || !this.computePipeline) throw new Error('No compiled flame.');
+    await this.ready();
 
     const solid = this.solid;
     const cells = o.tileW * o.tileH;

@@ -50,7 +50,6 @@ export const UNPORTABLE: Record<string, string> = {
   "natural_foam": "CPU-built point set",
   "neuron3D": "CPU-built point set",
   "nsudoku": "CPU-built point set",
-  "obj_mesh_primitive_wf": "renders external content (flame, image, mesh, SVG, text)",
   "obj_mesh_wf": "renders external content (flame, image, mesh, SVG, text)",
   "parplot2d_wf": "runs user code / a formula at render time",
   "plane_wf": "renders external content (flame, image, mesh, SVG, text)",

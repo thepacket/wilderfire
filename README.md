@@ -26,7 +26,9 @@ in the stack.
 
 ## Features
 
-- **940 variations** — 70 hand-written flam3 classics plus **938 JWildfire
+- **941 variations** — 71 hand-written entries (the flam3 classics and JWildfire's
+  `obj_mesh_primitive_wf`, whose 26 built-in meshes ship as compact binaries and are
+  subdivided/smoothed exactly like JWildfire) plus **938 JWildfire
   variations ported mechanically**: JWildfire's own GPU snippets and, for
   variations that have none, its Java `transform()` code (attractors, the
   `crop_*` and `glsl_*` shader-art families, `synth`, `nBlur`, `falloff3`,
@@ -37,7 +39,7 @@ in the stack.
   JWildfire's own GPU≠CPU snippet bugs are patched back to the Java, and
   shader hashes on cell ids run in double-float so cut/worley patterns
   match — see [`scripts/jwf-port/README.md`](scripts/jwf-port/README.md)).
-  The 86 JWildfire variations that are *not* implemented are listed with
+  The 85 JWildfire variations that are *not* implemented are listed with
   their reason in `scripts/jwf-port/data/unportable.json` (user code compiled
   at run time, external content such as sub-flames/images/meshes/SVG/text,
   CPU-built point sets, …); the importer names the reason when a flame uses one.
@@ -69,7 +71,9 @@ in the stack.
   same way) and **shadow maps** (`ShadowCalculator`: a light-space depth map per
   casting light filled by the chaos game itself, hard or smoothed lookups, bias,
   per-light shadow intensity; verified the same way); `sld_render_*` attributes
-  import/export
+  import/export. `obj_mesh_primitive_wf` (ball, box, torus, gears, mandelbulb, …)
+  is available for solid scenes — the primitives are sampled on the GPU from a
+  face CDF, loaded on demand
 - **Layers** (up to 8) — each with its own transforms, final transform,
   gradient, density weight, and visibility, blended in one histogram; walker
   threads are partitioned across layers on the GPU

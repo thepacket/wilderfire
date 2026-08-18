@@ -22,6 +22,7 @@ export const FIXTURES = [
   'wfield_amount', 'wfield_jitter', 'wfield_ppow', 'wfield_cell', 'wfield_value',
   // JWildfire solid rendering (z-buffer + lights/materials): two materials, a per-xform material index, coloured lights, filter on/off
   'Solid_0', 'Solid_1', 'Solid_2', 'Solid_3', // Solid_2 = Solid_0 with ambient occlusion, Solid_3 = + smooth shadow maps from both lights
+  'Solid_4', // obj_mesh_primitive_wf: torus + subdivided ball + flat box, two materials, AO, fast shadows
 ];
 
 export async function runFlameTest(device: GPUDevice, palette: RGB[], opts: { files?: string[]; verbose?: boolean } = {}): Promise<FlameTestResult[]> {

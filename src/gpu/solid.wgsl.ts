@@ -107,8 +107,10 @@ fn originAt(cell: u32) -> vec3f {
   return vec3f(bitcast<f32>(zpay[b]), bitcast<f32>(zpay[b + 1u]), bitcast<f32>(zpay[b + 2u]));
 }
 
+// 3 × 10 bits, signed around 511 so an exact 0 component stays exactly 0 (the AO tangent term divides by
+// nx·Rx + ny·Ry and JWildfire's flat axis-aligned faces hit exactly 0 there — see aoRawPass)
 fn packNormal(n: vec3f) -> u32 {
-  let q = vec3u(clamp((n * 0.5 + 0.5) * 1023.0 + 0.5, vec3f(0.0), vec3f(1023.0)));
+  let q = vec3u(clamp(round(n * 511.0), vec3f(-511.0), vec3f(511.0)) + 511.0);
   return q.x | (q.y << 10u) | (q.z << 20u) | 0x80000000u;
 }
 
@@ -198,7 +200,7 @@ fn vs(@builtin(vertex_index) vi: u32) -> @builtin(position) vec4f {
 }
 
 fn unpackNormal(p: u32) -> vec3f {
-  return vec3f(f32(p & 1023u), f32((p >> 10u) & 1023u), f32((p >> 20u) & 1023u)) / 1023.0 * 2.0 - 1.0;
+  return (vec3f(f32(p & 1023u), f32((p >> 10u) & 1023u), f32((p >> 20u) & 1023u)) - 511.0) / 511.0;
 }
 
 // LightDiffFuncPreset
@@ -390,7 +392,7 @@ const ZBUF_ZMIN: f32 = -3.0e38; // JWildfire: -Float.MAX_VALUE (any real depth i
 @group(0) @binding(6) var<storage, read_write> aoTmp: array<f32>;
 
 fn unpackNormal(p: u32) -> vec3f {
-  return vec3f(f32(p & 1023u), f32((p >> 10u) & 1023u), f32((p >> 20u) & 1023u)) / 1023.0 * 2.0 - 1.0;
+  return (vec3f(f32(p & 1023u), f32((p >> 10u) & 1023u), f32((p >> 20u) & 1023u)) - 511.0) / 511.0;
 }
 fn pcg(v: u32) -> u32 {
   let st = v * 747796405u + 2891336453u;
@@ -433,6 +435,9 @@ fn aoRawPass(@builtin(global_invocation_id) gid: vec3u) {
         let RR = sqrt(px * px + py * py);
         let Rx = px / RR; let Ry = py / RR;
         let tt = n.x * Rx + Ry * n.y;
+        // JWildfire: tt = 0 (an exactly axis-aligned normal, e.g. a box face) makes the tangent NaN and the
+        // sample is skipped by the ao > prevH test; WGSL may not preserve NaN, so skip explicitly
+        if (tt == 0.0) { r0 += A.radiusStep; continue; }
         let tx = -(Ry * n.x * n.y - Rx * n.y * n.y - Rx * n.z * n.z) / tt;
         let ty = (Ry * n.x * n.x + Ry * n.z * n.z - n.x * Rx * n.y) / tt;
         let tz = (-Ry * n.y * n.z - n.x * Rx * n.z) / tt;

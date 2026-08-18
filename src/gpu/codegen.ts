@@ -24,6 +24,7 @@ import { visibleLayers, usesMaterials } from '../core/flame';
 import { VARIATIONS } from '../core/variations';
 import { WFIELD_WGSL } from './wfield.wgsl';
 import { SOLID_KERNEL_WGSL, SOLID_PAY_WORDS } from './solid.wgsl';
+import { meshKey, meshLayout } from '../core/meshes';
 
 const CDF_ROW = 16;
 const HEADER = 72;    // floats per xform block header (6 affine, 6 post, color, colorSpeed, opacity, pad, 24 3D affines, 8 colour modifiers, 16 weighting field, material, materialSpeed, 6 spare)
@@ -39,6 +40,8 @@ export interface CompiledFlame {
   solid: boolean;
   /** The kernel carries a per-point material index (binding 9 `mats`). */
   usesMat: boolean;
+  /** A variation samples the shared mesh buffer (binding 12 `mesh`; obj_mesh_primitive_wf). */
+  usesMesh: boolean;
 }
 
 /** All variation lists of an xform in serialized order: pre, main, post. */
@@ -51,7 +54,7 @@ function blockSize(x: XForm): number {
   for (const list of varLists(x)) {
     for (const v of list) {
       const def = VARIATIONS[v.name];
-      if (def) n += 1 + (def.params?.length ?? 0);
+      if (def) n += 1 + (def.params?.length ?? 0) + (def.extra ?? 0);
     }
   }
   return n;
@@ -132,7 +135,9 @@ function genXformFn(name: string, x: XForm, B: number, palBase: number): string 
       const w = wf ? `(xd[${off}u] * wfAmp${wfParamScale(vi.name, 'amount')})` : `xd[${off}u]`;
       // a modulated int param is rounded like JWildfire's Tools.FTOI (the snippet's own (int) cast would truncate)
       const p = (def.params ?? []).map((pd, k) => (wf && wfParamScale(vi.name, pd.name) ? (pd.int ? `round(xd[${off + 1 + k}u]${wfParamScale(vi.name, pd.name)})` : `(xd[${off + 1 + k}u]${wfParamScale(vi.name, pd.name)})`) : `xd[${off + 1 + k}u]`));
-      off += 1 + (def.params?.length ?? 0);
+      const nP = def.params?.length ?? 0;
+      for (let k = 0; k < (def.extra ?? 0); k++) p.push(`xd[${off + 1 + nP + k}u]`); // hidden slots (data hook)
+      off += 1 + nP + (def.extra ?? 0);
       const dprio = def.priority ?? 0;
       // JWildfire per-instance override: only a normal variation forced to pre/post has a distinct meaning
       // (EnforcedPre/PostVariationTransformationStep: the point becomes p + w·f(p)); other combinations keep the definition
@@ -305,6 +310,7 @@ export function compileFlame(flame: Flame, nPoints: number): CompiledFlame {
   const usesMods = layers.some((ly) => [...ly.xforms, ...(ly.final ? [ly.final] : []), ...ly.moreFinals].some((x) => x.colorMods?.some((v) => v !== 0)));
   const solid = !!flame.solid?.enabled;
   const usesMat = solid && usesMaterials(flame);
+  const usesMesh = layers.some((ly) => [...ly.xforms, ...(ly.final ? [ly.final] : []), ...ly.moreFinals].some((x) => varLists(x).some((l) => l.some((vi) => VARIATIONS[vi.name]?.flags?.includes('mesh')))));
   const L = layers.length;
 
   // ---- Layout ----
@@ -550,7 +556,7 @@ struct Params {
 @group(0) @binding(3) var<storage, read_write> rngs: array<vec2u>; // x: rng state, y: prev xform
 @group(0) @binding(4) var<storage, read_write> hist: array<atomic<u32>>;
 @group(0) @binding(5) var<storage, read> pal: array<vec4f>;
-${usesMods ? MODS_WGSL : ''}${solid ? SOLID_KERNEL_WGSL : ''}${usesMat ? '\n@group(0) @binding(9) var<storage, read_write> mats: array<f32>; // per-point material index (JWildfire p.material)\n' : ''}
+${usesMods ? MODS_WGSL : ''}${solid ? SOLID_KERNEL_WGSL : ''}${usesMat ? '\n@group(0) @binding(9) var<storage, read_write> mats: array<f32>; // per-point material index (JWildfire p.material)\n' : ''}${usesMesh ? '\n@group(0) @binding(12) var<storage, read> mesh: array<f32>; // mesh samplers: face CDFs + triangles (src/core/meshes.ts)\n' : ''}
 
 fn rnd(state: ptr<function, u32>) -> f32 {
   var x = *state;
@@ -658,6 +664,13 @@ ${lcases}
             for (const pd of def.params ?? []) {
               out[o++] = vi.params[pd.name] ?? pd.def;
             }
+            if (def.extra) {
+              // data hook: obj_mesh_primitive_wf → [cdf base, face count, triangle base] of its sampler in the mesh buffer (0 faces until loaded)
+              const P = vi.params;
+              const lay = def.flags?.includes('mesh') ? meshLayout.get(meshKey(P.primitive ?? 0, P.subdiv_level ?? 0, P.subdiv_smooth_passes ?? 12, P.subdiv_smooth_lambda ?? 0.42, P.subdiv_smooth_mu ?? -0.45)) : undefined;
+              out[o++] = lay?.cdfBase ?? 0; out[o++] = lay?.faces ?? 0; out[o++] = lay?.triBase ?? 0;
+              for (let k = 3; k < def.extra; k++) out[o++] = 0;
+            }
           }
         }
       };
@@ -667,7 +680,7 @@ ${lcases}
     });
   };
 
-  return { wgsl, dataSize, writeData, usesMods, solid, usesMat };
+  return { wgsl, dataSize, writeData, usesMods, solid, usesMat, usesMesh };
 }
 
 export const TONEMAP_WGSL = `// WilderFire tonemap: density-estimation filter + log-density + gamma/vibrancy
