@@ -206,3 +206,21 @@ describe('JWildfire background gradients', () => {
     expect(flat.background[0]).toBeCloseTo(0.1, 6);
   });
 });
+
+describe('JWildfire colour types CYCLIC / DISTANCE', () => {
+  it('imports, keeps the symmetry, exports, and the kernel carries the colour rules', async () => {
+    const xml = '<flame name="c" size="64 64" scale="10"><xform weight="1" color="0.3" symmetry="-0.83" color_type="DISTANCE" linear="1" coefs="1 0 0 1 0 0"/><xform weight="1" color="0.5" symmetry="0.25" color_type="CYCLIC" spherical="1" coefs="1 0 0 1 0 0"/><xform weight="1" color="0.5" color_type="NONE" linear="1" coefs="1 0 0 1 0 0"/></flame>';
+    const { flame } = importFlameText(xml, GREY);
+    const [a, b, c] = flame.layers[0].xforms;
+    expect(a.colorType).toBe('DISTANCE'); expect(a.colorSpeed).toBeCloseTo((1 + 0.83) / 2, 6);
+    expect(b.colorType).toBe('CYCLIC'); expect(b.colorSpeed).toBeCloseTo((1 - 0.25) / 2, 6);
+    expect(c.colorType).toBeUndefined(); expect(c.colorSpeed).toBe(0);
+    const back = roundTrip(flame).flame;
+    expect(back.layers[0].xforms.map((x) => x.colorType)).toEqual(['DISTANCE', 'CYCLIC', undefined]);
+    const { compileFlame } = await import('../src/gpu/codegen');
+    const w = compileFlame(flame, 1024).wgsl;
+    expect(w).toContain('c = fract(c + (1.0 - 2.0 * xd[');
+    expect(w).toContain('length(np - p) * (2.0 - 2.0 * xd[');
+    expect(w).toContain('rgbo.w > 0.25');
+  });
+});

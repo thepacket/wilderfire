@@ -345,22 +345,27 @@ export function compileFlame(flame: Flame, nPoints: number): CompiledFlame {
     const cases = ly.xforms.map((_, i) => {
       const b = info.bases[i];
       // Color-speed blend runs first so direct-color variations get the last word.
+      const ct = ly.xforms[i].colorType;
+      // JWildfire ColorType: DIFFUSION blends the index (default); CYCLIC adds the symmetry to the index (mod 1); DISTANCE keeps
+      // the index and paints the palette entry at color + |Δp|·(symmetry+1) — a plot colour that a later gradient step
+      // (DIFFUSION/CYCLIC final) replaces, unlike a direct-colour variation's (rgbo.w 0.5 vs 1)
+      const cstep = ct === 'CYCLIC' ? `        c = fract(c + (1.0 - 2.0 * xd[${b + 13}u]));`
+        : ct === 'DISTANCE' ? '' : `        let cs = xd[${b + 13}u];\n        c = c * (1.0 - cs) + xd[${b + 12}u] * cs;`;
+      const dstep = ct === 'DISTANCE' ? `\n        if (rgbo.w < 0.75) { let dci = i32((xd[${b + 12}u] + length(np - p) * (2.0 - 2.0 * xd[${b + 13}u])) * 254.0 + 0.5) % 256; rgbo = vec4f(pal[${li * 256}u + u32(dci)].xyz, 0.5); }` : '';
       return `      case ${i}u: {
-        let cs = xd[${b + 13}u];
-        c = c * (1.0 - cs) + xd[${b + 12}u] * cs;
+${cstep}
         op = xd[${b + 14}u];${usesMods ? `\n        m = modBlend(m, ${b}u);` : ''}${usesMat ? `\n        mt = mt * (1.0 + xd[${b + 65}u]) * 0.5 + xd[${b + 64}u] * (1.0 - xd[${b + 65}u]) * 0.5;` : ''}
-        np = applyX${li}_${i}(p, &c, &rs, &hide, &rgbo);
+        np = applyX${li}_${i}(p, &c, &rs, &hide, &rgbo);${dstep}
       }`;
     }).join('\n');
     // final transforms run in sequence (JWildfire: each further final takes the previous output)
-    const finalStep = (fn: string, base: number, input: string) => `
+    const finalStep = (fn: string, base: number, input: string, fx: XForm) => `
       {
-        let fcs = xd[${base + 13}u];
-        dc = dc * (1.0 - fcs) + xd[${base + 12}u] * fcs;${usesMods ? `\n        dm = modBlend(dm, ${base}u);` : ''}
+        ${fx.colorType === 'CYCLIC' ? `dc = fract(dc + (1.0 - 2.0 * xd[${base + 13}u]));` : fx.colorType === 'DISTANCE' ? '' : `let fcs = xd[${base + 13}u];\n        dc = dc * (1.0 - fcs) + xd[${base + 12}u] * fcs;`}${usesMods ? `\n        dm = modBlend(dm, ${base}u);` : ''}${fx.colorType !== 'DISTANCE' && (fx.colorType === 'CYCLIC' || fx.colorSpeed > 0) ? '\n        if (rgbo.w < 0.75) { rgbo = vec4f(0.0); } // gradient step: a DISTANCE plot colour is replaced by palette[index]' : ''}
       }
-      dp = ${fn}(${input}, &dc, &rs, &hide, &rgbo);`;
-    let finalBlock = ly.final ? finalStep(`applyF${li}`, info.finalBase, 'p') : '';
-    ly.moreFinals.forEach((_, k) => { finalBlock += finalStep(`applyF${li}_${k}`, info.moreBases[k], 'dp'); }); // dp starts as p
+      dp = ${fn}(${input}, &dc, &rs, &hide, &rgbo);${fx.colorType === 'DISTANCE' ? `\n      if (rgbo.w < 0.75) { let dci = i32((xd[${base + 12}u] + length(dp - ${input}) * (2.0 - 2.0 * xd[${base + 13}u])) * 254.0 + 0.5) % 256; rgbo = vec4f(pal[${li * 256}u + u32(dci)].xyz, 0.5); }` : ''}`;
+    let finalBlock = ly.final ? finalStep(`applyF${li}`, info.finalBase, 'p', ly.final) : '';
+    ly.moreFinals.forEach((fx, k) => { finalBlock += finalStep(`applyF${li}_${k}`, info.moreBases[k], 'dp', fx); }); // dp starts as p
 
     iterFns += `
 fn iterLayer${li}(idx: u32) {
@@ -491,14 +496,14 @@ ${solid ? `    // JWildfire solid rendering: no density — the nearest point pe
     else if (drawn && P.shadow.x == 1u && !bdone) { bdone = true; shadowSplat(dp); }
     if (visible && fx >= 0.0 && fy >= 0.0 && fx < f32(P.width) && fy < f32(P.height) && drawn) {
       var col = pal[${li * 256}u + min(u32(clamp(dc, 0.0, 1.0) * 255.99), 255u)];
-      if (rgbo.w > 0.5) { col = vec4f(clamp(rgbo.xyz, vec3f(0.0), vec3f(1.0)), 1.0); }
+      if (rgbo.w > 0.25) { col = vec4f(clamp(rgbo.xyz, vec3f(0.0), vec3f(1.0)), 1.0); }
       if (dz < 1.0) { col = vec4f(mix(P.dimColor.xyz, col.xyz, dz), col.w); }
       let lw = xd[${8 + li}u] * (200.0 / 256.0); // JWildfire RenderColor scale: the shading sees palette·200/256/255
       solidSplat(u32(fy) * P.width + u32(fx), cz, dp, col.xyz * lw, ${usesMat ? 'mt' : '0.0'});
     }` : `    if (visible && fx >= 0.0 && fy >= 0.0 && fx < f32(P.width) && fy < f32(P.height)) {
       let hi = (u32(fy) * P.width + u32(fx)) * 4u;
       var col = pal[${li * 256}u + min(u32(clamp(dc, 0.0, 1.0) * 255.99), 255u)];
-      if (rgbo.w > 0.5) { col = vec4f(clamp(rgbo.xyz, vec3f(0.0), vec3f(1.0)), 1.0); }${usesMods ? '\n      col = vec4f(applyColorMods(col.xyz, dm), col.w);' : ''}
+      if (rgbo.w > 0.25) { col = vec4f(clamp(rgbo.xyz, vec3f(0.0), vec3f(1.0)), 1.0); }${usesMods ? '\n      col = vec4f(applyColorMods(col.xyz, dm), col.w);' : ''}
       if (dz < 1.0) { col = vec4f(mix(P.dimColor.xyz, col.xyz, dz), col.w); }
       let lw = op * xd[${8 + li}u]; // JWildfire layer weight: colour intensity multiplier (the density count is unaffected)
       // fixed-point colour accumulation is dithered so dim contributions (small weights/opacities) stay unbiased

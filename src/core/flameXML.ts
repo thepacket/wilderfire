@@ -151,7 +151,8 @@ function parseXFormEl(elm: Element, ctx?: CurveCtx): XForm {
   // normal xforms) — a *final* xform defaults to NONE and leaves the colour alone; explicit NONE
   // (and the target/distance/cyclic modes we do not model) never blend towards `color`
   const ctype = (elm.getAttribute('color_type') ?? '').toUpperCase();
-  if (ctype === 'NONE' || ctype === 'TARGET' || ctype === 'DISTANCE' || ctype === 'CYCLIC' || (elm.tagName.toLowerCase() === 'finalxform' && ctype !== 'DIFFUSION' && ctype !== 'TARGETG')) x.colorSpeed = 0;
+  if (ctype === 'CYCLIC' || ctype === 'DISTANCE') x.colorType = ctype; // symmetry (1 − 2·colorSpeed) is their parameter
+  else if (ctype === 'NONE' || ctype === 'TARGET' || (elm.tagName.toLowerCase() === 'finalxform' && ctype !== 'DIFFUSION' && ctype !== 'TARGETG')) x.colorSpeed = 0;
   const chaos = nums(elm.getAttribute('chaos'));
   if (chaos.length) x.xaos = chaos.map((v) => Math.max(0, v));
   // JWildfire solid-rendering material index (+ blend speed), like colour/color_speed
@@ -653,7 +654,8 @@ function xformToXML(x: XForm, tag: string, nXForms: number, extraAttrs: string[]
   attrs.push(`color="${fmt(x.color)}"`);
   attrs.push(`color_speed="${fmt(x.colorSpeed)}"`);
   attrs.push(`symmetry="${fmt(1 - 2 * x.colorSpeed)}"`);
-  if (tag === 'finalxform' && x.colorSpeed > 0) attrs.push('color_type="DIFFUSION"'); // JWildfire finals default to NONE (no recolouring)
+  if (x.colorType) attrs.push(`color_type="${x.colorType}"`);
+  else if (tag === 'finalxform' && x.colorSpeed > 0) attrs.push('color_type="DIFFUSION"'); // JWildfire finals default to NONE (no recolouring)
   if (x.wfield) {
     const w = x.wfield;
     attrs.push(`wfield_type="${w.type}"`, `wfield_input="${w.input}"`, `wfield_color_intensity="${fmt(w.color)}"`, `wfield_var_amount_intensity="${fmt(w.varAmount)}"`,

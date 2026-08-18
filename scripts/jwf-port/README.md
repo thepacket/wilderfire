@@ -356,6 +356,11 @@ same sample density and depth distribution as JWildfire's.
   bilinear quadrants of size W/2−1 meeting at `cc`), spanning the full image so hi-res tiles agree; only 36 of the 864
   files carrying the attribute have non-uniform colours — an all-equal gradient imports as the single colour.
   `_solid7`/`_sh1` (the flame that was 0.74 for that reason) → 0.99, density variant 0.99.
+* **Colour types CYCLIC and DISTANCE** (`XForm.colorType`; `TransformationInitStep`/`TransformationDistanceColorStep`):
+  CYCLIC adds the transform's symmetry to the colour index (mod 1); DISTANCE keeps the index and plots the palette entry at
+  `color + |Δposition|·(symmetry+1)` (index `·254 + 0.5`, mod 256) — a plot colour that a following DIFFUSION/CYCLIC
+  gradient step replaces, unlike a direct-colour variation's (`rgbo.w` 0.5 vs 1). NONE stays "no recolouring". Verified
+  on 4 DISTANCE flames (three at 1.00–1.01; `rhodonea-2` differs for its own reasons) and one CYCLIC (1.00).
 * Verified: `inversion` flames `_pv1` 0.99, `_pv2` 1.12, `_pv3` 0.95, `_pv4nc` 0.97 (`_pv4` itself has `curliecue2`, a
   sequential-state variation); `mobius3D_with_inverse` `_pv5` 0.99, `_pv6` 1.09, `_pv7` 1.00; `pre_stabilize` flames are
   attractor scenes whose look depends on the long single trajectory (JWildfire's points diffuse for ~10 k steps

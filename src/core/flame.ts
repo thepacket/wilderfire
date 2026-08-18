@@ -124,6 +124,9 @@ export interface XForm {
    *  colour (m' = m·(1+speed)/2 + material·(1−speed)/2). Absent = 0 (the first material). */
   material?: number;
   materialSpeed?: number;
+  /** JWildfire colour type beyond DIFFUSION/NONE: CYCLIC = colour index += symmetry (mod 1); DISTANCE = the plotted colour is
+   *  the palette entry at color + |Δposition|·(symmetry+1) while the index stays. symmetry = 1 − 2·colorSpeed. */
+  colorType?: 'CYCLIC' | 'DISTANCE';
   opacity: number;     // 0..1 plot opacity
   variations: VarInstance[];
   /** Optional variation stages evaluated BEFORE the main sum (transforming the
@@ -289,7 +292,8 @@ export function flameSignature(f: Flame): string {
   return visibleLayers(f)
     .map((l) => l.xforms.map(sig).join('|') + '#' + [l.final, ...l.moreFinals].map((x) => (x ? sig(x) : '-')).join('#'))
     .join('@@') + (visibleLayers(f).some((l) => [...l.xforms, l.final, ...l.moreFinals].some((x) => x?.colorMods?.some((v) => v !== 0))) ? '~mods' : '')
-    + (f.solid?.enabled ? '~solid' : '') + (usesMaterials(f) ? '~mat' : '');
+    + (f.solid?.enabled ? '~solid' : '') + (usesMaterials(f) ? '~mat' : '')
+    + (visibleLayers(f).some((l) => [...l.xforms, l.final, ...l.moreFinals].some((x) => x?.colorType)) ? '~ctype' : '');
 }
 
 /** True when any transform carries a non-default material blend (the kernel then tracks a per-point material). */
@@ -346,6 +350,7 @@ function normXForm(x: any): XForm {
     opacity: clamp01(num(x?.opacity, 1)),
     variations: vars.length ? vars : d.variations,
   };
+  if (x?.colorType === 'CYCLIC' || x?.colorType === 'DISTANCE') out.colorType = x.colorType;
   if (num(x?.material, 0) !== 0) out.material = num(x.material, 0);
   if (num(x?.materialSpeed, 0) !== 0) out.materialSpeed = Math.min(1, Math.max(-1, num(x.materialSpeed, 0)));
   for (const k of ['yz', 'zx', 'yzPost', 'zxPost'] as const) {
