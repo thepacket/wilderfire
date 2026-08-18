@@ -1,4 +1,4 @@
-// A tiny complex-expression language for custom escape-time formulas (Ultra-Fractal style "z = …" lines),
+// A tiny complex-expression language for custom escape-time formulas ("z = …" lines),
 // compiled to WGSL. Everything is a complex number (vec2f); real functions of a complex argument return
 // (value, 0). Grammar (usual precedence, right-assoc ^):
 //   expr := term (('+'|'-') term)* ; term := unary (('*'|'/') unary)* ; unary := ('-'|'+') unary | pow

@@ -1,4 +1,4 @@
-// Escape-time fractal layer (Ultra-Fractal style): a per-pixel iteration z ← f(z, c) with a bailout,
+// Escape-time fractal layer: a per-pixel iteration z ← f(z, c) with a bailout,
 // coloured from the escape data through a gradient. Rendered by src/gpu/escapeRenderer.ts.
 
 import type { RGB } from './flame';

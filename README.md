@@ -87,8 +87,8 @@ in the stack.
   optional own background, and clipping to what is below; a plain flame is a
   one-layer composition, so every file and library entry keeps working. Hi-res
   export, PNG, video and the library thumbnail composite the stack the same way.
-- **Escape-time layers** (Composition → + Escape, Escape tab) — Ultra-Fractal-style
-  per-pixel fractals in the same stack as the flames: Mandelbrot z^p+c, Burning
+- **Escape-time layers** (Composition → + Escape, Escape tab) — per-pixel
+  fractals in the same stack as the flames: Mandelbrot z^p+c, Burning
   Ship, Tricorn, Celtic, Perpendicular, Lambda, Phoenix, Magnet, Newton, Nova and
   **custom formulas** (`z^3 + p1*z + c`, `sin(z) + c`, … — a small complex
   expression language compiled to WGSL), Mandelbrot or Julia mode, seed/constant,
