@@ -50,7 +50,7 @@ export function buildComposePanel(app: App, root: HTMLElement) {
       const pal = ly.kind === 'flame' ? ly.flame.layers[0]?.palette : ly.escape.palette;
       const mid = pal?.[128] ?? [0.5, 0.5, 0.5];
       sw.style.background = `rgb(${mid.map((v: number) => Math.round(v * 255)).join(',')})`;
-      const name = el('span', 'xname', (ly.kind === 'escape' ? '⌘ ' : '') + ly.name);
+      const name = el('span', 'xname', (ly.kind === 'escape' ? 'ƒ ' : '') + ly.name);
       name.title = ly.kind === 'escape' ? 'escape-time fractal layer (Escape tab)' : 'flame layer';
       const info = el('span', 'xinfo', `${ly.blend}${ly.opacity < 1 ? ` · ${Math.round(ly.opacity * 100)}%` : ''}${ly.clip ? ' · clip' : ''}`);
       item.append(vis, sw, name, info);
@@ -96,10 +96,8 @@ export function buildComposePanel(app: App, root: HTMLElement) {
       lab.title = title;
       return lab;
     };
-    flags.append(
-      mk('Own background', 'Draw this flame\'s background colour/gradient (opaque). Off: transparent where nothing is plotted, so the layers below show through', () => ly.ownBackground, (v) => { ly.ownBackground = v; }),
-      mk('Clip', 'Only draw where the layers below have already drawn (clipping mask)', () => ly.clip, (v) => { ly.clip = v; }),
-    );
+    if (ly.kind === 'flame') flags.append(mk('Own background', 'Draw this flame\'s background colour/gradient (opaque). Off: transparent where nothing is plotted, so the layers below show through', () => ly.ownBackground, (v) => { ly.ownBackground = v; }));
+    flags.append(mk('Clip', 'Only draw where the layers below have already drawn (clipping mask)', () => ly.clip, (v) => { ly.clip = v; }));
     const bgRow = el('div', 'row');
     bgRow.append(el('label', '', 'Backdrop'));
     const bgInp = el('input') as HTMLInputElement;
