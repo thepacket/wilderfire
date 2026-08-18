@@ -392,9 +392,13 @@ export class Composer {
     if (this._exporting) return;
     let activeStats: RenderStats | null = null;
     let anyPresented = false;
+    // an escape-time layer with an incomplete picture gets the frame's GPU time: the flames skip their accumulation
+    // passes (they only present) so a zoom/pan answers in the next frame instead of queueing behind ~15 ms of flame work
+    const escapeBusy = this.slots.some((s) => s.layer.visible && s.renderer instanceof EscapeRenderer && s.renderer.wantsGpu);
     this.slots.forEach((s, i) => {
       if (!s.layer.visible) return;
       s.renderer.presented = false;
+      if (escapeBusy && s.renderer instanceof FlameRenderer) s.renderer.holdOnce = true;
       const st = s.renderer.tick(t);
       if (s.renderer.presented) anyPresented = true;
       if (i === this.active) activeStats = st;

@@ -56,6 +56,8 @@ export class FlameRenderer {
   transparentBg = false;
   /** set after every present of the live view (the composer re-blends the layers when any of them changed) */
   presented = false;
+  /** (driven) skip this tick's accumulation — the composer hands the GPU to another layer for a frame */
+  holdOnce = false;
 
   private histBuf!: GPUBuffer;
   private ptsBuf!: GPUBuffer;
@@ -1148,7 +1150,8 @@ export class FlameRenderer {
     const os2 = this.oversample * this.oversample;
     const spp = this.samples / Math.max(w * h * os2, 1);
     const converged = spp >= this.targetQuality;
-    const accumulate = !this.paused && !converged;
+    const hold = this.holdOnce; this.holdOnce = false;
+    const accumulate = !this.paused && !converged && !hold;
 
     const dt = this.lastT ? (t - this.lastT) / 1000 : 0;
     this.lastT = t;

@@ -236,6 +236,18 @@ ${shade}
 
 const UNIFORM_FLOATS = 60; // 240 bytes
 
+// quick preview: a quarter-resolution pass blitted (bilinear) over the display before the full-resolution bands
+const BLIT_WGSL = `
+@group(0) @binding(0) var src: texture_2d<f32>;
+@group(0) @binding(1) var samp: sampler;
+struct VOut { @builtin(position) pos: vec4f, @location(0) uv: vec2f }
+@vertex fn vs(@builtin(vertex_index) vi: u32) -> VOut {
+  var p = array<vec2f, 3>(vec2f(-1.0, -1.0), vec2f(3.0, -1.0), vec2f(-1.0, 3.0));
+  var o: VOut; o.pos = vec4f(p[vi], 0.0, 1.0); o.uv = vec2f(p[vi].x * 0.5 + 0.5, 0.5 - p[vi].y * 0.5); return o;
+}
+@fragment fn fs(in: VOut) -> @location(0) vec4f { return textureSampleLevel(src, samp, in.uv, 0.0); }
+`;
+
 // While a new view renders band by band, the display shows the last complete picture warped into the new view
 // (scale/rotate/shift about the centre) — a zoom or pan never flashes; sharp bands then overwrite it top-down.
 const REPROJ_WGSL = `
@@ -271,6 +283,12 @@ export class EscapeRenderer {
   private reprojBuf: GPUBuffer;
   private reprojSampler: GPUSampler;
   private needsReproject = false;
+  private blitPipe: GPURenderPipeline;
+  private low: GPUTexture | null = null;      // quarter-resolution preview target
+  private uLow: GPUBuffer;
+  private bgLow: GPUBindGroup | null = null;
+  private lowPending = false;                  // a preview pass is due before the full-resolution bands
+  private lowDrawn = false;                    // …and was drawn this submission (blit it over the display)
   // GPU timestamps around a band (when the device has 'timestamp-query'): the only clean measure of the band's own cost
   private tsQuery: GPUQuerySet | null = null;
   private tsResolve: GPUBuffer | null = null;
@@ -318,6 +336,9 @@ export class EscapeRenderer {
     this.reprojPipe = device.createRenderPipeline({ layout: 'auto', vertex: { module: rm, entryPoint: 'vs' }, fragment: { module: rm, entryPoint: 'fs', targets: [{ format: 'rgba16float' }] }, primitive: { topology: 'triangle-list' } });
     this.reprojBuf = device.createBuffer({ size: 32, usage: GPUBufferUsage.UNIFORM | GPUBufferUsage.COPY_DST });
     this.reprojSampler = device.createSampler({ magFilter: 'linear', minFilter: 'linear' });
+    const bm = device.createShaderModule({ code: BLIT_WGSL });
+    this.blitPipe = device.createRenderPipeline({ layout: 'auto', vertex: { module: bm, entryPoint: 'vs' }, fragment: { module: bm, entryPoint: 'fs', targets: [{ format: 'rgba16float' }] }, primitive: { topology: 'triangle-list' } });
+    this.uLow = device.createBuffer({ size: UNIFORM_FLOATS * 4, usage: GPUBufferUsage.UNIFORM | GPUBufferUsage.COPY_DST });
     if (device.features.has('timestamp-query')) {
       this.tsQuery = device.createQuerySet({ type: 'timestamp', count: 2 });
       this.tsResolve = device.createBuffer({ size: 16, usage: GPUBufferUsage.QUERY_RESOLVE | GPUBufferUsage.COPY_SRC });
@@ -334,8 +355,9 @@ export class EscapeRenderer {
     if (this.tex && w === this.w && h === this.h) return;
     this.w = w; this.h = h;
     const mk = () => this.device.createTexture({ size: [w, h], format: 'rgba16float', usage: GPUTextureUsage.RENDER_ATTACHMENT | GPUTextureUsage.TEXTURE_BINDING | GPUTextureUsage.COPY_SRC | GPUTextureUsage.COPY_DST });
-    this.tex?.destroy(); this.back?.destroy(); this.front?.destroy();
+    this.tex?.destroy(); this.back?.destroy(); this.front?.destroy(); this.low?.destroy();
     this.tex = mk(); this.back = mk(); this.front = null; this.frontView = null;
+    this.low = this.device.createTexture({ size: [Math.max(1, w >> 1), Math.max(1, h >> 1)], format: 'rgba16float', usage: GPUTextureUsage.RENDER_ATTACHMENT | GPUTextureUsage.TEXTURE_BINDING });
     this.view = this.back.createView();
     this.nextRow = 0;
     this.needsReproject = true;
@@ -365,6 +387,7 @@ export class EscapeRenderer {
     const entries = (u: GPUBuffer) => [{ binding: 0, resource: { buffer: u } }, { binding: 1, resource: { buffer: this.palBuf } }, { binding: 2, resource: { buffer: this.refBuf } }];
     this.bg = this.device.createBindGroup({ layout: bgl, entries: entries(this.uBuf) });
     this.bgOff = this.device.createBindGroup({ layout: bgl, entries: entries(this.uOff) });
+    this.bgLow = this.device.createBindGroup({ layout: bgl, entries: entries(this.uLow) });
   }
 
   /** perturbation: the reference orbit (BigInt fixed point on the CPU). It is kept while the view stays within a
@@ -438,9 +461,12 @@ export class EscapeRenderer {
     for (let i = 0; i < 256; i++) { const c = e.palette[i] ?? [0, 0, 0]; pal.set([c[0], c[1], c[2], 1], i * 4); }
     this.device.queue.writeBuffer(this.palBuf, 0, pal);
     this.writeUniforms(this.uBuf, e, { x: 0, y: 0, w: this.w, h: this.h, fullW: this.w, fullH: this.h });
+    if (this.low) this.writeUniforms(this.uLow, e, { x: 0, y: 0, w: this.low.width, h: this.low.height, fullW: this.low.width, fullH: this.low.height });
     this.nextRow = 0;
     this.needsReproject = true;
-    if (sig !== this.lastSigForRows) { this.rows = 0; this.lastSigForRows = sig; }
+    // a full-resolution frame that would not fit one budget gets a quarter-resolution preview first
+    this.lowPending = this.msPerRow <= 0 || this.msPerRow * this.h > EscapeRenderer.BUDGET_MS * 0.6;
+    if (sig !== this.lastSigForRows) { this.msPerRow = 0; this.lastSigForRows = sig; } // a new shader: learn its cost afresh
   }
 
   /** Display update after bands were drawn into `back`: on the first band of a new render the old picture is warped
@@ -474,6 +500,13 @@ export class EscapeRenderer {
       }
       // (no previous picture: the display keeps whatever it shows until the bands arrive)
     }
+    if (this.lowDrawn) {
+      // the quarter-resolution preview replaces the warped old picture as soon as it exists
+      this.lowDrawn = false;
+      const bg = this.device.createBindGroup({ layout: this.blitPipe.getBindGroupLayout(0), entries: [{ binding: 0, resource: this.low!.createView() }, { binding: 1, resource: this.reprojSampler }] });
+      const pass = enc.beginRenderPass({ colorAttachments: [{ view: this.tex.createView(), loadOp: 'load', storeOp: 'store' }] });
+      pass.setPipeline(this.blitPipe); pass.setBindGroup(0, bg); pass.draw(3); pass.end();
+    }
     if (this.nextRow > 0) enc.copyTextureToTexture({ texture: this.back }, { texture: this.tex }, { width: this.w, height: this.nextRow });
     if (this.nextRow >= this.h) {
       // complete: remember it as the front picture for the next view change
@@ -501,57 +534,60 @@ export class EscapeRenderer {
     return true;
   }
 
-  // progressive budget: rows per band start from an iteration-count estimate and adapt to the measured GPU time of the
-  // last band (target ~12 ms), one band in flight at a time so the queue never backs up behind a heavy render
-  private rows = 0;
-  private rows0 = 0;
+  // Progressive budget. The goal is an "analog microscope": a change is answered by one full-frame render in the
+  // very next frame whenever the GPU can do it within `budgetMs`, and only truly heavy settings fall back to bands.
+  // The per-row GPU cost is learned from timestamp queries on the first band of each render; until it is known an
+  // iteration-count estimate stands in.
+  private msPerRow = 0;
   private bandInFlight = false;
   private lastSigForRows = '';
-  private rowsPerTick(): number {
+  private static readonly BUDGET_MS = 40;
+  /** true while the current picture is incomplete */
+  get dirty() { return !!this.data && this.nextRow < this.h; }
+  /** incomplete AND about to finish quickly (≲150 ms of GPU): the composer holds the flames' accumulation for those frames so
+   *  the picture answers at once; a really heavy render shares the GPU instead of freezing the flames for seconds */
+  get wantsGpu() { return this.dirty && (this.msPerRow <= 0 || (this.h - this.nextRow) * this.msPerRow < 150); }
+  private rowsForBudget(): number {
     const e = this.data!;
-    if (this.rows <= 0) {
-      const aa = e.antialias * e.antialias;
-      const cost = escapeTier(e) === 'perturb' ? 12 : escapeTier(e) === 'ds' ? 6 : 1; // relative per-iteration cost
-      this.rows = Math.max(Math.ceil(this.h / 24), Math.min(this.h, Math.round(4e8 / Math.max(1, this.w * e.maxIter * aa * cost))));
-      this.rows0 = this.rows;
-    }
-    return this.rows;
+    if (this.msPerRow > 0) return Math.max(8, Math.min(this.h, Math.floor(EscapeRenderer.BUDGET_MS / this.msPerRow)));
+    const aa = e.antialias * e.antialias;
+    const cost = escapeTier(e) === 'perturb' ? 12 : escapeTier(e) === 'ds' ? 6 : 1; // relative per-iteration cost
+    // ~1e9 f32 iterations per BUDGET_MS is a modest GPU; most pixels escape long before maxIter, so this is pessimistic
+    return Math.max(Math.ceil(this.h / 24), Math.min(this.h, Math.round(1e9 / Math.max(1, this.w * e.maxIter * aa * cost))));
   }
 
-  /** One live step: draw the next band while the picture is incomplete. */
+  /** One live step: render the whole picture if it fits the budget, else the next band(s). */
   tick(_t: number): RenderStats | null {
     if (this.exporting || !this.data || !this.pipe) return null;
-    if (this.nextRow < this.h && !this.bandInFlight) {
-      const rows = this.rowsPerTick();
+    if (this.nextRow < this.h) {
+      const rows = this.rowsForBudget();
       const enc = this.device.createCommandEncoder();
-      const timed = !!this.tsQuery && !!this.tsResolve && !!this.tsRead;
+      const timed = !this.bandInFlight && !!this.tsQuery && !!this.tsResolve && !!this.tsRead;
+      if (this.lowPending && this.low && this.bgLow) {
+        // quarter-resolution pass over the whole picture (a quarter of the full cost) — shown at once, refined by the bands
+        this.lowPending = false;
+        const pass = enc.beginRenderPass({ colorAttachments: [{ view: this.low.createView(), loadOp: 'clear', clearValue: { r: 0, g: 0, b: 0, a: 0 }, storeOp: 'store' }] });
+        pass.setPipeline(this.pipe); pass.setBindGroup(0, this.bgLow); pass.draw(3); pass.end();
+        this.lowDrawn = true;
+      }
+      const rowsBefore = this.nextRow;
       this.encodeBands(enc, rows, timed);
+      const rowsDone = this.nextRow - rowsBefore;
       this.encodeDisplay(enc);
       if (timed) { enc.resolveQuerySet(this.tsQuery!, 0, 2, this.tsResolve!, 0); enc.copyBufferToBuffer(this.tsResolve!, 0, this.tsRead!, 0, 16); }
       this.device.queue.submit([enc.finish()]);
       this.presented = true;
-      this.bandInFlight = true;
-      const target = 10; // ms of GPU time per band
       if (timed) {
+        this.bandInFlight = true;
         this.tsRead!.mapAsync(GPUMapMode.READ).then(() => {
           const t = new BigUint64Array(this.tsRead!.getMappedRange());
           const ms = Number(t[1] - t[0]) / 1e6;
           this.tsRead!.unmap();
           this.bandInFlight = false;
-          if (ms > 0 && isFinite(ms)) {
-            // aim at the target with a damped step; the measure is this band's own GPU time, other layers excluded
-            const f = Math.max(0.25, Math.min(3, target / ms));
-            this.rows = Math.max(2, Math.min(this.h, Math.round(this.rows * (0.5 + 0.5 * f))));
+          if (ms > 0 && isFinite(ms) && rowsDone > 0) {
+            const per = ms / rowsDone;
+            this.msPerRow = this.msPerRow > 0 ? this.msPerRow * 0.5 + per * 0.5 : per;
           }
-        }, () => { this.bandInFlight = false; });
-      } else {
-        // no timestamps: the estimate stands (never shrink on queue completion, which includes the flames' work),
-        // grow only when the whole queue was clearly idle
-        const t0 = performance.now();
-        this.device.queue.onSubmittedWorkDone().then(() => {
-          const ms = performance.now() - t0;
-          this.bandInFlight = false;
-          if (ms < 8) this.rows = Math.min(this.h, Math.round(this.rows * 1.6));
         }, () => { this.bandInFlight = false; });
       }
     }
@@ -606,6 +642,7 @@ export class EscapeRenderer {
 
   destroy() {
     this.tex?.destroy(); this.tex = null;
+    this.low?.destroy(); this.low = null;
     this.tsQuery?.destroy(); this.tsResolve?.destroy(); this.tsRead?.destroy();
     this.back?.destroy(); this.back = null;
     this.front?.destroy(); this.front = null;
