@@ -334,10 +334,10 @@ export function buildRenderPanel(app: App, root: HTMLElement) {
   xmlBtn.onclick = () =>
     saveText(flameToXML(app.flame, { curves: app.getCurves() }), { suggestedName: `${baseName()}.flame`, description: 'Flame XML', mime: 'application/xml', ext: '.flame' });
   const loadBtn = el('button', '', '⬆ Load');
-  loadBtn.title = 'Load a WilderFire JSON or a .flame XML (flam3 / Apophysis / JWildfire) — a pack file with several flames opens a chooser';
+  loadBtn.title = 'Load a WilderFire JSON, a .flame XML (flam3 / Apophysis / JWildfire) or a .zip of flames — several flames open a chooser';
   const fileInp = el('input') as HTMLInputElement;
   fileInp.type = 'file';
-  fileInp.accept = '.json,.flame,.xml,application/json,application/xml,text/xml';
+  fileInp.accept = '.json,.flame,.flames,.xml,.zip,application/json,application/xml,text/xml,application/zip';
   fileInp.style.display = 'none';
   fileInp.onchange = async () => {
     const f = fileInp.files?.[0];

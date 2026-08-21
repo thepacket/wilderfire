@@ -52,10 +52,43 @@ export function openPackChooser(app: App, flames: Flame[], unknown: string[], au
   if (autoAdd) addBtn.click(); // dropping a pack goes straight to the library
 }
 
-/** Load a .flame / .json file: one flame into the editor, a pack into the chooser.
+/** Every flame inside a .zip (flame packs are distributed zipped): each .flame/.flames entry is
+ *  parsed, unnamed flames are named after their entry, and the lot is returned as one pack. */
+async function flamesFromZip(app: App, file: File): Promise<{ flames: Flame[]; unknown: string[]; skipped: number }> {
+  const { readZip } = await import('../core/zip');
+  const entries = readZip(await file.arrayBuffer()).filter((e) => /\.flames?$/i.test(e.name));
+  if (!entries.length) throw new Error('no .flame files inside this zip');
+  const flames: Flame[] = [];
+  const unknown = new Set<string>();
+  let skipped = 0;
+  for (const e of entries) {
+    try {
+      const r = importFlameText(await e.text(), app.activeLayer.palette);
+      const base = e.name.replace(/^.*\//, '').replace(/\.[^.]+$/, '');
+      r.flames.forEach((fl, i) => { if (!fl.name || fl.name === 'imported') fl.name = r.flames.length > 1 ? `${base} ${i + 1}` : base; });
+      flames.push(...r.flames);
+      for (const u of r.unknown) unknown.add(u);
+    } catch (err) {
+      skipped++;
+      console.warn(`zip entry ${e.name}: ${(err as Error).message}`);
+    }
+  }
+  if (!flames.length) throw new Error(`none of the ${entries.length} .flame entries could be read`);
+  return { flames, unknown: [...unknown], skipped };
+}
+
+/** Load a .flame / .json / .zip file: one flame into the editor, a pack into the chooser.
  *  `autoAdd` starts a pack's library import right away (drag-and-drop). */
 export async function importFlameFile(app: App, file: File, autoAdd = false): Promise<void> {
   try {
+    if (/\.zip$/i.test(file.name) || file.type === 'application/zip') {
+      const { flames, unknown, skipped } = await flamesFromZip(app, file);
+      if (skipped) console.info(`${skipped} entr${skipped === 1 ? 'y' : 'ies'} in ${file.name} could not be read (see warnings above).`);
+      if (flames.length === 1) { app.setFlame(flames[0]); await noteUnknown(unknown); return; }
+      openPackChooser(app, flames, unknown, autoAdd);
+      return;
+    }
+    if (/\.(rar|7z)$/i.test(file.name)) throw new Error(`${file.name}: only .zip archives can be opened in the browser — unpack it first`);
     const text = await file.text();
     // A whole-library export dropped by mistake — merge it instead of failing on the outer object.
     if (/^\s*\{/.test(text) && text.includes('"wilderfireLibrary"')) {

@@ -135,8 +135,8 @@ in the stack.
   timeline persist across reloads; a thumbnail library on IndexedDB (no
   practical size limit; an older localStorage library migrates itself) with
   whole-library JSON export/import for backups and moving between browsers.
-  **Drag a `.flame` onto the canvas** to load it (a pack dropped this way
-  goes straight into the library).
+  **Drag a `.flame` or a `.zip` onto the canvas** to load it (a pack dropped
+  this way goes straight into the library; zips are unpacked in the browser).
   Loading a **flame pack** (a JWildfire `.flame` file holding many flames)
   opens a chooser: load one, or add them all to the library at once — each
   entry gets a thumbnail rendered on the spot
