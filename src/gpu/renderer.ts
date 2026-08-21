@@ -677,7 +677,12 @@ export class FlameRenderer {
     // JWildfire RenderColor pre-scales palette entries by 200/256, then divides by whiteLevel
     tf32[18] = (255 * 200 / 256) / Math.max(f.whiteLevel ?? 220, 1);
     tf32[19] = f.lowDensityBrightness ?? 0.24;
-    tf32[4] = f.brightness; tf32[5] = f.gamma; tf32[6] = f.vibrancy;
+    // Post symmetry plots N copies of every point; JWildfire compensates by dividing the
+    // brightness constant k1 by the copy count (LogScaleCalculator's constructor: POINT → /order,
+    // X/Y_AXIS → /2 — note /order even though order+1 points are plotted). The glow term (bg_glow,
+    // built from k2) is deliberately NOT divided, matching JWildfire.
+    const symDiv = f.postSymmetry ? (f.postSymmetry.type === 'POINT' ? Math.max(1, f.postSymmetry.order) : 2) : 1;
+    tf32[4] = f.brightness / symDiv; tf32[5] = f.gamma; tf32[6] = f.vibrancy;
     tf32[7] = Math.max(spp, 1e-6);
     {
       // JWildfire: estimatorRadius = de_radius · 9 · pixelsPerUnitScale (capped 18)
@@ -975,7 +980,9 @@ export class FlameRenderer {
     const need = (solid ? 1 : cells) * HIST_CELL_BYTES;
     if (!this.offHist || this.offHistSize < need) {
       this.offHist?.destroy();
-      this.offHist = d.createBuffer({ size: need, usage: GPUBufferUsage.STORAGE | GPUBufferUsage.COPY_DST });
+      // COPY_SRC: dev readbacks of the raw raster (renderCheck-style numeric debugging) — without it a
+      // copyBufferToBuffer readback silently returns zeros (same trap as the solid buffers, 2026-08-18)
+      this.offHist = d.createBuffer({ size: need, usage: GPUBufferUsage.STORAGE | GPUBufferUsage.COPY_DST | GPUBufferUsage.COPY_SRC });
       this.offHistSize = need;
       this.bgBExport = null; // the filter pass binds this buffer (adaptive kernel selection)
     }

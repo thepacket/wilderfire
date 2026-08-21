@@ -223,7 +223,7 @@ Over 5623 flames from ~150 community packs:
 | `bg_transparency` | 32% | `Flame.bgTransparency`; presets the PNG export's alpha checkbox |
 | `oversample` | 24% | `Flame.oversample`, applied to the renderer when a flame loads |
 | `saturation` | 23% | HSL saturation shift of (value − 1) on the finished pixel, **after** the background is composited in (`GammaCorrectionFilter.applyModSaturation`); clamped at −1 |
-| `post_symmetry_*` | 11% | plotted points are duplicated in the kernel (`symApply`): X/Y axis mirror about the centre at half `distance`, with the two copies counter-rotated by `rotation`; POINT plots the original plus `order` rotated copies — JWildfire's own i = 0 copy repeats the original, so the centre is plotted twice and we match that. **Open defect — see below** |
+| `post_symmetry_*` | 11% | plotted points are duplicated in the kernel (`symApply`): X/Y axis mirror about the centre at half `distance`, with the two copies counter-rotated by `rotation`; POINT plots the original plus `order` rotated copies — JWildfire's own i = 0 copy repeats the original, so the centre is plotted twice and we match that. **The tonemap divides k1 by the copy count** (see below) |
 | `filter_kernel="MITCHELL_SINEPOW"` | 6% | adaptive filtering: per pixel, SINEPOW10 at 1.5×(filter + 0.25) where the density is below `filter_low_density`, SINEPOW10 at 1× where the Scharr edge response is below `filter_sharpness`, else Mitchell-smooth at 0.75× |
 | `fg_opacity` | 4% | scales **alpha only** by 1 − atan(3·(v − 1))/1.25; the colour keeps its unscaled log-scale factor, so the background composites in more or less |
 
@@ -239,16 +239,20 @@ blkMAE 4.7 / corr 0.98:
 | `_cmp_psymX` / `_cmp_psymY` | 1.17 | 23.7 | 0.66 | 0.94 | **too bright** |
 | `_cmp_psymP` (order 3) | 1.29 | 42.4 | 0.42 | 0.97 | **too bright** |
 
-**Open defect: post symmetry renders too bright**, by ~16% with two copies and ~29% with four.
-What has been ruled out: the geometry (a pure mirror, `_cmp_psym0` — distance 0, rotation 0 —
-still shows ratio 1.16 at corr 0.97 with matching coverage, so the copies land where JWildfire
-puts them); our sample accounting (luma is 160.6 at 150, 300 and 600 spp — already spp-invariant);
-and JWildfire compensating in its budget (`nSamples = quality · rasterSize / oversample`, no
-symmetry term, and `currSample = iter` counts iterations, not plotted points, so its density
-doubles exactly as ours does). Both engines plot two points per iteration and normalise by
-iterations, yet a density doubling brightens JWildfire by ~10 luma and us by ~34. The remaining
-suspect is how the density change interacts with the DE gather, which matches on the control.
-Whoever picks this up: start by comparing raw raster counts rather than tonemapped luma.
+**Post-symmetry brightness — root-caused and FIXED (2026-08-21, the raster-count experiment).**
+The raw-raster probe (`scratchpad/diff/RasterProbe.java`, reflection into `FlameRenderer.raster`
+→ `rawCount`; our side reads `offHist` back — it now carries COPY_SRC for exactly this) showed
+both engines double their plot counts *exactly* (JW 14.34M → 28.67M, ours ratio 2.000), yet
+JWildfire's luma rose only +7% while ours rose +28% — so the divergence was in the tonemap's
+response, not the plotting. The cause sits in plain sight in `LogScaleCalculator`'s constructor:
+**k1 is divided by the symmetry copy count** (POINT → `/order`, X/Y_AXIS → `/2` — note `/order`
+even though order+1 points are plotted). In the log curve's linear regime the doubled density and
+the halved k1 cancel, leaving only the redistribution gain. The `bg_glow` term is built from k2
+and is deliberately NOT divided. Fix: `writeUniforms` divides the brightness uniform (k1's only
+input; both its shader consumers — `logScaled` and `adaptSelect`'s intensity — want the divided
+value). After the fix: `_cmp_psym0/X/Y/P` at ratio 0.98–0.99 (control 0.97), psymP blkMAE
+42.4 → 2.1, hist ∩ 0.42 → 0.98. Tracked fixtures `Psym_0` (POINT order 3 off-centre) and
+`Psym_1` (X_AXIS + rotation) are in the render baseline (97 flames).
 
 Findings worth keeping: `filter_type` (GLOBAL_SHARPENING / GLOBAL_SMOOTHING / ADAPTIVE, on 51%
 of flames) does **not** change the render — at render time it only drives a debug overlay gated on

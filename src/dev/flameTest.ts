@@ -23,6 +23,7 @@ export const FIXTURES = [
   // JWildfire solid rendering (z-buffer + lights/materials): two materials, a per-xform material index, coloured lights, filter on/off
   'Solid_0', 'Solid_1', 'Solid_2', 'Solid_3', // Solid_2 = Solid_0 with ambient occlusion, Solid_3 = + smooth shadow maps from both lights
   'Solid_4', // obj_mesh_primitive_wf: torus + subdivided ball + flat box, two materials, AO, fast shadows
+  'Psym_0', 'Psym_1', // post symmetry: POINT order 3 off-centre; X_AXIS with distance + rotation (k1 divided by the copy count, LogScaleCalculator)
   'Sub_0', // subflame_wf (JWildfire's default sub-flame, colour mode 0, scale/angle/offset/colorscale_z) + a forced-post julian (enforced-priority preserve-z) + post_crop final (pre/post preserve-z)
 ];
 
