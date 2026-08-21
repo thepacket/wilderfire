@@ -79,6 +79,10 @@ export interface SolidRender {
   ao: { enabled: boolean; intensity: number; searchRadius: number; blurRadius: number; radiusSamples: number; azimuthSamples: number; falloff: number; affectDiffuse: number };
   /** shadow maps per light */
   shadows: { type: 'OFF' | 'FAST' | 'SMOOTH'; smoothRadius: number; mapSize: number; bias: number };
+  /** Post-process DOF (JWildfire PostDOFCalculator, runs when the flame is solid and cam_dof > 0):
+   *  every tonemapped pixel scatters as a kernel disc of radius |dofDist|·10 px; rare bright pixels
+   *  become enlarged, brightened glints — the post_bokeh_* attributes shape those. */
+  postBokeh: { filterKernel: string; intensity: number; brightness: number; size: number; activation: number };
 }
 
 export function defaultSolidLight(i = 0): SolidLight {
@@ -97,6 +101,8 @@ export function defaultSolidRender(enabled = false): SolidRender {
     materials: [defaultSolidMaterial()],
     ao: { enabled: true, intensity: 0.6, searchRadius: 4, blurRadius: 1.5, radiusSamples: 6, azimuthSamples: 7, falloff: 0.5, affectDiffuse: 0.1 },
     shadows: { type: 'OFF', smoothRadius: 1, mapSize: 2048, bias: 0.01 },
+    // JWildfire SolidRenderSettings.setupDefaultPostBokehOptions
+    postBokeh: { filterKernel: 'SINEPOW15', intensity: 0.005, brightness: 1, size: 2, activation: 0.2 },
   };
 }
 
@@ -567,6 +573,13 @@ export function normSolid(s: any): SolidRender {
     shadows: {
       type: sh.type === 'FAST' || sh.type === 'SMOOTH' ? sh.type : 'OFF', smoothRadius: Math.max(0, num(sh.smoothRadius, d.shadows.smoothRadius)),
       mapSize: Math.max(64, Math.round(num(sh.mapSize, d.shadows.mapSize))), bias: num(sh.bias, d.shadows.bias),
+    },
+    postBokeh: {
+      filterKernel: typeof s?.postBokeh?.filterKernel === 'string' ? s.postBokeh.filterKernel : d.postBokeh.filterKernel,
+      intensity: Math.max(0, num(s?.postBokeh?.intensity, d.postBokeh.intensity)),
+      brightness: Math.max(0, num(s?.postBokeh?.brightness, d.postBokeh.brightness)),
+      size: Math.max(0, num(s?.postBokeh?.size, d.postBokeh.size)),
+      activation: Math.max(0, num(s?.postBokeh?.activation, d.postBokeh.activation)),
     },
   };
 }

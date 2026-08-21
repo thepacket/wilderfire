@@ -553,6 +553,13 @@ export function parseFlameXML(text: string, fallbackPalette: RGB[]): Flame[] {
           shadowIntensity: numOr(`sld_render_light_shadow_intensity${i}`, 0.8),
         }));
       }
+      // Post-bokeh (JWildfire PostDOFCalculator — solid post-process DOF's glint shaping; flame-level attrs)
+      const bk = (fe.getAttribute('post_bokeh_filter_kernel') ?? '').toUpperCase();
+      if (bk) s.postBokeh.filterKernel = bk;
+      s.postBokeh.intensity = Math.max(0, numOr('post_bokeh_intensity', s.postBokeh.intensity));
+      s.postBokeh.brightness = Math.max(0, numOr('post_bokeh_brightness', s.postBokeh.brightness));
+      s.postBokeh.size = Math.max(0, numOr('post_bokeh_size', s.postBokeh.size));
+      s.postBokeh.activation = Math.max(0, numOr('post_bokeh_activation', s.postBokeh.activation));
       f.solid = s;
     }
     // Motion curves (only the first flame's curves are surfaced)
@@ -798,6 +805,13 @@ function solidAttrs(f: Flame): string {
     `sld_render_light_red${i}="${fmt(l.color[0])}"`, `sld_render_light_green${i}="${fmt(l.color[1])}"`, `sld_render_light_blue${i}="${fmt(l.color[2])}"`,
     `sld_render_light_shadows${i}="${l.castShadows ? 1 : 0}"`,
   ));
+  a.push(
+    `post_bokeh_filter_kernel="${s.postBokeh.filterKernel}"`,
+    `post_bokeh_intensity="${fmt(s.postBokeh.intensity)}"`,
+    `post_bokeh_brightness="${fmt(s.postBokeh.brightness)}"`,
+    `post_bokeh_size="${fmt(s.postBokeh.size)}"`,
+    `post_bokeh_activation="${fmt(s.postBokeh.activation)}"`,
+  );
   return ' ' + a.join(' ');
 }
 

@@ -562,8 +562,10 @@ ${symN > 1 ? `    // post symmetry: plot this point once per symmetry copy (shad
       }
       var px = cx;
       var py = cy;
-      // depth of field (bubble shape): random disc offset ∝ distance from focus
-      if (P.dof.x != 0.0) {
+      // depth of field (bubble shape): random disc offset ∝ distance from focus.
+      // Solid flames skip the jitter entirely — JWildfire's view calls applyOnlyCamera and defers
+      // the blur to the post-process DOF pass (PostDOFCalculator), which we run after the tonemap.
+      if (${solid ? 'false' : 'P.dof.x != 0.0'}) {
         var dist = 0.0;
         if (P.dof.w > 0.5) {
           let fx_ = cx - P.focus.x; let fy_ = cy - P.focus.y; let fz_ = cz - P.focus.z;

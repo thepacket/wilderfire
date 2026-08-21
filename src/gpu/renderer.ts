@@ -5,8 +5,8 @@
 import type { Flame } from '../core/flame';
 import { flameSignature, visibleLayers, MAX_LAYERS, LIGHT_DIFF_FUNCS } from '../core/flame';
 import { compileFlame, TONEMAP_WGSL, type CompiledFlame } from './codegen';
-import { buildSpatialFilters, solidFilterWeights, gaussianFilter1D, normFilterKernel, FILT_FLOATS, type FilterKernel } from './filters';
-import { SOLID_POST_WGSL, SOLID_TONEMAP_WGSL, SOLID_AO_WGSL, SOLID_SHADOW_WGSL, SOLID_PAY_WORDS, SOLID_MAX_LIGHTS, SOLID_MAX_MATS, SOLID_FILT_FLOATS } from './solid.wgsl';
+import { buildSpatialFilters, solidFilterWeights, gaussianFilter1D, normFilterKernel, kernelCoeff, kernelSupport, FILT_FLOATS, type FilterKernel } from './filters';
+import { SOLID_POST_WGSL, SOLID_TONEMAP_WGSL, SOLID_AO_WGSL, SOLID_SHADOW_WGSL, SOLID_PDOF_WGSL, SOLID_PDOF_BLIT_WGSL, SOLID_PAY_WORDS, SOLID_MAX_LIGHTS, SOLID_MAX_MATS, SOLID_FILT_FLOATS } from './solid.wgsl';
 import { flameMeshKeys, ensureMesh, meshSampler, meshLayout } from '../core/meshes';
 
 const XD_FLOATS = 8192;
@@ -78,6 +78,19 @@ export class FlameRenderer {
   private solidPipe!: GPURenderPipeline;        // → canvas format
   private solidExportPipe!: GPURenderPipeline; // → rgba8
   private solidTmLayout!: GPUBindGroupLayout;
+  // Post-process DOF for solid flames (PostDOFCalculator): scatter compute pass + present blit
+  private solidMidPipe: GPURenderPipeline | null = null; // solid tonemap into midTex (rgba16float)
+  private pdofPipe!: GPUComputePipeline;
+  private pdofBlitLive: GPURenderPipeline | null = null;
+  private pdofBlitExport: GPURenderPipeline | null = null;
+  private pdofBlitModule!: GPUShaderModule;
+  private solidModule!: GPUShaderModule;
+  private solidLayout!: GPUPipelineLayout;
+  private pdofUni!: GPUBuffer;
+  private pdofLut!: GPUBuffer;
+  private pdofLutKey = '';
+  private pdofAcc: GPUBuffer | null = null;
+  private pdofAccSize = 0;
   private sppBuf!: GPUBuffer;       // post-pass params
   private spBuf!: GPUBuffer;        // solid tonemap params
   private lightsBuf!: GPUBuffer;    // lights + materials
@@ -252,6 +265,13 @@ export class FlameRenderer {
       primitive: { topology: 'triangle-list' },
     });
 
+    this.solidModule = solidModule;
+    this.solidLayout = solidLayout;
+    this.pdofPipe = d.createComputePipeline({ layout: 'auto', compute: { module: d.createShaderModule({ code: SOLID_PDOF_WGSL }), entryPoint: 'scatter' } });
+    this.pdofBlitModule = d.createShaderModule({ code: SOLID_PDOF_BLIT_WGSL });
+    this.pdofUni = d.createBuffer({ size: 176, usage: GPUBufferUsage.UNIFORM | GPUBufferUsage.COPY_DST });
+    this.pdofLut = d.createBuffer({ size: 256 * 4, usage: GPUBufferUsage.STORAGE | GPUBufferUsage.COPY_DST });
+
     const tmModule = d.createShaderModule({ code: TONEMAP_WGSL });
     this.tmModule = tmModule;
     // Two-pass tonemap: A (DE + log scale) → rgba16float, B (filter + gamma) → target
@@ -287,6 +307,8 @@ export class FlameRenderer {
 
   /** The current flame renders solid (JWildfire z-buffer shading instead of density). */
   get solid(): boolean { return !!this.compiled?.solid; }
+  /** JWildfire runs PostDOFCalculator when the flame is solid and cam_dof > 0 (plot-time jitter is skipped). */
+  private get pdofOn(): boolean { return this.solid && ((this.flame?.camDOF ?? 0) > 1e-9); }
   private get cellBytes(): number { return this.solid ? SOLID_CELL_BYTES : HIST_CELL_BYTES; }
 
   private makeSolidBufs(cells: number): SolidBufs {
@@ -707,7 +729,7 @@ export class FlameRenderer {
     tf32[47] = f.filterSharpness ?? 4;
     this.device.queue.writeBuffer(this.tmBuf, 0, tu32);
 
-    if (this.solid) this.writeSolidUniforms(f, w, h, os, transparent, [m02, m12, m22], ppu, Math.hypot(fullW, fullH), bgWords);
+    if (this.solid) this.writeSolidUniforms(f, w, h, os, transparent, [m00, m10, m20, m01, m11, m21, m02, m12, m22], ppu, Math.hypot(fullW, fullH), bgWords);
   }
 
   /** Solid rendering: post-pass params, tonemap params, lights/materials, raster-cell filter kernel. */
@@ -719,13 +741,43 @@ export class FlameRenderer {
     return [...c(g?.ul), kind, ...c(g?.ur), 0, ...c(g?.ll), 0, ...c(g?.lr), 0, ...c(g?.cc), 0, tileX, tileY, fullW, fullH];
   }
 
-  private writeSolidUniforms(f: Flame, rasterW: number, rasterH: number, os: number, transparent: boolean, m2: number[], ppu: number, imgSize: number, bgWords: number[]) {
+  private writeSolidUniforms(f: Flame, rasterW: number, rasterH: number, os: number, transparent: boolean, cam: number[], ppu: number, imgSize: number, bgWords: number[]) {
     const s = f.solid!;
+    const m2 = cam.slice(6, 9);
     const q = new Uint32Array(8);
     const qf = new Float32Array(q.buffer);
     q[0] = rasterW; q[1] = rasterH; qf[2] = ppu;
     qf.set([m2[0], m2[1], m2[2], f.camPosZ], 4);
     this.device.queue.writeBuffer(this.sppBuf, 0, q);
+
+    // Post-process DOF (PostDOFCalculator): scatter-pass uniforms + the bokeh kernel LUT
+    if (this.pdofOn) {
+      const pb = s.postBokeh ?? { filterKernel: 'SINEPOW15', intensity: 0.005, brightness: 1, size: 2, activation: 0.2 };
+      const kern = normFilterKernel(pb.filterKernel);
+      const support = kernelSupport(kern);
+      if (this.pdofLutKey !== kern) {
+        this.pdofLutKey = kern;
+        const lut = new Float32Array(256);
+        // JWildfire evaluates getFilterCoeff far beyond the support (glint discs shrink r by
+        // plainRadius/radius), and skips non-positive coefficients — bake that into the LUT
+        for (let i = 0; i < 256; i++) lut[i] = Math.max(0, kernelCoeff(kern, (i / 255) * support * 8));
+        this.device.queue.writeBuffer(this.pdofLut, 0, lut);
+      }
+      const u = new Uint32Array(44);
+      const uf = new Float32Array(u.buffer);
+      u[0] = rasterW / os; u[1] = rasterH / os; u[2] = os; u[3] = 0x9e3779b9; // stable seed: glints must not flicker in the live preview
+      uf.set([cam[0], cam[1], cam[2], f.camPosX], 4);
+      uf.set([cam[3], cam[4], cam[5], f.camPosY], 8);
+      uf.set([cam[6], cam[7], cam[8], f.camPosZ], 12);
+      const area = f.camDOFArea ?? 0.5;
+      uf.set([f.newDOF ? 1 : 0, area, f.camDOFExponent ?? 2, f.camZ ?? 0], 16);
+      uf.set([f.focusX ?? 0, f.focusY ?? 0, f.focusZ ?? 0, area / 2.25], 20);
+      uf.set([pb.intensity * 1000 / Math.max(imgSize, 1), pb.brightness, pb.size, pb.activation], 24);
+      uf.set([support, support * 8, 256, Math.max(1, Math.floor(imgSize))], 28);
+      // RasterFloatIntForSolidRendering: dofDist = |dist| · cam_dof · diagonal / 1000
+      uf[32] = (f.camDOF ?? 0) * imgSize / 1000;
+      this.device.queue.writeBuffer(this.pdofUni, 0, u);
+    }
 
     // AOCalculator params (Tools.limitValue ranges); radii scale with the raster diagonal / 500
     this.aoOn = !!s.ao.enabled;
@@ -901,11 +953,79 @@ export class FlameRenderer {
       }
     }
     cp.end();
-    const rp = enc.beginRenderPass({ colorAttachments: [{ view: target, loadOp: 'clear', clearValue: clear, storeOp: 'store' }] });
-    rp.setPipeline(pipe);
+    if (!this.pdofOn) {
+      const rp = enc.beginRenderPass({ colorAttachments: [{ view: target, loadOp: 'clear', clearValue: clear, storeOp: 'store' }] });
+      rp.setPipeline(pipe);
+      rp.setBindGroup(0, bg.tm);
+      rp.draw(3);
+      rp.end();
+      return;
+    }
+    // Post-process DOF (PostDOFCalculator): tonemap into midTex, scatter every pixel as a bokeh
+    // disc into a fixed-point buffer, then blit the buffer to the target.
+    const d = this.device;
+    const exportFmt = pipe === this.solidExportPipe;
+    const outW = exportFmt ? rasterW : this.width, outH = exportFmt ? rasterH : this.height;
+    this.ensureMid(outW, outH);
+    if (!this.solidMidPipe) {
+      this.solidMidPipe = d.createRenderPipeline({
+        layout: this.solidLayout,
+        vertex: { module: this.solidModule, entryPoint: 'vs' },
+        fragment: { module: this.solidModule, entryPoint: 'fs', targets: [{ format: 'rgba16float' }] },
+        primitive: { topology: 'triangle-list' },
+      });
+    }
+    const rp = enc.beginRenderPass({ colorAttachments: [{ view: this.midTex!.createView(), loadOp: 'clear', clearValue: clear, storeOp: 'store' }] });
+    rp.setPipeline(this.solidMidPipe);
     rp.setBindGroup(0, bg.tm);
     rp.draw(3);
     rp.end();
+    const need = outW * outH * 16;
+    if (!this.pdofAcc || this.pdofAccSize < need) {
+      this.pdofAcc?.destroy();
+      this.pdofAcc = d.createBuffer({ size: need, usage: GPUBufferUsage.STORAGE | GPUBufferUsage.COPY_DST });
+      this.pdofAccSize = need;
+    }
+    enc.clearBuffer(this.pdofAcc);
+    const scatterBG = d.createBindGroup({
+      layout: this.pdofPipe.getBindGroupLayout(0),
+      entries: [
+        { binding: 0, resource: { buffer: this.pdofUni } },
+        { binding: 1, resource: { buffer: bufs.key } },
+        { binding: 2, resource: { buffer: bufs.pay } },
+        { binding: 3, resource: this.midTex!.createView() },
+        { binding: 4, resource: { buffer: this.pdofLut } },
+        { binding: 5, resource: { buffer: this.pdofAcc } },
+      ],
+    });
+    const sp = enc.beginComputePass();
+    sp.setPipeline(this.pdofPipe);
+    sp.setBindGroup(0, scatterBG);
+    sp.dispatchWorkgroups(Math.ceil(outW / 16), Math.ceil(outH / 16));
+    sp.end();
+    let blit = exportFmt ? this.pdofBlitExport : this.pdofBlitLive;
+    if (!blit) {
+      blit = d.createRenderPipeline({
+        layout: 'auto',
+        vertex: { module: this.pdofBlitModule, entryPoint: 'vs' },
+        fragment: { module: this.pdofBlitModule, entryPoint: 'fs', targets: [{ format: exportFmt ? 'rgba8unorm' : this.format }] },
+        primitive: { topology: 'triangle-list' },
+      });
+      if (exportFmt) this.pdofBlitExport = blit; else this.pdofBlitLive = blit;
+    }
+    const blitBG = d.createBindGroup({
+      layout: blit.getBindGroupLayout(0),
+      entries: [
+        { binding: 0, resource: { buffer: this.pdofUni } }, // PB reads only width/height — PD's first words
+        { binding: 1, resource: { buffer: this.pdofAcc } },
+        { binding: 2, resource: this.midTex!.createView() },
+      ],
+    });
+    const bp = enc.beginRenderPass({ colorAttachments: [{ view: target, loadOp: 'clear', clearValue: clear, storeOp: 'store' }] });
+    bp.setPipeline(blit);
+    bp.setBindGroup(0, blitBG);
+    bp.draw(3);
+    bp.end();
   }
 
   /** Upload the JWildfire spatial-filter kernels for the flame's settings; returns [Ncolour, Nintensity]. */

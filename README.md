@@ -59,6 +59,9 @@ in the stack.
   camera (pitch / yaw / bank, perspective, position, `preserve_z`),
   **depth of field** (focus point or focus plane, area, fade) and
   **dimish-z** depth fade; all of it round-trips through `.flame`
+- **Solid post-process DOF + bokeh** — solid flames with `cam_dof` blur exactly like
+  JWildfire (sharp z-buffer, then `PostDOFCalculator`'s disc scatter over the finished
+  image, with `post_bokeh_*` glints), instead of plot-time jitter
 - **JWildfire colour and compositing stage** — flame-level `saturation` (an HSL shift
   applied after the background composites in), `fg_opacity` (alpha only), transparent
   background, per-file `oversample`, **post symmetry** (X/Y mirror or rotational copies

@@ -616,3 +616,177 @@ fn smoothPass(@builtin(global_invocation_id) gid: vec3u) {
   }
 }
 `;
+
+/** JWildfire post-process DOF for solid flames (PostDOFCalculator / PostDOFBuffer, ported literally).
+ *  Runs after the solid tonemap when cam_dof > 0: every tonemapped pixel is scattered as a disc of
+ *  radius |dofDist|·10 px with the bokeh kernel's falloff (r scaled by support/plainRadius, weights
+ *  normalised to 1 — energy preserving). With probability bokehIntensity·1000/imgSize a pixel whose
+ *  luma ≥ activation becomes a glint: colour × rnd(0.2..0.4)·radius²·brightness, radius × size·(1+rnd·size).
+ *  dofDist is recomputed from the z-buffer's stored world position with the same formula the view uses
+ *  (FlameRendererView: solid flames get applyOnlyCamera — no plot-time jitter; the blur happens here). */
+export const SOLID_PDOF_WGSL = `
+struct PD {
+  width: u32,
+  height: u32,
+  os: u32,
+  seed: u32,
+  cam0: vec4f,   // camera row 0, w = camPos.x
+  cam1: vec4f,   // camera row 1, w = camPos.y
+  cam2: vec4f,   // camera row 2, w = camPos.z
+  dof: vec4f,    // x: newDOF flag, y: area, z: exponent, w: camZ (legacy)
+  focus: vec4f,  // xyz: focus point, w: fade = area / 2.25
+  bok: vec4f,    // x: glint probability (intensity·1000/imgSize), y: brightness, z: size, w: activation
+  kern: vec4f,   // x: kernel spatial support, y: LUT domain max, z: LUT size, w: max steps (imgSize)
+  scl: vec4f,    // x: dofAmount = cam_dof · image diagonal / 1000 (RasterFloatIntForSolidRendering.calcDOF)
+};
+@group(0) @binding(0) var<uniform> D: PD;
+@group(0) @binding(1) var<storage, read> zkey2: array<u32>;
+@group(0) @binding(2) var<storage, read> zpay2: array<u32>;
+@group(0) @binding(3) var srcTex: texture_2d<f32>;
+@group(0) @binding(4) var<storage, read> klut: array<f32>;
+@group(0) @binding(5) var<storage, read_write> acc: array<atomic<u32>>; // r, g, b ×1024 + 1 pad per pixel
+
+fn pdRnd(state: ptr<function, u32>) -> f32 {
+  var x = *state;
+  x ^= x << 13u; x ^= x >> 17u; x ^= x << 5u;
+  *state = x;
+  return f32(x) * 2.3283064365386963e-10;
+}
+
+// Tools.FTOI: round half away from zero (truncation differences only matter off-raster)
+fn ftoi(v: f32) -> f32 { return select(floor(v + 0.5), -floor(-v + 0.5), v < 0.0); }
+
+fn kernAt(r: f32) -> f32 {
+  if (r >= D.kern.y) { return 0.0; }
+  let t = r / D.kern.y * (D.kern.z - 1.0);
+  let i = u32(t);
+  return mix(klut[i], klut[min(i + 1u, u32(D.kern.z) - 1u)], t - floor(t));
+}
+
+// FlameRendererView's dofDist for the winning surface point of this cell (0 = sharp)
+fn dofDistAt(x: u32, y: u32) -> f32 {
+  let cell = (y * D.os) * (D.width * D.os) + x * D.os;
+  if (zkey2[cell] == 0u) { return 0.0; }
+  let b = cell * ${SOLID_PAY_WORDS}u;
+  let p = vec3f(bitcast<f32>(zpay2[b]), bitcast<f32>(zpay2[b + 1u]), bitcast<f32>(zpay2[b + 2u]));
+  let cxp = dot(D.cam0.xyz, p) + D.cam0.w;
+  let cyp = dot(D.cam1.xyz, p) + D.cam1.w;
+  let czp = dot(D.cam2.xyz, p) + D.cam2.w;
+  if (D.dof.x < 0.5) {
+    // legacy DOF: distance in front of camZ
+    return max(D.dof.w - czp, 0.0) * D.scl.x;
+  }
+  let dx = cxp - D.focus.x; let dy = cyp - D.focus.y; let dz = czp - D.focus.z;
+  let dist = pow(dx * dx + dy * dy + dz * dz, 1.0 / D.dof.z);
+  let area = D.dof.y; let fade = D.focus.w; let amf = area - fade;
+  // the raster scales the stored distance by dofAmount before anyone reads it (calcDOF)
+  if (dist > area) { return dist * D.scl.x; }
+  if (dist > amf) {
+    let u = clamp((dist - amf) / fade, 0.0, 1.0);
+    return u * u * u * (u * (u * 6.0 - 15.0) + 10.0) * dist * D.scl.x;
+  }
+  return 0.0;
+}
+
+// PostDOFCalculator's radius-dependent step table (×0.5)
+fn stepFor(radius: f32) -> f32 {
+  var s = 1.0;
+  if (radius < 2.0) { s = 0.0625; }
+  else if (radius < 3.0) { s = 0.125; }
+  else if (radius < 4.0) { s = 0.25; }
+  else if (radius < 5.0) { s = 0.375; }
+  else if (radius < 6.0) { s = 0.5; }
+  else if (radius < 7.0) { s = 0.625; }
+  else if (radius < 8.0) { s = 0.75; }
+  else if (radius < 9.0) { s = 0.875; }
+  s = s * 0.5;
+  if (radius / s > D.kern.w) { s = radius / D.kern.w; }
+  return s;
+}
+
+fn splat(x: i32, y: i32, c: vec3f, w: f32) {
+  if (x < 0 || y < 0 || x >= i32(D.width) || y >= i32(D.height)) { return; }
+  let i = (u32(y) * D.width + u32(x)) * 4u;
+  atomicAdd(&acc[i], u32(c.r * w * 1024.0 + 0.5));
+  atomicAdd(&acc[i + 1u], u32(c.g * w * 1024.0 + 0.5));
+  atomicAdd(&acc[i + 2u], u32(c.b * w * 1024.0 + 0.5));
+}
+
+@compute @workgroup_size(16, 16)
+fn scatter(@builtin(global_invocation_id) gid: vec3u) {
+  let x = gid.x; let y = gid.y;
+  if (x >= D.width || y >= D.height) { return; }
+  // clamp like the rgba8 path: JWildfire's addSample receives the finished 0..255 ints,
+  // while our rgba16float mid texture can hold highlights above 1.0
+  var c = floor(clamp(textureLoad(srcTex, vec2u(x, y), 0).rgb, vec3f(0.0), vec3f(1.0)) * 255.0 + 0.5);
+  if (c.r <= 0.0 && c.g <= 0.0 && c.b <= 0.0) { return; }
+  let plainRadius = abs(dofDistAt(x, y)) * 10.0;
+  var radius = ftoi(plainRadius);
+  if (radius < 2.0) { radius = 2.0; }
+  var rs = (x * 1973u + y * 9277u + D.seed * 26699u) | 1u;
+  rs ^= rs >> 15u; rs *= 0x2c1b3c6du; rs ^= rs >> 12u;
+  // glint: rare bright pixels become enlarged, brightened discs (JWildfire's bokeh)
+  let luma = c.r * 0.2990 / 255.0 + c.g * 0.5880 / 255.0 + c.b * 0.1130 / 255.0;
+  if (pdRnd(&rs) > 1.0 - D.bok.x && luma >= D.bok.w) {
+    let intensity = (pdRnd(&rs) + 1.0) / 5.0;
+    c = floor(c * intensity * radius * radius * D.bok.y + 0.5);
+    radius = radius * D.bok.z * (1.0 + pdRnd(&rs) * D.bok.z);
+  } else {
+    radius = radius * (1.0 + (0.5 - pdRnd(&rs)) * 0.1);
+  }
+  if (plainRadius < 1e-6) {
+    // scaledInvRadius → ∞: only the centre sample survives (JWildfire's empty-list fallback)
+    splat(i32(x), i32(y), c, 1.0);
+    return;
+  }
+  let sir = 1.0 / plainRadius * D.kern.x;
+  let stepSize = stepFor(radius);
+  // pass 1: the weight sum (JWildfire normalises each disc to 1 — energy preserving)
+  var wsum = 0.0;
+  for (var i = -radius; i < radius + 1e-9; i += stepSize) {
+    let i2 = (i * sir) * (i * sir);
+    if (i2 >= D.kern.y * D.kern.y) { continue; } // kernel is 0 out here — skip the row
+    for (var j = -radius; j < radius + 1e-9; j += stepSize) {
+      let w = kernAt(sqrt(i2 + (j * sir) * (j * sir)));
+      if (w > 1e-9) { wsum += w; }
+    }
+  }
+  if (wsum <= 0.0) {
+    splat(i32(x), i32(y), c, 1.0);
+    return;
+  }
+  // pass 2: scatter
+  for (var i = -radius; i < radius + 1e-9; i += stepSize) {
+    let i2 = (i * sir) * (i * sir);
+    if (i2 >= D.kern.y * D.kern.y) { continue; }
+    let dstX = i32(ftoi(f32(x) + i));
+    for (var j = -radius; j < radius + 1e-9; j += stepSize) {
+      let w = kernAt(sqrt(i2 + (j * sir) * (j * sir)));
+      if (w > 1e-9) { splat(dstX, i32(ftoi(f32(y) + j)), c, w / wsum); }
+    }
+  }
+}
+`;
+
+/** Present the scattered buffer (alpha comes from the tonemapped source). */
+export const SOLID_PDOF_BLIT_WGSL = `
+struct PB { width: u32, height: u32, pad0: u32, pad1: u32 };
+@group(0) @binding(0) var<uniform> B: PB;
+@group(0) @binding(1) var<storage, read> acc: array<u32>;
+@group(0) @binding(2) var srcTex: texture_2d<f32>;
+
+@vertex
+fn vs(@builtin(vertex_index) vi: u32) -> @builtin(position) vec4f {
+  var pos = array<vec2f, 3>(vec2f(-1.0, -3.0), vec2f(3.0, 1.0), vec2f(-1.0, 1.0));
+  return vec4f(pos[vi], 0.0, 1.0);
+}
+
+@fragment
+fn fs(@builtin(position) fragPos: vec4f) -> @location(0) vec4f {
+  let x = u32(fragPos.x); let y = u32(fragPos.y);
+  if (x >= B.width || y >= B.height) { return vec4f(0.0); }
+  let i = (y * B.width + x) * 4u;
+  let rgb = clamp(vec3f(f32(acc[i]), f32(acc[i + 1u]), f32(acc[i + 2u])) / (1024.0 * 255.0), vec3f(0.0), vec3f(1.0));
+  return vec4f(rgb, textureLoad(srcTex, vec2u(x, y), 0).a);
+}
+`;

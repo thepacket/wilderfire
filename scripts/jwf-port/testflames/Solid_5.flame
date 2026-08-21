@@ -1,0 +1,39 @@
+<flame cam_dof="0.5" cam_dof_area="0.3" new_dof="1" post_bokeh_intensity="0.02" post_bokeh_brightness="1.5" name="Solid_0" version="WilderFire 0.1" size="512 512" center="0.0 0.0" scale="120" rotate="0" cam_pitch="0.7" cam_yaw="0.35" cam_persp="0.1" preserve_z="1" filter="0.5" filter_kernel="GAUSSIAN" antialias_amount="0" antialias_radius="0" quality="200" brightness="4" gamma="4" gamma_threshold="0.01" vibrancy="1" background="0.05 0.05 0.08" sld_render_enabled="1" sld_render_ao_enabled="0" sld_render_shadow_type="OFF" sld_render_material_count="2" sld_render_material_diffuse0="0.7" sld_render_material_ambient0="0.5" sld_render_material_phong0="0.6" sld_render_material_phong_size0="24.0" sld_render_material_phong_red0="1.0" sld_render_material_phong_green0="1.0" sld_render_material_phong_blue0="1.0" sld_render_material_light_diif_func0="COSA" sld_render_material_diffuse1="0.4" sld_render_material_ambient1="0.9" sld_render_material_phong1="1.2" sld_render_material_phong_size1="8.0" sld_render_material_phong_red1="1.0" sld_render_material_phong_green1="0.8" sld_render_material_phong_blue1="0.5" sld_render_material_light_diif_func1="COSA_HALVE" sld_render_ligtht_count="2" sld_render_light_altitude0="55.0" sld_render_light_azimuth0="-22.0" sld_render_light_intensity0="0.8" sld_render_light_red0="1.0" sld_render_light_green0="1.0" sld_render_light_blue0="1.0" sld_render_light_shadows0="1" sld_render_light_altitude1="-30.0" sld_render_light_azimuth1="120.0" sld_render_light_intensity1="0.6" sld_render_light_red1="0.6" sld_render_light_green1="0.8" sld_render_light_blue1="1.0" sld_render_light_shadows1="0">
+  <xform weight="1.0" color="0.1" color_speed="0.5" julia3D="1.0" julia3D_power="4" coefs="1.0 0.0 0.0 1.0 0.0 0.0"/>
+  <xform weight="0.6" color="0.6" color_speed="0.5" material="1.0" spherical3D="0.6" linear3D="0.35" coefs="0.8 0.3 -0.3 0.8 0.4 -0.2"/>
+  <xform weight="0.4" color="0.9" color_speed="0.5" bubble="0.8" zscale="0.4" coefs="0.7 0.0 0.0 0.7 -0.5 0.3"/>
+  <palette count="256" format="RGB">
+7FED1082EB0E85EA0D88E80C8CE60A8FE40992E20895E007
+98DE069BDC059EDA04A1D803A4D602A7D302AAD101ADCE01
+B0CC00B3C900B6C700B9C400BBC200BEBF00C1BC00C3B900
+C6B700C9B400CBB101CEAE01D0AB01D3A802D5A503D7A203
+D99F04DC9C05DE9906E09607E29308E4900AE68C0BE7890C
+E9860DEB830FED8010EE7D12F07A14F17715F27317F47019
+F56D1BF66A1DF7671FF86421F96123FA5E26FB5B28FC582A
+FC552CFD522FFD4F31FE4C34FE4936FE4639FE443CFE413E
+FE3E41FE3B44FE3947FE3649FE344CFD314FFD2F52FC2C55
+FC2A58FB285BFA255EFA2361F92164F81F67F71D6AF61B6E
+F41971F31774F21577F0147AEF127DED1080EC0F83EA0D87
+E80C8AE70B8DE50990E30893E10796DF0699DD059CDB049F
+D803A2D603A5D402A8D101ABCF01AECD00B1CA00B4C800B7
+C500BAC200BCC000BFBD00C2BA00C5B700C7B400CAB200CC
+AF01CFAC01D1A902D3A603D6A303D8A004DA9D05DC9A06DF
+9707E19408E39009E58D0AE68A0CE8870DEA840FEC8110ED
+7E12EF7A13F07715F27417F37119F46E1BF56B1CF7681FF8
+6521F96223FA5F25FA5C27FB5929FC562CFC532EFD5031FD
+4D33FE4A36FE4738FE443BFE423EFE3F40FE3C43FE3946FE
+3749FE344CFE324EFD2F51FD2D54FC2A57FC285AFB265DFA
+2460F92163F81F66F71D6AF61B6DF51970F41873F31676F1
+1479F0127CEE117FED0F83EB0E86EA0C89E80B8CE60A8FE4
+0892E20795E00698DE059BDC049FDA04A2D803A5D502A8D3
+02ABD001ADCE01B0CC00B3C900B6C600B9C400BCC100BEBE
+00C1BC00C4B900C6B600C9B300CCB001CEAD01D0AB02D3A8
+02D5A503D7A204DA9F05DC9B06DE9807E09508E29209E48F
+0AE68C0BE8890DE9860EEB8310ED7F11EE7C13F07915F176
+16F37318F4701AF56D1CF66A1EF76720F86322F96024FA5D
+27FB5A29FC572BFC542EFD5130FD4E33FE4C35FE4938FE46
+3AFE433DFE4040FE3E42FE3B45FE3848FE364BFE334EFD31
+51FD2E54FC2C56FC2959FB275CFA2560FA2363F92166F81F
+69F71D6CF51B6FF41972F31775F21578F0137BEF127FED10
+  </palette>
+</flame>

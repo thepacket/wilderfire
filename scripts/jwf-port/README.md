@@ -210,6 +210,30 @@ walks whose JWildfire points drift out of view over millions of steps while
 our short trajectories stay near the origin); **the other 38 match**
 (`Bokeh_1` closest at 0.80 / corr 0.84 — a three-layer flame).
 
+### Solid rendering — stage 5: post-process DOF + bokeh (2026-08-21)
+
+JWildfire never jitters solid plots: `FlameRendererView` calls `applyOnlyCamera` and defers the whole
+blur to `PostDOFCalculator`, a scatter pass over the finished tonemapped image. Ported as
+`SOLID_PDOF_WGSL` (+ blit): when the flame is solid and `cam_dof > 0`, the solid tonemap renders into
+the rgba16float mid texture (**clamped to 0..1 before scattering — JWildfire's addSample sees finished
+0..255 ints, not HDR**), then a compute pass scatters every pixel as a kernel-weighted disc into a
+fixed-point buffer (energy-normalised per disc, like PostDOFBuffer.addSamples), and a blit presents it.
+`dofDist` is recomputed per pixel from the z-buffer's stored world position with the view's own formula —
+**scaled by `cam_dof · image-diagonal / 1000`** (`RasterFloatIntForSolidRendering.calcDOF`'s `dofAmount`;
+missing this made discs world-sized: blur far too wide and glints ~6× too strong). Glints
+(`post_bokeh_*`, now on `SolidRender.postBokeh`): probability `intensity·1000/diagonal` per pixel with
+luma ≥ activation, colour × rnd(0.2..0.4)·radius²·brightness, radius × size·(1+rnd·size); the disc's
+kernel argument keeps the *pre-glint* `support/plainRadius` scale, and SINEPOW15 dies at r ≈ 0.9, so the
+LUT (256 samples over 8·support, negatives clamped like JWildfire's `> EPSILON` skip) covers it. The
+scatter's rnd is seeded per pixel with a fixed constant so live-preview glints don't flicker.
+**Compare verdict:** `_pdof0/1/2` (Solid_0 + DOF; glints off / default / ×10) all at **ratio 1.00,
+blkMAE ≤ 0.7, corr 1.00**; real flame `_pdofS` 0.99/0.98. (`_pdofR` corr 0.14 is a separate
+dc_carpet3D-flame divergence, `_pdofT` uses unported `sattractor3D` — neither is post-DOF.)
+Survey correction: `post_bokeh_*` only ever fires with solid + `cam_dof > 0` — 0 flames in the
+community corpus, 19 in the user's own collection; the "2 %" was JWildfire writing its default 0.005.
+Tracked fixture `Solid_5` (baseline 98). Leftover from the solid plan now: reflection maps,
+`receiveOnlyShadows`, light motion curves, `_sh8`/`_mesh10` geometry deviations.
+
 ### Attributes the importer used to drop (2026-08-21)
 
 A flame can import without a single reported error and still render differently, because
