@@ -102,11 +102,36 @@ export function buildLibrary(app: App, anim: AnimAPI) {
     };
     tools.append(expBtn, impBtn, impFile);
     if (!entries.length) {
-      body.append(el('div', 'hint', 'Empty — use 💾 Save to keep the current flame here. Stored in your browser (IndexedDB).'), tools);
+      body.append(tools, el('div', 'hint', 'Empty — use 💾 Save to keep the current flame here, or drop .flame / .zip files on the canvas. Stored in your browser (IndexedDB).'));
       return;
     }
     const grid = el('div', 'lib-grid');
-    for (const e of entries) {
+    const items: HTMLElement[] = [];
+    let sel = -1;
+    const select = (i: number, scroll = true) => {
+      if (!items.length) return;
+      i = Math.max(0, Math.min(items.length - 1, i));
+      items[sel]?.classList.remove('sel');
+      sel = i;
+      items[sel].classList.add('sel');
+      if (scroll) items[sel].scrollIntoView({ block: 'nearest' });
+    };
+    const load = (i: number) => {
+      const e = entries[i];
+      if (!e) return;
+      app.setFlame(normalizeFlame(e.flame, app.activeLayer.palette));
+      close();
+    };
+    const remove = (i: number) => {
+      const e = entries[i];
+      if (!e) return;
+      libDelete(e.id).then(() => {
+        items[i].remove(); items.splice(i, 1); entries.splice(i, 1);
+        hint.textContent = `${entries.length} flame${entries.length === 1 ? '' : 's'}`;
+        if (items.length) select(Math.min(i, items.length - 1)); else sel = -1;
+      }).catch((err) => alert('Delete failed: ' + (err as Error).message));
+    };
+    entries.forEach((e, i) => {
       const item = el('div', 'lib-item');
       const img = el('img') as HTMLImageElement;
       if (e.thumb) img.src = e.thumb;
@@ -116,19 +141,48 @@ export function buildLibrary(app: App, anim: AnimAPI) {
         el('div', 'lib-name', e.name),
         el('div', 'lib-date', new Date(e.date).toLocaleString()),
       );
+      meta.title = e.name; // the full name, where the grid has to truncate it
       const del = el('button', 'lib-del danger', '✕');
-      del.onclick = (ev) => {
-        ev.stopPropagation();
-        libDelete(e.id).then(() => item.remove()).catch((err) => alert('Delete failed: ' + (err as Error).message));
-      };
+      del.onclick = (ev) => { ev.stopPropagation(); remove(items.indexOf(item)); };
       item.append(img, meta, del);
-      item.onclick = () => {
-        app.setFlame(normalizeFlame(e.flame, app.activeLayer.palette));
-        close();
-      };
+      item.onclick = () => load(items.indexOf(item));
+      item.onmouseenter = () => select(items.indexOf(item), false);
+      items.push(item);
       grid.append(item);
-    }
-    body.append(el('div', 'hint', `${entries.length} flame${entries.length > 1 ? 's' : ''}`), grid, tools);
+    });
+    const hint = el('div', 'hint', `${entries.length} flame${entries.length > 1 ? 's' : ''} — arrow keys / Page Up / Page Down move, Enter loads, Delete removes, Esc closes`);
+    body.append(tools, hint, grid);
+    // Keyboard navigation: the grid is a wrapping flex of fixed-width cards, so a row is
+    // however many fit across the body; Page Up/Down jump by the rows the viewport shows.
+    body.tabIndex = 0;
+    const columns = () => {
+      if (items.length < 2) return 1;
+      const y0 = items[0].offsetTop;
+      let n = 1;
+      while (n < items.length && items[n].offsetTop === y0) n++;
+      return n;
+    };
+    const pageRows = () => Math.max(1, Math.floor(body.clientHeight / (items[0].offsetHeight + 10)));
+    body.addEventListener('keydown', (ev) => {
+      const cols = columns();
+      const cur = sel < 0 ? 0 : sel;
+      switch (ev.key) {
+        case 'ArrowRight': select(cur + 1); break;
+        case 'ArrowLeft': select(cur - 1); break;
+        case 'ArrowDown': select(sel < 0 ? 0 : cur + cols); break;
+        case 'ArrowUp': select(cur - cols); break;
+        case 'PageDown': select(cur + cols * pageRows()); break;
+        case 'PageUp': select(cur - cols * pageRows()); break;
+        case 'Home': select(0); break;
+        case 'End': select(items.length - 1); break;
+        case 'Enter': if (sel >= 0) load(sel); break;
+        case 'Delete': case 'Backspace': if (sel >= 0) remove(sel); break;
+        case 'Escape': close(); break;
+        default: return;
+      }
+      ev.preventDefault();
+    });
+    body.focus();
   }
 
   // ---------- Autosave ----------

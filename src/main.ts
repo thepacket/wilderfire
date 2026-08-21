@@ -165,8 +165,20 @@ async function boot() {
       <a href="https://github.com/thepacket/wilderfire/blob/main/NOTICE.md" target="_blank" rel="noopener">NOTICE.md</a>.</p>`;
   };
 
-  const spacer = el('div', 'spacer');
-  header.append(logo, presetSel, randBtn, mutBtn, undoBtn, redoBtn, spacer, saveBtn, libBtn, triBtn, themeBtn, aboutBtn);
+  // The loaded flame's name, in full, where there is room for it; editing it renames the flame.
+  const nameInp = el('input', 'flame-name') as HTMLInputElement;
+  nameInp.type = 'text';
+  nameInp.placeholder = 'untitled';
+  nameInp.spellcheck = false;
+  nameInp.title = 'Name of the loaded flame — click to rename';
+  const showName = () => {
+    nameInp.value = app.flame.name ?? '';
+    nameInp.title = (app.flame.name || 'untitled') + ' — click to rename';
+    document.title = (app.flame.name ? app.flame.name + ' — ' : '') + 'WilderFire';
+  };
+  nameInp.addEventListener('change', () => { app.flame.name = nameInp.value.trim(); app.commitTone('name'); showName(); });
+  nameInp.addEventListener('keydown', (e) => { if (e.key === 'Enter' || e.key === 'Escape') { if (e.key === 'Escape') showName(); nameInp.blur(); } });
+  header.append(logo, presetSel, randBtn, mutBtn, undoBtn, redoBtn, nameInp, saveBtn, libBtn, triBtn, themeBtn, aboutBtn);
 
   // ---------- Layout ----------
   const main = el('div', 'main');
@@ -301,6 +313,10 @@ async function boot() {
   new ResizeObserver(fit).observe(wrap);
   fit();
   app.setFlame(app.flame);
+
+  app.on('flame', showName);
+  app.on('tone', (src) => { if (src !== 'name') showName(); });
+  showName();
 
   // Drag a .flame / .json onto the canvas: one flame is loaded, a pack goes into the library.
   (await import('./ui/flameImport')).enableFlameDrop(app, wrap);

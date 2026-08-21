@@ -302,10 +302,24 @@ a { color: var(--accent2); }
 }
 .stop-marker.selected { border-color: var(--accent); }
 
-::-webkit-scrollbar { width: 9px; height: 9px; }
-::-webkit-scrollbar-thumb { background: var(--bg3); border-radius: 5px; }
-::-webkit-scrollbar-thumb:hover { background: var(--border); }
+/* Scrollbars: a thumb that actually reads against the panels (the old one was --bg3 on --bg2,
+   a 3 % luminance step). Same colour for Firefox through scrollbar-color. */
+* { scrollbar-width: thin; scrollbar-color: color-mix(in srgb, var(--fg-dim) 55%, transparent) transparent; }
+::-webkit-scrollbar { width: 11px; height: 11px; }
+::-webkit-scrollbar-thumb { background: color-mix(in srgb, var(--fg-dim) 55%, transparent); border-radius: 6px; border: 2px solid transparent; background-clip: padding-box; }
+::-webkit-scrollbar-thumb:hover { background: color-mix(in srgb, var(--fg-dim) 85%, transparent); background-clip: padding-box; }
 ::-webkit-scrollbar-track { background: transparent; }
+/* Library keyboard selection */
+.lib-item.sel { border-color: var(--accent); box-shadow: 0 0 0 2px color-mix(in srgb, var(--accent) 45%, transparent); }
+.modal-body:focus { outline: none; }
+/* The loaded flame's full name, editable, fills the header's free space */
+.header .flame-name {
+  flex: 1; min-width: 80px; height: 30px; padding: 0 10px;
+  background: transparent; border: 1px solid transparent; border-radius: 6px;
+  color: var(--fg); font: inherit; font-weight: 600; text-overflow: ellipsis;
+}
+.header .flame-name:hover { border-color: var(--border); }
+.header .flame-name:focus { border-color: var(--accent); background: var(--bg3); outline: none; text-overflow: clip; }
 
 /* ---- variation picker ---- */
 .vpick-btn {
