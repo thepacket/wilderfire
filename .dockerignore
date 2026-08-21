@@ -4,3 +4,6 @@ dist
 .claude
 *.md
 .DS_Store
+compare-out
+scripts
+tests
