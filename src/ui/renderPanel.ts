@@ -1,7 +1,8 @@
 // Right panel — Render tab: camera, tonemap, quality, export.
 import { App, el, slider } from './common';
 import { flameToJSON } from '../core/flame';
-import { flameToXML, importFlameText } from '../core/flameXML';
+import { flameToXML } from '../core/flameXML';
+import { importFlameFile } from './flameImport';
 import { pickSave, saveBlob, saveText } from './saveFile';
 import { renderHiRes, resolveSize, SIZE_OPTIONS, QUALITY_OPTIONS } from './hiresExport';
 import { openBatchExport } from './batchExport';
@@ -152,7 +153,25 @@ export function buildRenderPanel(app: App, root: HTMLElement) {
     app.commitTone(SRC);
   });
   bgRow.append(bgInp);
-  tone.append(brS.root, gaS.root, gtS.root, viS.root, ctS.root, wlS.root, sfS.root, fkRow, bgRow);
+  const satS = slider({
+    label: 'Saturation', min: 0, max: 2, step: 0.01, value: app.flame.saturation ?? 1,
+    onInput: (v) => { app.flame.saturation = v; app.commitTone(SRC); },
+  });
+  satS.root.title = 'JWildfire saturation: shifts the finished pixel by (value − 1) in HSL. 1 = unchanged, 0 = greyscale';
+  const fgS = slider({
+    label: 'Foreground', min: 0, max: 2, step: 0.01, value: app.flame.fgOpacity ?? 1,
+    onInput: (v) => { app.flame.fgOpacity = v; app.commitTone(SRC); },
+  });
+  fgS.root.title = 'JWildfire foreground opacity: scales the alpha only, so the background shows through more (below 1) or less (above 1)';
+  const btRow = el('div', 'row');
+  btRow.append(el('label', '', 'Transparent bg'));
+  const btChk = el('input') as HTMLInputElement;
+  btChk.type = 'checkbox';
+  btChk.checked = app.flame.bgTransparency ?? false;
+  btChk.title = 'JWildfire bg_transparency: saved PNGs keep the background transparent (the preview always shows it)';
+  btChk.onchange = () => { app.flame.bgTransparency = btChk.checked; alphaChk.checked = btChk.checked; app.commitTone(SRC); };
+  btRow.append(btChk);
+  tone.append(brS.root, gaS.root, gtS.root, viS.root, satS.root, fgS.root, ctS.root, wlS.root, sfS.root, fkRow, bgRow, btRow);
 
   const perf = el('div', 'section');
   perf.append(el('h3', '', 'Engine'));
@@ -315,34 +334,14 @@ export function buildRenderPanel(app: App, root: HTMLElement) {
   xmlBtn.onclick = () =>
     saveText(flameToXML(app.flame, { curves: app.getCurves() }), { suggestedName: `${baseName()}.flame`, description: 'Flame XML', mime: 'application/xml', ext: '.flame' });
   const loadBtn = el('button', '', '⬆ Load');
-  loadBtn.title = 'Load a WilderFire JSON or a .flame XML (flam3 / Apophysis compatible)';
+  loadBtn.title = 'Load a WilderFire JSON or a .flame XML (flam3 / Apophysis / JWildfire) — a pack file with several flames opens a chooser';
   const fileInp = el('input') as HTMLInputElement;
   fileInp.type = 'file';
   fileInp.accept = '.json,.flame,.xml,application/json,application/xml,text/xml';
   fileInp.style.display = 'none';
   fileInp.onchange = async () => {
     const f = fileInp.files?.[0];
-    if (!f) return;
-    try {
-      const { flame, count, unknown, curves } = importFlameText(await f.text(), app.activeLayer.palette);
-      app.setFlame(flame);
-      if (curves.length) {
-        app.setCurves(curves);
-        console.info(`Loaded ${curves.length} motion curve${curves.length > 1 ? 's' : ''} from the file (Anim tab).`);
-      }
-      if (count > 1) {
-        console.info(`File contained ${count} flames — loaded the first ("${flame.name}").`);
-      }
-      if (unknown.length) {
-        // deliberately unported JWildfire variations carry a reason (src/core/variations.unportable.ts)
-        const { UNPORTABLE } = await import('../core/variations.unportable');
-        const lines = unknown.map((n) => (UNPORTABLE[n] ? `${n} — ${UNPORTABLE[n]}` : n));
-        console.warn(`Unsupported variations skipped: ${unknown.join(', ')}`);
-        alert(`Loaded, but ${unknown.length} variation${unknown.length > 1 ? 's are' : ' is'} not supported and ${unknown.length > 1 ? 'were' : 'was'} skipped:\n${lines.join('\n')}`);
-      }
-    } catch (e) {
-      alert('Could not import flame: ' + (e as Error).message);
-    }
+    if (f) await importFlameFile(app, f);
     fileInp.value = '';
   };
   loadBtn.onclick = () => fileInp.click();
@@ -425,6 +424,11 @@ export function buildRenderPanel(app: App, root: HTMLElement) {
     viS.set(app.flame.vibrancy);
     ctS.set(app.flame.contrast ?? 1); wlS.set(app.flame.whiteLevel ?? 220); sfS.set(app.flame.filterRadius ?? 0); fkSel.value = normFilterKernel(app.flame.filterKernel);
     deS.set(app.flame.deRadius ?? 1); deCurveS.set(app.flame.deCurve ?? 0.8);
+    satS.set(app.flame.saturation ?? 1); fgS.set(app.flame.fgOpacity ?? 1);
+    btChk.checked = alphaChk.checked = app.flame.bgTransparency ?? false;
+    // A loaded flame carries JWildfire's own oversampling; apply it (the select still overrides).
+    const wantOs = app.flame.oversample ?? 1;
+    if (wantOs !== app.renderer.oversample) osSel.value = String(app.renderer.setOversample(wantOs));
     bgInp.value = toHex(app.flame.background);
   });
 }

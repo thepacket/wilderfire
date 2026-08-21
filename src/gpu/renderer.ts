@@ -348,6 +348,7 @@ export class FlameRenderer {
       size,
       usage: GPUBufferUsage.STORAGE | GPUBufferUsage.COPY_DST | GPUBufferUsage.COPY_SRC,
     });
+    this.bgB = null; // the filter pass binds the histogram (adaptive kernel selection)
     this.destroySolidBufs(this.solidLive);
     this.solidLive = this.solid ? this.makeSolidBufs(cells) : null;
     if (this.solidLive) this.ensureShadowBufs(this.solidLive, this.shadowCasters(), this.shadowMapSize());
@@ -658,11 +659,17 @@ export class FlameRenderer {
     pf32.set([this.solid ? 0 : f.antialiasAmount ?? 0.25, this.solid ? 0 : f.antialiasRadius ?? 0.5, 0, 0], 48);
     this.device.queue.writeBuffer(this.paramsBuf, 0, pu32);
 
-    const tu32 = new Uint32Array(48);
+    const tu32 = new Uint32Array(52);
     const tf32 = new Float32Array(tu32.buffer);
     tu32[0] = tile ? tile.tileW : this.width; // output pixels; hist rows are width×os
     tu32[1] = tile ? tile.tileH : this.height;
-    { const [nc, ni] = this.uploadFilters(f.filterRadius ?? 0, normFilterKernel(f.filterKernel)); tu32[2] = nc; tu32[3] = ni; }
+    {
+      const fk = this.uploadFilters(f.filterRadius ?? 0, normFilterKernel(f.filterKernel));
+      tu32[2] = fk.nc; tu32[3] = fk.ni;
+      // JWildfire runs the adaptive kernel only on density renders (never solid)
+      const adaptive = fk.adaptive && !this.solid;
+      tf32[48] = adaptive ? 1 : 0; tf32[49] = fk.nLow; tf32[50] = fk.nSmooth; tf32[51] = fk.nDetail;
+    }
     // world area covered by the full image (zoom-invariant density normalisation)
     const ppuOut = ppu / os;
     tf32[16] = (fullW / os) * (fullH / os) / (ppuOut * ppuOut);
@@ -687,6 +694,12 @@ export class FlameRenderer {
     // JWildfire background gradient (corner colours + kind in bgUL.w; the gradient spans the FULL image, tiles offset into it)
     const bgWords = this.bgGradientWords(f, tile ? tile.tileX : 0, tile ? tile.tileY : 0, fullW / os, fullH / os);
     tf32.set(bgWords, 20);
+    // GammaCorrectionFilter: saturation is an HSL shift of (saturation − 1), clamped at −1;
+    // foreground opacity scales alpha by 1 − atan(3·(v − 1))/1.25.
+    tf32[44] = Math.max(-1, (f.saturation ?? 1) - 1);
+    tf32[45] = 1 - Math.atan(3 * ((f.fgOpacity ?? 1) - 1)) / 1.25;
+    tf32[46] = f.filterLowDensity ?? 0.025;
+    tf32[47] = f.filterSharpness ?? 4;
     this.device.queue.writeBuffer(this.tmBuf, 0, tu32);
 
     if (this.solid) this.writeSolidUniforms(f, w, h, os, transparent, [m02, m12, m22], ppu, Math.hypot(fullW, fullH), bgWords);
@@ -832,6 +845,9 @@ export class FlameRenderer {
         layout: pipeB.getBindGroupLayout(0),
         entries: [
           { binding: 0, resource: { buffer: this.tmBuf } },
+          // adaptive filtering reads raw raster cells (density + colour sums) to pick a kernel per
+          // pixel, so the filter pass needs the histogram too — the export pass its own copy
+          { binding: 1, resource: { buffer: exportFmt ? this.offHist! : this.histBuf } },
           { binding: 2, resource: { buffer: this.filtBuf } },
           { binding: 3, resource: this.midTex!.createView() },
         ],
@@ -888,14 +904,15 @@ export class FlameRenderer {
   }
 
   /** Upload the JWildfire spatial-filter kernels for the flame's settings; returns [Ncolour, Nintensity]. */
-  private uploadFilters(radius: number, kernel: FilterKernel): [number, number] {
-    const { weights, nc, ni, key } = buildSpatialFilters(radius, kernel);
-    if (nc === 0 && ni === 0) return [0, 0];
+  private uploadFilters(radius: number, kernel: FilterKernel) {
+    const built = buildSpatialFilters(radius, kernel);
+    const { weights, nc, ni, key } = built;
+    if (nc === 0 && ni === 0) return { ...built, nc: 0, ni: 0 };
     if (key !== this.filtKey) {
       this.filtKey = key;
       this.device.queue.writeBuffer(this.filtBuf, 0, weights);
     }
-    return [nc, ni];
+    return built;
   }
 
   /** Resolves once everything the current flame needs is on the GPU (mesh primitives load asynchronously;
@@ -960,6 +977,7 @@ export class FlameRenderer {
       this.offHist?.destroy();
       this.offHist = d.createBuffer({ size: need, usage: GPUBufferUsage.STORAGE | GPUBufferUsage.COPY_DST });
       this.offHistSize = need;
+      this.bgBExport = null; // the filter pass binds this buffer (adaptive kernel selection)
     }
     if (solid && (!this.solidOff || this.solidOff.cells < cells)) {
       this.destroySolidBufs(this.solidOff);

@@ -88,6 +88,15 @@ html, body {
   position: absolute; inset: 0; width: 100%; height: 100%; display: block;
 }
 #overlay { cursor: crosshair; }
+/* Drag a flame file over the canvas (see ui/flameImport.ts) */
+.canvas-wrap.drop-over::after {
+  content: 'Drop a .flame — a pack goes to the library';
+  position: absolute; inset: 6px; z-index: 3; pointer-events: none;
+  display: flex; align-items: center; justify-content: center;
+  border: 2px dashed var(--accent); border-radius: 10px;
+  background: color-mix(in srgb, var(--bg2) 45%, transparent);
+  color: var(--fg); font-size: 13px;
+}
 
 .statusbar {
   position: absolute; left: 8px; bottom: 8px;

@@ -116,6 +116,61 @@ describe('JWildfire fixtures', () => {
     expect(f.layers[0].xforms[0].affine).toEqual([1, 3, 5, 2, 4, 6]);
     expect(lastImportUnknown).toContain('not_a_variation');
   });
+  it('JWildfire colour/compositing attributes import and round-trip', () => {
+    const xml = '<flame name="c" size="100 100" scale="25" saturation="1.35" fg_opacity="0.4" bg_transparency="1" oversample="2" filter_sharpness="3.5" filter_low_density="0.01"><xform weight="1" linear="1" coefs="1 0 0 1 0 0"/></flame>';
+    const { flame } = importFlameText(xml, GREY);
+    expect(flame.saturation).toBeCloseTo(1.35, 6);
+    expect(flame.fgOpacity).toBeCloseTo(0.4, 6);
+    expect(flame.bgTransparency).toBe(true);
+    expect(flame.oversample).toBe(2);
+    expect(flame.filterSharpness).toBeCloseTo(3.5, 6);
+    expect(flame.filterLowDensity).toBeCloseTo(0.01, 6);
+    const back = roundTrip(flame).flame;
+    expect(back.saturation).toBeCloseTo(1.35, 5);
+    expect(back.fgOpacity).toBeCloseTo(0.4, 5);
+    expect(back.bgTransparency).toBe(true);
+    expect(back.oversample).toBe(2);
+    expect(back.filterSharpness).toBeCloseTo(3.5, 5);
+  });
+  it('defaults match JWildfire when the attributes are absent', () => {
+    const { flame } = importFlameText('<flame name="d" size="100 100" scale="25"><xform weight="1" linear="1" coefs="1 0 0 1 0 0"/></flame>', GREY);
+    expect(flame.saturation).toBe(1);
+    expect(flame.fgOpacity).toBe(1);
+    expect(flame.bgTransparency).toBe(false);
+    expect(flame.oversample).toBe(1);
+    expect(flame.filterSharpness).toBe(4);
+    expect(flame.filterLowDensity).toBeCloseTo(0.025, 6);
+    expect(flame.postSymmetry).toBeUndefined();
+  });
+  it('post symmetry imports every mode and round-trips (NONE stays absent)', () => {
+    const psym = (t: string, extra = '') =>
+      `<flame name="s" size="100 100" scale="25" post_symmetry_type="${t}" ${extra}><xform weight="1" linear="1" coefs="1 0 0 1 0 0"/></flame>`;
+    expect(importFlameText(psym('NONE'), GREY).flame.postSymmetry).toBeUndefined();
+    const pt = importFlameText(psym('POINT', 'post_symmetry_order="5" post_symmetry_centre_x="0.25" post_symmetry_centre_y="-0.5"'), GREY).flame;
+    expect(pt.postSymmetry).toEqual({ type: 'POINT', order: 5, centreX: 0.25, centreY: -0.5, distance: 1.25, rotation: 6 });
+    const ax = importFlameText(psym('X_AXIS', 'post_symmetry_distance="0.8" post_symmetry_rotation="12.5"'), GREY).flame;
+    expect(ax.postSymmetry?.type).toBe('X_AXIS');
+    expect(ax.postSymmetry?.distance).toBeCloseTo(0.8, 6);
+    expect(ax.postSymmetry?.rotation).toBeCloseTo(12.5, 6);
+    expect(roundTrip(ax).flame.postSymmetry).toEqual(ax.postSymmetry);
+    expect(roundTrip(importFlameText(psym('Y_AXIS'), GREY).flame).flame.postSymmetry?.type).toBe('Y_AXIS');
+  });
+  it('post symmetry changes the compile signature (the kernel bakes its constants)', async () => {
+    const { flameSignature } = await import('../src/core/flame');
+    const plain = importFlameText('<flame name="p" size="100 100" scale="25"><xform weight="1" linear="1" coefs="1 0 0 1 0 0"/></flame>', GREY).flame;
+    const sym = importFlameText('<flame name="p" size="100 100" scale="25" post_symmetry_type="POINT" post_symmetry_order="4"><xform weight="1" linear="1" coefs="1 0 0 1 0 0"/></flame>', GREY).flame;
+    expect(flameSignature(plain)).not.toBe(flameSignature(sym));
+    const sym6 = JSON.parse(JSON.stringify(sym));
+    sym6.postSymmetry.order = 6;
+    expect(flameSignature(sym)).not.toBe(flameSignature(sym6));
+  });
+  it('a pack file returns every flame, first one as the active flame', () => {
+    const one = (n: string) => `<flame name="${n}" size="100 100" scale="25"><xform weight="1" linear="1" coefs="1 0 0 1 0 0"/></flame>`;
+    const { flame, flames, count } = importFlameText(`<flames>${one('a')}${one('b')}${one('c')}</flames>`, GREY);
+    expect(count).toBe(3);
+    expect(flames.map((f) => f.name)).toEqual(['a', 'b', 'c']);
+    expect(flame).toBe(flames[0]);
+  });
   it('sample flames bundled in public/ all import cleanly', async () => {
     const { JWF_SAMPLES } = await import('../src/core/samples');
     const { readFileSync } = await import('node:fs');

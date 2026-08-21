@@ -6,7 +6,12 @@
 // LogDensityFilter filters colours with the primary kernel and, for "sharpening"
 // kernels (Mitchell, Lanczos, CatRom, Blackman, Hamming, Hanning), the intensity with a gaussian of radius 0.75.
 
-export const FILT_FLOATS = 256; // colour kernel at [0..), intensity kernel at [128..)
+// colour kernel at [0..), intensity kernel at [128..); the adaptive (MITCHELL_SINEPOW) kernels
+// follow at [256..) low-density, [384..) smoothing, [512..) detail
+export const FILT_FLOATS = 640;
+export const FILT_ADAPT_LOW = 256;
+export const FILT_ADAPT_SMOOTH = 384;
+export const FILT_ADAPT_DETAIL = 512;
 export const FILT_INTENSITY_OFFSET = 128;
 const MAX_N = 11;
 
@@ -142,14 +147,40 @@ export function solidFilterWeights(radius: number, kernel: FilterKernel, os: num
   return { n, w };
 }
 
-/** Both kernels packed for the tonemap's `sfilt` buffer. */
-export function buildSpatialFilters(radius: number, kernel: FilterKernel): { weights: Float32Array<ArrayBuffer>; nc: number; ni: number; key: string } {
+/** JWildfire's adaptive kernel (MITCHELL_SINEPOW) picks a kernel per pixel: SINEPOW10 at 1.5×
+ *  the radius where the density is below `filter_low_density`, SINEPOW10 at 1× where the Scharr
+ *  edge response is below `filter_sharpness`, and the Mitchell-smooth primary at 0.75× on detail.
+ *  The radius they scale is JWildfire's filterRadiusA = filter + 0.25; below 0.5 it stays primary. */
+export function isAdaptiveKernel(kernel: FilterKernel): boolean {
+  return kernel === 'MITCHELL_SINEPOW';
+}
+
+/** Both kernels packed for the tonemap's `sfilt` buffer (plus the adaptive trio when in use). */
+export function buildSpatialFilters(radius: number, kernel: FilterKernel): {
+  weights: Float32Array<ArrayBuffer>; nc: number; ni: number; key: string;
+  adaptive: boolean; nLow: number; nSmooth: number; nDetail: number;
+} {
   const weights = new Float32Array(new ArrayBuffer(FILT_FLOATS * 4));
   const c = kernelWeights(radius, kernel);
   const i = kernelSharpening(kernel) ? kernelWeights(0.75, 'GAUSSIAN') : c;
   weights.set(c.w, 0);
   weights.set(i.w, FILT_INTENSITY_OFFSET);
-  return { weights, nc: c.n, ni: radius < 1e-6 ? 0 : i.n, key: `${kernel}:${radius.toFixed(4)}` };
+  const rA = radius + 0.25;
+  const adaptive = isAdaptiveKernel(kernel) && rA >= 0.5;
+  let nLow = 0, nSmooth = 0, nDetail = 0;
+  if (adaptive) {
+    const low = kernelWeights(1.5 * rA, 'SINEPOW10');
+    const smooth = kernelWeights(1.0 * rA, 'SINEPOW10');
+    const detail = kernelWeights(0.75 * rA, 'MITCHELL_SMOOTH');
+    weights.set(low.w, FILT_ADAPT_LOW);
+    weights.set(smooth.w, FILT_ADAPT_SMOOTH);
+    weights.set(detail.w, FILT_ADAPT_DETAIL);
+    nLow = low.n; nSmooth = smooth.n; nDetail = detail.n;
+  }
+  return {
+    weights, nc: c.n, ni: radius < 1e-6 ? 0 : i.n, key: `${kernel}:${radius.toFixed(4)}`,
+    adaptive, nLow, nSmooth, nDetail,
+  };
 }
 
 /** The 1-D factor of a JWildfire gaussian FilterHolder kernel (os 1): the 2-D kernel exp(−2(ii²+jj²)) normalised

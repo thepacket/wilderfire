@@ -205,6 +205,10 @@ export interface Flame {
   filterRadius: number;
   /** JWildfire FilterKernelType name (MITCHELL_SMOOTH default; SINEPOW15 etc.) */
   filterKernel: FilterKernel;
+  /** Adaptive filtering (MITCHELL_SINEPOW only): edge threshold and the density below which
+   *  a pixel counts as sparse (JWildfire `filter_sharpness` / `filter_low_density`). */
+  filterSharpness: number;
+  filterLowDensity: number;
   /** JWildfire antialiasing: a fraction of samples get a random sub-pixel-ish jitter. */
   antialiasAmount: number;
   antialiasRadius: number;
@@ -212,10 +216,35 @@ export interface Flame {
    *  (0 = off), deCurve = acceptance falloff with distance (0.8 default). */
   deRadius: number;
   deCurve: number;
+  /** JWildfire `saturation`: an HSL saturation shift of (saturation − 1) applied to the
+   *  finished pixel, after the background is composited in (GammaCorrectionFilter). */
+  saturation: number;
+  /** JWildfire `fg_opacity`: scales the alpha channel only, by 1 − atan(3·(v − 1))/1.25. */
+  fgOpacity: number;
+  /** JWildfire `bg_transparency`: the background stays transparent in the saved image. */
+  bgTransparency: boolean;
+  /** JWildfire `oversample` (spatial oversampling, 1–3): histogram supersampling factor. */
+  oversample: number;
+  /** JWildfire post symmetry, applied to the plotted point (DefaultRenderIterationState). */
+  postSymmetry?: PostSymmetry;
   /** JWildfire solid rendering (z-buffer surface shading instead of density accumulation). Absent = off. */
   solid?: SolidRender;
   /** JWildfire background gradient (`background_type`): 2×2 corner colours, optionally with a centre colour. Absent = single colour `background`. */
   bgGradient?: { type: 'GRADIENT_2X2' | 'GRADIENT_2X2_C'; ul: RGB; ur: RGB; ll: RGB; lr: RGB; cc: RGB };
+}
+
+/** JWildfire post symmetry (`post_symmetry_*`): every plotted point is duplicated,
+ *  mirrored about an axis through the centre, or rotated into `order` copies. */
+export interface PostSymmetry {
+  type: 'X_AXIS' | 'Y_AXIS' | 'POINT';
+  /** rotational copies (POINT only) */
+  order: number;
+  centreX: number;
+  centreY: number;
+  /** mirror offset from the centre (axis modes) */
+  distance: number;
+  /** degrees of extra rotation applied to the mirrored copy (axis modes) */
+  rotation: number;
 }
 
 export const IDENTITY: Affine = [1, 0, 0, 0, 1, 0];
@@ -267,6 +296,8 @@ export function defaultFlame(palette: RGB[]): Flame {
     filterRadius: 0, filterKernel: 'MITCHELL_SMOOTH',
     antialiasAmount: 0.25, antialiasRadius: 0.5,
     deRadius: 1, deCurve: 0.8,
+    saturation: 1, fgOpacity: 1, bgTransparency: false, oversample: 1,
+    filterSharpness: 4, filterLowDensity: 0.025,
   };
 }
 
@@ -299,7 +330,9 @@ export function flameSignature(f: Flame): string {
     .map((l) => l.xforms.map(sig).join('|') + '#' + [l.final, ...l.moreFinals].map((x) => (x ? sig(x) : '-')).join('#'))
     .join('@@') + (visibleLayers(f).some((l) => [...l.xforms, l.final, ...l.moreFinals].some((x) => x?.colorMods?.some((v) => v !== 0))) ? '~mods' : '')
     + (f.solid?.enabled ? '~solid' : '') + (usesMaterials(f) ? '~mat' : '')
-    + (visibleLayers(f).some((l) => [...l.xforms, l.final, ...l.moreFinals].some((x) => x?.colorType)) ? '~ctype' : '');
+    + (visibleLayers(f).some((l) => [...l.xforms, l.final, ...l.moreFinals].some((x) => x?.colorType)) ? '~ctype' : '')
+    // post-symmetry constants are baked into the kernel, so every field belongs in the signature
+    + (f.postSymmetry ? `~psym(${f.postSymmetry.type},${f.postSymmetry.order},${f.postSymmetry.centreX},${f.postSymmetry.centreY},${f.postSymmetry.distance},${f.postSymmetry.rotation})` : '');
 }
 
 /** True when any transform carries a non-default material blend (the kernel then tracks a per-point material). */
@@ -479,8 +512,21 @@ export function normalizeFlame(obj: any, fallbackPalette: RGB[]): Flame {
     antialiasRadius: Math.max(0, num(obj?.antialiasRadius, 0.5)),
     deRadius: Math.min(2, Math.max(0, num(obj?.deRadius, 1))),
     deCurve: Math.min(1, Math.max(0.01, num(obj?.deCurve, 0.8))),
+    // JWildfire clamps the saturation shift at −1 (fully desaturated); above 1 it saturates further.
+    filterSharpness: num(obj?.filterSharpness, 4),
+    filterLowDensity: num(obj?.filterLowDensity, 0.025),
+    saturation: Math.max(0, num(obj?.saturation, 1)),
+    fgOpacity: Math.max(0, num(obj?.fgOpacity, 1)),
+    bgTransparency: !!obj?.bgTransparency,
+    oversample: Math.min(3, Math.max(1, Math.round(num(obj?.oversample, 1)))),
     ...(obj?.solid && typeof obj.solid === 'object' ? { solid: normSolid(obj.solid) } : {}),
     ...(obj?.bgGradient && (obj.bgGradient.type === 'GRADIENT_2X2' || obj.bgGradient.type === 'GRADIENT_2X2_C') ? { bgGradient: { type: obj.bgGradient.type, ul: rgb(obj.bgGradient.ul, [0, 0, 0]), ur: rgb(obj.bgGradient.ur, [0, 0, 0]), ll: rgb(obj.bgGradient.ll, [0, 0, 0]), lr: rgb(obj.bgGradient.lr, [0, 0, 0]), cc: rgb(obj.bgGradient.cc, [0, 0, 0]) } } : {}),
+    ...(obj?.postSymmetry && ['X_AXIS', 'Y_AXIS', 'POINT'].includes(obj.postSymmetry.type) ? { postSymmetry: {
+      type: obj.postSymmetry.type as 'X_AXIS' | 'Y_AXIS' | 'POINT',
+      order: Math.min(64, Math.max(1, Math.round(num(obj.postSymmetry.order, 3)))),
+      centreX: num(obj.postSymmetry.centreX, 0), centreY: num(obj.postSymmetry.centreY, 0),
+      distance: num(obj.postSymmetry.distance, 1.25), rotation: num(obj.postSymmetry.rotation, 6),
+    } } : {}),
   };
 }
 

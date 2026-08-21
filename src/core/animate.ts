@@ -195,6 +195,11 @@ export function interpFlame(a: Flame, b: Flame, t: number): Flame {
     filterRadius: lerp(a.filterRadius ?? 0, b.filterRadius ?? 0, t), filterKernel: t < 0.5 ? (a.filterKernel ?? 'MITCHELL_SMOOTH') : (b.filterKernel ?? 'MITCHELL_SMOOTH'),
     antialiasAmount: lerp(a.antialiasAmount ?? 0.25, b.antialiasAmount ?? 0.25, t), antialiasRadius: lerp(a.antialiasRadius ?? 0.5, b.antialiasRadius ?? 0.5, t),
     deRadius: lerp(a.deRadius ?? 1, b.deRadius ?? 1, t), deCurve: lerp(a.deCurve ?? 0.8, b.deCurve ?? 0.8, t),
+    filterSharpness: a.filterSharpness ?? 4, filterLowDensity: a.filterLowDensity ?? 0.025,
+    saturation: lerp(a.saturation ?? 1, b.saturation ?? 1, t), fgOpacity: lerp(a.fgOpacity ?? 1, b.fgOpacity ?? 1, t),
+    // discrete settings follow the source flame rather than blending into meaningless in-betweens
+    bgTransparency: a.bgTransparency, oversample: a.oversample ?? 1,
+    ...(a.postSymmetry ? { postSymmetry: a.postSymmetry } : {}),
     vibrancy: lerp(a.vibrancy, b.vibrancy, t),
     background: [
       lerp(a.background[0], b.background[0], t),

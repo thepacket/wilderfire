@@ -210,6 +210,61 @@ walks whose JWildfire points drift out of view over millions of steps while
 our short trajectories stay near the origin); **the other 38 match**
 (`Bokeh_1` closest at 0.80 / corr 0.84 — a three-layer flame).
 
+### Attributes the importer used to drop (2026-08-21)
+
+A flame can import without a single reported error and still render differently, because
+the importer reports unknown *variations* but silently ignores unknown *attributes*.
+`node scripts/jwf-port/attr-survey.mjs <dir>` counts, over a corpus of real flames, how many
+of them switch an unported feature ON — the number that decides what is worth porting.
+Over 5623 flames from ~150 community packs:
+
+| JWildfire attribute | flames | ported as |
+|---|---|---|
+| `bg_transparency` | 32% | `Flame.bgTransparency`; presets the PNG export's alpha checkbox |
+| `oversample` | 24% | `Flame.oversample`, applied to the renderer when a flame loads |
+| `saturation` | 23% | HSL saturation shift of (value − 1) on the finished pixel, **after** the background is composited in (`GammaCorrectionFilter.applyModSaturation`); clamped at −1 |
+| `post_symmetry_*` | 11% | plotted points are duplicated in the kernel (`symApply`): X/Y axis mirror about the centre at half `distance`, with the two copies counter-rotated by `rotation`; POINT plots the original plus `order` rotated copies — JWildfire's own i = 0 copy repeats the original, so the centre is plotted twice and we match that. **Open defect — see below** |
+| `filter_kernel="MITCHELL_SINEPOW"` | 6% | adaptive filtering: per pixel, SINEPOW10 at 1.5×(filter + 0.25) where the density is below `filter_low_density`, SINEPOW10 at 1× where the Scharr edge response is below `filter_sharpness`, else Mitchell-smooth at 0.75× |
+| `fg_opacity` | 4% | scales **alpha only** by 1 − atan(3·(v − 1))/1.25; the colour keeps its unscaled log-scale factor, so the background composites in more or less |
+
+**Compare verdict (2026-08-21, Brokat_0 variants at 384 px / quality 300).** Isolate-and-diff
+fixtures `_cmp_*` (gitignored) against headless JWildfire, control `_cmp_base` at ratio 0.98 /
+blkMAE 4.7 / corr 0.98:
+
+| fixture | ratio | blkMAE | hist | corr | |
+|---|---|---|---|---|---|
+| `_cmp_sat05` / `_cmp_sat14` | 0.98 / 0.97 | 4.9 / 7.9 | 0.95 / 0.94 | 0.98 / 0.96 | matches the control ✓ |
+| `_cmp_adapt` (MITCHELL_SINEPOW) | 1.00 | 2.7 | 0.97 | 0.99 | better than the control ✓ |
+| `_cmp_fg05` | 0.99 | 2.0 | 0.98 | 1.00 | better than the control ✓ |
+| `_cmp_psymX` / `_cmp_psymY` | 1.17 | 23.7 | 0.66 | 0.94 | **too bright** |
+| `_cmp_psymP` (order 3) | 1.29 | 42.4 | 0.42 | 0.97 | **too bright** |
+
+**Open defect: post symmetry renders too bright**, by ~16% with two copies and ~29% with four.
+What has been ruled out: the geometry (a pure mirror, `_cmp_psym0` — distance 0, rotation 0 —
+still shows ratio 1.16 at corr 0.97 with matching coverage, so the copies land where JWildfire
+puts them); our sample accounting (luma is 160.6 at 150, 300 and 600 spp — already spp-invariant);
+and JWildfire compensating in its budget (`nSamples = quality · rasterSize / oversample`, no
+symmetry term, and `currSample = iter` counts iterations, not plotted points, so its density
+doubles exactly as ours does). Both engines plot two points per iteration and normalise by
+iterations, yet a density doubling brightens JWildfire by ~10 luma and us by ~34. The remaining
+suspect is how the density change interacts with the DE gather, which matches on the control.
+Whoever picks this up: start by comparing raw raster counts rather than tonemapped luma.
+
+Findings worth keeping: `filter_type` (GLOBAL_SHARPENING / GLOBAL_SMOOTHING / ADAPTIVE, on 51%
+of flames) does **not** change the render — at render time it only drives a debug overlay gated on
+`filter_indicator`, which is 0 everywhere in the corpus; its real effect is choosing a kernel at
+import time when `filter_kernel` is absent, and the kernel is what we already read. `balancing_red/green/blue`
+(4%) and `color_oversample` (9%) are dead attributes too: the renderer never reads them
+(`balancing_*` only drives a gradient-editor button, `color_oversample` only a render-file header).
+Still unported: `ai_post_denoiser` (18%, OptiX/OIDN — not reproducible), `post_bokeh` (2%),
+`background_image` (1%, absolute Windows paths), `mixer_mode` (0.3%), non-BUBBLE `cam_dof_shape` (0.4%).
+
+Two traps met on the way, both worth remembering: `mod` is a **reserved keyword** in WGSL, and a
+backtick inside a WGSL comment closes the TypeScript template literal the shader lives in. Also,
+adding a histogram read to the tonemap's `fsB` changed its derived bind-group layout — the cached
+`bgB`/`bgBExport` groups had to gain binding 1 and be invalidated when either histogram is
+reallocated, or the whole filter pass silently produces a transparent image.
+
 ### Engine semantics found by the isolate-and-diff loop (2026-08-17)
 
 Each of these was found by making XML variants of a differing fixture

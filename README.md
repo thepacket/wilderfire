@@ -59,6 +59,11 @@ in the stack.
   camera (pitch / yaw / bank, perspective, position, `preserve_z`),
   **depth of field** (focus point or focus plane, area, fade) and
   **dimish-z** depth fade; all of it round-trips through `.flame`
+- **JWildfire colour and compositing stage** — flame-level `saturation` (an HSL shift
+  applied after the background composites in), `fg_opacity` (alpha only), transparent
+  background, per-file `oversample`, **post symmetry** (X/Y mirror or rotational copies
+  of every plotted point) and **adaptive filtering** (the `MITCHELL_SINEPOW` kernel picks
+  a kernel per pixel from the local density and Scharr edge response)
 - **Solid rendering** (Render → Solid) — instead of accumulating density, every
   raster cell keeps its nearest point (a GPU z-buffer on the camera depth) and the
   surface is shaded from screen-space normals with up to 4 **distant lights**
@@ -126,7 +131,12 @@ in the stack.
 - **Session autosave + flame library** — the working flame and animation
   timeline persist across reloads; a thumbnail library on IndexedDB (no
   practical size limit; an older localStorage library migrates itself) with
-  whole-library JSON export/import for backups and moving between browsers
+  whole-library JSON export/import for backups and moving between browsers.
+  **Drag a `.flame` onto the canvas** to load it (a pack dropped this way
+  goes straight into the library).
+  Loading a **flame pack** (a JWildfire `.flame` file holding many flames)
+  opens a chooser: load one, or add them all to the library at once — each
+  entry gets a thumbnail rendered on the spot
 - **Mutation grid** (MutaGen-style) — 3×3 explorer of random mutations
   rendered offscreen; click to adopt and keep exploring
 - Progressive refinement with quality cap, speed presets, pause/re-render,

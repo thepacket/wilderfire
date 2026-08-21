@@ -11,6 +11,45 @@ const LS_AUTOSAVE = 'wilderfire.autosave';
 /** The saved flames, newest first (for the batch export queue). */
 export const listLibrary = (): Promise<LibEntry[]> => libAll();
 
+/** Render a square JPEG thumbnail for a flame the renderer isn't currently showing (pack import). */
+async function offscreenThumb(app: App, flame: Flame, size = 144, spp = 150): Promise<string> {
+  app.renderer.setFlame(flame);
+  const px = await app.renderer.renderRegion({ fullW: size, fullH: size, tileX: 0, tileY: 0, tileW: size, tileH: size, spp });
+  const c = document.createElement('canvas');
+  c.width = c.height = size;
+  c.getContext('2d')!.putImageData(new ImageData(px, size, size), 0, 0);
+  return c.toDataURL('image/jpeg', 0.72);
+}
+
+/** Add every flame of an imported pack to the library, rendering a thumbnail for each.
+ *  `onProgress` may return false to stop early; the flames done so far are kept. */
+export async function addFlamesToLibrary(
+  app: App,
+  flames: Flame[],
+  onProgress?: (done: number, total: number, name: string) => boolean | void,
+): Promise<number> {
+  const entries: LibEntry[] = [];
+  const now = Date.now();
+  try {
+    for (const [i, f] of flames.entries()) {
+      let thumb = '';
+      try { thumb = await offscreenThumb(app, f); } catch { /* keep the flame, skip its picture */ }
+      entries.push({
+        id: Math.random().toString(36).slice(2),
+        name: f.name || `pack ${i + 1}`,
+        date: now - i, // the grid is newest-first, so descending stamps keep the pack's own order
+        flame: JSON.parse(JSON.stringify(f)),
+        thumb,
+      });
+      if (onProgress?.(i + 1, flames.length, f.name) === false) break;
+    }
+  } finally {
+    app.resumeRender();
+  }
+  if (entries.length) await libPut(entries);
+  return entries.length;
+}
+
 export function buildLibrary(app: App, anim: AnimAPI) {
   function thumbnail(size = 144): string {
     return app.renderer.captureSync((cv) => {
@@ -70,7 +109,8 @@ export function buildLibrary(app: App, anim: AnimAPI) {
     for (const e of entries) {
       const item = el('div', 'lib-item');
       const img = el('img') as HTMLImageElement;
-      img.src = e.thumb;
+      if (e.thumb) img.src = e.thumb;
+      else img.alt = e.name; // pack import whose thumbnail render failed
       const meta = el('div', 'lib-meta');
       meta.append(
         el('div', 'lib-name', e.name),

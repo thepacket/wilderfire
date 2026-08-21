@@ -302,6 +302,9 @@ async function boot() {
   fit();
   app.setFlame(app.flame);
 
+  // Drag a .flame / .json onto the canvas: one flame is loaded, a pack goes into the library.
+  (await import('./ui/flameImport')).enableFlameDrop(app, wrap);
+
   // Offline: the build ships a service worker (vite.config.ts) that precaches this build's assets;
   // production only, so the dev server's modules are never cached. A newer build waiting to
   // take over is announced in the status bar (it takes effect on the next load).

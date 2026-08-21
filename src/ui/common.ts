@@ -159,6 +159,9 @@ export class App {
   }
   setSolo(on: boolean) { this.solo = on; this.renderer.setFlame(this.renderFlame()); this.emit('solo'); }
 
+  /** Re-arm the renderer with the current flame after an offscreen render borrowed it (pack thumbnails). */
+  resumeRender() { this.renderer.setFlame(this.renderFlame()); }
+
   private restore() {
     this.flame = JSON.parse(this.hist[this.hp]);
     this.clampSelection();

@@ -19,7 +19,7 @@
 //                       8 colour modifiers, 16 weighting field, material + materialSpeed (solid rendering),
 //                       6 spare, then per variation: weight + params
 
-import type { Flame, XForm, VarInstance, Layer } from '../core/flame';
+import type { Flame, XForm, VarInstance, Layer, PostSymmetry } from '../core/flame';
 import { visibleLayers, usesMaterials } from '../core/flame';
 import { VARIATIONS, DFLT_SUBFLAME_XML } from '../core/variations';
 import { importFlameText } from '../core/flameXML';
@@ -362,10 +362,56 @@ function subflameInstances(layers: Layer[]): VarInstance[] {
   return out;
 }
 
+/** WGSL for JWildfire's post-symmetry projectors: copy `i` of a plotted world point.
+ *  Axis modes offset by half the distance, mirror about the centre, then rotate the two
+ *  copies in opposite directions by `rotation` degrees. POINT rotates by i·2π/order. */
+function symmetryWgsl(p: PostSymmetry, n: number): string {
+  const cx = p.centreX, cy = p.centreY;
+  const a = (p.rotation * Math.PI) / 180;
+  const doRotate = Math.abs(a) > 1e-9;
+  const hd = p.distance / 2;
+  const f = (v: number) => (Number.isFinite(v) ? v : 0).toPrecision(9);
+  if (p.type === 'POINT') {
+    const order = n - 1;
+    return `
+fn symApply(q: vec3f, i: u32) -> vec3f {
+  if (i == 0u) { return q; } // JWildfire plots the original, then `+ order + ` rotated copies (its first repeats it)
+  let ang = f32(i - 1u) * ${f((2 * Math.PI) / order)};
+  let ca = cos(ang); let sa = sin(ang);
+  let dx = q.x - ${f(cx)}; let dy = q.y - ${f(cy)};
+  return vec3f(${f(cx)} + dx * ca - dy * sa, ${f(cy)} + dy * ca + dx * sa, q.z);
+}
+`;
+  }
+  const axisX = p.type === 'X_AXIS';
+  const mirror = axisX
+    ? `var x = select(${f(cx)} - dx - ${f(hd)}, ${f(cx)} + dx + ${f(hd)}, i == 0u);\n  var y = q.y;`
+    : `var x = q.x;\n  var y = select(${f(cy)} - dy - ${f(hd)}, ${f(cy)} + dy + ${f(hd)}, i == 0u);`;
+  const rot = !doRotate ? '' : `
+  let rx = x - ${f(cx)}; let ry = y - ${f(cy)};
+  let ca = ${f(Math.cos(a))}; let sa = ${f(Math.sin(a))};
+  if (i == 0u) { x = ${f(cx)} + rx * ca + ry * sa; y = ${f(cy)} + ry * ca - rx * sa; }
+  else { x = ${f(cx)} + rx * ca - ry * sa; y = ${f(cy)} + ry * ca + rx * sa; }`;
+  return `
+fn symApply(q: vec3f, i: u32) -> vec3f {
+  let dx = q.x - ${f(cx)};
+  let dy = q.y - ${f(cy)};
+  ${mirror}${rot}
+  return vec3f(x, y, q.z);
+}
+`;
+}
+
 export function compileFlame(flame: Flame, nPoints: number): CompiledFlame {
   const layers = visibleLayers(flame);
   const usesMods = layers.some((ly) => [...ly.xforms, ...(ly.final ? [ly.final] : []), ...ly.moreFinals].some((x) => x.colorMods?.some((v) => v !== 0)));
   const solid = !!flame.solid?.enabled;
+  // JWildfire post symmetry (DefaultRenderIterationState's projector chain): every plotted point
+  // is duplicated. Axis modes plot two mirrored copies; POINT plots the original plus `order`
+  // rotated copies (its i = 0 copy repeats the original, exactly as JWildfire does).
+  const psym = flame.postSymmetry;
+  const symN = !psym ? 1 : psym.type === 'POINT' ? Math.min(64, Math.max(1, Math.round(psym.order))) + 1 : 2;
+  const symWgsl = !psym ? '' : symmetryWgsl(psym, symN);
   const usesMat = solid && usesMaterials(flame);
   const usesMesh = layers.some((ly) => [...ly.xforms, ...(ly.final ? [ly.final] : []), ...ly.moreFinals].some((x) => varLists(x).some((l) => l.some((vi) => VARIATIONS[vi.name]?.flags?.includes('mesh')))));
   const L = layers.length;
@@ -492,7 +538,10 @@ ${cases}
     var dp = p;
     var dc = c;${usesMods ? '\n    var dm = m;' : ''}${finalBlock}
     if (hide) { op = 0.0; }
-
+${symN > 1 ? `    // post symmetry: plot this point once per symmetry copy (shadowing dp inside the loop
+    // keeps the projection below untouched — its initialiser still reads the outer point)
+    for (var si = 0u; si < ${symN}u; si = si + 1u) {
+    let dp = symApply(dp, si);` : ''}
     var rx: f32;
     var ry: f32;
     var visible = true;
@@ -582,6 +631,7 @@ ${solid ? `    // JWildfire solid rendering: no density — the nearest point pe
       atomicAdd(&hist[hi + 2u], u32(col.z * lw * 255.0 + dth));
       atomicAdd(&hist[hi + 3u], u32(op * 256.0));
     }`}
+${symN > 1 ? '    }' : ''}
   }
 
   pts[idx] = vec4f(p, c);${usesMods ? '\n  mods[idx] = m;' : ''}${usesMat ? '\n  mats[idx] = mt;' : ''}
@@ -729,7 +779,7 @@ struct Params {
 @group(0) @binding(3) var<storage, read_write> rngs: array<vec2u>; // x: rng state, y: prev xform
 @group(0) @binding(4) var<storage, read_write> hist: array<atomic<u32>>;
 @group(0) @binding(5) var<storage, read> pal: array<vec4f>;
-${usesMods ? MODS_WGSL : ''}${solid ? SOLID_KERNEL_WGSL : ''}${usesMat ? '\n@group(0) @binding(9) var<storage, read_write> mats: array<f32>; // per-point material index (JWildfire p.material)\n' : ''}${usesMesh ? '\n@group(0) @binding(12) var<storage, read> mesh: array<f32>; // mesh samplers: face CDFs + triangles (src/core/meshes.ts)\n' : ''}
+${symWgsl}${usesMods ? MODS_WGSL : ''}${solid ? SOLID_KERNEL_WGSL : ''}${usesMat ? '\n@group(0) @binding(9) var<storage, read_write> mats: array<f32>; // per-point material index (JWildfire p.material)\n' : ''}${usesMesh ? '\n@group(0) @binding(12) var<storage, read> mesh: array<f32>; // mesh samplers: face CDFs + triangles (src/core/meshes.ts)\n' : ''}
 
 fn rnd(state: ptr<function, u32>) -> f32 {
   var x = *state;
@@ -898,6 +948,8 @@ struct TP {
   bgLR: vec4f,
   bgCC: vec4f,
   bgGeom: vec4f, // x, y: this tile's origin in the full image; z, w: full image size (the gradient spans the full image)
+  post: vec4f, // x: modSaturation (saturation − 1), y: alphaScale (foreground opacity), z: filter_low_density, w: filter_sharpness
+  adapt: vec4f, // adaptive filtering (MITCHELL_SINEPOW): x on/off, y/z/w = low-density/smoothing/detail kernel sizes
 };
 
 // Two passes: fsA = DE + log-scale per pixel into an rgba16float texture,
@@ -906,6 +958,42 @@ struct TP {
 @group(0) @binding(1) var<storage, read> hist: array<u32>;
 @group(0) @binding(2) var<storage, read> sfilt: array<f32>;
 @group(0) @binding(3) var midTex: texture_2d<f32>;
+
+// JWildfire GammaCorrectionFilter.applyModSaturation: the finished pixel (background already
+// composited in) goes through HSL with saturation shifted by (saturation − 1), clamped to 0..1.
+fn modSaturation(c: vec3f, shift: f32) -> vec3f {
+  if (abs(shift) < 1e-6) { return c; } // 'mod' is a WGSL reserved keyword — hence 'shift'
+  let mx = max(c.r, max(c.g, c.b));
+  let mn = min(c.r, min(c.g, c.b));
+  let l = (mx + mn) * 0.5;
+  let d = mx - mn;
+  if (d < 1e-9) { return c; } // grey has no hue to preserve
+  let s0 = select(d / (2.0 - mx - mn), d / (mx + mn), l <= 0.5);
+  let s = clamp(s0 + shift, 0.0, 1.0);
+  var h: f32;
+  if (mx == c.r) { h = (c.g - c.b) / d + select(0.0, 6.0, c.g < c.b); }
+  else if (mx == c.g) { h = (c.b - c.r) / d + 2.0; }
+  else { h = (c.r - c.g) / d + 4.0; }
+  h = h / 6.0;
+  let v = select(l + s - l * s, l * (1.0 + s), l <= 0.5);
+  if (v <= 0.0) { return vec3f(0.0); }
+  let m = l + l - v;
+  let sv = (v - m) / v;
+  let h6 = fract(h) * 6.0;
+  let sextant = i32(floor(h6));
+  let fr = h6 - floor(h6);
+  let vsf = v * sv * fr;
+  let mid1 = m + vsf;
+  let mid2 = v - vsf;
+  switch (sextant) {
+    case 0: { return vec3f(v, mid1, m); }
+    case 1: { return vec3f(mid2, v, m); }
+    case 2: { return vec3f(m, v, mid1); }
+    case 3: { return vec3f(m, mid2, v); }
+    case 4: { return vec3f(mid1, m, v); }
+    default: { return vec3f(v, m, mid2); }
+  }
+}
 
 @vertex
 fn vs(@builtin(vertex_index) vi: u32) -> @builtin(position) vec4f {
@@ -942,6 +1030,52 @@ fn blockAt(bx: i32, by: i32) -> vec4f {
     }
   }
   return acc / f32(os * os);
+}
+
+// ---- Adaptive filtering (JWildfire LogDensityFilter.getFilter, MITCHELL_SINEPOW) ----
+// Per pixel: sparse cells get a wide SINEPOW10, flat cells a 1× SINEPOW10, and cells with a
+// strong Scharr edge response keep the narrow Mitchell-smooth primary.
+const FILT_ADAPT_LOW: u32 = 256u;
+const FILT_ADAPT_SMOOTH: u32 = 384u;
+const FILT_ADAPT_DETAIL: u32 = 512u;
+
+// The JWildfire raster keeps colours on the RenderColor scale (palette·200/256); ours are ·255,
+// so rescale before the log10 or the edge threshold would sit ~0.1 decades off.
+fn adaptLum(cx: i32, cy: i32) -> f32 {
+  let c = cell(cx, cy);
+  return (0.299 * c.r + 0.588 * c.g + 0.113 * c.b) * (199.21875 / 255.0 / 255.0);
+}
+
+// Scharr magnitude, reproducing JWildfire's kernel verbatim — including its x-pass sampling
+// (x+1, y−1) twice where (x+1, y) would be symmetric. Parity beats tidiness here.
+fn adaptScharr(x: i32, y: i32) -> f32 {
+  let sx = 3.0 * adaptLum(x - 1, y - 1) - 3.0 * adaptLum(x + 1, y - 1)
+         + 10.0 * adaptLum(x - 1, y) - 10.0 * adaptLum(x + 1, y - 1)
+         + 3.0 * adaptLum(x - 1, y + 1) - 3.0 * adaptLum(x + 1, y + 1);
+  let sy = 3.0 * adaptLum(x - 1, y - 1) + 10.0 * adaptLum(x, y - 1) + 3.0 * adaptLum(x + 1, y - 1)
+         - 3.0 * adaptLum(x - 1, y + 1) - 10.0 * adaptLum(x, y + 1) - 3.0 * adaptLum(x + 1, y + 1);
+  return sqrt(sx * sx + sy * sy);
+}
+
+// LogScaleCalculator for one raw cell count (no density estimation, no palette scaling).
+fn adaptIntensity(count: f32) -> f32 {
+  let contrast = max(T.jw.y, 1e-3);
+  let d = count / T.spp;
+  let glow = T.jw.w / (contrast * T.spp) / (count + 1.0);
+  return 2.0 * contrast * T.brightness * 0.43429448 * log(1.0 + d / (contrast * T.jw.x)) + glow;
+}
+
+/** Returns (weight offset in sfilt, kernel size) for output pixel (x, y). */
+fn adaptSelect(x: i32, y: i32) -> vec2u {
+  let os = max(i32(T.de.w + 0.5), 1);
+  let rx = x * os;
+  let ry = y * os;
+  let c = cell(rx, ry);
+  if (c.w < 1.0) { return vec2u(0u, T.filterN); } // empty cell keeps the primary kernel
+  let whiteLevel = 199.21875 / max(T.jw.z, 1e-9);
+  if (adaptIntensity(c.w) * whiteLevel < T.post.z) { return vec2u(FILT_ADAPT_LOW, u32(T.adapt.y)); }
+  if (log(1.0 + adaptScharr(rx, ry)) * 0.43429448 < T.post.w) { return vec2u(FILT_ADAPT_SMOOTH, u32(T.adapt.z)); }
+  return vec2u(FILT_ADAPT_DETAIL, u32(T.adapt.w));
 }
 
 // Density-estimation + JWildfire log scale for output pixel (x, y):
@@ -1058,7 +1192,13 @@ fn fsB(@builtin(position) fragPos: vec4f) -> @location(0) vec4f {
   // Spatial filter (JWildfire LogDensityFilter) over the log-scaled image:
   // colours with the primary kernel, intensity with its own (smoothing) kernel.
   var v = vec4f(0.0);
-  let NC = i32(T.filterN);
+  var cOff = 0u;
+  var NC = i32(T.filterN);
+  if (T.adapt.x > 0.5) {
+    let sel = adaptSelect(x, y);
+    cOff = sel.x;
+    NC = i32(sel.y);
+  }
   let NI = i32(T.filterNI);
   if (NC <= 1 && NI <= 1) {
     v = mid(x, y);
@@ -1071,7 +1211,7 @@ fn fsB(@builtin(position) fragPos: vec4f) -> @location(0) vec4f {
       for (var i = -h; i <= h; i = i + 1) {
         var wc = 0.0;
         var wi = 0.0;
-        if (NC > 1 && abs(i) <= hc && abs(j) <= hc) { wc = sfilt[u32((j + hc) * NC + (i + hc))]; }
+        if (NC > 1 && abs(i) <= hc && abs(j) <= hc) { wc = sfilt[cOff + u32((j + hc) * NC + (i + hc))]; }
         if (NI > 1 && abs(i) <= hi && abs(j) <= hi) { wi = sfilt[128u + u32((j + hi) * NI + (i + hi))]; }
         if (NC <= 1 && i == 0 && j == 0) { wc = 1.0; }
         if (NI <= 1 && i == 0 && j == 0) { wi = 1.0; }
@@ -1112,12 +1252,15 @@ fn fsB(@builtin(position) fragPos: vec4f) -> @location(0) vec4f {
   // col is already alpha-scaled (flam3/JWildfire: logScl = alpha / intensity),
   // so composite as col + bg*(1 - alpha), NOT mix(bg, col, alpha), which would
   // apply alpha twice. Per-channel clip like JWildfire (whiteLevel < 255 fades to white).
-  let alpha = clamp(aG, 0.0, 1.0);
+  // JWildfire scales only the ALPHA by the foreground-opacity curve; the colour keeps the
+  // unscaled log-scale factor, so fg_opacity shows more or less background through the flame.
+  let alpha = clamp(aG * T.post.y, 0.0, 1.0);
   let ccol = clamp(col, vec3f(0.0), vec3f(1.0));
   if (transparent) {
     // straight (un-premultiplied) colour for the PNG alpha channel
-    return vec4f(select(ccol, clamp(col / max(alpha, 1e-6), vec3f(0.0), vec3f(1.0)), alpha > 1e-6), alpha);
+    let straight = select(ccol, clamp(col / max(alpha, 1e-6), vec3f(0.0), vec3f(1.0)), alpha > 1e-6);
+    return vec4f(modSaturation(straight, T.post.x), alpha);
   }
-  return vec4f(clamp(ccol + bgc * (1.0 - alpha), vec3f(0.0), vec3f(1.0)), 1.0);
+  return vec4f(modSaturation(clamp(ccol + bgc * (1.0 - alpha), vec3f(0.0), vec3f(1.0)), T.post.x), 1.0);
 }
 `;

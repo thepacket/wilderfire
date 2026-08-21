@@ -473,10 +473,28 @@ export function parseFlameXML(text: string, fallbackPalette: RGB[]): Flame[] {
     f.lowDensityBrightness = Math.max(0, numOr('low_density_brightness', 0.24));
     f.filterRadius = Math.min(3, Math.max(0, numOr('filter', 0.75)));
     f.filterKernel = normFilterKernel(fe.getAttribute('filter_kernel') ?? 'MITCHELL_SMOOTH');
+    // Adaptive filtering parameters (used only by the MITCHELL_SINEPOW kernel)
+    f.filterSharpness = numOr('filter_sharpness', 4);
+    f.filterLowDensity = numOr('filter_low_density', 0.025);
     f.antialiasAmount = Math.min(1, Math.max(0, numOr('antialias_amount', 0.25)));
     f.antialiasRadius = Math.max(0, numOr('antialias_radius', 0.5));
     f.deRadius = Math.min(2, Math.max(0, numOr('de_radius', 1)));
     f.deCurve = Math.min(1, Math.max(0.01, numOr('de_curve', 0.8)));
+    // Colour/compositing settings JWildfire applies after the tonemap (GammaCorrectionFilter)
+    f.saturation = Math.max(0, numOr('saturation', 1));
+    f.fgOpacity = Math.max(0, numOr('fg_opacity', 1));
+    f.bgTransparency = numAttr('bg_transparency') !== 0;
+    f.oversample = Math.min(3, Math.max(1, Math.round(numOr('oversample', 1))));
+    // Post symmetry (DefaultRenderIterationState): plotted points are mirrored or rotated
+    const pst = (fe.getAttribute('post_symmetry_type') ?? 'NONE').toUpperCase();
+    if (pst === 'X_AXIS' || pst === 'Y_AXIS' || pst === 'POINT') {
+      f.postSymmetry = {
+        type: pst,
+        order: Math.min(64, Math.max(1, Math.round(numOr('post_symmetry_order', 3)))),
+        centreX: numOr('post_symmetry_centre_x', 0), centreY: numOr('post_symmetry_centre_y', 0),
+        distance: numOr('post_symmetry_distance', 1.25), rotation: numOr('post_symmetry_rotation', 6),
+      };
+    }
     const bg = nums(fe.getAttribute('background'));
     if (bg.length === 3) {
       // Old files use 0-255, new ones 0-1 — sniff by magnitude.
@@ -737,6 +755,14 @@ function paletteToXML(palette: RGB[], indent: string): string {
 }
 
 /** JWildfire background gradient attributes (only when a gradient is set; SINGLE_COLOR is the default). */
+/** JWildfire post-symmetry attributes (always written, like JWildfire, so NONE round-trips). */
+function psymAttrs(f: Flame): string {
+  const p = f.postSymmetry;
+  return `post_symmetry_type="${p?.type ?? 'NONE'}" post_symmetry_order="${p?.order ?? 3}" ` +
+    `post_symmetry_centre_x="${fmt(p?.centreX ?? 0)}" post_symmetry_centre_y="${fmt(p?.centreY ?? 0)}" ` +
+    `post_symmetry_distance="${fmt(p?.distance ?? 1.25)}" post_symmetry_rotation="${fmt(p?.rotation ?? 6)}" `;
+}
+
 function bgAttrs(f: Flame): string {
   const g = f.bgGradient;
   if (!g) return '';
@@ -805,8 +831,12 @@ export function flameToXML(f: Flame, opts: XMLExportOpts = {}): string {
     `cam_dof_shape="BUBBLE" cam_dof_scale="${fmt(f.camDOFScale ?? 1)}" cam_dof_rotate="0" cam_dof_fade="${fmt(f.camDOFFade ?? 1)}" ` +
     `cam_zdimish="${fmt(f.dimishZ ?? 0)}" cam_zdimdist="${fmt(f.dimZDist ?? 0)}" cam_zdimcolor="${(f.dimZColor ?? [0, 0, 0]).map(fmt).join(' ')}" ` +
     `filter="${fmt(f.filterRadius ?? 0)}" filter_kernel="${normFilterKernel(f.filterKernel)}" ` +
+    `filter_sharpness="${fmt(f.filterSharpness ?? 4)}" filter_low_density="${fmt(f.filterLowDensity ?? 0.025)}" ` +
     `antialias_amount="${fmt(f.antialiasAmount ?? 0.25)}" antialias_radius="${fmt(f.antialiasRadius ?? 0.5)}" ` +
     `de_radius="${fmt(f.deRadius ?? 1)}" de_curve="${fmt(f.deCurve ?? 0.8)}" ` +
+    `saturation="${fmt(f.saturation ?? 1)}" fg_opacity="${fmt(f.fgOpacity ?? 1)}" ` +
+    `bg_transparency="${f.bgTransparency ? 1 : 0}" oversample="${f.oversample ?? 1}" ` +
+    psymAttrs(f) +
     `quality="200" brightness="${fmt(f.brightness)}" gamma="${fmt(f.gamma)}" gamma_threshold="${fmt(f.gammaThreshold)}" ` +
     `contrast="${fmt(f.contrast ?? 1)}" white_level="${fmt(f.whiteLevel ?? 220)}" low_density_brightness="${fmt(f.lowDensityBrightness ?? 0.24)}" ` +
     `vibrancy="${fmt(f.vibrancy)}" background="${fmt(f.background[0])} ${fmt(f.background[1])} ${fmt(f.background[2])}"` +
@@ -841,13 +871,14 @@ export function flameToXML(f: Flame, opts: XMLExportOpts = {}): string {
   return lines.join('\n');
 }
 
-/** Import from text: sniffs JSON vs .flame XML. Returns the first flame. */
-export function importFlameText(text: string, fallbackPalette: RGB[]): { flame: Flame; count: number; unknown: string[]; curves: MotionCurve[] } {
+/** Import from text: sniffs JSON vs .flame XML. Returns the first flame, plus every flame of a pack file. */
+export function importFlameText(text: string, fallbackPalette: RGB[]): { flame: Flame; flames: Flame[]; count: number; unknown: string[]; curves: MotionCurve[] } {
   const trimmed = text.trim();
   if (trimmed.startsWith('<')) {
     const flames = parseFlameXML(trimmed, fallbackPalette);
-    return { flame: flames[0], count: flames.length, unknown: [...lastImportUnknown], curves: [...lastImportCurves] };
+    return { flame: flames[0], flames, count: flames.length, unknown: [...lastImportUnknown], curves: [...lastImportCurves] };
   }
   const obj = JSON.parse(trimmed);
-  return { flame: normalizeFlame(obj, fallbackPalette), count: 1, unknown: [], curves: [] };
+  const flame = normalizeFlame(obj, fallbackPalette);
+  return { flame, flames: [flame], count: 1, unknown: [], curves: [] };
 }
