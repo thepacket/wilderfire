@@ -2,7 +2,7 @@
 import { App, el, slider } from './common';
 import { flameToJSON } from '../core/flame';
 import { flameToXML } from '../core/flameXML';
-import { importFlameFile } from './flameImport';
+import { importFlameFiles } from './flameImport';
 import { pickSave, saveBlob, saveText } from './saveFile';
 import { renderHiRes, resolveSize, SIZE_OPTIONS, QUALITY_OPTIONS } from './hiresExport';
 import { openBatchExport } from './batchExport';
@@ -334,14 +334,15 @@ export function buildRenderPanel(app: App, root: HTMLElement) {
   xmlBtn.onclick = () =>
     saveText(flameToXML(app.flame, { curves: app.getCurves() }), { suggestedName: `${baseName()}.flame`, description: 'Flame XML', mime: 'application/xml', ext: '.flame' });
   const loadBtn = el('button', '', '⬆ Load');
-  loadBtn.title = 'Load a WilderFire JSON, a .flame XML (flam3 / Apophysis / JWildfire) or a .zip of flames — several flames open a chooser';
+  loadBtn.title = 'Load WilderFire JSON, .flame XML (flam3 / Apophysis / JWildfire) or .zip files — pick several at once; more than one flame opens a chooser';
   const fileInp = el('input') as HTMLInputElement;
   fileInp.type = 'file';
+  fileInp.multiple = true;
   fileInp.accept = '.json,.flame,.flames,.xml,.zip,application/json,application/xml,text/xml,application/zip';
   fileInp.style.display = 'none';
   fileInp.onchange = async () => {
-    const f = fileInp.files?.[0];
-    if (f) await importFlameFile(app, f);
+    const files = Array.from(fileInp.files ?? []);
+    if (files.length) await importFlameFiles(app, files);
     fileInp.value = '';
   };
   loadBtn.onclick = () => fileInp.click();

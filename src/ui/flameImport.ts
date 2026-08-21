@@ -4,6 +4,7 @@
 import { App, el, openModal } from './common';
 import { importFlameText } from '../core/flameXML';
 import type { Flame } from '../core/flame';
+import type { MotionCurve } from '../core/motion';
 
 /** Report the variations an imported file used that this renderer has no port for. */
 async function noteUnknown(unknown: string[]) {
@@ -77,48 +78,97 @@ async function flamesFromZip(app: App, file: File): Promise<{ flames: Flame[]; u
   return { flames, unknown: [...unknown], skipped };
 }
 
-/** Load a .flame / .json / .zip file: one flame into the editor, a pack into the chooser.
- *  `autoAdd` starts a pack's library import right away (drag-and-drop). */
-export async function importFlameFile(app: App, file: File, autoAdd = false): Promise<void> {
-  try {
-    if (/\.zip$/i.test(file.name) || file.type === 'application/zip') {
-      const { flames, unknown, skipped } = await flamesFromZip(app, file);
-      if (skipped) console.info(`${skipped} entr${skipped === 1 ? 'y' : 'ies'} in ${file.name} could not be read (see warnings above).`);
-      if (flames.length === 1) { app.setFlame(flames[0]); await noteUnknown(unknown); return; }
-      openPackChooser(app, flames, unknown, autoAdd);
-      return;
+/** The flames inside one file (.flame / .flames / .json / .zip). A whole-library export JSON is
+ *  merged into the library on the spot and contributes no flames. */
+async function flamesFromFile(app: App, file: File): Promise<{ flames: Flame[]; unknown: string[]; curves: MotionCurve[] }> {
+  if (/\.zip$/i.test(file.name) || file.type === 'application/zip') {
+    const { flames, unknown, skipped } = await flamesFromZip(app, file);
+    if (skipped) console.info(`${skipped} entr${skipped === 1 ? 'y' : 'ies'} in ${file.name} could not be read (see warnings above).`);
+    return { flames, unknown, curves: [] };
+  }
+  if (/\.(rar|7z)$/i.test(file.name)) throw new Error(`${file.name}: only .zip archives can be opened in the browser — unpack it first`);
+  const text = await file.text();
+  if (/^\s*\{/.test(text) && text.includes('"wilderfireLibrary"')) {
+    const { libPut } = await import('../core/libraryStore');
+    const entries = JSON.parse(text).entries;
+    if (!Array.isArray(entries) || !entries.length) throw new Error('no library entries in this file');
+    await libPut(entries);
+    console.info(`Merged ${entries.length} library entries from ${file.name}.`);
+    return { flames: [], unknown: [], curves: [] };
+  }
+  const { flames, count, unknown, curves } = importFlameText(text, app.activeLayer.palette);
+  // Packs often carry unnamed flames (the importer's placeholder) — name those after the file.
+  const base = file.name.replace(/\.[^.]+$/, '');
+  flames.forEach((fl, i) => { if (!fl.name || fl.name === 'imported') fl.name = count > 1 ? `${base} ${i + 1}` : base; });
+  return { flames, unknown, curves };
+}
+
+/** Load any number of files: one flame in total goes into the editor (with its motion curves),
+ *  more open the pack chooser. `autoAdd` starts the library import right away (drag-and-drop). */
+export async function importFlameFiles(app: App, files: File[], autoAdd = false): Promise<void> {
+  const all: Flame[] = [];
+  const unknown = new Set<string>();
+  let curves: MotionCurve[] = [];
+  const failed: string[] = [];
+  for (const f of files) {
+    if (!/\.(flame|flames|json|xml|zip|rar|7z)$/i.test(f.name) && f.type !== 'application/zip') continue; // a folder's pictures, readmes…
+    try {
+      const r = await flamesFromFile(app, f);
+      all.push(...r.flames);
+      for (const u of r.unknown) unknown.add(u);
+      if (r.curves.length && files.length === 1) curves = r.curves;
+    } catch (e) {
+      failed.push(`${f.name}: ${(e as Error).message}`);
     }
-    if (/\.(rar|7z)$/i.test(file.name)) throw new Error(`${file.name}: only .zip archives can be opened in the browser — unpack it first`);
-    const text = await file.text();
-    // A whole-library export dropped by mistake — merge it instead of failing on the outer object.
-    if (/^\s*\{/.test(text) && text.includes('"wilderfireLibrary"')) {
-      const { libPut } = await import('../core/libraryStore');
-      const entries = JSON.parse(text).entries;
-      if (!Array.isArray(entries) || !entries.length) throw new Error('no library entries in this file');
-      await libPut(entries);
-      console.info(`Merged ${entries.length} library entries from ${file.name}.`);
-      return;
-    }
-    const { flame, flames, count, unknown, curves } = importFlameText(text, app.activeLayer.palette);
-    if (count > 1) {
-      // Packs often carry unnamed flames (the importer's placeholder) — name those after the file.
-      const base = file.name.replace(/\.[^.]+$/, '');
-      flames.forEach((fl, i) => { if (!fl.name || fl.name === 'imported') fl.name = `${base} ${i + 1}`; });
-      openPackChooser(app, flames, unknown, autoAdd);
-      return;
-    }
-    app.setFlame(flame);
+  }
+  if (failed.length) {
+    console.warn('Not imported:\n' + failed.join('\n'));
+    if (!all.length) { alert('Could not import:\n' + failed.slice(0, 8).join('\n')); return; }
+    if (failed.length === files.length) return;
+  }
+  if (!all.length) return; // e.g. only a library export — already merged
+  if (all.length === 1) {
+    app.setFlame(all[0]);
     if (curves.length) {
       app.setCurves(curves);
       console.info(`Loaded ${curves.length} motion curve${curves.length > 1 ? 's' : ''} from the file (Anim tab).`);
     }
-    await noteUnknown(unknown);
-  } catch (e) {
-    alert('Could not import flame: ' + (e as Error).message);
+    await noteUnknown([...unknown]);
+    return;
   }
+  openPackChooser(app, all, [...unknown], autoAdd);
 }
 
-/** Drag a .flame / .json onto the canvas to load it; a pack goes into the library. */
+/** One file — the ⬆ Load button's single-file path. */
+export const importFlameFile = (app: App, file: File, autoAdd = false) => importFlameFiles(app, [file], autoAdd);
+
+/** Every file under a dropped item, recursing into folders (Chrome/Safari/Firefox expose
+ *  dropped directories through the FileSystem Entry API; plain files come straight through). */
+async function filesFromDrop(dt: DataTransfer): Promise<File[]> {
+  const items = Array.from(dt.items ?? []);
+  const entries = items.map((i) => (i.kind === 'file' && 'webkitGetAsEntry' in i ? i.webkitGetAsEntry() : null));
+  if (!entries.some((e) => e)) return Array.from(dt.files ?? []);
+  const out: File[] = [];
+  const readDir = (dir: FileSystemDirectoryEntry): Promise<FileSystemEntry[]> => new Promise((res, rej) => {
+    const reader = dir.createReader();
+    const acc: FileSystemEntry[] = [];
+    const step = () => reader.readEntries((batch) => { if (!batch.length) res(acc); else { acc.push(...batch); step(); } }, rej); // readEntries returns ≤ 100 per call
+    step();
+  });
+  const walk = async (e: FileSystemEntry | null): Promise<void> => {
+    if (!e) return;
+    if (e.isFile) {
+      const f = await new Promise<File>((res, rej) => (e as FileSystemFileEntry).file(res, rej));
+      out.push(f);
+    } else if (e.isDirectory) {
+      for (const child of await readDir(e as FileSystemDirectoryEntry)) await walk(child);
+    }
+  };
+  for (const e of entries) await walk(e);
+  return out;
+}
+
+/** Drag .flame / .json / .zip files — or whole folders — onto the canvas; a pack goes into the library. */
 export function enableFlameDrop(app: App, target: HTMLElement) {
   const dragged = (e: DragEvent) => Array.from(e.dataTransfer?.items ?? []).some((i) => i.kind === 'file');
   let depth = 0; // dragenter/leave also fire for children (the overlay canvas, the status bar)
@@ -137,9 +187,9 @@ export function enableFlameDrop(app: App, target: HTMLElement) {
   target.addEventListener('drop', (e) => {
     depth = 0;
     target.classList.remove('drop-over');
-    const file = e.dataTransfer?.files?.[0];
-    if (!file) return;
+    if (!e.dataTransfer) return;
     e.preventDefault();
-    void importFlameFile(app, file, true);
+    const dt = e.dataTransfer;
+    void filesFromDrop(dt).then((files) => { if (files.length) return importFlameFiles(app, files, true); });
   });
 }
