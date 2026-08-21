@@ -6,7 +6,9 @@ WORKDIR /app
 COPY package.json package-lock.json ./
 RUN npm ci
 COPY . .
-RUN npm run build
+# Assets only: tsc + vitest are pre-push checks and need tests/ + scripts/, which
+# .dockerignore keeps out of the build context (they are 340 MB of dev tooling).
+RUN npx vite build
 
 FROM nginx:1.27-alpine
 COPY nginx.conf /etc/nginx/conf.d/default.conf
