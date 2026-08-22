@@ -189,6 +189,23 @@ if (cr0 && esc) {
     patch: [['x = RANDFLOAT()*(_max_checks + 1) *  __checkerboard_wf_checker_size ;', 'x = (int)(RANDFLOAT()*(_max_checks + 1)) *  __checkerboard_wf_checker_size ;'],
       ['y = RANDFLOAT()*(_max_checks + 1) *  __checkerboard_wf_checker_size ;', 'y = (int)(RANDFLOAT()*(_max_checks + 1)) *  __checkerboard_wf_checker_size ;']],
   },
+  // random(Integer.MAX_VALUE)·2π/p on the CPU picks one of p rotations exactly (only k mod p matters; k·2π/p is
+  // evaluated in double); the GPU snippets round RANDFLOAT·0x7fff and multiply in f32 — an argument of tens of
+  // thousands of radians whose sine the GPU evaluates with coarse error, so the rotation jitters and the tiling
+  // smears into faint extra coverage (solid fixture _mesh10, hypertile3D2 p=7 q=5: 20 % more covered pixels).
+  hypertile3D1: { note: 'see hypertile3D2', patch: [['float a = lroundf(RANDFLOAT() * 0x00007fff) * pa;', 'float a = (float)((int)(RANDFLOAT() * lroundf(__hypertile3D1_p))) * pa;']] },
+  hypertile3D2: { note: 'random(MAX_INT)·2π/p → (int)(rnd·p)·2π/p (see the comment above)', patch: [['float a = lroundf(RANDFLOAT()*0x00007fff) * pa;', 'float a = (float)((int)(RANDFLOAT() * lroundf(__hypertile3D2_p))) * pa;']] },
+  hypertile3D2b: {
+    note: 'see hypertile3D2; here pa = b·π/p, so the period in k is 2p/b — that many discrete angles when it is an integer, a uniform angle otherwise',
+    patch: [['float a = lroundf(RANDFLOAT() * 0x00007fff) * pa;',
+      'float h2b_m = 2.f * lroundf(__hypertile3D2b_p) / __hypertile3D2b_b; float a = (fabsf(h2b_m - lroundf(h2b_m)) < 1e-6f) ? (float)((int)(RANDFLOAT() * h2b_m)) * pa : RANDFLOAT() * 2.f * PI;']],
+  },
+  hypertile2: { note: 'see hypertile3D2', patch: [['float rpa = pa * lroundf(RANDFLOAT() * 0x00007fff);', 'float rpa = pa * (float)((int)(RANDFLOAT() * lroundf(__hypertile2_p)));']] },
+  phoenix_julia: {
+    note: 'see hypertile3D2; power is a double here: an integer power gives |power| discrete angles, a fractional one makes k·2π/power equidistributed, i.e. a uniform angle',
+    patch: [['float a = atan2f(preY, preX) * _invN + lroundf(0x00007fff * RANDFLOAT()) * _inv2PI_N;',
+      'float pj_n = fabsf(__phoenix_julia_power); float a = atan2f(preY, preX) * _invN + ((fabsf(pj_n - lroundf(pj_n)) < 1e-6f) ? (float)((int)(RANDFLOAT() * pj_n)) * _inv2PI_N : RANDFLOAT() * 2.0f * PI);']],
+  },
   post_point_symmetry_wf: {
     note: 'CPU picks the symmetry index uniformly (random(order)); the GPU rounded rnd·(order−1), halving the weight of the first and last copies.',
     patch: [['int idx = lroundf(RANDFLOAT() * (order-1));', 'int idx = (int)(RANDFLOAT() * (float)order); if (idx >= order) idx = order - 1;']],

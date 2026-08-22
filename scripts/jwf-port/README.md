@@ -236,7 +236,7 @@ preserve_z off → 1.00, DOF off alone → 0.09.)
 Survey correction: `post_bokeh_*` only ever fires with solid + `cam_dof > 0` — 0 flames in the
 community corpus, 19 in the user's own collection; the "2 %" was JWildfire writing its default 0.005.
 Tracked fixture `Solid_5` (baseline 98). Leftover from the solid plan now: reflection maps,
-`receiveOnlyShadows`, light motion curves, `_sh8`/`_mesh10` geometry deviations.
+`receiveOnlyShadows`, light motion curves. `_sh8`/`_mesh10` resolved 2026-08-22 — neither was geometry: `_sh8` was `checkerboard_wf`'s GPU snippet (int cast, above), `_mesh10` was `hypertile3D2` (p=7, q=5): JWildfire's CPU picks one of p rotations exactly (`random(MAX_INT)·2π/p`, only k mod p matters), its GPU snippets round `RANDFLOAT·0x7fff` and multiply in f32 — tens of thousands of radians whose sine the GPU evaluates coarsely, so the rotation jittered and the tiling smeared into 20 % more covered pixels (in the density render too, faintly; every point counts in a z-buffer). `overrides.ts` rewrites the angle as `(int)(rnd·p)·2π/p` for hypertile2/3D1/3D2/3D2b (period 2p/b there) and phoenix_julia (uniform angle for a fractional power); `_mesh10` 1.25 / 0.90 → **1.00 / 1.00**, oracle 100 % on all six.
 
 ### Attributes the importer used to drop (2026-08-21)
 
