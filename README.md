@@ -26,7 +26,7 @@ in the stack.
 
 ## Features
 
-- **946 variations** — 76 hand-written entries (the flam3 classics, JWildfire's
+- **947 variations** — 77 hand-written entries (the flam3 classics, JWildfire's
   `obj_mesh_primitive_wf` — its 26 built-in meshes ship as compact binaries and are
   subdivided/smoothed exactly like JWildfire — `sattractor3D` — a strange attractor
   (21 JWildfire presets or your own x/y/z formulas) swept into a faceted tube on the
@@ -44,7 +44,7 @@ in the stack.
   JWildfire's own GPU≠CPU snippet bugs are patched back to the Java, and
   shader hashes on cell ids run in double-float so cut/worley patterns
   match — see [`scripts/jwf-port/README.md`](scripts/jwf-port/README.md)).
-  The 80 JWildfire variations that are *not* implemented are listed with
+  The 79 JWildfire variations that are *not* implemented are listed with
   their reason in `scripts/jwf-port/data/unportable.json` (user code compiled
   at run time, external content such as sub-flames/images/meshes/SVG/text,
   CPU-built point sets, …); the importer names the reason when a flame uses one.
@@ -173,10 +173,15 @@ in the stack.
   through `.flame` export
 - **Session autosave + flame library** — the working flame and animation
   timeline persist across reloads; a thumbnail library on IndexedDB (no
-  practical size limit; an older localStorage library migrates itself) with
-  whole-library JSON export/import for backups and moving between browsers.
-  The grid is virtualised — only the cards in view exist, so a library of
-  thousands opens and scrolls like one of a dozen. **Favourites** (★ on the
+  practical size limit; an older localStorage library migrates itself;
+  thumbnails are stored as binary JPEG blobs, so thousands of entries open in a
+  blink) with whole-library JSON export/import for backups and moving between
+  browsers, a name/author/source/tag **search**, names in natural order,
+  keyboard navigation (arrows, Page Up/Down, Home/End, Enter loads), **Remove
+  duplicates** (identical parameters, first instance kept — one pass, not N²)
+  and **Empty library** (asks first). The grid is virtualised — only the cards
+  in view exist, so a library of thousands opens and scrolls like one of a
+  dozen. **Favourites** (★ on the
   card or Space), free-form **tags** (🏷 on the card; "Tag all shown…" tags a
   whole search result in one write) and **collections** — a select listing
   ★ Favourites, every tag and every source pack with counts — that combine with
@@ -228,7 +233,11 @@ in the stack.
   color_speed / symmetry, all three palette encodings, `<layer>` blocks,
   3D camera, DOF, dimish-z, tonemap/filter/DE settings, motion curves,
   `cam_zoom` folded into zoom; unsupported variations are skipped and
-  reported). Exports open a real **Save as… dialog** where the browser
+  reported; the twenty variations whose parameter names contain spaces or
+  dots — `glsl_*`, `crop_trapezoid`, `mobius_strip`, `flame_bulb` — are
+  written verbatim the way JWildfire writes and reads them, so those files
+  are not strict XML, and the importer's lenient pass takes them back).
+  Exports open a real **Save as… dialog** where the browser
   supports it (Chrome/Edge), falling back to a download elsewhere
 - **Installable & offline** — a web-app manifest and a build-generated service
   worker precache the app (incl. the variation registry and the sample flames),
@@ -239,7 +248,9 @@ in the stack.
 - **AI assistant** via [OpenRouter.ai](https://openrouter.ai) — bring your own
   key and pick any model from a **live, searchable model picker** (provider
   chips, context length, price, vision support, custom IDs); the model sees
-  the current flame JSON **and a screenshot of the current render** (vision
+  a compact summary of the current flame (the full JSON only when you choose
+  it — the `get_flame` tool follows the same setting) **and a screenshot of
+  the current render** (vision
   models can look at the result and iterate — including an optional
   **auto-refine loop** that re-captures the render and self-critiques for up
   to 3 extra rounds), editing the flame live. **Context controls** let you
@@ -288,7 +299,10 @@ src/
               hand-written WGSL + generated variations.jwf.ts ports, the
               latter a lazily loaded, separately cached ~300 KB gz chunk),
               palettes, presets, randomizer, .flame XML I/O (flameXML.ts),
-              keyframe morphing (animate.ts), motion curves (motion.ts)
+              keyframe morphing (animate.ts), motion curves (motion.ts),
+              library store (libraryStore.ts), meshes + the sattractor3D
+              formula evaluator and tube builder (meshes.ts, formula.ts,
+              sattractor.ts), similarity, share links, PNG metadata
   gpu/        codegen.ts  — flame → WGSL compute kernel + data layout
               renderer.ts — WebGPU pipelines, atomic histogram, tonemap, camera
   ui/         panels (transforms, render, gradient, anim, AI), triangle
