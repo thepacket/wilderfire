@@ -162,7 +162,10 @@ async function boot() {
       (© Andreas Maschke and contributors, LGPL 2.1+): the mathematical formulas of the ported variations,
       the GPU helper library they use, the tone-mapping and solid-rendering (lighting) formulas, and the sample flames in the Tests menu.
       That is why the whole project carries the LGPL. The full list of third-party material is in
-      <a href="https://github.com/thepacket/wilderfire/blob/main/NOTICE.md" target="_blank" rel="noopener">NOTICE.md</a>.</p>`;
+      <a href="https://github.com/thepacket/wilderfire/blob/main/NOTICE.md" target="_blank" rel="noopener">NOTICE.md</a>.</p>
+    <p>Looking for flames? The JWildfire community shares hundreds of packs at
+      <a href="https://www.jwfsanctuary.club/downloads/flamepacks/" target="_blank" rel="noopener">jwfsanctuary.club/downloads/flamepacks</a> —
+      drop the downloaded .zip or .flame files on the canvas and they go into your library. The packs are their authors' work; check each pack's own terms.</p>`;
   };
 
   // The loaded flame's name, in full, where there is room for it; editing it renames the flame.

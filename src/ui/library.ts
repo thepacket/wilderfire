@@ -131,7 +131,11 @@ export function buildLibrary(app: App, anim: AnimAPI) {
     search.spellcheck = false;
     tools.append(search, expBtn, impBtn, dedupBtn, clearBtn, impFile);
     if (!entries.length) {
-      body.append(tools, el('div', 'hint', 'Empty — use 💾 Save to keep the current flame here, or drop .flame / .zip files on the canvas. Stored in your browser (IndexedDB).'));
+      const empty = el('div', 'hint', 'Empty — use 💾 Save to keep the current flame here, or drop .flame / .zip files on the canvas. Stored in your browser (IndexedDB). ');
+      const link = el('a', '', 'Flame packs to get started: jwfsanctuary.club/downloads/flamepacks') as HTMLAnchorElement;
+      link.href = 'https://www.jwfsanctuary.club/downloads/flamepacks/'; link.target = '_blank'; link.rel = 'noopener';
+      empty.append(link);
+      body.append(tools, empty);
       return;
     }
     const grid = el('div', 'lib-grid');

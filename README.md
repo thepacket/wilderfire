@@ -135,6 +135,9 @@ in the stack.
   timeline persist across reloads; a thumbnail library on IndexedDB (no
   practical size limit; an older localStorage library migrates itself) with
   whole-library JSON export/import for backups and moving between browsers.
+  Hundreds of community packs are at
+  [jwfsanctuary.club/downloads/flamepacks](https://www.jwfsanctuary.club/downloads/flamepacks/)
+  (their authors' work — check each pack's terms).
   **Drag `.flame` / `.zip` files — several at once, or a whole folder — onto the
   canvas**: one flame loads, more go straight into the library (zips are unpacked
   in the browser; pictures and readmes in a folder are ignored).
