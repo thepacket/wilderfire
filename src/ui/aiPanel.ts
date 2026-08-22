@@ -161,7 +161,7 @@ export function buildAIPanel(app: App, root: HTMLElement) {
   };
   ctxBox.append(el('div', 'ai-ctx-head', 'Send'));
   mkSel<FlameMode>('Flame', [['summary', 'summary (compact)'], ['json', 'full JSON'], ['none', 'nothing']], ctx.flame, (v) => { ctx.flame = v; },
-    'How the current flame is described to the model. Summary is a few hundred tokens with the paths edits use; full JSON is thousands.');
+    'How the current flame is described to the model. Summary is a few hundred tokens with the paths edits use; full JSON is thousands. The get_flame tool follows this too: the model only receives the JSON when this says full JSON.');
   mkSel<PaletteMode>('Palette', [['stops', '8 stops'], ['full', 'full'], ['none', 'nothing']], ctx.palette, (v) => { ctx.palette = v; },
     'Gradient detail sent with the flame. 8 stops is enough for colour work; full = 256 colours.');
   mkSel<VarsMode>('Variations', [['used', 'in use + classics'], ['all', `all (${'≈10k tokens'})`], ['none', 'nothing']], ctx.vars, (v) => { ctx.vars = v; },

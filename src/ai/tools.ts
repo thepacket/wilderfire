@@ -24,8 +24,8 @@ const num = { type: 'number' } as const;
 const str = { type: 'string' } as const;
 
 export const TOOL_DEFS: ToolDef[] = [
-  { type: 'function', function: { name: 'get_flame', description: 'The current flame: a compact summary (transform paths T1…, F, variations, palette stops, camera, tone) or the complete JSON.',
-    parameters: { type: 'object', properties: { detail: { type: 'string', enum: ['summary', 'json'], description: 'summary (default) or json' } } } } },
+  { type: 'function', function: { name: 'get_flame', description: 'The current flame as a compact summary (transform paths T1…, F, variations, palette stops, camera, tone) — enough for every edit. The complete JSON is only available when the user has set Send → Flame to "full JSON"; otherwise the summary is returned.',
+    parameters: { type: 'object', properties: { detail: { type: 'string', enum: ['summary', 'json'], description: 'summary (default). json is honoured only when the user enabled full JSON.' } } } } },
   { type: 'function', function: { name: 'apply_edits', description: 'Change the flame with edit commands, one per line (set <path> <number> · addvar <T#|F> <name> [weight] [param=value…] · delvar · addxform [weight] · delxform <T#> · palette [[t,r,g,b],…] · name <text>). Returns how many applied, any errors, and the new render when screenshots are on.',
     parameters: { type: 'object', properties: { edits: { type: 'string', description: 'the edit commands' } }, required: ['edits'] } } },
   { type: 'function', function: { name: 'set_flame_json', description: 'Replace the whole flame with complete flame JSON (same shape get_flame returns with detail=json). Use apply_edits for small changes — this costs far more tokens.',
@@ -77,6 +77,8 @@ export async function runTool(name: string, argsJson: string, env: ToolEnv): Pro
   try {
     switch (name) {
       case 'get_flame':
+        // the full JSON costs thousands of tokens per call: only when the user asked for it in Send → Flame
+        if (s('detail') === 'json' && env.ctx.flame !== 'json') return { text: flameSummary(app.flame, env.ctx.palette) + '\n(full JSON is off — the user\'s Send → Flame setting is "summary"; work from the summary and the edit paths.)' };
         return { text: s('detail') === 'json' ? flameJSONFor(app.flame, env.ctx.palette) : flameSummary(app.flame, env.ctx.palette) };
       case 'apply_edits': {
         const edits = s('edits') ?? '';
