@@ -66,6 +66,7 @@ html, body {
 .panel-left { width: 292px; border-right: 1px solid var(--border); }
 .panel-right { width: 330px; border-left: 1px solid var(--border); }
 .panel.collapsed { display: none; }
+.panel:focus, .tab-body:focus { outline: none; } /* focusable for keyboard scrolling; no ring on the container itself */
 
 /* Slim strip on the inner edge of each pane; click to collapse/expand. */
 .pane-handle {

@@ -141,7 +141,9 @@ async function boot() {
       else app.undo();
       return;
     }
-    // Arrow keys nudge the selected transform's translation (Shift = coarse)
+    // Arrow keys nudge the selected transform's translation (Shift = coarse) — unless a side pane has the focus
+    // (a click inside it), where the arrows scroll the pane like anywhere else
+    if ((e.target as HTMLElement)?.closest?.('.panel')) return;
     const nudges: Record<string, [number, number]> = {
       ArrowLeft: [-1, 0], ArrowRight: [1, 0], ArrowUp: [0, 1], ArrowDown: [0, -1],
     };
@@ -214,8 +216,10 @@ async function boot() {
   // ---------- Layout ----------
   const main = el('div', 'main');
   const left = el('div', 'panel panel-left');
+  left.tabIndex = 0; // keyboard scrolling (arrows, Page Up/Down, Home/End) once clicked
   const wrap = el('div', 'canvas-wrap');
   const right = el('div', 'panel panel-right');
+  right.tabIndex = 0;
 
   const canvas = el('canvas') as HTMLCanvasElement;
   canvas.id = 'render';
@@ -270,6 +274,7 @@ async function boot() {
     };
     tabs.append(b);
     const body = el('div', 'tab-body' + (i === 0 ? ' active' : ''));
+    body.tabIndex = 0; // the scrolling element of the right pane: focusable so the keys scroll it
     bodies.push(body);
   });
   right.append(tabs, ...bodies);

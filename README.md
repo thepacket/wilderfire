@@ -277,7 +277,7 @@ in the stack.
 | key | action |
 |---|---|
 | `Ctrl/Cmd+Z`, `Shift+Ctrl/Cmd+Z` | undo / redo |
-| arrow keys (`Shift` = coarse) | nudge the selected transform |
+| arrow keys (`Shift` = coarse) | nudge the selected transform (over the canvas; inside a side pane they scroll the pane — click in it first, Page Up/Down, Home/End work too) |
 | `[` / `]` | collapse / expand the left / right pane |
 
 ## Run it
