@@ -134,7 +134,17 @@ export function buildLibrary(app: App, anim: AnimAPI) {
     search.placeholder = 'Search names, authors, sources…';
     search.title = 'Show only flames whose name, author or source contains this text (press / to get here, Esc to clear)';
     search.spellcheck = false;
-    tools.append(search, expBtn, impBtn, dedupBtn, clearBtn, impFile);
+    const galBtn = el('button', 'primary', '▶ Gallery');
+    galBtn.title = 'Fullscreen slideshow through these flames (the search result, in this order) — ← → browse, Space auto-advances, Esc leaves with the shown flame loaded';
+    galBtn.onclick = async () => {
+      const list = vis.map((card) => entries[entryOf(card)]);
+      if (!list.length) return;
+      const startAt = sel >= 0 ? sel : 0;
+      const { openGallery } = await import('./gallery');
+      close();
+      openGallery(app, list, startAt);
+    };
+    tools.append(search, galBtn, expBtn, impBtn, dedupBtn, clearBtn, impFile);
     if (!entries.length) {
       const empty = el('div', 'hint', 'Empty — use 💾 Save to keep the current flame here, or drop .flame / .zip files on the canvas. Stored in your browser (IndexedDB). ');
       const link = el('a', '', 'Flame packs to get started: jwfsanctuary.club/downloads/flamepacks') as HTMLAnchorElement;

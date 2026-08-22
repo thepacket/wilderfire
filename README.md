@@ -131,6 +131,11 @@ in the stack.
 - **Editor niceties** — reorder transforms (xaos-aware) and layers, copy/paste
   transforms across layers and flames, rotational/mirror **symmetry
   generators**, arrow-key nudging, **collapsible side panes** (`[` / `]`)
+- **Gallery mode** — ▶ Gallery in the library turns the search result into a
+  fullscreen slideshow rendered live (quality cap 100–1000 spp, your choice):
+  ← → browse, Page Up/Down ±10, Space auto-advances (3–40 s), F browser
+  fullscreen, Esc leaves with the shown flame loaded; the name and provenance
+  sit in a caption that fades with the controls when the mouse is still
 - **AI assistant that acts** — with tools on (default), the model works through
   function calls: `apply_edits`, `set_camera`, `screenshot`, `variation_lookup`,
   `library_search` / `library_load` / `library_save`, `randomize`, `mutate`, `undo`,

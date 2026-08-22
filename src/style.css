@@ -406,3 +406,26 @@ a { color: var(--accent2); }
 .ugr-item:hover { border-color: var(--accent); }
 .ugr-item canvas { width: 100%; height: 18px; display: block; border-radius: 3px; }
 .ugr-name { display: block; font-size: 11px; margin-top: 3px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+
+/* ---------- Gallery mode (ui/gallery.ts) ---------- */
+#app.gallery .header, #app.gallery .panel, #app.gallery .pane-handle, #app.gallery .statusbar, #app.gallery #overlay { display: none !important; }
+#app.gallery .canvas-wrap { background: #000; }
+#app.gallery-idle { cursor: none; }
+.gallery-hud { position: fixed; inset: 0; pointer-events: none; z-index: 50; transition: opacity 0.35s; }
+.gallery-hud.hidden { opacity: 0; }
+.gallery-hud > * { pointer-events: auto; }
+.gallery-top {
+  position: absolute; top: 10px; right: 12px; display: flex; align-items: center; gap: 6px;
+  background: color-mix(in srgb, var(--bg2) 80%, transparent); border: 1px solid var(--border); border-radius: 8px; padding: 4px 8px;
+}
+.gallery-top .gallery-counter { font-size: 12px; color: var(--fg-dim); margin-right: 4px; font-variant-numeric: tabular-nums; }
+.gallery-top button.icon { min-width: 28px; height: 26px; }
+.gallery-top button.icon.active { color: var(--accent); }
+.gallery-top select { height: 26px; font-size: 11px; }
+.gallery-caption {
+  position: absolute; left: 14px; bottom: 14px; max-width: 70vw;
+  background: color-mix(in srgb, var(--bg2) 80%, transparent); border: 1px solid var(--border); border-radius: 8px; padding: 8px 12px;
+}
+.gallery-name { font-weight: 700; font-size: 15px; }
+.gallery-prov { font-size: 11px; color: var(--fg-dim); margin-top: 2px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.gallery-help { position: absolute; right: 14px; bottom: 14px; font-size: 11px; color: var(--fg-dim); background: color-mix(in srgb, var(--bg2) 70%, transparent); border-radius: 6px; padding: 4px 8px; }
