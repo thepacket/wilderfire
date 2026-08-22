@@ -253,7 +253,7 @@ export function buildRenderPanel(app: App, root: HTMLElement) {
   const qRow = el('div', 'row');
   qRow.append(el('label', '', 'Quality cap'));
   const qSel = el('select') as HTMLSelectElement;
-  for (const q of [500, 1000, 2000, 4000, 10000]) {
+  for (const q of [100, 250, 500, 1000, 2000, 4000, 10000]) {
     const o = el('option', '', String(q)) as HTMLOptionElement;
     o.value = String(q);
     if (q === 1000) o.selected = true;
