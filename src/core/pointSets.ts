@@ -160,3 +160,123 @@ registerPointSet('scrambly', (P) => {
   }
   const w = new PointSetWriter(); w.raw(Array.from(mx)); return w.done();
 });
+
+// dla_wf (DLAWFFunc): diffusion-limited aggregation on a buffer_size² grid from a seeded Marsaglia sequence; the
+// occupied cells become points (scaled to `scale`, optionally jittered on a circle of radius `jitter`)
+registerPointSet('dla_wf', (P) => {
+  const bufferSize = Math.max(16, Math.min(2000, Math.round(P.buffer_size ?? 800)));
+  const maxIter = Math.max(1, Math.min(200000, Math.round(P.max_iter ?? 6000)));
+  const seed = Math.round(P.seed ?? 666), scale = P.scale ?? 10, jitter = Math.max(0.01, P.jitter ?? 0.01);
+  const jitterRadius = Math.max(Math.min(1, jitter), 0);
+  // calculate()
+  const rng = new Marsaglia(); rng.randomize(seed);
+  const centre = Math.floor(bufferSize / 2), size2 = bufferSize - 2;
+  const q = new Uint8Array(bufferSize * bufferSize);
+  const at = (i: number, j: number) => q[i * bufferSize + j];
+  q[centre * bufferSize + centre] = 1;
+  let r1 = 3, r2 = 3 * r1;
+  for (let i = 0; i < maxIter; i++) {
+    const phi = 2 * Math.PI * rng.random();
+    let ci = centre + Math.trunc(r1 * Math.cos(phi) + 0.5);
+    let cj = centre + Math.trunc(r1 * Math.sin(phi) + 0.5);
+    let qt = 0;
+    let guard = 0;
+    while (qt === 0) {
+      if (++guard > 4_000_000) return { data: new Float32Array(0), count: 0 };
+      let rr = rng.random(); rr += rr; rr += rr;
+      switch (Math.trunc(rr)) { case 0: ci++; break; case 1: cj--; break; case 2: ci--; break; default: cj++; }
+      if (ci < 1 || ci > size2 || cj < 1 || cj > size2) { qt = 1; i--; }
+      else {
+        const sum = at(ci - 1, cj) + at(ci + 1, cj) + at(ci, cj - 1) + at(ci, cj + 1);
+        const r3 = Math.hypot(ci - centre, cj - centre);
+        if (sum !== 0) { q[ci * bufferSize + cj] = 1; qt = 1; if (r3 > r1) { r1 = r3; r2 = 2.1 * r1; } }
+        else if (r3 > r2) { qt = 1; i--; }
+      }
+    }
+  }
+  // getPoints(): the occupied cells, one jitter random per cell (drawn for every cell when jitter > 0)
+  const jr = new Marsaglia(); jr.randomize(seed);
+  const w = new PointSetWriter();
+  for (let i = 0; i < bufferSize; i++) for (let j = 0; j < bufferSize; j++) {
+    const aRnd = jitterRadius > 1e-9 ? jr.random() : 0;
+    if (q[i * bufferSize + j] !== 0) {
+      let x = (i - centre) / bufferSize * scale, y = (j - centre) / bufferSize * scale;
+      if (jitterRadius > 1e-9) { const alpha = aRnd * 2 * Math.PI; x += jitterRadius * Math.cos(alpha); y += jitterRadius * Math.sin(alpha); }
+      w.point(x, y);
+    }
+  }
+  return w.done();
+});
+
+/** java.util.Random (48-bit LCG), for builders that seed one: Brownian's midpoint displacement. */
+export class JavaRandom {
+  private seed: bigint;
+  private static readonly MULT = BigInt('0x5DEECE66D');
+  private static readonly MASK = (BigInt(1) << BigInt(48)) - BigInt(1);
+  constructor(seed: number) { this.seed = (BigInt(Math.trunc(seed)) ^ JavaRandom.MULT) & JavaRandom.MASK; }
+  private next(bits: number): number { this.seed = (this.seed * JavaRandom.MULT + BigInt(11)) & JavaRandom.MASK; return Number(this.seed >> BigInt(48 - bits)); }
+  nextDouble(): number { return (this.next(26) * 134217728 + this.next(27)) / 9007199254740992; }
+}
+
+// ---- the `_js` turtle family: line segments; the kernel draws a random point along one (plotLine, ± line_thickness)
+// or, with probability show_points/(show_lines+show_points), a dot of radius point_thickness at its first end
+const turtleLines = (segs: number[], thickness: number): PointSet => { const w = new PointSetWriter(); for (let i = 0; i < segs.length; i += 4) w.line(segs[i], segs[i + 1], segs[i + 2], segs[i + 3], thickness); return w.done(); };
+const level = (P: Record<string, number>, dflt: number, max: number) => Math.max(0, Math.min(max, Math.round(P.level ?? dflt)));
+
+// brownian_js (BrownianFunc.Draw2D.midpoint): recursive midpoint displacement with gaussian offsets, java.util.Random(seed)
+registerPointSet('brownian_js', (P) => {
+  const lvl = Math.max(1, Math.min(15, Math.round(P.level ?? 10))), variation = P.variation ?? 3;
+  const seedP = Math.round(P.seed ?? 0);
+  const rnd = new JavaRandom(seedP === 0 ? Date.now() : seedP);
+  const uniform = (a: number, b: number) => a + rnd.nextDouble() * (b - a);
+  const gaussian = () => { let r, x, y; do { x = uniform(-1, 1); y = uniform(-1, 1); r = x * x + y * y; } while (r >= 1 || r === 0); return x * Math.sqrt(-2 * Math.log(r) / r); };
+  const segs: number[] = [];
+  const midpoint = (x0: number, y0: number, x1: number, y1: number, v: number, n: number): void => {
+    if (n === 0) { segs.push(x0, y0, x1, y1); return; }
+    const xm = 0.5 * (x0 + x1) + Math.sqrt(v) * gaussian();
+    const ym = 0.5 * (y0 + y1) + Math.sqrt(v) * gaussian();
+    midpoint(x0, y0, xm, ym, v / 2.7, n - 1); midpoint(xm, ym, x1, y1, v / 2.7, n - 1);
+  };
+  midpoint(0, 0, 0, 0, variation / Math.sqrt(2), lvl);
+  return turtleLines(segs, (P.line_thickness ?? 0.5) / 100);
+});
+
+// htree_js (HtreeFunc.draw): an H of `size` at the origin, four half-size H-trees at its tips, `level` deep
+registerPointSet('htree_js', (P) => {
+  const segs: number[] = []; const size = P.size ?? 2;
+  const drawH = (x: number, y: number, s: number) => { const x0 = x - s / 2, x1 = x + s / 2, y0 = y - s / 2, y1 = y + s / 2; segs.push(x0, y0, x0, y1, x1, y0, x1, y1, x0, y, x1, y); };
+  const draw = (n: number, x: number, y: number, s: number): void => { if (n === 0) return; drawH(x, y, s); const x0 = x - s / 2, x1 = x + s / 2, y0 = y - s / 2, y1 = y + s / 2; draw(n - 1, x0, y0, s / 2); draw(n - 1, x0, y1, s / 2); draw(n - 1, x1, y0, s / 2); draw(n - 1, x1, y1, s / 2); };
+  draw(level(P, 2, 9), 0, 0, size);
+  return turtleLines(segs, (P.line_thickness ?? 0.5) / 100);
+});
+
+// koch_js (KochFunc.koch): the Koch curve, step 0.5, from the origin facing +x
+registerPointSet('koch_js', (P) => {
+  const t = new Turtle(0, 0, 0);
+  const koch = (n: number, step: number): void => { if (n === 0) { t.goForward(step); return; } koch(n - 1, step); t.turnLeft(60); koch(n - 1, step); t.turnLeft(-120); koch(n - 1, step); t.turnLeft(60); koch(n - 1, step); };
+  koch(level(P, 2, 8), 0.5);
+  return turtleLines(t.segs, (P.line_thickness ?? 0.5) / 100);
+});
+
+// tree_js (TreeFunc.tree): a trunk of length 2 straight up, each branch bends and forks (branch_angle, branch_ratio)
+registerPointSet('tree_js', (P) => {
+  const segs: number[] = [];
+  const bend = (P.bend_angle ?? 0) * Math.PI / 180, branch = (P.branch_angle ?? 0) * Math.PI / 180, ratio = P.branch_ratio ?? 0;
+  const tree = (n: number, x: number, y: number, a: number, r: number): void => {
+    const cx = x + Math.cos(a) * r, cy = y + Math.sin(a) * r;
+    segs.push(x, y, cx, cy);
+    if (n === 0) return;
+    tree(n - 1, cx, cy, a + bend - branch, r * ratio); tree(n - 1, cx, cy, a + bend + branch, r * ratio); tree(n - 1, cx, cy, a + bend, r * (1 - ratio));
+  };
+  tree(level(P, 2, 12), 0, 0, Math.PI / 2, 2);
+  return turtleLines(segs, (P.line_thickness ?? 0.5) / 100);
+});
+
+// hilbert_js (HilbertFunc.Hilbert.draw_hilbert): the Hilbert curve of order `level`, unit steps
+registerPointSet('hilbert_js', (P) => {
+  const t = new Turtle(0, 0, 0);
+  const h = (n: number): void => { if (n === 0) return; t.turnLeft(90); tr(n - 1); t.goForward(1); t.turnLeft(-90); h(n - 1); t.goForward(1); h(n - 1); t.turnLeft(-90); t.goForward(1); tr(n - 1); t.turnLeft(90); };
+  const tr = (n: number): void => { if (n === 0) return; t.turnLeft(-90); h(n - 1); t.goForward(1); t.turnLeft(90); tr(n - 1); t.goForward(1); tr(n - 1); t.turnLeft(90); t.goForward(1); h(n - 1); t.turnLeft(-90); };
+  h(level(P, 2, 9));
+  return turtleLines(t.segs, (P.line_thickness ?? 0.5) / 100);
+});

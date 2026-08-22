@@ -901,7 +901,12 @@ ${lcases}
           }
           if (def.extra) {
             let k = 0;
-            if (def.flags?.includes('pset')) {
+            if (def.derive) {
+              // data hook: numbers the registry entry derives from the params on the CPU (klein_group's generator matrices, …)
+              const d = def.derive(vi.params);
+              for (let i = 0; i < d.length && i < def.extra; i++) out[o++] = d[i];
+              k = Math.min(d.length, def.extra);
+            } else if (def.flags?.includes('pset')) {
               // data hook: point-set variations → [record base, record count] of their set in the pset buffer
               const pk = pointSetKeyFor(vi);
               const lay = pk ? pointSetLayout.get(pk) : undefined;

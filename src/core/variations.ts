@@ -16,6 +16,8 @@ import type { JwfVariationDef } from './variations.jwf.ts';
 import { PSET_STRIDE } from './pointSets';
 
 export interface VariationDef {
+  /** numbers computed on the CPU from the params, written into the hidden `extra` slots (codegen data hook) */
+  derive?: (params: Record<string, number>) => number[];
   params?: { name: string; def: number; int?: boolean }[];
   code: (w: string, p: string[], A: (i: number) => string) => string;
   /** JWildfire "prepost" pair: runs first in the stage (priority -2) on the input point (the inverse), while `code` runs last (priority 2) on the output. */
@@ -156,11 +158,116 @@ const PSET_FUNCS = `fn psetSample(base: u32, n: u32, amount: f32, rs: ptr<functi
   let qx = ca * x - sa * y; let qy = sa * x + ca * y;
   return vec2f(qx * scl * rc + qy * scl * rsn + px, -qx * scl * rsn + qy * scl * rc + py);
 }`;
+/** The `_js` turtle transforms: a uniform segment, then plotLine with probability lineFrac, else a dot of radius
+ *  pointThickness around its first end (plotPoint / pDot); both thresholds as in their init(). */
+const PSET_LINE_OR_DOT = `fn psetLineOrDot(base: u32, n: u32, lineFrac: f32, pointTh: f32, rs: ptr<function, u32>) -> vec2f {
+  if (n == 0u) { return vec2f(0.0); }
+  let o = (base + min(u32(rnd(rs) * f32(n)), n - 1u)) * ${PSET_STRIDE}u;
+  let x1 = pset[o + 2u]; let y1 = pset[o + 3u]; let x2 = pset[o + 4u]; let y2 = pset[o + 5u]; let th = pset[o + 6u];
+  let r = rnd(rs);
+  if (r < lineFrac) {
+    let xdiff = x2 - x1; let ydiff = y2 - y1;
+    let m = select(ydiff / xdiff, 10000.0, xdiff == 0.0);
+    let d = rnd(rs) * sqrt(xdiff * xdiff + ydiff * ydiff);
+    var xo = d / sqrt(1.0 + m * m);
+    if (x2 < x1) { xo = -xo; }
+    var yo = abs(m * xo);
+    if (y2 < y1) { yo = -yo; }
+    if (th != 0.0) { xo += (rnd(rs) - 0.5) * th; yo += (rnd(rs) - 0.5) * th; }
+    return vec2f(x1 + xo, y1 + yo);
+  }
+  if (pointTh != 0.0) { let ro = rnd(rs) * pointTh; let ra = rnd(rs) * 6.283185307179586; return vec2f(x1 + ro * cos(ra), y1 + ro * sin(ra)); }
+  return vec2f(x1, y1);
+}`;
+/** show_lines / show_points → the line fraction; point_thickness / 100 */
+const turtleCode = (w: string, p: string[], base: number, lines: string, points: string, pointTh: string, gain = '1.0') =>
+  `{ let sum_ = ${lines} + ${points}; let lf_ = select(${lines} / sum_, 1.0, sum_ == 0.0);
+  v += (${w} * ${gain}) * psetLineOrDot(u32(${p[base]}), u32(${p[base + 1]}), lf_, ${pointTh} / 100.0, rs); }`;
+
 /** `b` = index of the first hidden slot (record base; count follows) */
 const psetCode = (w: string, p: string[], b: number, dc: boolean) =>
   `{ var c_: f32 = 0.0; let q = psetSample(u32(${p[b]}), u32(${p[b + 1]}), ${w}, rs, &c_); v += ${w} * q;${dc ? ' (*cp) = c_;' : ''} }`;
 
+/** KleinGroupFunc's generator recipes (Grandma, Maskit, modified Maskit, Jorgensen, Riley, modified Riley, Maskit-Leys) as
+ *  the four matrices [a, A, b, B] (A = a⁻¹, B = b⁻¹ by JWildfire's matrixInverse: [d, −b, −c, a]), 8 floats each. */
+type C = [number, number];
+const cAdd = (a: C, b: C): C => [a[0] + b[0], a[1] + b[1]];
+const cSub = (a: C, b: C): C => [a[0] - b[0], a[1] - b[1]];
+const cMul = (a: C, b: C): C => [a[0] * b[0] - a[1] * b[1], a[0] * b[1] + a[1] * b[0]];
+const cScale = (a: C, s: number): C => [a[0] * s, a[1] * s];
+const cDiv = (a: C, b: C): C => { const d = b[0] * b[0] + b[1] * b[1]; return [(a[0] * b[0] + a[1] * b[1]) / d, (a[1] * b[0] - a[0] * b[1]) / d]; };
+const cSqrt = (a: C): C => { const r = Math.hypot(a[0], a[1]); const re = Math.sqrt(Math.max(0, (r + a[0]) / 2)); const im = Math.sqrt(Math.max(0, (r - a[0]) / 2)); return [re, a[1] < 0 ? -im : im]; };
+export function kleinGenerators(P: Record<string, number>): number[] {
+  const ar = P.a_re ?? 2, ai = P.a_im ?? 0, br = P.b_re ?? 2, bi = P.b_im ?? 0, recipe = Math.floor(P.recipe ?? 0);
+  const zero: C = [0, 0], re1: C = [1, 0], re2: C = [2, 0], re4: C = [4, 0], im1: C = [0, 1], im2: C = [0, 2], im4: C = [0, 4];
+  let ma: C[], mb: C[];
+  const traces = () => {
+    const tA: C = [ar, ai], tB: C = [br, bi];
+    const b = cScale(cMul(tA, tB), -1);
+    const c = cAdd(cMul(tA, tA), cMul(tB, tB));
+    const bsq = cMul(b, b), ac4 = cScale(c, 4);
+    const trABminus = cDiv(cSub(cScale(b, -1), cSqrt(cSub(bsq, ac4))), re2);
+    return { tA, tB, tAB: trABminus };
+  };
+  if (recipe === 1 || recipe === 5 || recipe === 6) { // Maskit μ, modified, Maskit-Leys modified
+    const mu: C = [ar, ai];
+    ma = [cMul(cScale(mu, -1), im1), cScale(im1, -1), cScale(im1, -1), zero];
+    const b1: C = recipe === 1 ? re2 : recipe === 5 ? [br, bi] : [2 * Math.cos(Math.PI / br), bi];
+    mb = [re1, b1, zero, re1];
+  } else if (recipe === 2) { // Jorgensen
+    const { tA, tB, tAB } = traces();
+    ma = [cSub(tA, cDiv(tB, tAB)), cDiv(tA, cMul(tAB, tAB)), tA, cDiv(tB, tAB)];
+    mb = [cSub(tB, cDiv(tA, tAB)), cDiv(cScale(tB, -1), cMul(tAB, tAB)), cScale(tB, -1), cDiv(tA, tAB)];
+  } else if (recipe === 3 || recipe === 4) { // Riley, modified Riley
+    const c: C = [ar, ai];
+    ma = [re1, zero, c, re1];
+    mb = [re1, recipe === 3 ? re2 : [br, bi], zero, re1];
+  } else { // Grandma (default)
+    const { tA, tB, tAB } = traces();
+    const z0 = cDiv(cMul(cSub(tAB, re2), tB), cAdd(cSub(cMul(tB, tAB), cMul(tA, re2)), cMul(tAB, im2)));
+    const a0 = cDiv(tA, re2);
+    const a1 = cDiv(cAdd(cSub(cMul(tA, tAB), cMul(tB, re2)), im4), cMul(cAdd(cMul(tAB, re2), re4), z0));
+    const a2 = cDiv(cMul(cSub(cSub(cMul(tA, tAB), cMul(tB, re2)), im4), z0), cSub(cMul(tAB, re2), re4));
+    const a3 = cDiv(tA, re2);
+    ma = [a0, a1, a2, a3];
+    mb = [cDiv(cSub(tB, im2), re2), cDiv(tB, re2), cDiv(tB, re2), cDiv(cAdd(tB, im2), re2)];
+  }
+  const inv = (m: C[]): C[] => [m[3], cScale(m[1], -1), cScale(m[2], -1), m[0]];
+  const out: number[] = [];
+  for (const m of [ma, inv(ma), mb, inv(mb)]) for (const z of m) out.push(z[0], z[1]);
+  return out.map((v) => (Number.isFinite(v) ? v : 0));
+}
+
 const HAND_VARIATIONS: Record<string, VariationDef> = {
+  // ---- klein_group (Möbius generators a, b and their inverses from a recipe; one picked per point, optionally never
+  // the inverse of the previous one — that memory is a per-thread private, like JWildfire's prev_matrix field) ----
+  klein_group: {
+    params: [{ name: 'a_re', def: 2 }, { name: 'a_im', def: 0 }, { name: 'b_re', def: 2 }, { name: 'b_im', def: 0 }, { name: 'recipe', def: 0, int: true }, { name: 'avoid_reversal', def: 0, int: true }],
+    extra: 32,
+    derive: (P) => kleinGenerators(P),
+    flags: ['state'], types: ['2D', 'SIMULATION', 'BASE_SHAPE'],
+    funcNames: ['jwx_klein_prev', 'cmulk', 'cdivk'], funcs: `var<private> jwx_klein_prev: i32 = 0;
+fn cmulk(a: vec2f, b: vec2f) -> vec2f { return vec2f(a.x * b.x - a.y * b.y, a.x * b.y + a.y * b.x); }
+fn cdivk(a: vec2f, b: vec2f) -> vec2f { let d = b.x * b.x + b.y * b.y; return vec2f((a.x * b.x + a.y * b.y) / d, (a.y * b.x - a.x * b.y) / d); }`,
+    code: (w, p) => {
+      const B = /xd\[(\d+)u\]/.exec(p[6])![1]; // hidden slots 6..37: the four matrices [a, A, b, B], 8 floats each (re, im of a, b, c, d)
+      return `{
+    var mi: i32;
+    if (${p[5]} != 0.0) {
+      // all = [a, A, b, B]; the set that excludes the previous matrix's inverse (a↔A, b↔B), then a uniform pick in it
+      let excl = select(select(select(2, 3, jwx_klein_prev == 2), 0, jwx_klein_prev == 1), 1, jwx_klein_prev == 0);
+      let r3 = i32(rnd(rs) * 3.0);
+      mi = select(r3, r3 + 1, r3 >= excl);
+    } else { mi = i32(rnd(rs) * 4.0); }
+    mi = clamp(mi, 0, 3);
+    let mb = ${B}u + u32(mi) * 8u;
+    let A = vec2f(xd[mb], xd[mb + 1u]); let Bm = vec2f(xd[mb + 2u], xd[mb + 3u]); let C = vec2f(xd[mb + 4u], xd[mb + 5u]); let D = vec2f(xd[mb + 6u], xd[mb + 7u]);
+    let win = t / ${w};
+    let wout = cdivk(cmulk(win, A) + Bm, cmulk(win, C) + D);
+    v += ${w} * wout;
+    jwx_klein_prev = mi; }`;
+    },
+  },
   // ---- Point-set variations (src/core/pointSets.ts builds the primitives on the CPU; binding 13) ----
   dragon_js: {
     params: [{ name: 'level', def: 2, int: true }, { name: 'line_thickness', def: 0.5 }],
@@ -171,6 +278,40 @@ const HAND_VARIATIONS: Record<string, VariationDef> = {
     params: [{ name: 'nPoints', def: 500, int: true }, { name: 'shape', def: 10, int: true }, { name: 'scale', def: 0.02 }, { name: 'angle', def: 180 }, { name: 'color', def: 0 }, { name: 'F. filling', def: 0 }, { name: 'invert', def: 0, int: true }],
     extra: 2, flags: ['pset', 'dc'], types: ['2D', 'BASE_SHAPE', 'DC'], funcNames: ['psetSample'], funcs: PSET_FUNCS,
     code: (w, p) => psetCode(w, p, 7, true),
+  },
+  // dla_wf: a seeded diffusion-limited aggregate (the point is taken as is: getRandomPoint, no blur — the kernel adds
+  // nothing but amount·point, so the record's kind 0 blur must be skipped: hence the dedicated code)
+  dla_wf: {
+    params: [{ name: 'buffer_size', def: 800, int: true }, { name: 'max_iter', def: 6000, int: true }, { name: 'seed', def: 666, int: true }, { name: 'scale', def: 10 }, { name: 'jitter', def: 0.01 }],
+    extra: 2, flags: ['pset'], types: ['2D', 'BASE_SHAPE'],
+    code: (w, p) => `{ let n_ = u32(${p[6]}); if (n_ > 0u) { let o_ = (u32(${p[5]}) + min(u32(rnd(rs) * f32(n_)), n_ - 1u)) * ${PSET_STRIDE}u; v += ${w} * vec2f(pset[o_ + 2u], pset[o_ + 3u]); } }`,
+  },
+  // the `_js` turtle family (Jesus Sosa): line segments built on the CPU, lines or dots per point
+  brownian_js: {
+    params: [{ name: 'level', def: 10, int: true }, { name: 'variation', def: 3 }, { name: 'seed', def: 0, int: true }, { name: 'line_thickness', def: 0.5 }, { name: 'show_lines', def: 1 }, { name: 'show_points', def: 0 }, { name: 'point_thickness', def: 3 }],
+    extra: 2, flags: ['pset'], types: ['2D', 'BASE_SHAPE'], funcNames: ['psetLineOrDot'], funcs: PSET_LINE_OR_DOT,
+    code: (w, p) => turtleCode(w, p, 7, p[4], p[5], p[6]),
+  },
+  htree_js: {
+    params: [{ name: 'level', def: 2, int: true }, { name: 'size', def: 2 }, { name: 'show_lines', def: 1 }, { name: 'line_thickness', def: 0.5 }, { name: 'show_points', def: 0 }, { name: 'point_thickness', def: 3 }],
+    extra: 2, flags: ['pset'], types: ['2D', 'BASE_SHAPE'], funcNames: ['psetLineOrDot'], funcs: PSET_LINE_OR_DOT,
+    code: (w, p) => turtleCode(w, p, 6, p[2], p[4], p[5]),
+  },
+  koch_js: {
+    params: [{ name: 'level', def: 2, int: true }, { name: 'show_lines', def: 1, int: true }, { name: 'line_thickness', def: 0.5 }, { name: 'show_points', def: 0, int: true }, { name: 'point_thickness', def: 3 }],
+    extra: 2, flags: ['pset'], types: ['2D', 'BASE_SHAPE'], funcNames: ['psetLineOrDot'], funcs: PSET_LINE_OR_DOT,
+    code: (w, p) => turtleCode(w, p, 5, p[1], p[3], p[4]),
+  },
+  // TreeFunc.transform adds amount·out twice (a JWildfire quirk kept for fidelity): gain 2
+  tree_js: {
+    params: [{ name: 'level', def: 2, int: true }, { name: 'show_lines', def: 1, int: true }, { name: 'line_thickness', def: 0.5 }, { name: 'bend_angle', def: 0 }, { name: 'branch_angle', def: 30 }, { name: 'branch_ratio', def: 0.5 }, { name: 'show_points', def: 0, int: true }, { name: 'point_thickness', def: 3 }],
+    extra: 2, flags: ['pset'], types: ['2D', 'BASE_SHAPE'], funcNames: ['psetLineOrDot'], funcs: PSET_LINE_OR_DOT,
+    code: (w, p) => turtleCode(w, p, 8, p[1], p[6], p[7], '2.0'),
+  },
+  hilbert_js: {
+    params: [{ name: 'level', def: 2, int: true }, { name: 'show_lines', def: 1, int: true }, { name: 'line_thickness', def: 0.5 }, { name: 'show_points', def: 0, int: true }, { name: 'point_thickness', def: 3 }],
+    extra: 2, flags: ['pset'], types: ['2D', 'BASE_SHAPE'], funcNames: ['psetLineOrDot'], funcs: PSET_LINE_OR_DOT,
+    code: (w, p) => turtleCode(w, p, 5, p[1], p[3], p[4]),
   },
   // scrambly (dark-beam): cells of an l×l grid swapped by a seeded permutation (the table lives in the pset buffer)
   scrambly: {
