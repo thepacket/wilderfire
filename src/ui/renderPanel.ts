@@ -1,5 +1,5 @@
 // Right panel — Render tab: camera, tonemap, quality, export.
-import { App, el, slider, toast } from './common';
+import { App, el, slider, toast, progressToast } from './common';
 import { flameToJSON } from '../core/flame';
 import { flameToXML } from '../core/flameXML';
 import { importFlameFiles } from './flameImport';
@@ -429,16 +429,24 @@ export function buildRenderPanel(app: App, root: HTMLElement) {
     hiBtn.disabled = true;
     if (app.solo) app.setSolo(false); // exports always render the whole flame
     r.exporting = true;
+    // the file exists (empty) from the moment the dialog closed: say so while the tiles render and the PNG is written
+    const busy = progressToast(`Rendering ${fullW}×${fullH} PNG for ${target.name}… (the file stays empty until it is written)`);
     try {
       const blob = await renderHiRes(r, app.flame, {
         w: fullW, h: fullH, spp, transparent, curves: app.getCurves(),
-        onTile: (n, total) => { hiStatus.textContent = `Hi-res: tile ${n}/${total} (${fullW}×${fullH})…`; },
+        onTile: (n, total) => {
+          hiStatus.textContent = `Hi-res: tile ${n}/${total} (${fullW}×${fullH})…`;
+          busy.set(`Rendering ${fullW}×${fullH} PNG — tile ${n} of ${total}… (${target.name} stays empty until it is written)`);
+        },
       });
       hiStatus.textContent = 'Saving PNG…';
+      busy.set(`Encoding and writing ${target.name} (${(blob.size / 1e6).toFixed(1)} MB)…`);
       await target.write(blob);
       hiStatus.textContent = `Saved ${fullW}×${fullH} PNG (${(blob.size / 1e6).toFixed(1)} MB).`;
+      busy.close();
       toast(`${savedMessage(target, blob)} — ${fullW}×${fullH}`);
     } catch (e) {
+      busy.close();
       hiStatus.textContent = '⚠ ' + (e as Error).message;
       toast(`⚠ Hi-res PNG not saved: ${(e as Error).message}`, 'error');
     } finally {

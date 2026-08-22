@@ -252,3 +252,15 @@ export function toast(message: string, kind: 'info' | 'error' = 'info', ms = kin
   box.append(t);
   setTimeout(remove, ms);
 }
+
+/** A toast that stays until closed, for work in progress; `set` replaces its text (tile 3/12, saving…). */
+export function progressToast(message: string): { set: (text: string) => void; close: () => void } {
+  let box = document.querySelector('.toasts') as HTMLElement | null;
+  if (!box) { box = el('div', 'toasts'); document.getElementById('app')?.append(box); }
+  const t = el('div', 'toast busy', message);
+  box.append(t);
+  return {
+    set: (text) => { t.textContent = text; },
+    close: () => { t.classList.add('out'); setTimeout(() => t.remove(), 250); },
+  };
+}
