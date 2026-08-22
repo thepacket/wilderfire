@@ -2,6 +2,11 @@
 import { App, el, openModal } from './common';
 import { normalizeFlame, type Flame } from '../core/flame';
 import { libAll, libPut, libDelete, libDeleteMany, libClear, packOf, type LibEntry } from '../core/libraryStore';
+import { flameSignature, rankSimilar, type FlameSig } from '../core/similarity';
+
+/** Signatures cached per entry id (a library entry's flame never changes; a re-save makes a new id). */
+const sigCache = new Map<string, FlameSig>();
+export const sigOf = (e: LibEntry): FlameSig => { let s = sigCache.get(e.id); if (!s) { s = flameSignature(e.flame); sigCache.set(e.id, s); } return s; };
 import { saveText } from './saveFile';
 import type { AnimAPI } from './animPanel';
 
@@ -163,12 +168,29 @@ export function buildLibrary(app: App, anim: AnimAPI) {
       const add = (value: string, label: string, group?: HTMLOptGroupElement) => { const o = el('option', '', label) as HTMLOptionElement; o.value = value; (group ?? collSel).append(o); };
       add('all', `All flames (${entries.length})`);
       add('fav', `★ Favourites (${favs})`);
+      add('similar', similarTo ? `≈ Similar to: ${similarTo.name}` : '≈ Similar to the current flame');
       if (tags.size) { const g = el('optgroup') as HTMLOptGroupElement; g.label = 'Tags'; for (const [t, n] of [...tags].sort((a, b) => byName.compare(a[0], b[0]))) add('tag:' + t, `${t} (${n})`, g); collSel.append(g); }
       if (packs.size) { const g = el('optgroup') as HTMLOptGroupElement; g.label = 'Packs'; for (const [k, n] of [...packs].sort((a, b) => byName.compare(a[0], b[0]))) add('pack:' + k, `${k} (${n})`, g); collSel.append(g); }
       collSel.value = [...collSel.options].some((o) => o.value === collection) ? collection : (collection = 'all');
     };
-    collSel.onchange = () => { collection = collSel.value; applyFilter(); body.focus(); };
-    const inCollection = (e: LibEntry) => collection === 'all' || (collection === 'fav' ? !!e.fav : collection.startsWith('tag:') ? (e.tags ?? []).includes(collection.slice(4)) : packOf(e) === collection.slice(5));
+    // "More like this": rank the library by similarity to a target — the current flame (the
+    // standing option) or a selected card (the ≈ button); the 60 best show in score order.
+    let similarTo: { name: string; sig: FlameSig; id?: string } | null = null;
+    const similarScores = new Map<string, number>();
+    const setSimilarTarget = (t: { name: string; sig: FlameSig; id?: string }) => { similarTo = t; collection = 'similar'; refreshCollections(); applyFilter(); };
+    collSel.onchange = () => {
+      collection = collSel.value;
+      if (collection === 'similar' && !similarTo) similarTo = { name: app.flame.name || 'the current flame', sig: flameSignature(app.flame) };
+      applyFilter(); body.focus();
+    };
+    const simBtn = el('button', '', '≈ Similar');
+    simBtn.title = 'More like this: rank the library by similarity to the selected card — or, with nothing selected, to the flame in the editor (variations, palette, structure)';
+    simBtn.onclick = () => {
+      const e = sel >= 0 ? vis[sel] : null;
+      setSimilarTarget(e ? { name: e.name, sig: sigOf(e), id: e.id } : { name: app.flame.name || 'the current flame', sig: flameSignature(app.flame) });
+      body.focus();
+    };
+    const inCollection = (e: LibEntry) => collection === 'all' || (collection === 'fav' ? !!e.fav : collection.startsWith('tag:') ? (e.tags ?? []).includes(collection.slice(4)) : collection.startsWith('pack:') ? packOf(e) === collection.slice(5) : true);
     const tagAllBtn = el('button', '', '🏷 Tag all shown…');
     tagAllBtn.title = 'Add a tag to every flame in the current result (search + collection) — one write for the lot';
     tagAllBtn.onclick = async () => {
@@ -181,7 +203,7 @@ export function buildLibrary(app: App, anim: AnimAPI) {
       refreshCollections(); applyFilter();
     };
     const tools2 = el('div', 'btn-row');
-    tools.append(search, collSel, galBtn);
+    tools.append(search, collSel, simBtn, galBtn);
     tools2.append(expBtn, impBtn, tagAllBtn, dedupBtn, clearBtn, impFile);
     if (!entries.length) {
       const empty = el('div', 'hint', 'Empty — use 💾 Save to keep the current flame here, or drop .flame / .zip files on the canvas. Stored in your browser (IndexedDB). ');
@@ -221,7 +243,8 @@ export function buildLibrary(app: App, anim: AnimAPI) {
       const meta = el('div', 'lib-meta');
       const prov = [e.author ? 'by ' + e.author : '', e.source ?? ''].filter(Boolean).join(' · ');
       const tagsEl = el('div', 'lib-tags', (e.tags ?? []).join(' · ') || '\u00a0');
-      meta.append(el('div', 'lib-name', e.name), el('div', 'lib-date', new Date(e.date).toLocaleString()), el('div', 'lib-prov', prov || '\u00a0'), tagsEl);
+      const score = similarScores.get(e.id);
+      meta.append(el('div', 'lib-name', e.name), el('div', 'lib-date', score !== undefined ? `≈ ${Math.round(score * 100)} % similar` : new Date(e.date).toLocaleString()), el('div', 'lib-prov', prov || '\u00a0'), tagsEl);
       meta.title = [e.name, e.author ? 'Author: ' + e.author : '', e.source ? 'Source: ' + e.source : '', e.tags?.length ? 'Tags: ' + e.tags.join(', ') : ''].filter(Boolean).join('\n');
       const fav = el('button', 'lib-fav' + (e.fav ? ' on' : ''), e.fav ? '★' : '☆');
       fav.title = 'Favourite (Space on the selected card)';
@@ -320,13 +343,23 @@ export function buildLibrary(app: App, anim: AnimAPI) {
       const q = search.value.trim().toLowerCase();
       sel = -1;
       const textHit = (en: LibEntry) => !q || en.name.toLowerCase().includes(q) || (en.author ?? '').toLowerCase().includes(q) || (en.source ?? '').toLowerCase().includes(q) || (en.tags ?? []).some((t) => t.toLowerCase().includes(q));
-      vis = collection === 'all' && !q ? entries : entries.filter((en) => inCollection(en) && textHit(en));
+      similarScores.clear();
+      if (collection === 'similar' && similarTo) {
+        const target = similarTo;
+        const pool = entries.filter((en) => en.id !== target.id && textHit(en)).map((en) => ({ item: en, sig: sigOf(en) }));
+        const ranked = rankSimilar(target.sig, pool, 60);
+        vis = ranked.map((r) => { similarScores.set(r.item.id, r.score); return r.item; });
+      } else {
+        vis = collection === 'all' && !q ? entries : entries.filter((en) => inCollection(en) && textHit(en));
+      }
       idx.clear();
       vis.forEach((en, i) => idx.set(en.id, i));
       for (const [id, card] of cards) if (!idx.has(id)) { card.remove(); cards.delete(id); }
       const n = entries.length;
       const where = collection === 'all' ? '' : ` in ${collSel.selectedOptions[0]?.label.replace(/ \(\d+\)$/, '') ?? collection}`;
-      hint.textContent = (q || collection !== 'all' ? `${vis.length} of ${n} flame${n === 1 ? '' : 's'}${where}${q ? ' match' : ''}` : `${n} flame${n === 1 ? '' : 's'}`) +
+      hint.textContent = (collection === 'similar' && similarTo
+        ? `${vis.length} most similar to "${similarTo.name}"${q ? ` among names matching "${q}"` : ''}, best first`
+        : q || collection !== 'all' ? `${vis.length} of ${n} flame${n === 1 ? '' : 's'}${where}${q ? ' match' : ''}` : `${n} flame${n === 1 ? '' : 's'}`) +
         ' — arrows move, Enter loads, Space ★, Delete removes, Esc closes';
       layout();
       render();

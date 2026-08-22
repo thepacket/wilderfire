@@ -156,7 +156,11 @@ in the stack.
   card or Space), free-form **tags** (🏷 on the card; "Tag all shown…" tags a
   whole search result in one write) and **collections** — a select listing
   ★ Favourites, every tag and every source pack with counts — that combine with
-  the search box; the gallery plays whatever collection is showing
+  the search box; the gallery plays whatever collection is showing.
+  **≈ Similar** ("more like this") ranks the library by a structural signature —
+  which variations a flame uses and how heavily, its palette's hue histogram,
+  transform count, final, 3D, solid — against the selected card or the flame
+  in the editor; one O(N) pass, no rendering, so it is instant at thousands
   Hundreds of community packs are at
   [jwfsanctuary.club/downloads/flamepacks](https://www.jwfsanctuary.club/downloads/flamepacks/)
   (their authors' work — check each pack's terms).
