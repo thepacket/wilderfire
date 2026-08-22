@@ -108,12 +108,25 @@ export function buildLibrary(app: App, anim: AnimAPI) {
       if (!confirm(`Remove all ${n} flame${n === 1 ? '' : 's'} from the library?\n\nThis cannot be undone — ⬇ Export library first if you want a backup.`)) return;
       try { await libClear(); close(); open(); } catch (e) { alert('Could not empty the library: ' + (e as Error).message); }
     };
+    const dedupBtn = el('button', '', '⧉ Remove duplicates');
+    dedupBtn.title = 'Remove entries whose flame is identical to an earlier one (same parameters, the name may differ) — the first instance added is kept';
+    dedupBtn.onclick = async () => {
+      // identity = the flame's parameters; the name, date and thumbnail are not part of it
+      const key = (e: LibEntry) => { const f = { ...(e.flame as Record<string, unknown>) }; delete f.name; return JSON.stringify(f); };
+      const seen = new Set<string>();
+      const dupes: LibEntry[] = [];
+      for (const e of [...entries].sort((a, b) => a.date - b.date)) { const k = key(e); if (seen.has(k)) dupes.push(e); else seen.add(k); }
+      if (!dupes.length) { alert('No duplicates — every flame in the library is different.'); return; }
+      if (!confirm(`Remove ${dupes.length} duplicate${dupes.length === 1 ? '' : 's'}, keeping the first instance of each flame?\n\n${dupes.slice(0, 6).map((e) => '• ' + e.name).join('\n')}${dupes.length > 6 ? '\n…' : ''}`)) return;
+      try { for (const e of dupes) await libDelete(e.id); close(); open(); }
+      catch (e) { alert('Could not remove duplicates: ' + (e as Error).message); }
+    };
     const search = el('input', 'lib-search') as HTMLInputElement;
     search.type = 'search';
     search.placeholder = 'Search names…';
     search.title = 'Show only flames whose name contains this text (press / to get here, Esc to clear)';
     search.spellcheck = false;
-    tools.append(search, expBtn, impBtn, clearBtn, impFile);
+    tools.append(search, expBtn, impBtn, dedupBtn, clearBtn, impFile);
     if (!entries.length) {
       body.append(tools, el('div', 'hint', 'Empty — use 💾 Save to keep the current flame here, or drop .flame / .zip files on the canvas. Stored in your browser (IndexedDB).'));
       return;
