@@ -251,7 +251,7 @@ describe('zero-amount variations (JWildfire applies them)', () => {
     const xml = (g: string) => `<flame name="g" size="64 64" scale="10" gamma="${g}"><xform weight="1" linear="1" coefs="1 0 0 1 0 0"/></flame>`;
     expect(importFlameText(xml('0.0'), GREY).flame.gamma).toBe(0);
     expect(importFlameText(xml('-1'), GREY).flame.gamma).toBe(4);
-    expect(normalizeFlame(JSON.parse(flameToJSON(importFlameText(xml('0.0'), GREY).flame))).gamma).toBe(0);
+    expect(normalizeFlame(JSON.parse(flameToJSON(importFlameText(xml('0.0'), GREY).flame)), GREY).gamma).toBe(0);
   });
 });
 

@@ -24,7 +24,6 @@ export const UNPORTABLE: Record<string, string> = {
   "glynns3subfl": "renders external content (flame, image, mesh, SVG, text)",
   "gosperisland_js": "CPU-built point set",
   "gpattern": "CPU-built point set",
-  "grid3d_wf": "CPU-built point set",
   "hamid_js": "renders external content (flame, image, mesh, SVG, text)",
   "iflames_wf": "renders external content (flame, image, mesh, SVG, text)",
   "isosfplot3d_wf": "runs user code / a formula at render time",

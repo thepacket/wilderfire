@@ -82,6 +82,17 @@ describe('turtle family', () => {
   });
 });
 
+describe('grid3d_wf', () => {
+  it('compiles as a 3D direct-colour kernel variation (cube faces, per-cell hash spread, amount ignored)', () => {
+    const f = defaultFlame(pal);
+    f.layers[0].xforms[0].variations = [{ name: 'grid3d_wf', params: { ...defaultParams('grid3d_wf'), size: 0.5, beta: 1, beta_spread: 2 } }];
+    const c = compileFlame(f);
+    expect(c.wgsl).toContain('fn g3cell(');
+    expect(c.wgsl).toContain('pz_ += f32(cz) * sz + dz;');
+    expect(VARIATIONS.grid3d_wf.params!.map((p) => p.name)).toEqual(['size', 'size_spread', 'spacing', 'alpha', 'alpha_spread', 'beta', 'beta_spread', 'gamma', 'gamma_spread', 'c1', 'c2', 'c3', 'c4', 'c5', 'c6']);
+  });
+});
+
 describe('klein_group generators', () => {
   it('Grandma with traces 2, 2 gives finite matrices with det 1 and inverses [d, −b, −c, a]', () => {
     const g = kleinGenerators({ a_re: 2, a_im: 0, b_re: 2, b_im: 0, recipe: 0, avoid_reversal: 0 });

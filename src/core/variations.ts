@@ -268,6 +268,42 @@ fn cdivk(a: vec2f, b: vec2f) -> vec2f { let d = b.x * b.x + b.y * b.y; return ve
     jwx_klein_prev = mi; }`;
     },
   },
+  // ---- grid3d_wf (Grid3DWFFunc, thargor6): the input cell (size) drawn as a cube of spacing·size — one face per point,
+  // colour c1..c6 by face — optionally rotated by alpha/beta/gamma. JWildfire memoises a per-cell spread
+  // (spread − rnd·spread; all four spreads share one java.util.Random(123) and are drawn in first-visit order, so the
+  // values are not reproducible even there): a per-cell hash gives the same distribution. The amount is NOT applied
+  // (pVarTP.x += cxn·size + dx), exactly as in JWildfire. ----
+  grid3d_wf: {
+    params: [{ name: 'size', def: 0.1 }, { name: 'size_spread', def: 0 }, { name: 'spacing', def: 0.75 }, { name: 'alpha', def: 0 }, { name: 'alpha_spread', def: 0 }, { name: 'beta', def: 0 }, { name: 'beta_spread', def: 0 }, { name: 'gamma', def: 0 }, { name: 'gamma_spread', def: 0 }, { name: 'c1', def: 0.1 }, { name: 'c2', def: 0.2 }, { name: 'c3', def: 0.3 }, { name: 'c4', def: 0.4 }, { name: 'c5', def: 0.5 }, { name: 'c6', def: 0.6 }],
+    flags: ['3d', 'dc', 'z'], types: ['3D', 'DC', 'BASE_SHAPE'],
+    funcNames: ['g3cell'], funcs: `fn g3cell(x: i32, y: i32, z: i32) -> f32 {
+  var h = (u32(x) * 0x8da6b343u) ^ (u32(y) * 0xd8163841u) ^ (u32(z) * 0xcb1ab31fu) ^ 0x9e3779b9u;
+  h ^= h >> 15u; h *= 0x2c1b3c6du; h ^= h >> 12u; h *= 0x297a2d39u; h ^= h >> 15u;
+  return f32(h) * 2.3283064e-10;
+}`,
+    code: (_w, p) => `{
+    let sz = ${p[0]};
+    let cx = i32(t.x / sz); let cy = i32(t.y / sz); let cz = i32(z_ / sz);
+    let u = g3cell(cx, cy, cz);
+    let sizescl = ${p[2]} * (sz + select(0.0, ${p[1]} - u * ${p[1]}, ${p[1]} > 1e-10) * 0.1);
+    var dx = 0.0; var dy = 0.0; var dz = 0.0;
+    let face = i32(rnd(rs) * 3.0); let neg = rnd(rs) < 0.5;
+    let r1 = rnd(rs) - 0.5; let r2 = rnd(rs) - 0.5; let hs = select(0.5, -0.5, neg);
+    if (face == 0) { dx = sizescl * hs; dy = sizescl * r1; dz = sizescl * r2; (*cp) = clamp(select(${p[10]}, ${p[9]}, neg), 0.0, 1.0); }
+    else if (face == 1) { dx = sizescl * r1; dy = sizescl * hs; dz = sizescl * r2; (*cp) = clamp(select(${p[12]}, ${p[11]}, neg), 0.0, 1.0); }
+    else { dx = sizescl * r1; dy = sizescl * r2; dz = sizescl * hs; (*cp) = clamp(select(${p[14]}, ${p[13]}, neg), 0.0, 1.0); }
+    if (abs(${p[3]}) > 1e-10 || abs(${p[5]}) > 1e-10 || abs(${p[7]}) > 1e-10 || abs(${p[4]}) > 1e-10 || abs(${p[6]}) > 1e-10 || abs(${p[8]}) > 1e-10) {
+      let a = ${p[3]} + select(0.0, ${p[4]} - u * ${p[4]}, ${p[4]} > 1e-10);
+      let b = ${p[5]} + select(0.0, ${p[6]} - u * ${p[6]}, ${p[6]} > 1e-10);
+      let g = ${p[7]} + select(0.0, ${p[8]} - u * ${p[8]}, ${p[8]} > 1e-10);
+      let sina = sin(a); let cosa = cos(a); let sinb = sin(b); let cosb = cos(b); let sing = sin(g); let cosg = cos(g);
+      let dxr = dx * (cosb * cosg) + dy * (cosg * sina * sinb - cosa * sing) + dz * (cosa * cosg * sinb + sina * sing);
+      let dyr = dx * (cosb * sing) + dy * (cosa * cosg + sina * sinb * sing) + dz * (-cosg * sina + cosa * sinb * sing);
+      let dzr = dx * (-sinb) + dy * (cosb * sina) + dz * (cosa * cosb);
+      dx = dxr; dy = dyr; dz = dzr;
+    }
+    v += vec2f(f32(cx) * sz + dx, f32(cy) * sz + dy); pz_ += f32(cz) * sz + dz; }`,
+  },
   // ---- Point-set variations (src/core/pointSets.ts builds the primitives on the CPU; binding 13) ----
   dragon_js: {
     params: [{ name: 'level', def: 2, int: true }, { name: 'line_thickness', def: 0.5 }],
