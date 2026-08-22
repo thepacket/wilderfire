@@ -8,6 +8,7 @@ import { compileFlame, TONEMAP_WGSL, type CompiledFlame } from './codegen';
 import { buildSpatialFilters, solidFilterWeights, gaussianFilter1D, normFilterKernel, kernelCoeff, kernelSupport, FILT_FLOATS, type FilterKernel } from './filters';
 import { SOLID_POST_WGSL, SOLID_TONEMAP_WGSL, SOLID_AO_WGSL, SOLID_SHADOW_WGSL, SOLID_PDOF_WGSL, SOLID_PDOF_BLIT_WGSL, SOLID_PAY_WORDS, SOLID_MAX_LIGHTS, SOLID_MAX_MATS, SOLID_FILT_FLOATS } from './solid.wgsl';
 import { flameMeshKeys, ensureMesh, meshSampler, meshLayout } from '../core/meshes';
+import { flamePointSetKeys, pointSetFor, pointSetLayout, PSET_STRIDE } from '../core/pointSets';
 import { flameReflMaps, loadReflMap, reflMapKey, REFL_SIZE } from '../core/reflMaps';
 
 const XD_FLOATS = 8192;
@@ -77,6 +78,8 @@ export class FlameRenderer {
   private matsBuf!: GPUBuffer;      // per-point material index (bound when the compiled flame tracks materials)
   private meshBuf!: GPUBuffer;      // obj_mesh_primitive_wf samplers (face CDFs + triangles), packed per flame
   private meshPacked = '';          // keys packed into meshBuf
+  private psetBuf!: GPUBuffer;      // CPU-built point sets (dragon_js, sunflower, …), packed per flame
+  private psetPacked = '';
   private solidLive: SolidBufs | null = null;
   private solidOff: SolidBufs | null = null;
   private solidPostPipe!: GPUComputePipeline;
@@ -236,6 +239,7 @@ export class FlameRenderer {
     this.filtBuf = d.createBuffer({ size: FILT_FLOATS * 4, usage: GPUBufferUsage.STORAGE | GPUBufferUsage.COPY_DST });
     this.matsBuf = d.createBuffer({ size: this.nPoints * 4, usage: GPUBufferUsage.STORAGE | GPUBufferUsage.COPY_DST });
     this.meshBuf = d.createBuffer({ size: 16, usage: GPUBufferUsage.STORAGE | GPUBufferUsage.COPY_DST });
+    this.psetBuf = d.createBuffer({ size: 16, usage: GPUBufferUsage.STORAGE | GPUBufferUsage.COPY_DST });
     this.sppBuf = d.createBuffer({ size: 32, usage: GPUBufferUsage.UNIFORM | GPUBufferUsage.COPY_DST });
     this.spBuf = d.createBuffer({ size: 192, usage: GPUBufferUsage.UNIFORM | GPUBufferUsage.COPY_DST });
     this.lightsBuf = d.createBuffer({ size: (SOLID_MAX_LIGHTS * 3 + SOLID_MAX_MATS * 3) * 16, usage: GPUBufferUsage.UNIFORM | GPUBufferUsage.COPY_DST });
@@ -448,7 +452,29 @@ export class FlameRenderer {
       ] : []),
       ...(this.compiled?.usesMat ? [{ binding: 9, resource: { buffer: this.matsBuf } }] : []),
       ...(this.compiled?.usesMesh ? [{ binding: 12, resource: { buffer: this.meshBuf } }] : []),
+      ...(this.compiled?.usesPset ? [{ binding: 13, resource: { buffer: this.psetBuf } }] : []),
     ];
+  }
+
+  /** Point-set variations: build (cached) and pack every set the flame uses into `psetBuf`; synchronous, so
+   *  writeData right after sees the final offsets. */
+  private ensurePointSets(flame: Flame) {
+    const keys = flamePointSetKeys(flame);
+    const packKey = keys.join('|');
+    if (!keys.length || packKey === this.psetPacked) return;
+    const sets = keys.map(pointSetFor);
+    const total = sets.reduce((a, s) => a + s.data.length, 0);
+    const data = new Float32Array(Math.max(total, 4));
+    let o = 0;
+    pointSetLayout.clear();
+    sets.forEach((s, i) => { data.set(s.data, o); pointSetLayout.set(keys[i], { base: o / PSET_STRIDE, count: s.count }); o += s.data.length; });
+    if (this.psetBuf.size < data.byteLength) {
+      this.psetBuf.destroy();
+      this.psetBuf = this.device.createBuffer({ size: data.byteLength, usage: GPUBufferUsage.STORAGE | GPUBufferUsage.COPY_DST });
+      this.rebuildComputeBG();
+    }
+    this.device.queue.writeBuffer(this.psetBuf, 0, data);
+    this.psetPacked = packKey;
   }
 
   /** obj_mesh_primitive_wf: make sure every mesh the flame uses is prepared and packed into `meshBuf`
@@ -591,6 +617,7 @@ export class FlameRenderer {
       else this.rebuildComputeBG();
     }
     if (this.compiled.usesMesh) this.ensureMeshes(flame); // (writeData sees 0 faces for meshes still loading)
+    if (this.compiled.usesPset) this.ensurePointSets(flame);
     this.compiled.writeData(flame, this.xdData);
     this.device.queue.writeBuffer(this.xdBuf, 0, this.xdData, 0, this.compiled.dataSize);
     visibleLayers(flame).forEach((ly, li) => {

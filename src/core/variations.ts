@@ -13,6 +13,7 @@
 // remain as fallbacks for anything the port pipeline does not cover.
 
 import type { JwfVariationDef } from './variations.jwf.ts';
+import { PSET_STRIDE } from './pointSets';
 
 export interface VariationDef {
   params?: { name: string; def: number; int?: boolean }[];
@@ -99,7 +100,96 @@ const meshCode = (w: string, p: string[], b: number) => `{ let mc = u32(${p[b + 
     pz_ += ${w} * q.z;
   } }`;
 
+/** Point-set sampler (src/core/pointSets.ts records): DrawFunc.getPrimitive picks uniformly by index; then plotBlur /
+ *  plotLine / plotTriangle / nBlur's randXY — transcribed. `col` receives the primitive's colour. */
+const PSET_FUNCS = `fn psetSample(base: u32, n: u32, amount: f32, rs: ptr<function, u32>, col: ptr<function, f32>) -> vec2f {
+  if (n == 0u) { return vec2f(0.0); }
+  let o = (base + min(u32(rnd(rs) * f32(n)), n - 1u)) * ${PSET_STRIDE}u;
+  let kind = u32(pset[o] + 0.5);
+  *col = pset[o + 1u];
+  if (kind == 0u) { // point: plotBlur, a disc of radius amount·rnd
+    let r = rnd(rs) * 6.283185307179586; let r2 = amount * rnd(rs);
+    return vec2f(pset[o + 2u] + r2 * cos(r), pset[o + 3u] + r2 * sin(r));
+  }
+  if (kind == 1u) { // line: plotLine — a random distance along, then ± thickness/2 on each axis
+    let x1 = pset[o + 2u]; let y1 = pset[o + 3u]; let x2 = pset[o + 4u]; let y2 = pset[o + 5u]; let th = pset[o + 6u];
+    let xdiff = x2 - x1; let ydiff = y2 - y1;
+    let m = select(ydiff / xdiff, 10000.0, xdiff == 0.0);
+    let len = sqrt(xdiff * xdiff + ydiff * ydiff);
+    let d = rnd(rs) * len;
+    var xo = d / sqrt(1.0 + m * m);
+    if (x2 < x1) { xo = -xo; }
+    var yo = abs(m * xo);
+    if (y2 < y1) { yo = -yo; }
+    if (th != 0.0) { xo += (rnd(rs) - 0.5) * th; yo += (rnd(rs) - 0.5) * th; }
+    return vec2f(x1 + xo, y1 + yo);
+  }
+  if (kind == 2u) { // triangle: uniform barycentric
+    let s1 = sqrt(rnd(rs)); let r2 = rnd(rs);
+    let a = 1.0 - s1; let b = s1 * (1.0 - r2); let c = r2 * s1;
+    return vec2f(a * pset[o + 2u] + b * pset[o + 4u] + c * pset[o + 6u], a * pset[o + 3u] + b * pset[o + 5u] + c * pset[o + 7u]);
+  }
+  if (kind == 4u) { // dot (Brownian pDot): a square of side thickness around the point
+    let th = pset[o + 4u];
+    return vec2f(pset[o + 2u] + (rnd(rs) - 0.5) * th, pset[o + 3u] + (rnd(rs) - 0.5) * th);
+  }
+  // kind 3: n-gon — nBlur's randXY over a regular polygon of \`sides\` with a hole ratio \`fill\`, rotated by half a sector,
+  // then scaled/rotated/offset like SunFlowersFunc.transform
+  let px = pset[o + 2u]; let py = pset[o + 3u]; let nEdges = max(3.0, pset[o + 4u]); let scl = pset[o + 5u];
+  let rc = pset[o + 6u]; let rsn = pset[o + 7u]; let ratioHole = pset[o + 8u];
+  let midAngle = 6.283185307179586 / nEdges;
+  let tan90m2 = tan(1.5707963267948966 + midAngle / 2.0);
+  let arcTan1 = 13.0 / pow(nEdges, 1.3);
+  let arcTan2 = 2.0 * atan(arcTan1 / (-2.0));
+  let kEdge = f32(i32(rnd(rs) * 32767.0) % i32(nEdges));
+  var angXY = (atan(arcTan1 * (rnd(rs) - 0.5)) / arcTan2 + 0.5 + kEdge) * midAngle;
+  var x = sin(angXY); var y = cos(angXY);
+  loop { if (angXY <= midAngle) { break; } angXY -= midAngle; }
+  let xTmp = tan90m2 / (tan90m2 - tan(angXY));
+  let yTmp = xTmp * tan(angXY);
+  let lenOuter = sqrt(xTmp * xTmp + yTmp * yTmp);
+  let lenInner = ratioHole * lenOuter;
+  let ranTmp = lenInner + sqrt(rnd(rs)) * (lenOuter - lenInner);
+  x *= ranTmp; y *= ranTmp;
+  // plotPolygon: rotate by half a sector
+  let ha = midAngle / 2.0; let sa = sin(ha); let ca = cos(ha);
+  let qx = ca * x - sa * y; let qy = sa * x + ca * y;
+  return vec2f(qx * scl * rc + qy * scl * rsn + px, -qx * scl * rsn + qy * scl * rc + py);
+}`;
+/** `b` = index of the first hidden slot (record base; count follows) */
+const psetCode = (w: string, p: string[], b: number, dc: boolean) =>
+  `{ var c_: f32 = 0.0; let q = psetSample(u32(${p[b]}), u32(${p[b + 1]}), ${w}, rs, &c_); v += ${w} * q;${dc ? ' (*cp) = c_;' : ''} }`;
+
 const HAND_VARIATIONS: Record<string, VariationDef> = {
+  // ---- Point-set variations (src/core/pointSets.ts builds the primitives on the CPU; binding 13) ----
+  dragon_js: {
+    params: [{ name: 'level', def: 2, int: true }, { name: 'line_thickness', def: 0.5 }],
+    extra: 2, flags: ['pset'], types: ['2D', 'BASE_SHAPE'], funcNames: ['psetSample'], funcs: PSET_FUNCS,
+    code: (w, p) => psetCode(w, p, 2, false),
+  },
+  sunflower: {
+    params: [{ name: 'nPoints', def: 500, int: true }, { name: 'shape', def: 10, int: true }, { name: 'scale', def: 0.02 }, { name: 'angle', def: 180 }, { name: 'color', def: 0 }, { name: 'F. filling', def: 0 }, { name: 'invert', def: 0, int: true }],
+    extra: 2, flags: ['pset', 'dc'], types: ['2D', 'BASE_SHAPE', 'DC'], funcNames: ['psetSample'], funcs: PSET_FUNCS,
+    code: (w, p) => psetCode(w, p, 7, true),
+  },
+  // scrambly (dark-beam): cells of an l×l grid swapped by a seeded permutation (the table lives in the pset buffer)
+  scrambly: {
+    params: [{ name: 'l', def: 3, int: true }, { name: 'seed', def: 51, int: true }, { name: 'byrows', def: 0, int: true }, { name: 'cellsize', def: 0.1 }],
+    extra: 2, flags: ['pset'], types: ['2D'],
+    code: (w, p) => `{
+    var L = abs(i32(${p[0]})); if (L < 3) { L = 3; } else if (L > 25) { L = 25; }
+    let cella = ${p[3]} / f32(L); let mz = 0.5 * ${p[3]}; let inv = 1.0 / cella;
+    var Vx = (t.x + mz) * inv; var Vy = (t.y + mz) * inv;
+    let Ix = i32(floor(Vx)); let Iy = i32(floor(Vy));
+    if (${p[5]} == 0.0 || Ix < 0 || Ix >= L || Iy < 0 || Iy >= L) { v += ${w} * t; }
+    else {
+      Vx -= f32(Ix); Vy -= f32(Iy);
+      let swp = i32(pset[u32(${p[4]}) * ${PSET_STRIDE}u + u32(Ix + L * Iy)]);
+      Vx += f32(swp % L); Vy += f32(swp / L);
+      v += ${w} * vec2f(Vx * cella - mz, Vy * cella - mz);
+    } }`,
+  },
+
   linear: { code: (w) => `v += ${w} * t;` },
 
   sinusoidal: { code: (w) => `v += ${w} * sin(t);` },

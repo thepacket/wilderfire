@@ -26,6 +26,7 @@ import { importFlameText } from '../core/flameXML';
 import { WFIELD_WGSL } from './wfield.wgsl';
 import { SOLID_KERNEL_WGSL, SOLID_PAY_WORDS } from './solid.wgsl';
 import { meshKeyFor, meshLayout } from '../core/meshes';
+import { pointSetKeyFor, pointSetLayout, PSET_STRIDE } from '../core/pointSets';
 
 /** JWildfire pre/post-priority variation classes whose Java transform() ends with the preserve-z clause
  *  (`pVarTP.z += pAmount * pAffineTP.z`) like a 2D normal-priority one — grep of isPreserveZCoordinate over classes with a
@@ -54,6 +55,8 @@ export interface CompiledFlame {
   usesMat: boolean;
   /** A variation samples the shared mesh buffer (binding 12 `mesh`; obj_mesh_primitive_wf). */
   usesMesh: boolean;
+  /** A variation samples a CPU-built point set (binding 13 `pset`; dragon_js, sunflower, …). */
+  usesPset: boolean;
 }
 
 /** All variation lists of an xform in serialized order: pre, main, post. */
@@ -419,6 +422,7 @@ export function compileFlame(flame: Flame, nPoints: number): CompiledFlame {
   const symWgsl = !psym ? '' : symmetryWgsl(psym, symN);
   const usesMat = solid && usesMaterials(flame);
   const usesMesh = layers.some((ly) => [...ly.xforms, ...(ly.final ? [ly.final] : []), ...ly.moreFinals].some((x) => varLists(x).some((l) => l.some((vi) => VARIATIONS[vi.name]?.flags?.includes('mesh')))));
+  const usesPset = layers.some((ly) => [...ly.xforms, ...(ly.final ? [ly.final] : []), ...ly.moreFinals].some((x) => varLists(x).some((l) => l.some((vi) => VARIATIONS[vi.name]?.flags?.includes('pset')))));
   const L = layers.length;
 
   // ---- Layout ----
@@ -786,7 +790,7 @@ struct Params {
 @group(0) @binding(3) var<storage, read_write> rngs: array<vec2u>; // x: rng state, y: prev xform
 @group(0) @binding(4) var<storage, read_write> hist: array<atomic<u32>>;
 @group(0) @binding(5) var<storage, read> pal: array<vec4f>;
-${symWgsl}${usesMods ? MODS_WGSL : ''}${solid ? SOLID_KERNEL_WGSL : ''}${usesMat ? '\n@group(0) @binding(9) var<storage, read_write> mats: array<f32>; // per-point material index (JWildfire p.material)\n' : ''}${usesMesh ? '\n@group(0) @binding(12) var<storage, read> mesh: array<f32>; // mesh samplers: face CDFs + triangles (src/core/meshes.ts)\n' : ''}
+${symWgsl}${usesMods ? MODS_WGSL : ''}${solid ? SOLID_KERNEL_WGSL : ''}${usesMat ? '\n@group(0) @binding(9) var<storage, read_write> mats: array<f32>; // per-point material index (JWildfire p.material)\n' : ''}${usesPset ? '\n@group(0) @binding(13) var<storage, read> pset: array<f32>; // CPU-built point sets (src/core/pointSets.ts), ' + PSET_STRIDE + ' floats per record' : ''}${usesMesh ? '\n@group(0) @binding(12) var<storage, read> mesh: array<f32>; // mesh samplers: face CDFs + triangles (src/core/meshes.ts)\n' : ''}
 
 fn rnd(state: ptr<function, u32>) -> f32 {
   var x = *state;
@@ -897,7 +901,12 @@ ${lcases}
           }
           if (def.extra) {
             let k = 0;
-            if (def.flags?.includes('mesh')) {
+            if (def.flags?.includes('pset')) {
+              // data hook: point-set variations → [record base, record count] of their set in the pset buffer
+              const pk = pointSetKeyFor(vi);
+              const lay = pk ? pointSetLayout.get(pk) : undefined;
+              out[o++] = lay?.base ?? 0; out[o++] = lay?.count ?? 0; k = 2;
+            } else if (def.flags?.includes('mesh')) {
               // data hook: obj_mesh_primitive_wf / obj_mesh_wf → [cdf base, face count, triangle base] of its sampler in the mesh buffer (0 faces until loaded)
               const mk = meshKeyFor(vi);
               const lay = mk ? meshLayout.get(mk) : undefined;
@@ -933,7 +942,7 @@ ${lcases}
     });
   };
 
-  return { wgsl, dataSize, writeData, usesMods, solid, usesMat, usesMesh };
+  return { wgsl, dataSize, writeData, usesMods, solid, usesMat, usesMesh, usesPset };
 }
 
 export const TONEMAP_WGSL = `// WilderFire tonemap: density-estimation filter + log-density + gamma/vibrancy
