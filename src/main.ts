@@ -95,6 +95,8 @@ async function boot() {
 
   const mutBtn = el('button', '', '🧬 Mutate');
   mutBtn.title = 'Explore mutations of the current flame';
+  const shareBtn = el('button', 'icon', '🔗');
+  shareBtn.title = 'Share: copy a link that opens this flame in WilderFire (the flame is in the link itself — nothing is uploaded)';
   const saveBtn = el('button', 'icon', '💾');
   saveBtn.title = 'Save to library';
   const libBtn = el('button', '', '📚 Library');
@@ -188,7 +190,7 @@ async function boot() {
   };
   nameInp.addEventListener('change', () => { app.flame.name = nameInp.value.trim(); app.commitTone('name'); showName(); });
   nameInp.addEventListener('keydown', (e) => { if (e.key === 'Enter' || e.key === 'Escape') { if (e.key === 'Escape') showName(); nameInp.blur(); } });
-  header.append(logo, presetSel, randBtn, mutBtn, undoBtn, redoBtn, nameInp, provEl, saveBtn, libBtn, triBtn, themeBtn, aboutBtn);
+  header.append(logo, presetSel, randBtn, mutBtn, undoBtn, redoBtn, nameInp, provEl, shareBtn, saveBtn, libBtn, triBtn, themeBtn, aboutBtn);
 
   // ---------- Layout ----------
   const main = el('div', 'main');
@@ -273,8 +275,26 @@ async function boot() {
     status.textContent = '⚠ variation registry failed to load — reload the page';
     console.error('Variation registry failed to load:', e);
   }
+  // A share link (#f=…) carries a flame in the URL: it wins over the autosave and the first-visit sample.
+  let linkedCurves: import('./core/motion').MotionCurve[] = [];
+  let linked = false;
+  try {
+    const { decodeFlameHash } = await import('./core/shareLink');
+    const xml = await decodeFlameHash(location.hash);
+    if (xml) {
+      const { importFlameText } = await import('./core/flameXML');
+      const r = importFlameText(xml, app.flame.layers[0].palette);
+      app.flame = r.flame;
+      linkedCurves = r.curves;
+      app.flameSource = 'shared link';
+      linked = true;
+      history.replaceState(null, '', location.pathname + location.search); // the editor owns the flame now; 🔗 makes a fresh link
+    } else if (location.hash.startsWith('#f=')) {
+      console.warn('The link carried a flame that could not be read.');
+    }
+  } catch (e) { console.warn('Share link:', e); }
   // first visit (no autosave): start on the first sample flame; the built-in fallback stays if the fetch fails
-  if (!saved) loadSample(JWF_SAMPLES[0]).then(() => { presetSel.value = 'j:0'; }).catch((e) => console.warn('Sample load failed:', e));
+  if (!saved && !linked) loadSample(JWF_SAMPLES[0]).then(() => { presetSel.value = 'j:0'; }).catch((e) => console.warn('Sample load failed:', e));
 
   // Size canvas to container
   const fit = () => {
@@ -311,6 +331,38 @@ async function boot() {
     setTimeout(() => { saveBtn.textContent = '💾'; }, 900);
   };
   libBtn.onclick = () => library.open();
+  if (linkedCurves.length) app.setCurves(linkedCurves);
+  // A flame link pasted into an already-open tab only changes the hash (no reload): load it from here.
+  window.addEventListener('hashchange', async () => {
+    try {
+      const { decodeFlameHash } = await import('./core/shareLink');
+      const xml = await decodeFlameHash(location.hash);
+      if (!xml) return;
+      const { importFlameText } = await import('./core/flameXML');
+      const r = importFlameText(xml, app.activeLayer.palette);
+      app.flameSource = 'shared link';
+      app.setFlame(r.flame);
+      if (r.curves.length) app.setCurves(r.curves);
+      history.replaceState(null, '', location.pathname + location.search);
+    } catch (e) { console.warn('Share link:', e); }
+  });
+  shareBtn.onclick = async () => {
+    try {
+      const { encodeFlameLink } = await import('./core/shareLink');
+      const url = await encodeFlameLink(app.flame, app.getCurves());
+      let copied = false;
+      try { await navigator.clipboard.writeText(url); copied = true; } catch { /* no clipboard permission — show it instead */ }
+      const kb = (url.length / 1024).toFixed(1);
+      if (copied) {
+        shareBtn.textContent = '✓';
+        setTimeout(() => { shareBtn.textContent = '🔗'; }, 900);
+        console.info(`Share link copied (${kb} KB): ${url}`);
+        if (url.length > 32000) alert(`Link copied, but it is ${kb} KB — some chat apps and browsers truncate links this long. Saving a PNG (the flame is inside it) is the safer way to share this one.`);
+      } else {
+        prompt(`Copy this link (${kb} KB) — it opens the flame in WilderFire:`, url);
+      }
+    } catch (e) { alert('Could not make a link: ' + (e as Error).message); }
+  };
   const mutate = buildMutate(app);
   mutBtn.onclick = () => { mutate.open(); };
 

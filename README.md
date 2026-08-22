@@ -131,6 +131,9 @@ in the stack.
 - **Editor niceties** — reorder transforms (xaos-aware) and layers, copy/paste
   transforms across layers and flames, rotational/mirror **symmetry
   generators**, arrow-key nudging, **collapsible side panes** (`[` / `]`)
+- **Share links** — 🔗 in the header copies a link that opens the flame in
+  WilderFire; the flame's `.flame` XML is deflated into the URL hash, so nothing
+  is uploaded and the link works offline (a typical flame is ~2 KB of URL)
 - **The flame travels in the PNG** — every PNG WilderFire saves (Save PNG,
   hi-res, batch, the assistant's export) carries its `.flame` XML in a
   `flam3_genome` text chunk, flam3's own convention; drop such a PNG on the

@@ -47,6 +47,7 @@ export const TOOL_DEFS: ToolDef[] = [
   { type: 'function', function: { name: 'mutate', description: 'Apply one random mutation to the current flame (a variation on the theme; the old one is in undo).', parameters: { type: 'object', properties: {} } } },
   { type: 'function', function: { name: 'undo', description: 'Undo the last change to the flame.', parameters: { type: 'object', properties: {} } } },
   { type: 'function', function: { name: 'redo', description: 'Redo the change undone last.', parameters: { type: 'object', properties: {} } } },
+  { type: 'function', function: { name: 'share_link', description: 'A link that opens the current flame in WilderFire (the flame is encoded in the URL itself; nothing is uploaded). Show it to the user.', parameters: { type: 'object', properties: {} } } },
   { type: 'function', function: { name: 'export_png', description: 'Save the current render as a PNG file — the user is asked to confirm.', parameters: { type: 'object', properties: {} } } },
 ];
 
@@ -186,6 +187,11 @@ export async function runTool(name: string, argsJson: string, env: ToolEnv): Pro
       }
       case 'undo': app.undo(); return afterChange(env, 'Undone.');
       case 'redo': app.redo(); return afterChange(env, 'Redone.');
+      case 'share_link': {
+        const { encodeFlameLink } = await import('../core/shareLink');
+        const url = await encodeFlameLink(app.flame, app.getCurves());
+        return { text: `Share link (${(url.length / 1024).toFixed(1)} KB): ${url}` };
+      }
       case 'export_png': {
         if (!env.confirm(`Save a PNG of "${app.flame.name || 'untitled'}"?`)) return { text: 'The user declined the export.' };
         const blob = await app.renderer.exportPNG();
