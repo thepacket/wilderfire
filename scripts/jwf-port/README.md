@@ -97,7 +97,7 @@ points, `dc_gnarly` updates only 2 of its 6 gaussian summands — `& 5` — so i
 blur depends on the render's init randoms). Together with the 70 hand-written
 flam3 entries the app registry has 940 variations.
 
-### What is not ported (80)
+### What is not ported (69)
 
 `data/unportable.json` is the definitive list — every JWildfire variation is
 either in the registry or in that file with a category, and `gen.ts` writes it
@@ -108,7 +108,7 @@ variation was skipped. Categories:
 |---|---|---|
 | user-code | 21 | compiles user-supplied code or a formula at run time (`custom_wf`, `dc_code`, `glsl_code`, `c_var`, `ducks`, `fract_formula_*`, the `yplot2d_wf`… plot family, `colordomain`); the WebGPU kernel has no run-time compiler |
 | external-content | 25 | renders external content that would have to be uploaded to the GPU: sub-flames (`ringsubflame`, `glynns3subfl`), images (`post_bumpmap_wf`, `displacemap_wf`, `colormap_wf`, `kaleidoimg`, `plane_wf`, `wangtiles`), meshes (`terrain3D`, `metaballs3d_wf`, `knots3D`; `sattractor3D` IS ported — its formulas run through a small safe evaluator, src/core/formula.ts, and the tube is built on the CPU, src/core/sattractor.ts), `svg_wf`, `text_wf`, L-systems, brushes (`obj_mesh_wf` IS ported — the user loads the OBJ file into the browser's mesh store; `subflame_wf` IS ported — the sub-flame is compiled into the kernel) |
-| point-set | 30 | builds a point/segment list on the CPU at init and samples it per point: the `DrawFunc` family (`gpattern`, `mandala`, `nsudoku`, `sunflower`, `szubieta`, `triantruchet`, `curliecue`, `taprats`, `sunvoroni`), turtle/`DynamicArray` `_js` fractals (`dragon_js`, `koch_js`, `hilbert_js`, `tree_js`, …), `dla_wf`/`snowflake_wf` simulations, `inversion`, `maurer_lines`, `klein_group`, `natural_foam`, …; `neuron3D` builds a seed-shuffled 512-entry Perlin permutation table per instance (no per-flame table storage in the kernel) |
+| point-set | 20 | builds a point/segment list on the CPU at init and samples it per point — the rest of the `DrawFunc` family (`gpattern`, `mandala`, `mandala2`, `nsudoku`, `szubieta`, `triantruchet`, `curliecue`, `taprats`, `sunvoroni`, `arctruchet`, `geometricPrimitives`, `meeple`, `point_mirror_symmetry`), `gosperisland_js`, `rsquares_js`, `snowflake_wf`, `maurer_lines`, `grid3d_wf`, `natural_foam`; `neuron3D` builds a seed-shuffled 512-entry Perlin permutation table per instance. **Ported through the point-set mechanism (see below):** `dragon_js`, `sunflower`, `scrambly`, `dla_wf`, `brownian_js`, `htree_js`, `koch_js`, `tree_js`, `hilbert_js`, `klein_group` |
 | engine | 2 | needs an engine feature WilderFire lacks: a variation instantiating another (`sphtiling3v2`), `post_dcztransl` (no Java class) |
 | resource-params | 1 | `dc_triantess` keeps its colours as byte-array ressources |
 
@@ -185,6 +185,38 @@ rare-event Bernoulli tail — a `tile_hlp` column that shifts with p = 0.007 —
 makes that noise far larger than the Gaussian 1/√2n), so a std difference within
 that noise passes. Heavy-tailed variations (1/cos, tan) still cannot be judged
 per point and are the `FORCE_VERIFIED` cases above.
+
+### Point-set variations (2026-08-22)
+
+JWildfire's `DrawFunc` family, the `_js` turtle fractals and a few simulations build a list of primitives on the CPU
+in `init()` and sample one per point. `src/core/pointSets.ts` does the same: a builder per variation (registered by
+name, cached per parameter set) writes 12-float records — point / line / triangle / n-gon / dot — through a
+`PointSetWriter`, the renderer packs every set the flame uses into one storage buffer (binding 13 `pset`,
+synchronously in `setFlame`, like the mesh buffer), each instance's two hidden slots carry its record base and count
+(codegen data hook, flag `pset`), and WGSL `psetSample()` reproduces `DrawFunc.getPrimitive` (uniform by index),
+`plotBlur`, `plotLine` (± thickness), the uniform triangle and `nBlur`'s `randXY` polygon sampling exactly;
+`psetLineOrDot()` is the turtle family's `pLine`/`pDot` (a line with probability show_lines/(show_lines+show_points),
+else a dot of radius point_thickness/100 around the first end). JWildfire's `Turtle`, its
+`MarsagliaRandomGenerator` (seeded clouds) and `java.util.Random` (the 48-bit LCG, for `brownian_js`) are ported so
+seeded sets are the same points. `klein_group` is the odd one: no table, but its Möbius generators (the seven recipes
+— Grandma, Maskit, modified Maskit, Jorgensen, Riley, modified Riley, Maskit-Leys — with JEP's principal-branch
+complex sqrt) are computed on the CPU through a `VariationDef.derive` hook into 32 hidden slots, and the
+"previous matrix" memory for `avoid_reversal` is a per-thread private.
+
+Verdicts (Compare against headless JWildfire on corpus flames, 512 px / quality 100; fixtures
+`testflames/_ps_*.flame`): `sunflower` 1.00 / corr 1.00, `scrambly` 0.98 / 1.00, `dla_wf` 0.99 / 1.00,
+`dragon_js` 1.02 / 0.94 (sparse), `htree_js` 1.00 / 0.99, `koch_js` 1.00 / 1.00, `hilbert_js` 1.01 / 1.00,
+`tree_js` 1.00 / 1.00 (TreeFunc adds its output twice — kept), `brownian_js` 1.01 / 0.97, `klein_group` 1.02 / 1.00
+(Jorgensen, final xform) and 1.04 / 1.00 (modified Riley). The generator matrices of every recipe are unit-tested
+against values probed from `KleinGroupFunc.init()` (`tests/pointSets.test.ts`). Quirks kept: JWildfire reads
+the brownian canvas sequentially from one shared list (we pick uniformly — same distribution); `tree_js_size` in old
+files is an attribute the current `TreeFunc` no longer has (ignored by both).
+
+Found on the way: **`gamma="0.0"`** (20 of 5433 corpus flames, JWildfire V4.10/V5.50 files) is not "default" in
+JWildfire — `GammaCorrectionFilter` keeps the exponent 0, i.e. `pow(intensity, 0) = 1`: a flat image at full alpha
+above the threshold. The importer used to reject it and keep gamma 4 (renders at 0.5–0.6 of JWildfire's luma); now
+gamma 0 is kept, both tonemaps use exponent 0 for it (`gpow` keeps 0⁰ = 1 under fast-math), the JSON normaliser
+preserves it. `_ps_brownian_js` went from 0.51 / blkMAE 69 / corr 0.83 to 1.01 / 3.9 / 0.97.
 
 ## Image comparison (2026-08-17)
 

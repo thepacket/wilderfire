@@ -511,7 +511,7 @@ export function normalizeFlame(obj: any, fallbackPalette: RGB[]): Flame {
     dimishZ: Math.max(0, num(obj?.dimishZ, 0)), dimZDist: num(obj?.dimZDist, 0),
     dimZColor: (Array.isArray(obj?.dimZColor) && obj.dimZColor.length === 3 ? obj.dimZColor.map((v: unknown) => clamp01(num(v, 0))) : [0, 0, 0]) as RGB,
     brightness: Math.max(0.05, num(obj?.brightness, 4)),
-    gamma: Math.max(0.5, num(obj?.gamma, 4)),
+    gamma: num(obj?.gamma, 4) === 0 ? 0 : Math.max(0.5, num(obj?.gamma, 4)), // 0 = JWildfire flat tonemap
     gammaThreshold: Math.min(0.5, Math.max(0, num(obj?.gammaThreshold, 0.01))),
     vibrancy: clamp01(num(obj?.vibrancy, 1)),
     background: bg,

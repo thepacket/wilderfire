@@ -247,6 +247,12 @@ describe('zero-amount variations (JWildfire applies them)', () => {
     const { flame } = importFlameText('<flame name="b" size="64 64" scale="10" brightness="150"><xform weight="1" linear="1" coefs="1 0 0 1 0 0"/></flame>', GREY);
     expect(flame.brightness).toBe(150);
   });
+  it('keeps gamma 0 (old JWildfire files: the flat tonemap, exponent 0) but rejects a negative gamma', () => {
+    const xml = (g: string) => `<flame name="g" size="64 64" scale="10" gamma="${g}"><xform weight="1" linear="1" coefs="1 0 0 1 0 0"/></flame>`;
+    expect(importFlameText(xml('0.0'), GREY).flame.gamma).toBe(0);
+    expect(importFlameText(xml('-1'), GREY).flame.gamma).toBe(4);
+    expect(normalizeFlame(JSON.parse(flameToJSON(importFlameText(xml('0.0'), GREY).flame))).gamma).toBe(0);
+  });
 });
 
 describe('JWildfire background gradients', () => {

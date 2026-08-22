@@ -980,6 +980,9 @@ struct TP {
 @group(0) @binding(2) var<storage, read> sfilt: array<f32>;
 @group(0) @binding(3) var midTex: texture_2d<f32>;
 
+/** pow for the gamma exponent: exponent 0 gives 1 even at x = 0 (fast-math pow(0, 0) may be NaN) */
+fn gpow(x: f32, g: f32) -> f32 { return select(pow(x, g), 1.0, g == 0.0); }
+
 // JWildfire GammaCorrectionFilter.applyModSaturation: the finished pixel (background already
 // composited in) goes through HSL with saturation shifted by (saturation − 1), clamped to 0..1.
 fn modSaturation(c: vec3f, shift: f32) -> vec3f {
@@ -1251,21 +1254,23 @@ fn fsB(@builtin(position) fragPos: vec4f) -> @location(0) vec4f {
 
   // Gamma with flam3's gamma_threshold: a linear ramp below the threshold so
   // gamma never amplifies single-sample speckle into visible noise.
-  let g = 1.0 / max(T.gamma, 0.1);
+  // JWildfire: gamma 0 (old V4/V5 files) is the exponent 0 itself — a flat image (alpha 1 above the threshold);
+  // gpow keeps 0^0 = 1 under fast-math pow.
+  let g = select(1.0 / max(T.gamma, 0.1), 0.0, T.gamma == 0.0);
   let thr = T.bg.w;
   var aG: f32;
   if (thr > 0.0 && a < thr) {
     let frac = a / thr;
-    aG = (1.0 - frac) * a * (pow(thr, g) / thr) + frac * pow(a, g);
+    aG = (1.0 - frac) * a * (gpow(thr, g) / thr) + frac * gpow(a, g);
   } else {
-    aG = pow(max(a, 0.0), g);
+    aG = gpow(max(a, 0.0), g);
   }
 
   // flam3 vibrancy: scale channels by the gamma'd alpha ratio (saturation-
   // preserving) blended against per-channel gamma.
   let ls2 = select(0.0, aG / a, a > 0.0);
   var col = mix(
-    pow(max(crgb, vec3f(0.0)), vec3f(g)),
+    vec3f(gpow(max(crgb.r, 0.0), g), gpow(max(crgb.g, 0.0), g), gpow(max(crgb.b, 0.0), g)),
     crgb * ls2,
     clamp(T.vibrancy, 0.0, 1.0)
   );

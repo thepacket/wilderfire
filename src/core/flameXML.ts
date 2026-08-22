@@ -467,7 +467,7 @@ export function parseFlameXML(text: string, fallbackPalette: RGB[]): Flame[] {
     const br = parseFloat(fe.getAttribute('brightness') ?? '');
     if (isFinite(br) && br > 0) f.brightness = Math.min(br, 1000); // JWildfire allows any value (files with 150 exist); the slider covers 0.1–8
     const ga = parseFloat(fe.getAttribute('gamma') ?? '');
-    if (isFinite(ga) && ga > 0) f.gamma = Math.min(ga, 8);
+    if (isFinite(ga) && ga >= 0) f.gamma = Math.min(ga, 8); // 0 = JWildfire's flat tonemap (exponent 0), kept as such
     const gt = parseFloat(fe.getAttribute('gamma_threshold') ?? '');
     if (isFinite(gt) && gt >= 0) f.gammaThreshold = Math.min(gt, 0.5);
     const vi = parseFloat(fe.getAttribute('vibrancy') ?? '');

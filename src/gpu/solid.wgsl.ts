@@ -421,7 +421,7 @@ fn fs(@builtin(position) fragPos: vec4f) -> @location(0) vec4f {
   }
   if (inten <= 0.0) { return bgOut; }
   // GammaCorrectionFilter (solid branch): alpha = intensity^(1 + 1/gamma); colour = round(solid·255) + (invAlpha·bg) >> 8
-  let alpha = pow(inten, 1.0 + 1.0 / max(S.gamma, 0.1));
+  let alpha = pow(inten, 1.0 + select(1.0 / max(S.gamma, 0.1), 0.0, S.gamma == 0.0)); // JWildfire fixedGamma = 1 + (gamma 0 → 0)
   let alphaI = clamp(floor(alpha * 255.0 + 0.5), 0.0, 255.0);
   let solid255 = floor(sum * 255.0 + 0.5);
   if (transparent) {
