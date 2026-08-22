@@ -241,6 +241,63 @@ registerPointSet('brownian_js', (P) => {
   return turtleLines(segs, (P.line_thickness ?? 0.5) / 100);
 });
 
+// snowflake_wf (SnowflakeWFFunc.Snowflake): Reiter's hexagonal cellular automaton — a seeded background level with
+// noise, a frozen centre, max_iter steps of freeze (receptive cells and their six neighbours) + diffusion — rendered onto a
+// stretched canvas (values above threshold), then every lit canvas cell becomes a point (x from the row, y from the column,
+// as in JWildfire), intensity = value − threshold as the record colour; one Marsaglia jitter random per canvas cell.
+registerPointSet('snowflake_wf', (P) => {
+  const W = Math.max(4, Math.min(512, Math.round(P.buffer_size ?? 128))), maxIter = Math.max(0, Math.min(20000, Math.round(P.max_iter ?? 500)));
+  const bg = P.bg_freeze_level ?? 0.5, fgSpeed = P.fg_freeze_speed ?? 0.0005, diff = P.diffusion_speed ?? 0.01, asym = P.diffusion_asymmetry ?? 1;
+  const noise = P.rnd_bg_noise ?? 0.25, threshold = P.threshold ?? 0.65, seed = Math.round(P.seed ?? 12345), scale = P.scale ?? 1;
+  const jitterRadius = Math.max(Math.min(1, P.jitter ?? 0.001), 0);
+  const STRETCH = 1.5 / 1.7321, EPS = 1e-8;
+  const H = W + W - 1, N = W * H + (W - 1) * (H - 1);
+  const nbOff = [-W - (W - 1), -(W - 1), W, W + (W - 1), W - 1, -W];
+  const rng = new Marsaglia(); rng.randomize(seed);
+  const flake = new Float64Array(N);
+  for (let i = 0; i < N; i++) flake[i] = bg + (noise - 2 * noise * rng.random());
+  flake[Math.floor(N / 2)] = 1;
+  const nonRec = new Float64Array(N), rec = new Float64Array(N), tmp = new Float64Array(N);
+  const tFreeze = fgSpeed / 1000, tDiff = diff / 1000 + 1;
+  const cW = 0.5 * asym / tDiff, nbW = (1 * tDiff - cW) / 6;
+  for (let it = 0; it < maxIter; it++) {
+    tmp.set(flake); rec.fill(0);
+    for (let i = 0; i < N; i++) {
+      if (flake[i] >= 1) {
+        nonRec[i] = 0; rec[i] = flake[i];
+        for (let j = 0; j < 6; j++) { const nb = i + nbOff[j]; if (nb >= 0 && nb < N) { tmp[nb] = 0; rec[nb] = flake[nb] > 0 ? flake[nb] + tFreeze : flake[nb]; } }
+      }
+    }
+    // diffusionPart: nonRec[i] = tmp[i]·cW + Σ valid neighbours tmp[i + off]·nbW — each fixed offset is valid on one index range
+    for (let i = 0; i < N; i++) nonRec[i] = tmp[i] * cW;
+    for (let j = 0; j < 6; j++) { const off = nbOff[j]; const lo = Math.max(0, -off), hi = Math.min(N, N - off); for (let i = lo; i < hi; i++) nonRec[i] += tmp[i + off] * nbW; }
+    for (let i = 0; i < N; i++) flake[i] = nonRec[i] + rec[i];
+  }
+  // renderSnowflake(): canvas[y][x], later writes win
+  const cw = Math.floor(2 * W * STRETCH), ch = H;
+  const canvas = new Float32Array(cw * ch);
+  const put = (value: number, x: number, y: number) => { if (value > threshold + EPS && y >= 0 && y < ch && x >= 0 && x < cw) canvas[y * cw + x] = Math.fround(value - threshold); };
+  for (let i = 0; i < H; i++) for (let j = 0; j < W; j++) {
+    const base = (W + W - 1) * i + j;
+    put(flake[base], Math.trunc((2 * j) * STRETCH + 0.5), i);
+    const i1 = base - W + 1, i2 = base + W;
+    if (i1 >= 0 && i1 < N && i2 >= 0 && i2 < N) put((flake[i1] + flake[i2]) * 0.5, Math.trunc((2 * j + 1) * STRETCH + 0.5), i);
+  }
+  // getPoints()
+  const jr = new Marsaglia(); jr.randomize(seed);
+  const w = new PointSetWriter();
+  for (let i = 0; i < ch; i++) for (let j = 0; j < cw; j++) {
+    const aRnd = jitterRadius > EPS ? jr.random() : 0;
+    const v = canvas[i * cw + j];
+    if (v > EPS) {
+      let x = (i - ch * 0.5) * scale / ch, y = (j - cw * 0.5) * scale / cw * STRETCH;
+      if (jitterRadius > EPS) { const alpha = aRnd * 2 * Math.PI; x += jitterRadius * Math.cos(alpha); y += jitterRadius * Math.sin(alpha); }
+      w.point(x, y, v);
+    }
+  }
+  return w.done();
+});
+
 // htree_js (HtreeFunc.draw): an H of `size` at the origin, four half-size H-trees at its tips, `level` deep
 registerPointSet('htree_js', (P) => {
   const segs: number[] = []; const size = P.size ?? 2;

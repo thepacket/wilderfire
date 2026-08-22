@@ -97,7 +97,7 @@ points, `dc_gnarly` updates only 2 of its 6 gaussian summands — `& 5` — so i
 blur depends on the render's init randoms). Together with the 70 hand-written
 flam3 entries the app registry has 940 variations.
 
-### What is not ported (68)
+### What is not ported (66)
 
 `data/unportable.json` is the definitive list — every JWildfire variation is
 either in the registry or in that file with a category, and `gen.ts` writes it
@@ -108,7 +108,7 @@ variation was skipped. Categories:
 |---|---|---|
 | user-code | 21 | compiles user-supplied code or a formula at run time (`custom_wf`, `dc_code`, `glsl_code`, `c_var`, `ducks`, `fract_formula_*`, the `yplot2d_wf`… plot family, `colordomain`); the WebGPU kernel has no run-time compiler |
 | external-content | 25 | renders external content that would have to be uploaded to the GPU: sub-flames (`ringsubflame`, `glynns3subfl`), images (`post_bumpmap_wf`, `displacemap_wf`, `colormap_wf`, `kaleidoimg`, `plane_wf`, `wangtiles`), meshes (`terrain3D`, `metaballs3d_wf`, `knots3D`; `sattractor3D` IS ported — its formulas run through a small safe evaluator, src/core/formula.ts, and the tube is built on the CPU, src/core/sattractor.ts), `svg_wf`, `text_wf`, L-systems, brushes (`obj_mesh_wf` IS ported — the user loads the OBJ file into the browser's mesh store; `subflame_wf` IS ported — the sub-flame is compiled into the kernel) |
-| point-set | 19 | builds a point/segment list on the CPU at init and samples it per point — the rest of the `DrawFunc` family (`gpattern`, `mandala`, `mandala2`, `nsudoku`, `szubieta`, `triantruchet`, `curliecue`, `taprats`, `sunvoroni`, `arctruchet`, `geometricPrimitives`, `meeple`, `point_mirror_symmetry`), `gosperisland_js`, `rsquares_js`, `snowflake_wf`, `maurer_lines`, `natural_foam`; `neuron3D` builds a seed-shuffled 512-entry Perlin permutation table per instance. **Ported through the point-set mechanism (see below):** `dragon_js`, `sunflower`, `scrambly`, `dla_wf`, `brownian_js`, `htree_js`, `koch_js`, `tree_js`, `hilbert_js`, `klein_group` |
+| point-set | 17 | builds a point/segment list on the CPU at init and samples it per point — the rest of the `DrawFunc` family (`gpattern`, `mandala`, `mandala2`, `nsudoku`, `szubieta`, `triantruchet`, `curliecue`, `taprats`, `sunvoroni`, `arctruchet`, `geometricPrimitives`, `meeple`, `point_mirror_symmetry`), `gosperisland_js`, `rsquares_js`, `natural_foam`; `neuron3D` builds a seed-shuffled 512-entry Perlin permutation table per instance. **Ported through the point-set mechanism (see below):** `dragon_js`, `sunflower`, `scrambly`, `dla_wf`, `snowflake_wf`, `brownian_js`, `htree_js`, `koch_js`, `tree_js`, `hilbert_js`, `klein_group`, `grid3d_wf`, `maurer_lines` (lines render mode) |
 | engine | 2 | needs an engine feature WilderFire lacks: a variation instantiating another (`sphtiling3v2`), `post_dcztransl` (no Java class) |
 | resource-params | 1 | `dc_triantess` keeps its colours as byte-array ressources |
 
@@ -210,7 +210,14 @@ Verdicts (Compare against headless JWildfire on corpus flames, 512 px / quality 
 (Jorgensen, final xform) and 1.04 / 1.00 (modified Riley); `grid3d_wf` 1.03 / 0.98 — not a point set after all: a
 per-cell *memoised* random spread (one shared `java.util.Random(123)` drawn in first-visit order, so not reproducible
 even in JWildfire) became a per-cell hash with the same distribution, the cube faces / c1..c6 colours / rotation are
-exact and, as in JWildfire, the amount is ignored. The generator matrices of every recipe are unit-tested
+exact and, as in JWildfire, the amount is ignored; `snowflake_wf` **exact** (1.00 / blkMAE 0.0 / corr 1.00 with a
+`linear` partner — Reiter's hexagonal automaton ported cell for cell: same Marsaglia background noise, freeze /
+diffusion passes, stretched canvas, row→x column→y mapping and per-cell jitter draws; the point list equals
+`SnowflakeWFFunc._points` to float precision and a unit test pins five of the 1622 points); `maurer_lines` 0.97 / 0.5 /
+1.00 (rhodonea) — ported as an ordinary kernel variation for the LINES render mode with all 19 parametric curves,
+show_points / show_curve, line thickness and diff_mode; the spline / circle / ellipse / sine / Bézier render modes
+(drawn as the line), cosets, meta modes, filters and the direct-colour measures are not ported — the corpus never sets
+them. The generator matrices of every recipe are unit-tested
 against values probed from `KleinGroupFunc.init()` (`tests/pointSets.test.ts`). Quirks kept: JWildfire reads
 the brownian canvas sequentially from one shared list (we pick uniformly — same distribution); `tree_js_size` in old
 files is an attribute the current `TreeFunc` no longer has (ignored by both).

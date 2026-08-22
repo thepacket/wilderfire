@@ -82,11 +82,35 @@ describe('turtle family', () => {
   });
 });
 
+describe('snowflake_wf', () => {
+  it('default parameters give the 1622 points JWildfire builds (values probed from SnowflakeWFFunc._points)', () => {
+    const s = setOf('snowflake_wf', defaultParams('snowflake_wf'));
+    expect(s.count).toBe(1622);
+    const want: [number, number, number, number][] = [[0,-0.150718468,-0.00292436623,0.07198994],[1,-0.150280446,0.00267347395,0.37185037],[2,-0.151979142,0.0059278226,0.074771315],[800,-0.00998683382,0.0127318157,0.3512296],[1621,0.170496462,0.00295505782,0.030820705]];
+    for (const [i, x, y, inten] of want) {
+      expect(s.data[i * PSET_STRIDE + 2]).toBeCloseTo(x, 6);
+      expect(s.data[i * PSET_STRIDE + 3]).toBeCloseTo(y, 6);
+      expect(s.data[i * PSET_STRIDE + 1]).toBeCloseTo(inten, 5);
+    }
+  });
+});
+
+describe('maurer_lines', () => {
+  it('compiles with the 19-curve function and the diff_mode assignment', () => {
+    const f = defaultFlame(pal);
+    f.layers[0].xforms[0].variations = [{ name: 'maurer_lines', weight: 1, params: { ...defaultParams('maurer_lines'), curve_mode: 5, show_points: 0.2 } }];
+    const c = compileFlame(f, 1024);
+    expect(c.wgsl).toContain('fn mlCurve(');
+    expect(VARIATIONS.maurer_lines.params!.length).toBe(37);
+    expect(VARIATIONS.maurer_lines.params![0].name).toBe('curve_mode');
+  });
+});
+
 describe('grid3d_wf', () => {
   it('compiles as a 3D direct-colour kernel variation (cube faces, per-cell hash spread, amount ignored)', () => {
     const f = defaultFlame(pal);
-    f.layers[0].xforms[0].variations = [{ name: 'grid3d_wf', params: { ...defaultParams('grid3d_wf'), size: 0.5, beta: 1, beta_spread: 2 } }];
-    const c = compileFlame(f);
+    f.layers[0].xforms[0].variations = [{ name: 'grid3d_wf', weight: 1, params: { ...defaultParams('grid3d_wf'), size: 0.5, beta: 1, beta_spread: 2 } }];
+    const c = compileFlame(f, 1024);
     expect(c.wgsl).toContain('fn g3cell(');
     expect(c.wgsl).toContain('pz_ += f32(cz) * sz + dz;');
     expect(VARIATIONS.grid3d_wf.params!.map((p) => p.name)).toEqual(['size', 'size_spread', 'spacing', 'alpha', 'alpha_spread', 'beta', 'beta_spread', 'gamma', 'gamma_spread', 'c1', 'c2', 'c3', 'c4', 'c5', 'c6']);

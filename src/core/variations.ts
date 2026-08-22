@@ -304,6 +304,67 @@ fn cdivk(a: vec2f, b: vec2f) -> vec2f { let d = b.x * b.x + b.y * b.y; return ve
     }
     v += vec2f(f32(cx) * sz + dx, f32(cy) * sz + dy); pz_ += f32(cz) * sz + dz; }`,
   },
+  // ---- maurer_lines (MaurerLinesFunc, CozyG) — the LINES render mode: the input angle picks a step of the Maurer
+  // polyline on one of the 19 parametric curves (θ₁ = floor(cycles·atan2(y, x) / step)·step + initial, θ₂ = θ₁ + step),
+  // the output is a uniform point on that chord (± line_thickness), or with show_points / show_curve an end point / the
+  // curve point itself; diff_mode assigns t + amount·(out − t). NOT ported (the corpus never sets them): the circle /
+  // ellipse / sine / Bézier / spline render modes (drawn as the line), cosets, meta modes, filters (no hiding) and the
+  // direct-colour measures. No preserve-z clause (commented out in the Java). ----
+  maurer_lines: {
+    params: [{ name: 'curve_mode', def: 3, int: true }, { name: 'a', def: 2 }, { name: 'b', def: 1 }, { name: 'c', def: 0 }, { name: 'd', def: 1 }, { name: 'theta_step_size', def: 71 }, { name: 'initial_theta', def: 0 }, { name: 'line_count', def: 360 }, { name: 'irrationalize', def: 0 }, { name: 'render_mode', def: 0, int: true }, { name: 'render_submode', def: 0, int: true }, { name: 'tangent_submode', def: 0, int: true }, { name: 'render_modifier1', def: 1 }, { name: 'render_modifier2', def: 1 }, { name: 'render_modifier3', def: 1 }, { name: 'cosets_mode', def: 0, int: true }, { name: 'direct_color_measure', def: 1, int: true }, { name: 'direct_color_gradient', def: 0, int: true }, { name: 'direct_color_thresholding', def: 0, int: true }, { name: 'color_low_threshold', def: 0.3 }, { name: 'color_high_threshold', def: 2 }, { name: 'number_of_filters', def: 0, int: true }, { name: 'randomize', def: 0, int: true }, { name: 'diff_mode', def: 0, int: true }, { name: 'meta_mode', def: 0, int: true }, { name: 'meta_min_step', def: 30 }, { name: 'meta_max_step', def: 45 }, { name: 'meta_step_diff', def: 1 }, { name: 'show_points', def: 0 }, { name: 'show_curve', def: 0 }, { name: 'line_thickness', def: 0.1 }, { name: 'point_thickness', def: 1 }, { name: 'curve_thickness', def: 0.5 }, { name: 'e', def: 1 }, { name: 'f', def: 1 }, { name: 'g', def: 1 }, { name: 'h', def: 1 }],
+    flags: ['z'], types: ['2D', 'BASE_SHAPE'],
+    funcNames: ['mlCurve'], funcs: `fn mlCurve(mode: i32, t: f32, a: f32, b: f32, c: f32, d: f32, e: f32, f: f32, g: f32, h: f32) -> vec2f {
+  let TP = 6.283185307179586; let PI_ = 3.141592653589793;
+  switch mode {
+    case 1: { let n = floor(a); let th = abs(t % TP); let r = cos(PI_ / n) / cos(th % (TP / n) - PI_ / n); return vec2f(r * cos(th), r * sin(th)); }
+    case 2: { return vec2f(a * cos(t), b * sin(t)); }
+    case 3: { let r = cos((a / b) * t) + c; return vec2f(r * cos(t), r * sin(t)); }
+    case 4: { return vec2f((a + b) * cos(t) - c * cos(((a + b) / b) * t), (a + b) * sin(t) - c * sin(((a + b) / b) * t)); }
+    case 5: { return vec2f((a - b) * cos(t) + c * cos(((a - b) / b) * t), (a - b) * sin(t) - c * sin(((a - b) / b) * t)); }
+    case 6: { return vec2f(sin(a * t + c), sin(b * t)); }
+    case 7: { let r = 1.0 / cos((a / b) * t) + c; return vec2f(r * cos(t), r * sin(t)); }
+    case 8: { let r = pow(pow(abs(cos(a * t / 4.0)), c) + pow(abs(sin(a * t / 4.0)), d), -1.0 / b); return vec2f(r * cos(t), r * sin(t)); }
+    case 9: { let r = 2.0 + sin(a * t) / 2.0; let t2 = t + sin(b * t) / c; return vec2f(r * cos(t2), r * sin(t2)); }
+    case 10: { return vec2f(cos(t) / a + cos(6.0 * t) / b + sin(14.0 * t) / c, sin(t) / a + sin(6.0 * t) / b + cos(14.0 * t) / c); }
+    case 11: { return vec2f(sin(a * t) * cos(c * t), sin(b * t) * sin(c * t)); }
+    case 12: { let s = sin(t / 12.0); let r = 0.5 * (exp(cos(t)) - 2.0 * cos(4.0 * t) - s * s * s * s * s); return vec2f(r * sin(t), r * cos(t)); }
+    case 13: { let r = (1.0 - cos(a * t)) + (1.0 - cos(a * b * t)); return vec2f(r * cos(t), r * sin(t)); }
+    case 14: { let r = (1.0 - cos(a * t)) - (1.0 - cos(a * b * t)); return vec2f(r * cos(t), r * sin(t)); }
+    case 15: { let k = a / b; let r = (cos(k * t) + cos(c * k * t)) / 2.0; return vec2f(r * cos(t), r * sin(t)); }
+    case 16: { let k = a / b; let r = (cos(k * t) - cos(c * k * t)) / 2.0; return vec2f(r * cos(t), r * sin(t)); }
+    case 17: { let ct = cos(t); let st = sin(t); return vec2f(pow(abs(ct), 2.0 / c) * a * sign(ct), pow(abs(st), 2.0 / d) * b * sign(st)); }
+    case 18: { let rose = cos((a / b) * t); let ss = pow(pow(abs(cos(c * t / 4.0) / g), e) + pow(abs(sin(c * t / 4.0) / h), f), -1.0 / d); let r = rose * ss; return vec2f(r * cos(t), r * sin(t)); }
+    default: { return vec2f(a * cos(t), a * sin(t)); }
+  }
+}`,
+    code: (w, p) => `{
+    let a_ = ${p[1]}; let b_ = ${p[2]}; let c_ = ${p[3]}; let d_ = ${p[4]}; let e_ = ${p[33]}; let f_ = ${p[34]}; let g_ = ${p[35]}; let h_ = ${p[36]};
+    let cm = i32(${p[0]});
+    var tin: f32; if (${p[22]} >= 1.0) { tin = rnd(rs) * 6.283185307179586; } else { tin = atan2(t.y, t.x); }
+    var tstep = 6.283185307179586 * (${p[5]} / 360.0); if (${p[8]} != 0.0) { tstep += (${p[8]} * 0.01 * 2.718281828459045) / 360.0; }
+    let tinit = 6.283185307179586 * (${p[6]} / 360.0);
+    let tt = ((${p[7]} * tstep) / 6.283185307179586) * tin;
+    let th1 = floor(tt / tstep) * tstep + tinit; let th2 = th1 + tstep;
+    let q1 = mlCurve(cm, th1, a_, b_, c_, d_, e_, f_, g_, h_); let q2 = mlCurve(cm, th2, a_, b_, c_, d_, e_, f_, g_, h_);
+    var out = vec2f(0.0); var useRender = true;
+    let sp = ${p[28]}; let sc = ${p[29]};
+    if (sp > 0.0 || sc > 0.0) {
+      let r1 = rnd(rs); let r2 = rnd(rs);
+      if (r2 <= sp) {
+        useRender = false; var off = vec2f(0.0); let pth = ${p[31]} / 100.0;
+        if (pth != 0.0) { let ro = rnd(rs) * pth; let ra = rnd(rs) * 6.283185307179586; off = vec2f(ro * cos(ra), ro * sin(ra)); }
+        out = select(q2, q1, r1 <= sp / 2.0) + off;
+      } else if (r2 <= sp + sc) {
+        useRender = false; out = mlCurve(cm, tt, a_, b_, c_, d_, e_, f_, g_, h_); let cth = ${p[32]} / 100.0;
+        if (cth != 0.0) { out += vec2f((rnd(rs) - 0.5) * cth, (rnd(rs) - 0.5) * cth); }
+      }
+    }
+    if (useRender) {
+      let t1 = rnd(rs); out = q1 * (1.0 - t1) + q2 * t1;
+      let lth = ${p[30]} / 100.0; if (lth != 0.0) { out += vec2f((rnd(rs) - 0.5) * lth, (rnd(rs) - 0.5) * lth); }
+    }
+    if (${p[23]} >= 1.0) { v = t + ${w} * (out - t); pz_ = z_ - ${w} * z_; } else { v += ${w} * out; } }`,
+  },
   // ---- Point-set variations (src/core/pointSets.ts builds the primitives on the CPU; binding 13) ----
   dragon_js: {
     params: [{ name: 'level', def: 2, int: true }, { name: 'line_thickness', def: 0.5 }],
@@ -321,6 +382,12 @@ fn cdivk(a: vec2f, b: vec2f) -> vec2f { let d = b.x * b.x + b.y * b.y; return ve
     params: [{ name: 'buffer_size', def: 800, int: true }, { name: 'max_iter', def: 6000, int: true }, { name: 'seed', def: 666, int: true }, { name: 'scale', def: 10 }, { name: 'jitter', def: 0.01 }],
     extra: 2, flags: ['pset'], types: ['2D', 'BASE_SHAPE'],
     code: (w, p) => `{ let n_ = u32(${p[6]}); if (n_ > 0u) { let o_ = (u32(${p[5]}) + min(u32(rnd(rs) * f32(n_)), n_ - 1u)) * ${PSET_STRIDE}u; v += ${w} * vec2f(pset[o_ + 2u], pset[o_ + 3u]); } }`,
+  },
+  // snowflake_wf: a seeded Reiter snowflake (point taken as is, amount·point; colour = intensity·dc_color_scale + dc_color_offset when dc_color > 0)
+  snowflake_wf: {
+    params: [{ name: 'buffer_size', def: 128, int: true }, { name: 'max_iter', def: 500, int: true }, { name: 'bg_freeze_level', def: 0.5 }, { name: 'fg_freeze_speed', def: 0.0005 }, { name: 'diffusion_speed', def: 0.01 }, { name: 'diffusion_asymmetry', def: 1 }, { name: 'rnd_bg_noise', def: 0.25 }, { name: 'threshold', def: 0.65 }, { name: 'seed', def: 12345, int: true }, { name: 'scale', def: 1 }, { name: 'jitter', def: 0.001 }, { name: 'dc_color', def: 1, int: true }, { name: 'dc_color_scale', def: 2 }, { name: 'dc_color_offset', def: 0.1 }],
+    extra: 2, flags: ['pset', 'dc'], types: ['2D', 'DC', 'SIMULATION', 'BASE_SHAPE'],
+    code: (w, p) => `{ let n_ = u32(${p[15]}); if (n_ > 0u) { let o_ = (u32(${p[14]}) + min(u32(rnd(rs) * f32(n_)), n_ - 1u)) * ${PSET_STRIDE}u; v += ${w} * vec2f(pset[o_ + 2u], pset[o_ + 3u]); if (${p[11]} > 0.0) { (*cp) = pset[o_ + 1u] * ${p[12]} + ${p[13]}; } } }`,
   },
   // the `_js` turtle family (Jesus Sosa): line segments built on the CPU, lines or dots per point
   brownian_js: {
