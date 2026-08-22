@@ -33,6 +33,10 @@ export interface RenderStats {
   samplesPerSec: number;
   paused: boolean;
   converged: boolean;
+  /** converged because the wall-clock limit ran out, not because the quality cap was reached */
+  timedOut: boolean;
+  /** seconds the live view has spent accumulating since the last reset (paused / hidden time excluded) */
+  elapsedS: number;
   /** adaptive preview budget: fraction of the configured iterations per pass currently used (1 = full) */
   budgetScale: number;
   /** measured GPU time per preview frame (ms, smoothed) */
@@ -141,6 +145,11 @@ export class FlameRenderer {
   private framesSinceGate = 1e9;
   passesPerFrame = 2;
   targetQuality = 1000; // spp cap (the live view stops accumulating here; exports pick their own quality)
+  /** Wall-clock limit on the live view, seconds of accumulation since the last reset (0 = none). Whichever
+   *  of the two caps comes first stops the render — a heavy flame that would take minutes to reach the
+   *  quality cap stops here instead of keeping the GPU at full load. Exports ignore it. */
+  timeLimitS = 30;
+  private liveMs = 0;
   /** Live-preview cap on the DE estimator radius (px); exports use the flame's full radius. */
   deLiveCap = 6;
   /** Don't present a freshly reset accumulation until it has this many samples per
@@ -618,6 +627,7 @@ export class FlameRenderer {
 
   resetAccumulation() {
     this.samples = 0;
+    this.liveMs = 0;
     this.offShadowsReady = false;
     this.emaSps = 0;
     this.needsPresent = true;
@@ -1236,18 +1246,21 @@ export class FlameRenderer {
     const w = this.width, h = this.height;
     const os2 = this.oversample * this.oversample;
     const spp = this.samples / Math.max(w * h * os2, 1);
-    const converged = spp >= this.targetQuality;
+    const timedOut = this.timeLimitS > 0 && this.liveMs >= this.timeLimitS * 1000;
+    const converged = spp >= this.targetQuality || timedOut;
     const accumulate = !this.paused && !converged;
+    const stats = (samplesPerSec: number): RenderStats => ({ spp, samplesPerSec, paused: this.paused, converged, timedOut, elapsedS: this.liveMs / 1000, budgetScale: this.budgetScale, gpuMs: this.gpuMs });
 
     const dt = this.lastT ? (t - this.lastT) / 1000 : 0;
     this.lastT = t;
+    if (accumulate && dt > 0 && dt < 0.5) this.liveMs += dt * 1000; // rendering time only: a hidden tab or a pause does not count
     if (dt > 0.5 && !this.inFlight) { this.gpuMs = 0; this.dtMs = 0; } // we were away (hidden tab): the last probe says nothing about the GPU load
     else if (dt > 0) this.dtMs = this.dtMs ? this.dtMs * 0.8 + dt * 1000 * 0.2 : dt * 1000;
 
     // Idle: converged (or paused) and nothing to redraw → do no GPU work at all.
     // The canvas keeps its last presented frame. invalidate() wakes us up.
     if (!accumulate && !this.needsPresent) {
-      this.onFrame?.({ spp, samplesPerSec: 0, paused: this.paused, converged, budgetScale: this.budgetScale, gpuMs: this.gpuMs });
+      this.onFrame?.(stats(0));
       return;
     }
 
@@ -1327,7 +1340,7 @@ export class FlameRenderer {
       const sps = (perPass * passes) / dt;
       this.emaSps = this.emaSps ? this.emaSps * 0.95 + sps * 0.05 : sps;
     }
-    this.onFrame?.({ spp, samplesPerSec: this.emaSps, paused: this.paused, converged, budgetScale: this.budgetScale, gpuMs: this.gpuMs });
+    this.onFrame?.(stats(this.emaSps));
   };
 
   /** Dev diagnostic: total opacity-weighted hits in the live histogram and the count at a pixel. */

@@ -262,6 +262,24 @@ export function buildRenderPanel(app: App, root: HTMLElement) {
   qSel.onchange = () => { app.renderer.targetQuality = parseInt(qSel.value); app.renderer.invalidate(); };
   qRow.append(qSel);
 
+  const tRow = el('div', 'row');
+  const tLab = el('label', '', 'Stop after');
+  tLab.title = 'Wall-clock limit on the live render, in seconds (0 = none). Whichever comes first — this or the quality cap — stops the render, so a heavy flame does not keep the GPU at full load for minutes. Re-render restarts the clock. Exports ignore it.';
+  const tIn = el('input') as HTMLInputElement;
+  tIn.type = 'number'; tIn.min = '0'; tIn.max = '3600'; tIn.step = '5'; tIn.style.width = '5em';
+  const LS_TIME = 'wilderfire.render.timeLimit';
+  const savedT = parseFloat(localStorage.getItem(LS_TIME) ?? '');
+  app.renderer.timeLimitS = Number.isFinite(savedT) && savedT >= 0 ? savedT : 30;
+  tIn.value = String(app.renderer.timeLimitS);
+  tIn.onchange = () => {
+    const v = Math.max(0, Math.min(3600, parseFloat(tIn.value) || 0));
+    tIn.value = String(v);
+    app.renderer.timeLimitS = v;
+    localStorage.setItem(LS_TIME, String(v));
+    app.renderer.invalidate();
+  };
+  tRow.append(tLab, tIn, el('span', 'hint', 's'));
+
   const adaptRow = el('div', 'row');
   const adaptChk = el('input') as HTMLInputElement;
   adaptChk.type = 'checkbox';
@@ -283,7 +301,7 @@ export function buildRenderPanel(app: App, root: HTMLElement) {
   restartBtn.onclick = () => app.renderer.resetAccumulation();
   const pRow = el('div', 'btn-row');
   pRow.append(pauseBtn, restartBtn);
-  perf.append(modeRow, speedRow, holdS.root, deS.root, deCurveS.root, deLiveRow, osRow, qRow, adaptRow, pRow);
+  perf.append(modeRow, speedRow, holdS.root, deS.root, deCurveS.root, deLiveRow, osRow, qRow, tRow, adaptRow, pRow);
 
   const LS_MODE = 'wilderfire.render.mode';
   const MODES: Record<string, { speed: string; hold: number; deLive: string; os: string; q: string }> = {

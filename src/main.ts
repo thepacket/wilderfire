@@ -330,7 +330,7 @@ async function boot() {
     const mps = s.samplesPerSec / 1e6;
     status.textContent = swNote +
       `quality ${s.spp.toFixed(0)} spp` +
-      (s.converged ? ' · done' : s.paused ? ' · paused' : ` · ${mps.toFixed(0)} M iters/s`) +
+      (s.converged ? (s.timedOut ? ` · stopped after ${Math.round(s.elapsedS)} s` : ' · done') : s.paused ? ' · paused' : ` · ${mps.toFixed(0)} M iters/s`) +
       (s.budgetScale < 1 && !s.converged && !s.paused ? ` · budget ${Math.round(s.budgetScale * 100)}%` : '') +
       ` · ${renderer.width}×${renderer.height}`;
   };

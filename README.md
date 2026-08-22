@@ -194,7 +194,10 @@ in the stack.
   entry gets a thumbnail rendered on the spot
 - **Mutation grid** (MutaGen-style) — 3×3 explorer of random mutations
   rendered offscreen; click to adopt and keep exploring
-- Progressive refinement with quality cap, speed presets, pause/re-render,
+- Progressive refinement with a quality cap and a **wall-clock limit** (Engine →
+  Stop after, 30 s by default; whichever comes first ends the live render,
+  so a heavy flame never keeps the GPU at full load for minutes), speed
+  presets, pause/re-render,
   and a **preview hold** (Engine → Preview hold): after each edit the last
   image stays on screen until the new one has accumulated N samples per
   pixel (a bounded burst of extra passes gets it there within a frame), so
