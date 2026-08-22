@@ -137,6 +137,17 @@ export class FlameRenderer {
   private gpuMs = 0;
   private dtMs = 0; // smoothed rAF interval — the UI-stall symptom the budget reacts to
   private gpuProbeInFlight = false;
+  /** Present cadence. The tonemap pass (density estimation: (2R+1)² taps per pixel) costs far more than
+   *  the chaos game on a big canvas — ~35 ms at 5 Mpx against 5 ms of compute — and presenting it every
+   *  frame drags the frame rate down, which the budget controller would read as compute overload and
+   *  answer by throttling the chaos game to its floor. So the picture is presented no more often than
+   *  every 2× its measured cost (a third of the GPU at most, whatever the display's refresh rate), while
+   *  the compute keeps running every frame. */
+  private presentMs = 0;
+  private presentSkips = 0;
+  private lastPresentT = 0;
+  private lastPresented = false;
+  private probeDoneT = 0;
   passesPerFrame = 2;
   targetQuality = 1000; // spp cap (the live view stops accumulating here; exports pick their own quality)
   /** Wall-clock limit on the live view, seconds of accumulation since the last reset (0 = none). Whichever
@@ -1279,6 +1290,7 @@ export class FlameRenderer {
     // during a fast drag.
     const perPass = this.nPoints * iters;
     let passes = this.passesPerFrame;
+    let probing = false;
     if (accumulate && this.minDisplaySpp > 0) {
       const need = Math.ceil((this.minDisplaySpp * w * h - this.samples) / perPass);
       if (need > passes) passes = Math.min(need, this.passesPerFrame * 4);
@@ -1299,12 +1311,17 @@ export class FlameRenderer {
       }
       pass.end();
       this.device.queue.submit([cenc.finish()]);
-      if (!this.gpuProbeInFlight) {
+      // Probe the compute cost on frames whose queue holds no present from the previous frame (the queue
+      // is FIFO, so a present ahead of the compute would be timed with it) — unless presents are cheap,
+      // in which case every frame presents and the probe includes it, as it always did.
+      if (!this.gpuProbeInFlight && (this.presentMs < 4 || !this.lastPresented)) {
         this.gpuProbeInFlight = true;
+        probing = true;
         const t0 = performance.now();
         this.device.queue.onSubmittedWorkDone().then(() => {
           const ms = Math.min(performance.now() - t0, 200); // capped: one stall must not poison the average for long
           this.gpuMs = this.gpuMs ? this.gpuMs * 0.8 + ms * 0.2 : ms;
+          this.probeDoneT = performance.now();
           this.gpuProbeInFlight = false;
         }, () => { this.gpuProbeInFlight = false; });
       }
@@ -1316,14 +1333,27 @@ export class FlameRenderer {
     // the new one has reached minDisplaySpp — a WebGPU canvas keeps its last
     // frame as long as we don't fetch a new current texture.
     const sppAfter = this.samples / Math.max(w * h, 1);
-    const present = !accumulate || sppAfter >= this.minDisplaySpp || !this.hasPresented;
+    const due = performance.now() - this.lastPresentT >= 2 * this.presentMs - 1;
+    const present = !accumulate || !this.hasPresented || this.needsPresent || (due && sppAfter >= this.minDisplaySpp);
     if (present) {
       const view = this.context.getCurrentTexture().createView();
       this.presentTo(enc, view, accumulate);
       this.hasPresented = true;
       this.needsPresent = false;
+      this.lastPresentT = performance.now();
+      this.device.queue.submit([enc.finish()]);
+      if (probing) {
+        // this present follows the probed compute in the queue: its own cost is the gap between the two
+        // completions (callbacks that arrive in the same batch say nothing — skipped, and a run of skips
+        // lets the estimate decay so a canvas that got smaller presents more often again)
+        this.device.queue.onSubmittedWorkDone().then(() => {
+          const own = performance.now() - this.probeDoneT;
+          if (own > 0.3) { this.presentMs = this.presentMs ? this.presentMs * 0.7 + own * 0.3 : own; this.presentSkips = 0; }
+          else if (++this.presentSkips > 10) { this.presentMs *= 0.8; this.presentSkips = 0; }
+        }, () => {});
+      }
     }
-    if (present) this.device.queue.submit([enc.finish()]);
+    this.lastPresented = present;
 
     if (accumulate && dt > 0 && dt < 0.5) {
       const sps = (perPass * passes) / dt;

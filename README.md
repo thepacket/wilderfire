@@ -205,8 +205,11 @@ in the stack.
   Custom engine modes; and an **adaptive preview budget** that shrinks the
   work per frame on very heavy flames (many layers × variations) so the
   editor stays responsive — measured from the GPU's own completion time,
-  scaled back up when there is headroom, never applied to exports. Engine → ↺ Reset puts every
-  engine setting back to its default
+  scaled back up when there is headroom, never applied to exports. On a big
+  canvas the tonemap pass (density estimation) costs several times the
+  chaos game, so the picture is presented no more often than every 2× its
+  measured cost while the compute runs every frame at full budget. Engine →
+  ↺ Reset puts every engine setting back to its default
 - Gradient presets, IQ-cosine **random palettes**, hue rotation, a
   **draggable stop editor**, invert, and **.ugr / .map gradient import and
   export** (a .ugr gradient pack opens a chooser)
