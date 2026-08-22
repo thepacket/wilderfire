@@ -173,7 +173,18 @@ export class FlameRenderer {
   private samples = 0;
   private paused = false;
   /** While true, the rAF loop idles so an offline export can drive frames. */
-  exporting = false;
+  private _exporting = false;
+  get exporting(): boolean { return this._exporting; }
+  set exporting(v: boolean) {
+    this._exporting = v;
+    if (!v && this.pendingFlame && !this.regionDepth) { const f = this.pendingFlame; this.pendingFlame = null; this.setFlame(f); }
+  }
+  /** Offscreen renders in flight (renderRegion). A setFlame that arrives meanwhile is deferred: the region's command
+   *  buffers bind the pipeline they were built for, and swapping the kernel under them made the next chunk dispatch the
+   *  new pipeline with the old bind group — "pipeline created with a default layout is not compatible with the bind
+   *  group" on every later submit (seen after a hi-res export followed by a library load). */
+  private regionDepth = 0;
+  private pendingFlame: Flame | null = null;
   private raf = 0;
   private lastT = 0;
   private emaSps = 0;
@@ -551,6 +562,7 @@ export class FlameRenderer {
 
   /** Push the current flame to the GPU. Recompiles the kernel on structural change. */
   setFlame(flame: Flame) {
+    if (this.regionDepth > 0) { this.pendingFlame = flame; return; } // applied when the offscreen render finishes
     this.flame = flame;
     const sig = flameSignature(flame);
     if (sig !== this.sig || !this.compiled) {
@@ -1147,6 +1159,21 @@ export class FlameRenderer {
     tileX: number; tileY: number; tileW: number; tileH: number;
     spp: number; transparent?: boolean;
   }): Promise<Uint8ClampedArray<ArrayBuffer>> {
+    this.regionDepth++;
+    try {
+      return await this.renderRegionInner(o);
+    } finally {
+      this.regionDepth--;
+      // a flame set while the region was in flight (assistant, playback, a second import…) applies now — unless an
+      // export owns the renderer (it restores the flame itself when it clears `exporting`)
+      if (!this.regionDepth && !this._exporting && this.pendingFlame) { const f = this.pendingFlame; this.pendingFlame = null; this.setFlame(f); }
+    }
+  }
+  private async renderRegionInner(o: {
+    fullW: number; fullH: number;
+    tileX: number; tileY: number; tileW: number; tileH: number;
+    spp: number; transparent?: boolean;
+  }): Promise<Uint8ClampedArray<ArrayBuffer>> {
     const d = this.device;
     if (!this.flame || !this.computePipeline) throw new Error('No compiled flame.');
     await this.ready();
@@ -1168,8 +1195,9 @@ export class FlameRenderer {
       this.offShadowsReady = false;
     }
     if (solid && this.solidOff && this.ensureShadowBufs(this.solidOff, this.shadowCasters(), this.shadowMapSize())) this.offShadowsReady = false;
+    const pipeline = this.computePipeline; // the bind group below is built for THIS pipeline: use the pair together
     const computeBG = d.createBindGroup({
-      layout: this.computePipeline.getBindGroupLayout(0),
+      layout: pipeline.getBindGroupLayout(0),
       entries: this.computeEntries(this.offHist, this.solidOff),
     });
     if (!this.exportPipeline) {
@@ -1220,7 +1248,7 @@ export class FlameRenderer {
       // the flame changed (setFlame) or the buffers were re-created
       if (first) { enc.clearBuffer(this.offHist); if (solid && this.solidOff) { enc.clearBuffer(this.solidOff.key); if (!this.offShadowsReady) this.clearShadowBufs(enc, this.solidOff); } first = false; }
       const cp = enc.beginComputePass();
-      cp.setPipeline(this.computePipeline);
+      cp.setPipeline(pipeline);
       cp.setBindGroup(0, computeBG);
       for (let i = 0; i < nowP; i++) cp.dispatchWorkgroups(Math.ceil(this.nPoints / 256));
       cp.end();
