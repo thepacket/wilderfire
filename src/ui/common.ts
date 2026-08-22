@@ -68,6 +68,27 @@ const HISTORY_MAX = 100;
 const COALESCE_MS = 700;
 
 /** Central app state; panels mutate app.flame then call commit(). */
+/** The live-render engine settings as the Render tab exposes them (values as the UI shows them). */
+export interface EngineState {
+  mode: 'draft' | 'final' | 'custom';
+  /** samples per pixel at which the live view stops */
+  qualityCap: number;
+  /** wall-clock limit in seconds, 0 = none */
+  stopAfterS: number;
+  speed: 'eco' | 'balanced' | 'fast' | 'furnace';
+  oversample: 1 | 2;
+  dePreview: 'fast' | 'balanced' | 'full';
+  /** samples per pixel before a fresh render replaces the previous image (0 = every frame) */
+  previewHold: number;
+  adaptiveBudget: boolean;
+  paused: boolean;
+}
+export interface EngineAPI {
+  get(): EngineState;
+  /** apply any subset; returns what changed (keys) and the resulting state */
+  set(patch: Partial<EngineState> & { rerender?: boolean; reset?: boolean }): { changed: string[]; state: EngineState };
+}
+
 export class App {
   flame!: Flame;
   renderer!: FlameRenderer;
@@ -80,6 +101,8 @@ export class App {
   applyPalette: (pal: RGB[]) => void = (pal) => { this.activeLayer.palette = pal; this.commit('palette'); };
   /** Motion-curve bridge, registered by the Anim panel (used by .flame export/import). */
   getCurves: () => MotionCurve[] = () => [];
+  /** Engine settings bridge, registered by the Render tab (the assistant's get_engine / set_engine drive the same controls). */
+  engine: EngineAPI | null = null;
   setCurves: (curves: MotionCurve[]) => void = () => {};
   /** The animation timeline (registered by the Anim panel) for offscreen video renders — null when nothing is animated. */
   timeline: () => { t0: number; total: number; evalAt: (t: number) => Flame } | null = () => null;

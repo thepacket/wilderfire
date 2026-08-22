@@ -1,5 +1,5 @@
 // Right panel — Render tab: camera, tonemap, quality, export.
-import { App, el, slider, toast, progressToast } from './common';
+import { App, el, slider, toast, progressToast, type EngineState } from './common';
 import { flameToJSON } from '../core/flame';
 import { flameToXML } from '../core/flameXML';
 import { importFlameFiles } from './flameImport';
@@ -334,6 +334,41 @@ export function buildRenderPanel(app: App, root: HTMLElement) {
   modeSel.onchange = () => applyMode(modeSel.value);
   // touching any knob by hand switches the mode to Custom
   const toCustom = () => { if (!applyingMode && modeSel.value !== 'custom') { modeSel.value = 'custom'; localStorage.setItem(LS_MODE, 'custom'); } };
+
+  // The assistant's view of the engine: reads and drives these very controls, so the panel and the renderer stay in step.
+  const SPEEDS: Record<string, string> = { eco: '1', balanced: '2', fast: '4', furnace: '8' };
+  const DE: Record<string, string> = { fast: '4', balanced: '6', full: '-1' };
+  const inv = (m: Record<string, string>, v: string, dflt: string) => (Object.entries(m).find(([, x]) => x === v)?.[0] ?? dflt);
+  const engineState = (): EngineState => ({
+    mode: (modeSel.value === 'draft' || modeSel.value === 'final') ? modeSel.value : 'custom',
+    qualityCap: app.renderer.targetQuality, stopAfterS: app.renderer.timeLimitS,
+    speed: inv(SPEEDS, speedSel.value, 'balanced') as EngineState['speed'], oversample: app.renderer.oversample === 2 ? 2 : 1,
+    dePreview: inv(DE, deLiveSel.value, 'balanced') as EngineState['dePreview'], previewHold: app.renderer.minDisplaySpp,
+    adaptiveBudget: adaptChk.checked, paused: app.renderer.isPaused(),
+  });
+  app.engine = {
+    get: engineState,
+    set: (p) => {
+      const changed: string[] = [];
+      if (p.reset) { resetBtn.click(); changed.push('reset'); }
+      if (p.mode && p.mode !== 'custom' && MODES[p.mode]) { modeSel.value = p.mode; applyMode(p.mode); changed.push('mode'); }
+      if (p.speed && SPEEDS[p.speed]) { speedSel.value = SPEEDS[p.speed]; speedSel.onchange!(new Event('change')); changed.push('speed'); }
+      if (p.dePreview && DE[p.dePreview]) { deLiveSel.value = DE[p.dePreview]; deLiveSel.onchange!(new Event('change')); changed.push('dePreview'); }
+      if (p.oversample === 1 || p.oversample === 2) { osSel.value = String(p.oversample); osSel.onchange!(new Event('change')); changed.push('oversample'); }
+      if (typeof p.qualityCap === 'number' && p.qualityCap > 0) {
+        const caps = [...qSel.options].map((o) => parseInt(o.value));
+        const cap = caps.reduce((best, c) => (Math.abs(c - p.qualityCap!) < Math.abs(best - p.qualityCap!) ? c : best), caps[0]);
+        qSel.value = String(cap); qSel.onchange!(new Event('change')); changed.push('qualityCap');
+      }
+      if (typeof p.stopAfterS === 'number' && p.stopAfterS >= 0) { tIn.value = String(p.stopAfterS); tIn.onchange!(new Event('change')); changed.push('stopAfterS'); }
+      if (typeof p.previewHold === 'number' && p.previewHold >= 0) { const v = Math.min(60, Math.round(p.previewHold)); holdS.set(v); app.renderer.minDisplaySpp = v; toCustom(); changed.push('previewHold'); }
+      if (typeof p.adaptiveBudget === 'boolean') { adaptChk.checked = p.adaptiveBudget; adaptChk.onchange!(new Event('change')); changed.push('adaptiveBudget'); }
+      if (typeof p.paused === 'boolean' && p.paused !== app.renderer.isPaused()) { pauseBtn.click(); changed.push(p.paused ? 'paused' : 'resumed'); }
+      if (p.rerender) { restartBtn.click(); changed.push('rerender'); }
+      for (const s of [speedSel, deLiveSel, osSel, qSel]) if (changed.length && changed.some((c) => ['speed', 'dePreview', 'oversample', 'qualityCap'].includes(c)) && !p.mode) { s.dispatchEvent(new Event('change')); break; }
+      return { changed, state: engineState() };
+    },
+  };
   for (const sel of [speedSel, deLiveSel, osSel, qSel]) sel.addEventListener('change', toCustom);
   holdS.root.addEventListener('input', toCustom);
   {

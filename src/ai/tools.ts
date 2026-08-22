@@ -30,6 +30,21 @@ export const TOOL_DEFS: ToolDef[] = [
     parameters: { type: 'object', properties: { edits: { type: 'string', description: 'the edit commands' } }, required: ['edits'] } } },
   { type: 'function', function: { name: 'set_flame_json', description: 'Replace the whole flame with complete flame JSON (same shape get_flame returns with detail=json). Use apply_edits for small changes — this costs far more tokens.',
     parameters: { type: 'object', properties: { flame: { type: 'object', description: 'the complete flame' } }, required: ['flame'] } } },
+  { type: 'function', function: { name: 'get_engine', description: 'The live-render engine settings: mode (draft/final/custom), quality cap (spp), stop-after seconds, speed, oversample, DE preview, preview hold, adaptive budget, paused.', parameters: { type: 'object', properties: {} } } },
+  { type: 'function', function: { name: 'set_engine', description: 'Change live-render engine settings (not the flame): any subset of the fields; the others stay. mode=final gives full quality on screen (2× oversampling, full DE radius, cap 4000), draft is responsive editing. rerender restarts the accumulation, reset puts every setting back to its default.',
+    parameters: { type: 'object', properties: {
+      mode: { type: 'string', enum: ['draft', 'final'] },
+      qualityCap: { type: 'number', description: 'samples per pixel at which the live view stops (50…10000; snapped to the menu)' },
+      stopAfterS: { type: 'number', description: 'wall-clock limit in seconds, 0 = none' },
+      speed: { type: 'string', enum: ['eco', 'balanced', 'fast', 'furnace'] },
+      oversample: { type: 'integer', enum: [1, 2] },
+      dePreview: { type: 'string', enum: ['fast', 'balanced', 'full'], description: 'density-estimation radius cap for the live view' },
+      previewHold: { type: 'number', description: 'spp before a fresh render replaces the previous image (0…60)' },
+      adaptiveBudget: { type: 'boolean' },
+      paused: { type: 'boolean' },
+      rerender: { type: 'boolean' },
+      reset: { type: 'boolean' },
+    } } } },
   { type: 'function', function: { name: 'set_camera', description: 'Move the camera. Any subset of the fields; the others stay.',
     parameters: { type: 'object', properties: { zoom: { ...num, description: 'multiplier, ~0.3–4 (1 = default framing)' }, centerX: num, centerY: num, rotationDeg: { ...num, description: 'roll in degrees' }, pitch: { ...num, description: '3D pitch in degrees' }, yaw: { ...num, description: '3D yaw in degrees' }, perspective: { ...num, description: '0 = none, ~0.2 mild' } } } } },
   { type: 'function', function: { name: 'screenshot', description: 'A fresh small render of the current flame (vision models only). Use it to check a result before deciding what to change next.', parameters: { type: 'object', properties: {} } } },
@@ -189,6 +204,19 @@ export async function runTool(name: string, argsJson: string, env: ToolEnv): Pro
         const { mutateFlame } = await import('../ui/mutate');
         app.setFlame(mutateFlame(app.flame), 'ai');
         return afterChange(env, 'Mutation applied.');
+      }
+      case 'get_engine': {
+        if (!app.engine) return { text: 'Engine settings are not available in this view.' };
+        return { text: JSON.stringify(app.engine.get()) };
+      }
+      case 'set_engine': {
+        if (!app.engine) return { text: 'Engine settings are not available in this view.' };
+        const p: Record<string, unknown> = {};
+        for (const k of ['mode', 'speed', 'dePreview']) if (typeof a[k] === 'string') p[k] = (a[k] as string).toLowerCase();
+        for (const k of ['qualityCap', 'stopAfterS', 'previewHold', 'oversample']) if (typeof a[k] === 'number') p[k] = a[k];
+        for (const k of ['adaptiveBudget', 'paused', 'rerender', 'reset']) if (typeof a[k] === 'boolean') p[k] = a[k];
+        const r = app.engine.set(p);
+        return { text: (r.changed.length ? `Changed ${r.changed.join(', ')}. ` : 'Nothing to change. ') + 'Engine now: ' + JSON.stringify(r.state) };
       }
       case 'undo': app.undo(); return afterChange(env, 'Undone.');
       case 'redo': app.redo(); return afterChange(env, 'Redone.');
