@@ -10,6 +10,7 @@
 // uniformly per triangle.
 
 import { meshGet, meshPut, meshNames, meshDelete } from './libraryStore.ts';
+import { buildSAttractorMesh, sattractorFormulas, type SAttractorSpec } from './sattractor';
 
 export const MESH_PRIMITIVES = ['ball', 'capsule', 'cone', 'diamond', 'torus', 'box', 'gear15', 'icosahedron', 'tetrahedron', 'octahedron', 'dodecahedron', 'wedge',
   'icosidodecahedron', 'cubeoctahedron', 'gears6a', 'gears6s', 'gears8a', 'gears8s', 'gears12a', 'gears12s', 'gears16a', 'gears16s', 'gears24a', 'gears24s', 'mandelbulb', 'drop'];
@@ -208,9 +209,26 @@ function meshKeyOf(source: string, subdivLevel: number, smoothPasses: number, la
   const level = Math.max(0, Math.min(6, Math.round(subdivLevel)));
   return level > 0 ? `${source}#${level}#${Math.round(smoothPasses)}#${lambda}#${mu}` : `${source}#0`;
 }
-/** The key of an obj_mesh_primitive_wf / obj_mesh_wf instance (undefined for anything else). */
+/** sattractor3D meshes are generated from their spec (src/core/sattractor.ts); the source part of the key is a
+ *  hash of the spec, kept here so loadRaw can build it. */
+const sattrSpecs = new Map<string, SAttractorSpec>();
+const fnv = (s: string) => { let h = 0x811c9dc5; for (let i = 0; i < s.length; i++) { h ^= s.charCodeAt(i); h = Math.imul(h, 0x01000193) >>> 0; } return h.toString(16).padStart(8, '0'); };
+
+/** The key of an obj_mesh_primitive_wf / obj_mesh_wf / sattractor3D instance (undefined for anything else). */
 export function meshKeyFor(vi: { name: string; params: Record<string, number>; res?: Record<string, string> }): MeshKey | undefined {
   const P = vi.params;
+  if (vi.name === 'sattractor3D') {
+    const f = sattractorFormulas(P.presetId ?? 0, vi.res);
+    const spec: SAttractorSpec = {
+      ...f, steps: P.steps ?? 5, radius: P.radius ?? 0.05, stepTime: P.stepTime ?? 0.02, facets: P.facets ?? 3,
+      start: [P.start_x ?? 0.1, P.start_y ?? 0, P.start_z ?? 0], warmup: P.warmup ?? 1000,
+      params: ['a', 'b', 'c', 'd', 'e', 'f', 'g', 'h'].map((c) => P[`param_${c}`] ?? 0),
+    };
+    const json = JSON.stringify(spec);
+    const source = `sattr:${fnv(json)}${json.length.toString(36)}`;
+    if (!sattrSpecs.has(source)) sattrSpecs.set(source, spec);
+    return meshKeyOf(source, P.subdiv_level ?? 0, P.subdiv_smooth_passes ?? 12, P.subdiv_smooth_lambda ?? 0.42, P.subdiv_smooth_mu ?? -0.45);
+  }
   if (vi.name === 'obj_mesh_primitive_wf') return meshKey(P.primitive ?? 0, P.subdiv_level ?? 0, P.subdiv_smooth_passes ?? 12, P.subdiv_smooth_lambda ?? 0.42, P.subdiv_smooth_mu ?? -0.45);
   if (vi.name === 'obj_mesh_wf') {
     const file = vi.res?.obj_filename ?? '';
@@ -228,7 +246,10 @@ async function loadRaw(source: string): Promise<Mesh> {
   if (source === 'default') return defaultMesh();
   let p = rawCache.get(source);
   if (!p) {
-    if (source.startsWith('obj:')) {
+    if (source.startsWith('sattr:')) {
+      const spec = sattrSpecs.get(source);
+      p = Promise.resolve(spec ? buildSAttractorMesh(spec) : defaultMesh());
+    } else if (source.startsWith('obj:')) {
       const file = source.slice(4, source.lastIndexOf('@'));
       p = meshGet(file).then((bin) => {
         if (!bin) { console.warn(`obj_mesh_wf: no mesh "${file}" in the mesh store (load it in the transform editor); using the default cube`); return defaultMesh(); }
@@ -285,7 +306,7 @@ export function ensureMesh(key: MeshKey): Promise<MeshSampler> {
 /** Where each prepared sampler sits in the renderer's shared mesh buffer (set by the renderer when it packs it). */
 export const meshLayout = new Map<MeshKey, { cdfBase: number; triBase: number; faces: number }>();
 
-/** Every mesh key a flame needs (obj_mesh_primitive_wf / obj_mesh_wf instances). */
+/** Every mesh key a flame needs (obj_mesh_primitive_wf / obj_mesh_wf / sattractor3D instances). */
 export function flameMeshKeys(flame: { layers: { xforms: XFormLike[]; final: XFormLike | null; moreFinals: XFormLike[] }[] }): MeshKey[] {
   const keys = new Set<MeshKey>();
   for (const ly of flame.layers) {

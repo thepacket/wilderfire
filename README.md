@@ -28,7 +28,9 @@ in the stack.
 
 - **946 variations** — 76 hand-written entries (the flam3 classics, JWildfire's
   `obj_mesh_primitive_wf` — its 26 built-in meshes ship as compact binaries and are
-  subdivided/smoothed exactly like JWildfire — and `obj_mesh_wf` — your own OBJ
+  subdivided/smoothed exactly like JWildfire — `sattractor3D` — a strange attractor
+  (21 JWildfire presets or your own x/y/z formulas) swept into a faceted tube on the
+  CPU — and `obj_mesh_wf` — your own OBJ
   files, loaded into the browser from the transform editor —, `subflame_wf` — a
   whole flame nested as a variation, compiled into the same GPU kernel —,
   `inversion`, `mobius3D_with_inverse` and `pre_stabilize`) plus **938 JWildfire

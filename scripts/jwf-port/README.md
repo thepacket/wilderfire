@@ -107,7 +107,7 @@ variation was skipped. Categories:
 | category | count | why |
 |---|---|---|
 | user-code | 21 | compiles user-supplied code or a formula at run time (`custom_wf`, `dc_code`, `glsl_code`, `c_var`, `ducks`, `fract_formula_*`, the `yplot2d_wf`… plot family, `colordomain`); the WebGPU kernel has no run-time compiler |
-| external-content | 26 | renders external content that would have to be uploaded to the GPU: sub-flames (`ringsubflame`, `glynns3subfl`), images (`post_bumpmap_wf`, `displacemap_wf`, `colormap_wf`, `kaleidoimg`, `plane_wf`, `wangtiles`), meshes (`terrain3D`, `metaballs3d_wf`, `knots3D`, `sattractor3D`), `svg_wf`, `text_wf`, L-systems, brushes (`obj_mesh_wf` IS ported — the user loads the OBJ file into the browser's mesh store; `subflame_wf` IS ported — the sub-flame is compiled into the kernel) |
+| external-content | 25 | renders external content that would have to be uploaded to the GPU: sub-flames (`ringsubflame`, `glynns3subfl`), images (`post_bumpmap_wf`, `displacemap_wf`, `colormap_wf`, `kaleidoimg`, `plane_wf`, `wangtiles`), meshes (`terrain3D`, `metaballs3d_wf`, `knots3D`; `sattractor3D` IS ported — its formulas run through a small safe evaluator, src/core/formula.ts, and the tube is built on the CPU, src/core/sattractor.ts), `svg_wf`, `text_wf`, L-systems, brushes (`obj_mesh_wf` IS ported — the user loads the OBJ file into the browser's mesh store; `subflame_wf` IS ported — the sub-flame is compiled into the kernel) |
 | point-set | 30 | builds a point/segment list on the CPU at init and samples it per point: the `DrawFunc` family (`gpattern`, `mandala`, `nsudoku`, `sunflower`, `szubieta`, `triantruchet`, `curliecue`, `taprats`, `sunvoroni`), turtle/`DynamicArray` `_js` fractals (`dragon_js`, `koch_js`, `hilbert_js`, `tree_js`, …), `dla_wf`/`snowflake_wf` simulations, `inversion`, `maurer_lines`, `klein_group`, `natural_foam`, …; `neuron3D` builds a seed-shuffled 512-entry Perlin permutation table per instance (no per-flame table storage in the kernel) |
 | engine | 2 | needs an engine feature WilderFire lacks: a variation instantiating another (`sphtiling3v2`), `post_dcztransl` (no Java class) |
 | resource-params | 1 | `dc_triantess` keeps its colours as byte-array ressources |
@@ -227,7 +227,7 @@ kernel argument keeps the *pre-glint* `support/plainRadius` scale, and SINEPOW15
 LUT (256 samples over 8·support, negatives clamped like JWildfire's `> EPSILON` skip) covers it. The
 scatter's rnd is seeded per pixel with a fixed constant so live-preview glints don't flicker.
 **Compare verdict:** `_pdof0/1/2` (Solid_0 + DOF; glints off / default / ×10) all at **ratio 1.00,
-blkMAE ≤ 0.7, corr 1.00**; real flame `_pdofS` 0.99/0.98. (`_pdofT` uses unported `sattractor3D` — not post-DOF. `_pdofR` was at corr 0.14 and
+blkMAE ≤ 0.7, corr 1.00**; real flame `_pdofS` 0.99/0.98. (`_pdofT` (sattractor3D) is at **ratio 1.00 / corr 0.99** since the sattractor3D port — not post-DOF. `_pdofR` was at corr 0.14 and
 is now **0.99**: its dc_carpet3D is a `z`-flagged variation whose Java still carries the preserve-z
 clause, which the port had compiled to `false` and the engine's 2D-only rule skipped — with
 `preserve_z="1"` under a 60° pitch every point sat at the wrong z. `Z_PRESERVE_TOO` in codegen adds the

@@ -442,3 +442,8 @@ a { color: var(--accent2); }
 .gallery-name { font-weight: 700; font-size: 15px; }
 .gallery-prov { font-size: 11px; color: var(--fg-dim); margin-top: 2px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .gallery-help { position: absolute; right: 14px; bottom: 14px; font-size: 11px; color: var(--fg-dim); background: color-mix(in srgb, var(--bg2) 70%, transparent); border-radius: 6px; padding: 4px 8px; }
+
+/* sattractor3D formulas (transform editor) */
+.sattr-formulas .vp { display: flex; align-items: center; gap: 4px; width: 100%; }
+.sattr-formula { flex: 1; min-width: 0; font-family: ui-monospace, Menlo, monospace; font-size: 11px; }
+.sattr-formula.bad { outline: 1px solid #d33; }

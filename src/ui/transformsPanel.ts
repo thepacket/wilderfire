@@ -1,6 +1,9 @@
 // Left panel: layer stack + xform list + editor for the selected transform.
 // All transform edits operate on the active layer.
 import { App, el, slider, numberInput, formatNum, XFORM_COLORS } from './common';
+import { compileFormula } from '../core/formula';
+import { sattractorFormulas } from '../core/sattractor';
+import { SATTRACTOR_PRESETS } from '../core/sattractorPresets';
 import type { XForm } from '../core/flame';
 import {
   defaultXForm, defaultLayer, cloneXForm, cloneLayer,
@@ -628,6 +631,44 @@ export function buildTransformsPanel(app: App, root: HTMLElement) {
           reset.onclick = () => { if (vi.res) { delete vi.res.flame; if (!Object.keys(vi.res).length) delete vi.res; } lab.textContent = nm(); app.commit(); };
           vp.append(el('span', '', 'sub-flame'), lab, load, reset, file);
           row.append(vp);
+          item.append(row);
+        }
+        // sattractor3D: the x/y/z formulas (resources) — empty = the preset's (shown greyed); "↺ preset" reloads every
+        // preset value like JWildfire does when presetId changes
+        if (VARIATIONS[vi.name]?.res?.includes('xformula')) {
+          const row = el('div', 'var-params sattr-formulas');
+          const placeholders = () => sattractorFormulas(vi.params.presetId ?? 0);
+          const inputs: Record<string, HTMLInputElement> = {};
+          for (const k of ['x', 'y', 'z'] as const) {
+            const vp = el('span', 'vp');
+            const inp = el('input') as HTMLInputElement;
+            inp.type = 'text'; inp.spellcheck = false; inp.className = 'sattr-formula';
+            inp.value = vi.res?.[`${k}formula`] ?? '';
+            inp.placeholder = placeholders()[k];
+            inp.title = `d${k}/dt as a formula of x, y, z, param_a…param_h, pi (JWildfire syntax: + - * / ?: and MathLib functions). Empty = preset ${vi.params.presetId ?? 0}'s formula.`;
+            inp.onchange = () => {
+              const text = inp.value.trim();
+              if (text) { try { compileFormula(text); } catch (e) { alert(`${k}formula: ${(e as Error).message}`); inp.classList.add('bad'); return; } }
+              inp.classList.remove('bad');
+              if (text) (vi.res ??= {})[`${k}formula`] = text;
+              else if (vi.res) { delete vi.res[`${k}formula`]; if (!Object.keys(vi.res).length) delete vi.res; }
+              app.commit();
+            };
+            inputs[k] = inp;
+            vp.append(el('span', '', `${k}′`), inp);
+            row.append(vp);
+          }
+          const reset = el('button', '', '↺ preset');
+          reset.title = 'Take every value of the chosen presetId (formulas, start point, steps, radius, step time, param_a…h) like JWildfire does when the preset changes';
+          reset.onclick = () => {
+            const pr = SATTRACTOR_PRESETS[Math.round(vi.params.presetId ?? 0)];
+            if (!pr) return;
+            if (vi.res) { for (const k of ['xformula', 'yformula', 'zformula']) delete vi.res[k]; if (!Object.keys(vi.res).length) delete vi.res; }
+            Object.assign(vi.params, { start_x: pr.start[0], start_y: pr.start[1], start_z: pr.start[2], steps: pr.steps, radius: pr.radius, stepTime: pr.stepTime });
+            ['a', 'b', 'c', 'd', 'e', 'f', 'g', 'h'].forEach((c, i) => { vi.params[`param_${c}`] = pr.params[i]; });
+            app.commit();
+          };
+          row.append(reset);
           item.append(row);
         }
         wrap.append(item);

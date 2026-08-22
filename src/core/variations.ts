@@ -735,6 +735,26 @@ fn invMaxCurve(shape: i32, tin: f32, rot: f32, sc: f32, a: f32, b: f32, c: f32, 
     funcs: MESH_FUNCS,
     code: (w, p) => meshCode(w, p, 0),
   },
+  // ---- JWildfire sattractor3D (Strange3DFunc): a strange attractor integrated from its x/y/z formulas, swept into a
+  // faceted tube and sampled as a mesh (src/core/sattractor.ts builds it on the CPU; the formulas are the instance's
+  // xformula/yformula/zformula resources, or preset `presetId`'s — src/core/sattractorPresets.ts — when they are
+  // empty, as JWildfire does). Params in JWildfire's order, then the shared mesh params; defaults are preset 0's.
+  sattractor3D: {
+    params: [
+      { name: 'presetId', def: 0, int: true }, { name: 'steps', def: 5, int: true }, { name: 'radius', def: 0.05 }, { name: 'stepTime', def: 0.02 },
+      { name: 'facets', def: 3, int: true }, { name: 'start_x', def: 0.1 }, { name: 'start_y', def: 0 }, { name: 'start_z', def: 0 }, { name: 'warmup', def: 1000, int: true },
+      { name: 'param_a', def: 0.95 }, { name: 'param_b', def: 0.7 }, { name: 'param_c', def: 0.6 }, { name: 'param_d', def: 3.5 },
+      { name: 'param_e', def: 0.25 }, { name: 'param_f', def: 0.1 }, { name: 'param_g', def: 0 }, { name: 'param_h', def: 0 },
+      ...MESH_PARAMS,
+    ],
+    extra: 3,
+    res: ['xformula', 'yformula', 'zformula', 'presetId_reference'],
+    flags: ['3d', 'z', 'mesh', 'dc'],
+    types: ['3D', 'DC', 'BASE_SHAPE'],
+    funcNames: ['meshPick'],
+    funcs: MESH_FUNCS,
+    code: (w, p) => meshCode(w, p, 17),
+  },
 
   // ---- JWildfire subflame_wf: a nested flame's chaos game (its first layer) run one step per call, the point returned
   // scaled/rotated/offset. The sub-flame is the instance's `flame` resource (XML; JWildfire's default flame until set);

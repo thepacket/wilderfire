@@ -65,7 +65,6 @@ export const UNPORTABLE: Record<string, string> = {
   "pre_subflame_wf": "renders external content (flame, image, mesh, SVG, text)",
   "ringsubflame": "renders external content (flame, image, mesh, SVG, text)",
   "rsquares_js": "CPU-built point set",
-  "sattractor3D": "renders external content (flame, image, mesh, SVG, text)",
   "scrambly": "CPU-built point set",
   "shape_warp": "renders external content (flame, image, mesh, SVG, text)",
   "snowflake_wf": "CPU-built point set",
