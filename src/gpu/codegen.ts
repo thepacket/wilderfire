@@ -33,6 +33,11 @@ import { meshKeyFor, meshLayout } from '../core/meshes';
 const PREPOST_PRESERVE_Z = new Set(['post_circlecrop', 'post_crop_box', 'post_crop_polygon', 'post_crop_cross', 'post_crop_stars', 'post_crop_triangle',
   'post_crop_trapezoid', 'post_crop_rhombus', 'post_crop_x', 'post_crosscrop', 'post_crop_vesica', 'post_point_crop', 'post_trig', 'post_c_symmetry',
   'post_c_var', 'pre_recip', 'pre_c_symmetry', 'pre_c_var', 'ringtile']);
+/** 3D variations (flag `z`) whose Java transform() nevertheless carries the preserve-z clause at normal
+ *  priority — the port compiled `isPreserveZCoordinate()` to false, so the engine adds the line for them.
+ *  Found by comparing a real flame (`_pdofR`, dc_carpet3D under a 60° pitch) against JWildfire: with
+ *  preserve_z on it diverged (corr 0.09), with it off it matched (1.00). */
+const Z_PRESERVE_TOO = new Set(['dc_carpet3D', 'whirligig']);
 const CDF_ROW = 16;
 const HEADER = 72;    // floats per xform block header (6 affine, 6 post, color, colorSpeed, opacity, pad, 24 3D affines, 8 colour modifiers, 16 weighting field, material, materialSpeed, 6 spare)
 const XD_HEADER = 16; // floats reserved at the front of xd
@@ -169,7 +174,7 @@ function genXformFn(name: string, x: XForm, B: number, palBase: number, pzCond =
         if (b.prio !== prio) continue;
         // a 2D variation's preserve-z clause (JWildfire adds w·z of its input point to its output z)
         const snippet = b.def.code(b.w, b.p, A);
-        const pzLine = zOut && !(b.def.flags ?? []).includes('z') ? `    if ${pzCond} { pz_ += ${b.w} * z_; }\n` : '';
+        const pzLine = zOut && (!(b.def.flags ?? []).includes('z') || Z_PRESERVE_TOO.has(b.name)) ? `    if ${pzCond} { pz_ += ${b.w} * z_; }\n` : '';
         // the few pre/post-priority JWildfire functions that carry the clause too (their input is the affine point, the
         // output the accumulator, so it is the same line) — unless the port already writes pz_ itself
         const pzPrePost = zOut && prio !== 0 && PREPOST_PRESERVE_Z.has(b.name) && !/\bpz_\b/.test(snippet) ? `    if ${pzCond} { pz_ += ${b.w} * z_; }\n` : '';

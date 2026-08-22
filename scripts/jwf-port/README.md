@@ -227,8 +227,12 @@ kernel argument keeps the *pre-glint* `support/plainRadius` scale, and SINEPOW15
 LUT (256 samples over 8·support, negatives clamped like JWildfire's `> EPSILON` skip) covers it. The
 scatter's rnd is seeded per pixel with a fixed constant so live-preview glints don't flicker.
 **Compare verdict:** `_pdof0/1/2` (Solid_0 + DOF; glints off / default / ×10) all at **ratio 1.00,
-blkMAE ≤ 0.7, corr 1.00**; real flame `_pdofS` 0.99/0.98. (`_pdofR` corr 0.14 is a separate
-dc_carpet3D-flame divergence, `_pdofT` uses unported `sattractor3D` — neither is post-DOF.)
+blkMAE ≤ 0.7, corr 1.00**; real flame `_pdofS` 0.99/0.98. (`_pdofT` uses unported `sattractor3D` — not post-DOF. `_pdofR` was at corr 0.14 and
+is now **0.99**: its dc_carpet3D is a `z`-flagged variation whose Java still carries the preserve-z
+clause, which the port had compiled to `false` and the engine's 2D-only rule skipped — with
+`preserve_z="1"` under a 60° pitch every point sat at the wrong z. `Z_PRESERVE_TOO` in codegen adds the
+line for dc_carpet3D and whirligig; tests/preserveZ3d.test.ts. Isolated by variants of the flame:
+preserve_z off → 1.00, DOF off alone → 0.09.)
 Survey correction: `post_bokeh_*` only ever fires with solid + `cam_dof > 0` — 0 flames in the
 community corpus, 19 in the user's own collection; the "2 %" was JWildfire writing its default 0.005.
 Tracked fixture `Solid_5` (baseline 98). Leftover from the solid plan now: reflection maps,
