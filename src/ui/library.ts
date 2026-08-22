@@ -1,7 +1,7 @@
 // Flame library (IndexedDB, see ../core/libraryStore.ts) + session autosave (localStorage).
 import { App, el, openModal } from './common';
 import { normalizeFlame, type Flame } from '../core/flame';
-import { libAll, libPut, libDelete, libDeleteMany, libClear, packOf, type LibEntry } from '../core/libraryStore';
+import { libAll, libPut, libDelete, libDeleteMany, libClear, packOf, type LibEntry, thumbSrc, releaseThumbSrcs, thumbDataUrl, type Thumb } from '../core/libraryStore';
 import { flameSignature, rankSimilar, type FlameSig } from '../core/similarity';
 
 /** Signatures cached per entry id (a library entry's flame never changes; a re-save makes a new id). */
@@ -17,14 +17,17 @@ const LS_AUTOSAVE = 'wilderfire.autosave';
 export const listLibrary = (): Promise<LibEntry[]> => libAll();
 
 /** Render a square JPEG thumbnail for a flame the renderer isn't currently showing (pack import). */
-async function offscreenThumb(app: App, flame: Flame, size = 144, spp = 150): Promise<string> {
+async function offscreenThumb(app: App, flame: Flame, size = 144, spp = 150): Promise<Blob> {
   app.renderer.setFlame(flame);
   const px = await app.renderer.renderRegion({ fullW: size, fullH: size, tileX: 0, tileY: 0, tileW: size, tileH: size, spp });
   const c = document.createElement('canvas');
   c.width = c.height = size;
   c.getContext('2d')!.putImageData(new ImageData(px, size, size), 0, 0);
-  return c.toDataURL('image/jpeg', 0.72);
+  return jpegBlob(c);
 }
+/** A canvas as a JPEG Blob (what the library stores). */
+export const jpegBlob = (c: HTMLCanvasElement): Promise<Blob> =>
+  new Promise((res, rej) => c.toBlob((b) => (b ? res(b) : rej(new Error('could not encode the thumbnail'))), 'image/jpeg', 0.72));
 
 /** Add every flame of an imported pack to the library, rendering a thumbnail for each.
  *  `onProgress` may return false to stop early; the flames done so far are kept. */
@@ -38,7 +41,7 @@ export async function addFlamesToLibrary(
   const now = Date.now();
   try {
     for (const [i, f] of flames.entries()) {
-      let thumb = '';
+      let thumb: Thumb = '';
       try { thumb = await offscreenThumb(app, f); } catch { /* keep the flame, skip its picture */ }
       entries.push({
         id: Math.random().toString(36).slice(2),
@@ -59,7 +62,9 @@ export async function addFlamesToLibrary(
 }
 
 export function buildLibrary(app: App, anim: AnimAPI) {
-  function thumbnail(size = 144): string {
+  function thumbnail(size = 144): Promise<Blob> {
+    // the copy out of the WebGPU canvas must happen inside captureSync (synchronously, after the
+    // present); only the JPEG encoding is asynchronous
     return app.renderer.captureSync((cv) => {
       const c = document.createElement('canvas');
       c.width = size;
@@ -68,24 +73,27 @@ export function buildLibrary(app: App, anim: AnimAPI) {
       // Cover-crop the (usually non-square) render into a square thumb.
       const s = Math.min(cv.width, cv.height);
       g.drawImage(cv, (cv.width - s) / 2, (cv.height - s) / 2, s, s, 0, 0, size, size);
-      return c.toDataURL('image/jpeg', 0.72);
+      return jpegBlob(c);
     });
   }
 
-  function save() {
-    const entry: LibEntry = {
-      id: Math.random().toString(36).slice(2),
-      name: app.flame.name || 'untitled',
-      date: Date.now(),
-      flame: JSON.parse(JSON.stringify(app.flame)),
-      thumb: thumbnail(),
-      ...(app.flameSource ? { source: app.flameSource } : {}),
-      ...(app.flame.author ? { author: app.flame.author } : {}),
-    };
-    libPut(entry).catch((e) => alert('Could not save to the library: ' + (e as Error).message));
+  async function save() {
+    try {
+      const entry: LibEntry = {
+        id: Math.random().toString(36).slice(2),
+        name: app.flame.name || 'untitled',
+        date: Date.now(),
+        flame: JSON.parse(JSON.stringify(app.flame)),
+        thumb: await thumbnail(),
+        ...(app.flameSource ? { source: app.flameSource } : {}),
+        ...(app.flame.author ? { author: app.flame.author } : {}),
+      };
+      await libPut(entry);
+    } catch (e) { alert('Could not save to the library: ' + (e as Error).message); }
   }
 
   async function open() {
+    releaseThumbSrcs(); // object URLs of the previous dialog's pictures
     const { body, close } = openModal('Flame library');
     let entries: LibEntry[] = [];
     // The store returns newest-first (batch export wants that); the dialog shows names in order —
@@ -95,7 +103,12 @@ export function buildLibrary(app: App, anim: AnimAPI) {
     const tools = el('div', 'btn-row');
     const expBtn = el('button', '', '⬇ Export library');
     expBtn.title = 'Save every entry (flames + thumbnails) as one JSON file — a backup, or to move the library to another browser';
-    expBtn.onclick = () => saveText(JSON.stringify({ wilderfireLibrary: 1, entries }), { suggestedName: 'wilderfire-library.json', description: 'WilderFire library', mime: 'application/json', ext: '.json' });
+    expBtn.onclick = async () => {
+      // JSON is text: thumbnails go out as data URLs (and come back in as Blobs through libPut)
+      const out: LibEntry[] = [];
+      for (let i = 0; i < entries.length; i += 200) out.push(...await Promise.all(entries.slice(i, i + 200).map(async (e) => ({ ...e, thumb: await thumbDataUrl(e.thumb) }))));
+      await saveText(JSON.stringify({ wilderfireLibrary: 1, entries: out }), { suggestedName: 'wilderfire-library.json', description: 'WilderFire library', mime: 'application/json', ext: '.json' });
+    };
     const impBtn = el('button', '', '⬆ Import library');
     impBtn.title = 'Merge entries from an exported library JSON (existing entries are kept)';
     const impFile = el('input') as HTMLInputElement;
@@ -239,7 +252,7 @@ export function buildLibrary(app: App, anim: AnimAPI) {
       const item = el('div', 'lib-item');
       item.dataset.id = e.id;
       const img = el('img') as HTMLImageElement;
-      if (e.thumb) img.src = e.thumb; else img.alt = e.name;
+      if (e.thumb) img.src = thumbSrc(e.thumb); else img.alt = e.name;
       const meta = el('div', 'lib-meta');
       const prov = [e.author ? 'by ' + e.author : '', e.source ?? ''].filter(Boolean).join(' · ');
       const tagsEl = el('div', 'lib-tags', (e.tags ?? []).join(' · ') || '\u00a0');

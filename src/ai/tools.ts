@@ -159,14 +159,15 @@ export async function runTool(name: string, argsJson: string, env: ToolEnv): Pro
         const { libPut } = await import('../core/libraryStore');
         const name = s('name')?.trim();
         if (name) { app.flame.name = name; app.commitTone('ai'); }
-        const thumb = app.renderer.captureSync((cv) => {
+        const { jpegBlob } = await import('../ui/library');
+        const thumb = await app.renderer.captureSync((cv) => {
           const size = 144;
           const c = document.createElement('canvas');
           c.width = size; c.height = size;
           const g = c.getContext('2d')!;
           const sq = Math.min(cv.width, cv.height);
           g.drawImage(cv, (cv.width - sq) / 2, (cv.height - sq) / 2, sq, sq, 0, 0, size, size);
-          return c.toDataURL('image/jpeg', 0.72);
+          return jpegBlob(c);
         });
         await libPut({
           id: Math.random().toString(36).slice(2), name: app.flame.name || 'untitled', date: Date.now(),

@@ -2,6 +2,7 @@
 // output sizes in one go, offscreen and tiled, into a folder (File System Access API) or as
 // a series of downloads. Jobs run one after another on the single renderer; the queue can
 // be cancelled between tiles.
+import { thumbSrc, type Thumb } from '../core/libraryStore';
 import { App, el, openModal } from './common';
 import { normalizeFlame, type Flame } from '../core/flame';
 import { listLibrary } from './library';
@@ -28,13 +29,13 @@ export async function openBatchExport(app: App) {
   flamesSec.append(el('h4', '', 'Flames'));
   const flameList = el('div', 'batch-list');
   const flameChecks: { chk: HTMLInputElement; get: () => Flame; name: () => string }[] = [];
-  const row = (label: string, thumb: string | null, get: () => Flame, name: () => string, checked: boolean) => {
+  const row = (label: string, thumb: Thumb | null, get: () => Flame, name: () => string, checked: boolean) => {
     const lab = el('label', 'batch-item');
     const chk = el('input') as HTMLInputElement;
     chk.type = 'checkbox';
     chk.checked = checked;
     lab.append(chk);
-    if (thumb) { const img = el('img') as HTMLImageElement; img.src = thumb; lab.append(img); }
+    if (thumb) { const img = el('img') as HTMLImageElement; img.src = thumbSrc(thumb); lab.append(img); }
     else lab.append(el('span', 'batch-thumb-cur', '●'));
     lab.append(el('span', 'batch-name', label));
     flameList.append(lab);
