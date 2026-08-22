@@ -2,6 +2,7 @@
 // The model edits the flame by emitting a ```flame fenced JSON block, which we
 // parse, normalize, and apply live.
 import { App, el } from './common';
+import { setMarkdown } from './markdown';
 import { normalizeFlame, type Flame } from '../core/flame';
 import { streamChat, fetchLocalModels, fetchModels, SUGGESTED_MODELS, type ChatMessage, type ChatPart, type Usage } from '../ai/openrouter';
 import { TOOL_DEFS, MAX_TOOL_ROUNDS, runTool, type ToolEnv } from '../ai/tools';
@@ -320,7 +321,7 @@ export function buildAIPanel(app: App, root: HTMLElement) {
 
   /** Hide big JSON blocks in the visible transcript. */
   const displayText = (text: string) =>
-    text.replace(/```(?:flame|json)\s*\n[\s\S]*?```/g, '⟨flame JSON⟩').replace(/```edits?\s*\n([\s\S]*?)```/g, (_m, b: string) => '⟨edits⟩\n' + b.trim()).trim();
+    text.replace(/```(?:flame|json)\s*\n[\s\S]*?```/g, '⟨flame JSON⟩').replace(/```edits?\s*\n([\s\S]*?)```/g, (_m, b: string) => '```edits\n' + b.trim() + '\n```').trim();
 
   const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
 
@@ -385,14 +386,14 @@ export function buildAIPanel(app: App, root: HTMLElement) {
           signal: abortCtl.signal,
           onDelta: (d) => {
             acc += d;
-            bubble.textContent = displayText(acc) || '…';
+            setMarkdown(bubble, displayText(acc) || '…');
             msgs.scrollTop = msgs.scrollHeight;
           },
         });
         void recordUsage(r.usage);
         if (!r.toolCalls.length) { acc = r.text; break; }
         // the model asked for tools: run them, feed the results (and the render) back, go again
-        if (r.text.trim()) bubble.textContent = displayText(r.text); else bubble.remove();
+        if (r.text.trim()) setMarkdown(bubble, displayText(r.text)); else bubble.remove();
         messages.push({ role: 'assistant', content: r.text || null, tool_calls: r.toolCalls.map((tc) => ({ id: tc.id, type: 'function', function: { name: tc.name, arguments: tc.arguments } })) });
         let image: string | undefined;
         for (const tc of r.toolCalls) {
@@ -408,7 +409,7 @@ export function buildAIPanel(app: App, root: HTMLElement) {
         bubble = addMsg('assistant', '…');
       }
       history.push({ role: 'assistant', content: acc });
-      bubble.textContent = displayText(acc) || (applied ? 'Done.' : '(empty reply)');
+      setMarkdown(bubble, displayText(acc) || (applied ? 'Done.' : '(empty reply)'));
       if (tryApplyFlameBlocks(acc, c)) applied = true; // models that answer with a block instead of a tool
       if (applied) bubble.append(el('span', 'applied', '✦ flame changed'));
     } catch (e) {
