@@ -43,7 +43,8 @@ export const TOOL_DEFS: ToolDef[] = [
     parameters: { type: 'object', properties: { id: str }, required: ['id'] } } },
   { type: 'function', function: { name: 'library_save', description: 'Save the current flame into the library (with a thumbnail), optionally renaming it first.',
     parameters: { type: 'object', properties: { name: { ...str, description: 'new name (optional)' } } } } },
-  { type: 'function', function: { name: 'randomize', description: 'Replace the flame with a fresh random flame (a starting point; the old one is in undo).', parameters: { type: 'object', properties: {} } } },
+  { type: 'function', function: { name: 'randomize', description: 'Replace the flame with a fresh random flame (a starting point; the old one is in undo). Styles: any (default, one of JWildfire\'s generators), wilderfire (the built-in contractive randomizer), or a JWildfire style id: bubbles, julians, splits, spherical, ghosts, tentacle, linear, sierpinsky, galaxies, machine, brokat, spirals, phoenix, juliandisc, julianrings, xenomorph, outlines, duality.',
+    parameters: { type: 'object', properties: { style: { ...str, description: 'style id (default any)' } } } } },
   { type: 'function', function: { name: 'mutate', description: 'Apply one random mutation to the current flame (a variation on the theme; the old one is in undo).', parameters: { type: 'object', properties: {} } } },
   { type: 'function', function: { name: 'undo', description: 'Undo the last change to the flame.', parameters: { type: 'object', properties: {} } } },
   { type: 'function', function: { name: 'redo', description: 'Redo the change undone last.', parameters: { type: 'object', properties: {} } } },
@@ -175,9 +176,10 @@ export async function runTool(name: string, argsJson: string, env: ToolEnv): Pro
         return { text: `Saved "${app.flame.name || 'untitled'}" to the library.` };
       }
       case 'randomize': {
-        const { randomFlame } = await import('../core/random');
         app.flameSource = undefined;
-        app.setFlame(randomFlame(), 'ai');
+        const style = s('style') ?? 'any';
+        if (style === 'wilderfire') { const { randomFlame } = await import('../core/random'); app.setFlame(randomFlame(), 'ai'); }
+        else { const { randomFlameInStyle } = await import('../core/randomStyles'); app.setFlame(randomFlameInStyle(style), 'ai'); }
         return afterChange(env, `Random flame "${app.flame.name}" loaded.`);
       }
       case 'mutate': {

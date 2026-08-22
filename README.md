@@ -131,6 +131,12 @@ in the stack.
 - **Editor niceties** — reorder transforms (xaos-aware) and layers, copy/paste
   transforms across layers and flames, rotational/mirror **symmetry
   generators**, arrow-key nudging, **collapsible side panes** (`[` / `]`)
+- **Random flame styles** — the style select next to 🎲 Randomize offers
+  JWildfire's own generators, transcribed: Bubbles, Julians, Splits, Spherical,
+  Ghosts, Tentacle, Linear, Sierpinsky, Galaxies, Machine, Brokat, Spirals,
+  Phoenix, Julian disc, Julian rings, Xenomorph, Outlines, Duality — or "Any",
+  which picks one at random like JWildfire's "All"; the WilderFire randomizer
+  stays as its own entry
 - **Share links** — 🔗 in the header copies a link that opens the flame in
   WilderFire; the flame's `.flame` XML is deflated into the URL hash, so nothing
   is uploaded and the link works offline (a typical flame is ~2 KB of URL)

@@ -48,3 +48,4 @@ user supplies; no model, key, or prompt data is bundled.
 "JWildfire", "Apophysis" and "flam3" are the names of independent projects and
 are used here only to describe compatibility. WilderFire is not affiliated
 with or endorsed by them.
+| `src/core/randomStyles.ts` | JWildfire `create/tina/randomflame/*RandomFlameGenerator` + `XFormTransformService`, transcribed (18 random flame styles) | LGPL-2.1-or-later, © Andreas Maschke and contributors |

@@ -52,6 +52,7 @@ html, body {
 .logo .wf-fire { color: var(--accent); }
 .header .spacer { flex: 1; }
 .header select, .header button { height: 30px; }
+.header .rand-style { max-width: 120px; }
 
 /* ---------- Main layout ---------- */
 .main { flex: 1; display: flex; min-height: 0; }

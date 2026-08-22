@@ -90,8 +90,27 @@ async function boot() {
     }
   };
 
+  // Random flame styles: JWildfire's generators (src/core/randomStyles.ts) or WilderFire's own
+  const LS_STYLE = 'wilderfire.randomStyle';
+  const styleSel = el('select', 'rand-style') as HTMLSelectElement;
+  styleSel.title = 'Style of the next random flame — "Any" picks one of JWildfire\'s generators at random; "WilderFire" is the built-in contractive randomizer';
   const randBtn = el('button', 'primary', '🎲 Randomize');
-  randBtn.onclick = () => { app.flameSource = undefined; app.setFlame(randomFlame()); };
+  randBtn.onclick = async () => {
+    app.flameSource = undefined;
+    const style = styleSel.value;
+    if (style === 'wilderfire') { app.setFlame(randomFlame()); return; }
+    const { randomFlameInStyle } = await import('./core/randomStyles');
+    app.setFlame(randomFlameInStyle(style));
+  };
+  (async () => {
+    const { RANDOM_STYLES } = await import('./core/randomStyles');
+    for (const [value, label] of [['any', 'Any style'], ['wilderfire', 'WilderFire'], ...RANDOM_STYLES.map((s) => [s.id, s.name] as [string, string])]) {
+      const o = el('option', '', label) as HTMLOptionElement; o.value = value; styleSel.append(o);
+    }
+    styleSel.value = localStorage.getItem(LS_STYLE) ?? 'any';
+    if (!styleSel.value) styleSel.value = 'any';
+  })();
+  styleSel.onchange = () => localStorage.setItem(LS_STYLE, styleSel.value);
 
   const mutBtn = el('button', '', '🧬 Mutate');
   mutBtn.title = 'Explore mutations of the current flame';
@@ -163,7 +182,7 @@ async function boot() {
       Specific, clearly delimited parts derive from
       <a href="https://github.com/thargor6/JWildfire" target="_blank" rel="noopener">JWildfire</a>
       (© Andreas Maschke and contributors, LGPL 2.1+): the mathematical formulas of the ported variations,
-      the GPU helper library they use, the tone-mapping and solid-rendering (lighting) formulas, and the sample flames in the Tests menu.
+      the GPU helper library they use, the tone-mapping and solid-rendering (lighting) formulas, the random flame styles, and the sample flames in the Tests menu.
       That is why the whole project carries the LGPL. The full list of third-party material is in
       <a href="https://github.com/thepacket/wilderfire/blob/main/NOTICE.md" target="_blank" rel="noopener">NOTICE.md</a>.</p>
     <p>Looking for flames? The JWildfire community shares hundreds of packs at
@@ -190,7 +209,7 @@ async function boot() {
   };
   nameInp.addEventListener('change', () => { app.flame.name = nameInp.value.trim(); app.commitTone('name'); showName(); });
   nameInp.addEventListener('keydown', (e) => { if (e.key === 'Enter' || e.key === 'Escape') { if (e.key === 'Escape') showName(); nameInp.blur(); } });
-  header.append(logo, presetSel, randBtn, mutBtn, undoBtn, redoBtn, nameInp, provEl, shareBtn, saveBtn, libBtn, triBtn, themeBtn, aboutBtn);
+  header.append(logo, presetSel, styleSel, randBtn, mutBtn, undoBtn, redoBtn, nameInp, provEl, shareBtn, saveBtn, libBtn, triBtn, themeBtn, aboutBtn);
 
   // ---------- Layout ----------
   const main = el('div', 'main');
