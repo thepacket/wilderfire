@@ -309,6 +309,8 @@ a { color: var(--accent2); }
 ::-webkit-scrollbar-thumb { background: color-mix(in srgb, var(--fg-dim) 55%, transparent); border-radius: 6px; border: 2px solid transparent; background-clip: padding-box; }
 ::-webkit-scrollbar-thumb:hover { background: color-mix(in srgb, var(--fg-dim) 85%, transparent); background-clip: padding-box; }
 ::-webkit-scrollbar-track { background: transparent; }
+.lib-search { flex: 1; min-width: 140px; height: 30px; padding: 0 10px; background: var(--bg3); border: 1px solid var(--border); border-radius: 6px; color: var(--fg); font: inherit; }
+.lib-search:focus { border-color: var(--accent); outline: none; }
 /* Library keyboard selection */
 .lib-item.sel { border-color: var(--accent); box-shadow: 0 0 0 2px color-mix(in srgb, var(--accent) 45%, transparent); }
 .modal-body:focus { outline: none; }

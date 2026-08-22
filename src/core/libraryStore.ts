@@ -49,6 +49,14 @@ export async function libPut(entries: LibEntry | LibEntry[]): Promise<void> {
   await done(tx);
 }
 
+/** Remove every entry (the flame library only — user meshes stay). */
+export async function libClear(): Promise<void> {
+  const d = await db();
+  const tx = d.transaction(STORE, 'readwrite');
+  tx.objectStore(STORE).clear();
+  await done(tx);
+}
+
 export async function libDelete(id: string): Promise<void> {
   const d = await db();
   const tx = d.transaction(STORE, 'readwrite');

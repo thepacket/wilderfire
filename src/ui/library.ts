@@ -1,7 +1,7 @@
 // Flame library (IndexedDB, see ../core/libraryStore.ts) + session autosave (localStorage).
 import { App, el, openModal } from './common';
 import { normalizeFlame, type Flame } from '../core/flame';
-import { libAll, libPut, libDelete, type LibEntry } from '../core/libraryStore';
+import { libAll, libPut, libDelete, libClear, type LibEntry } from '../core/libraryStore';
 import { saveText } from './saveFile';
 import type { AnimAPI } from './animPanel';
 
@@ -100,35 +100,52 @@ export function buildLibrary(app: App, anim: AnimAPI) {
         close(); open();
       } catch (e) { alert('Import failed: ' + (e as Error).message); }
     };
-    tools.append(expBtn, impBtn, impFile);
+    const clearBtn = el('button', 'danger', '🗑 Empty library');
+    clearBtn.title = 'Remove every flame from the library (asks first; export a backup if in doubt)';
+    clearBtn.onclick = async () => {
+      const n = entries.length;
+      if (!n) return;
+      if (!confirm(`Remove all ${n} flame${n === 1 ? '' : 's'} from the library?\n\nThis cannot be undone — ⬇ Export library first if you want a backup.`)) return;
+      try { await libClear(); close(); open(); } catch (e) { alert('Could not empty the library: ' + (e as Error).message); }
+    };
+    const search = el('input', 'lib-search') as HTMLInputElement;
+    search.type = 'search';
+    search.placeholder = 'Search names…';
+    search.title = 'Show only flames whose name contains this text (press / to get here, Esc to clear)';
+    search.spellcheck = false;
+    tools.append(search, expBtn, impBtn, clearBtn, impFile);
     if (!entries.length) {
       body.append(tools, el('div', 'hint', 'Empty — use 💾 Save to keep the current flame here, or drop .flame / .zip files on the canvas. Stored in your browser (IndexedDB).'));
       return;
     }
     const grid = el('div', 'lib-grid');
     const items: HTMLElement[] = [];
-    let sel = -1;
+    let vis: HTMLElement[] = items; // the cards the search leaves visible; navigation runs over these
+    let sel = -1; // index into vis
     const select = (i: number, scroll = true) => {
-      if (!items.length) return;
-      i = Math.max(0, Math.min(items.length - 1, i));
-      items[sel]?.classList.remove('sel');
+      if (!vis.length) { sel = -1; return; }
+      i = Math.max(0, Math.min(vis.length - 1, i));
+      vis[sel]?.classList.remove('sel');
       sel = i;
-      items[sel].classList.add('sel');
-      if (scroll) items[sel].scrollIntoView({ block: 'nearest' });
+      vis[sel].classList.add('sel');
+      if (scroll) vis[sel].scrollIntoView({ block: 'nearest' });
     };
-    const load = (i: number) => {
-      const e = entries[i];
+    const entryOf = (card: HTMLElement) => items.indexOf(card);
+    const load = (card: HTMLElement) => {
+      const e = entries[entryOf(card)];
       if (!e) return;
       app.setFlame(normalizeFlame(e.flame, app.activeLayer.palette));
       close();
     };
-    const remove = (i: number) => {
+    const remove = (card: HTMLElement) => {
+      const i = entryOf(card);
       const e = entries[i];
       if (!e) return;
       libDelete(e.id).then(() => {
-        items[i].remove(); items.splice(i, 1); entries.splice(i, 1);
-        hint.textContent = `${entries.length} flame${entries.length === 1 ? '' : 's'}`;
-        if (items.length) select(Math.min(i, items.length - 1)); else sel = -1;
+        const vi = vis.indexOf(card);
+        card.remove(); items.splice(i, 1); entries.splice(i, 1);
+        applyFilter();
+        if (vis.length) select(Math.min(Math.max(vi, 0), vis.length - 1)); else sel = -1;
       }).catch((err) => alert('Delete failed: ' + (err as Error).message));
     };
     entries.forEach((e, i) => {
@@ -143,42 +160,63 @@ export function buildLibrary(app: App, anim: AnimAPI) {
       );
       meta.title = e.name; // the full name, where the grid has to truncate it
       const del = el('button', 'lib-del danger', '✕');
-      del.onclick = (ev) => { ev.stopPropagation(); remove(items.indexOf(item)); };
+      del.onclick = (ev) => { ev.stopPropagation(); remove(item); };
       item.append(img, meta, del);
-      item.onclick = () => load(items.indexOf(item));
-      item.onmouseenter = () => select(items.indexOf(item), false);
+      item.onclick = () => load(item);
+      item.onmouseenter = () => select(vis.indexOf(item), false);
       items.push(item);
       grid.append(item);
     });
-    const hint = el('div', 'hint', `${entries.length} flame${entries.length > 1 ? 's' : ''} — arrow keys / Page Up / Page Down move, Enter loads, Delete removes, Esc closes`);
+    const hint = el('div', 'hint');
+    const applyFilter = () => {
+      const q = search.value.trim().toLowerCase();
+      vis[sel]?.classList.remove('sel');
+      sel = -1;
+      vis = q ? items.filter((card, i) => entries[i].name.toLowerCase().includes(q)) : items;
+      for (const card of items) card.style.display = vis.includes(card) ? '' : 'none';
+      const n = entries.length;
+      hint.textContent = (q ? `${vis.length} of ${n} flame${n === 1 ? '' : 's'} match` : `${n} flame${n === 1 ? '' : 's'}`) +
+        ' — arrow keys / Page Up / Page Down move, Enter loads, Delete removes, Esc closes';
+    };
+    search.addEventListener('input', applyFilter);
+    search.addEventListener('keydown', (ev) => {
+      if (ev.key === 'Escape') { ev.preventDefault(); if (search.value) { search.value = ''; applyFilter(); } else close(); }
+      if (ev.key === 'Enter' || ev.key === 'ArrowDown') { ev.preventDefault(); body.focus(); select(0); }
+      ev.stopPropagation(); // typing must not drive the grid
+    });
+    applyFilter();
     body.append(tools, hint, grid);
     // Keyboard navigation: the grid is a wrapping flex of fixed-width cards, so a row is
     // however many fit across the body; Page Up/Down jump by the rows the viewport shows.
     body.tabIndex = 0;
     const columns = () => {
-      if (items.length < 2) return 1;
-      const y0 = items[0].offsetTop;
+      if (vis.length < 2) return 1;
+      const y0 = vis[0].offsetTop;
       let n = 1;
-      while (n < items.length && items[n].offsetTop === y0) n++;
+      while (n < vis.length && vis[n].offsetTop === y0) n++;
       return n;
     };
-    const pageRows = () => Math.max(1, Math.floor(body.clientHeight / (items[0].offsetHeight + 10)));
+    const pageRows = () => Math.max(1, Math.floor(body.clientHeight / ((vis[0]?.offsetHeight ?? 160) + 10)));
     body.addEventListener('keydown', (ev) => {
+      if (ev.target === search) return;
       const cols = columns();
       const cur = sel < 0 ? 0 : sel;
       switch (ev.key) {
         case 'ArrowRight': select(cur + 1); break;
         case 'ArrowLeft': select(cur - 1); break;
         case 'ArrowDown': select(sel < 0 ? 0 : cur + cols); break;
-        case 'ArrowUp': select(cur - cols); break;
+        case 'ArrowUp': if (cur - cols < 0 && sel >= 0) { search.focus(); sel >= 0 && vis[sel].classList.remove('sel'); sel = -1; } else select(cur - cols); break;
         case 'PageDown': select(cur + cols * pageRows()); break;
         case 'PageUp': select(cur - cols * pageRows()); break;
         case 'Home': select(0); break;
-        case 'End': select(items.length - 1); break;
-        case 'Enter': if (sel >= 0) load(sel); break;
-        case 'Delete': case 'Backspace': if (sel >= 0) remove(sel); break;
+        case 'End': select(vis.length - 1); break;
+        case 'Enter': if (sel >= 0) load(vis[sel]); break;
+        case 'Delete': case 'Backspace': if (sel >= 0) remove(vis[sel]); break;
         case 'Escape': close(); break;
-        default: return;
+        case '/': search.focus(); search.select(); break;
+        default:
+          if (ev.key.length === 1 && !ev.ctrlKey && !ev.metaKey && !ev.altKey) { search.focus(); return; } // start typing = search
+          return;
       }
       ev.preventDefault();
     });
