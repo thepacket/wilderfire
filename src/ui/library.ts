@@ -1,7 +1,7 @@
 // Flame library (IndexedDB, see ../core/libraryStore.ts) + session autosave (localStorage).
 import { App, el, openModal } from './common';
 import { normalizeFlame, type Flame } from '../core/flame';
-import { libAll, libPut, libDelete, libDeleteMany, libClear, type LibEntry } from '../core/libraryStore';
+import { libAll, libPut, libDelete, libDeleteMany, libClear, packOf, type LibEntry } from '../core/libraryStore';
 import { saveText } from './saveFile';
 import type { AnimAPI } from './animPanel';
 
@@ -144,13 +144,51 @@ export function buildLibrary(app: App, anim: AnimAPI) {
       close();
       openGallery(app, list, startAt);
     };
-    tools.append(search, galBtn, expBtn, impBtn, dedupBtn, clearBtn, impFile);
+    // Collections: ★ favourites, every tag, every source pack — one pass over the entries for the counts
+    const collSel = el('select', 'lib-coll') as HTMLSelectElement;
+    collSel.title = 'Show one collection: your favourites, a tag, or the pack the flames came from';
+    let collection = 'all';
+    const refreshCollections = () => {
+      let favs = 0;
+      const tags = new Map<string, number>();
+      const packs = new Map<string, number>();
+      for (const e of entries) {
+        if (e.fav) favs++;
+        for (const t of e.tags ?? []) tags.set(t, (tags.get(t) ?? 0) + 1);
+        const pk = packOf(e);
+        if (pk) packs.set(pk, (packs.get(pk) ?? 0) + 1);
+      }
+      const byName = new Intl.Collator(undefined, { numeric: true, sensitivity: 'base' });
+      collSel.textContent = '';
+      const add = (value: string, label: string, group?: HTMLOptGroupElement) => { const o = el('option', '', label) as HTMLOptionElement; o.value = value; (group ?? collSel).append(o); };
+      add('all', `All flames (${entries.length})`);
+      add('fav', `★ Favourites (${favs})`);
+      if (tags.size) { const g = el('optgroup') as HTMLOptGroupElement; g.label = 'Tags'; for (const [t, n] of [...tags].sort((a, b) => byName.compare(a[0], b[0]))) add('tag:' + t, `${t} (${n})`, g); collSel.append(g); }
+      if (packs.size) { const g = el('optgroup') as HTMLOptGroupElement; g.label = 'Packs'; for (const [k, n] of [...packs].sort((a, b) => byName.compare(a[0], b[0]))) add('pack:' + k, `${k} (${n})`, g); collSel.append(g); }
+      collSel.value = [...collSel.options].some((o) => o.value === collection) ? collection : (collection = 'all');
+    };
+    collSel.onchange = () => { collection = collSel.value; applyFilter(); body.focus(); };
+    const inCollection = (e: LibEntry) => collection === 'all' || (collection === 'fav' ? !!e.fav : collection.startsWith('tag:') ? (e.tags ?? []).includes(collection.slice(4)) : packOf(e) === collection.slice(5));
+    const tagAllBtn = el('button', '', '🏷 Tag all shown…');
+    tagAllBtn.title = 'Add a tag to every flame in the current result (search + collection) — one write for the lot';
+    tagAllBtn.onclick = async () => {
+      if (!vis.length) return;
+      const t = (prompt(`Tag to add to the ${vis.length} flame${vis.length === 1 ? '' : 's'} shown:`) ?? '').trim();
+      if (!t) return;
+      const changed = vis.filter((e) => !(e.tags ?? []).includes(t));
+      for (const e of changed) e.tags = [...(e.tags ?? []), t];
+      try { await libPut(changed); } catch (e) { alert('Could not save tags: ' + (e as Error).message); return; }
+      refreshCollections(); applyFilter();
+    };
+    const tools2 = el('div', 'btn-row');
+    tools.append(search, collSel, galBtn);
+    tools2.append(expBtn, impBtn, tagAllBtn, dedupBtn, clearBtn, impFile);
     if (!entries.length) {
       const empty = el('div', 'hint', 'Empty — use 💾 Save to keep the current flame here, or drop .flame / .zip files on the canvas. Stored in your browser (IndexedDB). ');
       const link = el('a', '', 'Flame packs to get started: jwfsanctuary.club/downloads/flamepacks') as HTMLAnchorElement;
       link.href = 'https://www.jwfsanctuary.club/downloads/flamepacks/'; link.target = '_blank'; link.rel = 'noopener';
       empty.append(link);
-      body.append(tools, empty);
+      body.append(tools, tools2, empty);
       return;
     }
     // ---- Virtualised grid: only the rows in view exist as DOM; everything else is arithmetic ----
@@ -182,11 +220,18 @@ export function buildLibrary(app: App, anim: AnimAPI) {
       if (e.thumb) img.src = e.thumb; else img.alt = e.name;
       const meta = el('div', 'lib-meta');
       const prov = [e.author ? 'by ' + e.author : '', e.source ?? ''].filter(Boolean).join(' · ');
-      meta.append(el('div', 'lib-name', e.name), el('div', 'lib-date', new Date(e.date).toLocaleString()), el('div', 'lib-prov', prov || '\u00a0'));
-      meta.title = [e.name, e.author ? 'Author: ' + e.author : '', e.source ? 'Source: ' + e.source : ''].filter(Boolean).join('\n');
+      const tagsEl = el('div', 'lib-tags', (e.tags ?? []).join(' · ') || '\u00a0');
+      meta.append(el('div', 'lib-name', e.name), el('div', 'lib-date', new Date(e.date).toLocaleString()), el('div', 'lib-prov', prov || '\u00a0'), tagsEl);
+      meta.title = [e.name, e.author ? 'Author: ' + e.author : '', e.source ? 'Source: ' + e.source : '', e.tags?.length ? 'Tags: ' + e.tags.join(', ') : ''].filter(Boolean).join('\n');
+      const fav = el('button', 'lib-fav' + (e.fav ? ' on' : ''), e.fav ? '★' : '☆');
+      fav.title = 'Favourite (Space on the selected card)';
+      fav.onclick = (ev) => { ev.stopPropagation(); toggleFav(e); };
+      const tagBtn = el('button', 'lib-tag', '🏷');
+      tagBtn.title = 'Edit this flame\'s tags';
+      tagBtn.onclick = (ev) => { ev.stopPropagation(); editTags(e); };
       const del = el('button', 'lib-del danger', '✕');
       del.onclick = (ev) => { ev.stopPropagation(); remove(e); };
-      item.append(img, meta, del);
+      item.append(img, meta, fav, tagBtn, del);
       item.onclick = () => load(e);
       item.onmouseenter = () => select(idx.get(e.id) ?? i, false);
       return item;
@@ -231,6 +276,31 @@ export function buildLibrary(app: App, anim: AnimAPI) {
       render();
       cards.get(vis[i].id)?.classList.add('sel');
     };
+    const refreshCard = (e: LibEntry) => {
+      const old = cards.get(e.id);
+      if (!old) return;
+      const fresh = makeCard(e, idx.get(e.id) ?? 0);
+      old.replaceWith(fresh);
+      cards.set(e.id, fresh);
+      place(fresh, idx.get(e.id) ?? 0);
+    };
+    const toggleFav = (e: LibEntry) => {
+      e.fav = !e.fav;
+      libPut(e).catch((err) => alert('Could not save: ' + (err as Error).message));
+      refreshCollections();
+      if (collection === 'fav' && !e.fav) applyFilter(); else refreshCard(e);
+    };
+    const editTags = (e: LibEntry) => {
+      const cur = (e.tags ?? []).join(', ');
+      const v = prompt(`Tags for "${e.name}" (comma separated):`, cur);
+      if (v === null) return;
+      const tags = [...new Set(v.split(',').map((t) => t.trim()).filter(Boolean))];
+      if (tags.join('\u0000') === (e.tags ?? []).join('\u0000')) return;
+      e.tags = tags;
+      libPut(e).catch((err) => alert('Could not save tags: ' + (err as Error).message));
+      refreshCollections();
+      if (collection.startsWith('tag:') && !tags.includes(collection.slice(4))) applyFilter(); else refreshCard(e);
+    };
     const load = (e: LibEntry) => {
       app.flameSource = e.source ?? `library: ${e.name}`;
       app.setFlame(normalizeFlame(e.flame, app.activeLayer.palette));
@@ -249,13 +319,15 @@ export function buildLibrary(app: App, anim: AnimAPI) {
     const applyFilter = () => {
       const q = search.value.trim().toLowerCase();
       sel = -1;
-      vis = q ? entries.filter((en) => en.name.toLowerCase().includes(q) || (en.author ?? '').toLowerCase().includes(q) || (en.source ?? '').toLowerCase().includes(q)) : entries;
+      const textHit = (en: LibEntry) => !q || en.name.toLowerCase().includes(q) || (en.author ?? '').toLowerCase().includes(q) || (en.source ?? '').toLowerCase().includes(q) || (en.tags ?? []).some((t) => t.toLowerCase().includes(q));
+      vis = collection === 'all' && !q ? entries : entries.filter((en) => inCollection(en) && textHit(en));
       idx.clear();
       vis.forEach((en, i) => idx.set(en.id, i));
       for (const [id, card] of cards) if (!idx.has(id)) { card.remove(); cards.delete(id); }
       const n = entries.length;
-      hint.textContent = (q ? `${vis.length} of ${n} flame${n === 1 ? '' : 's'} match` : `${n} flame${n === 1 ? '' : 's'}`) +
-        ' — arrow keys / Page Up / Page Down move, Enter loads, Delete removes, Esc closes';
+      const where = collection === 'all' ? '' : ` in ${collSel.selectedOptions[0]?.label.replace(/ \(\d+\)$/, '') ?? collection}`;
+      hint.textContent = (q || collection !== 'all' ? `${vis.length} of ${n} flame${n === 1 ? '' : 's'}${where}${q ? ' match' : ''}` : `${n} flame${n === 1 ? '' : 's'}`) +
+        ' — arrows move, Enter loads, Space ★, Delete removes, Esc closes';
       layout();
       render();
     };
@@ -265,9 +337,10 @@ export function buildLibrary(app: App, anim: AnimAPI) {
       if (ev.key === 'Enter' || ev.key === 'ArrowDown') { ev.preventDefault(); body.focus(); select(0); }
       ev.stopPropagation(); // typing must not drive the grid
     });
-    body.append(tools, hint, grid);
+    body.append(tools, tools2, hint, grid);
     body.addEventListener('scroll', scheduleRender, { passive: true });
     new ResizeObserver(() => { layout(); render(); }).observe(grid);
+    refreshCollections();
     applyFilter();
     // Keyboard navigation over the visible (filtered) list; Page Up/Down jump by the rows the viewport shows.
     body.tabIndex = 0;
@@ -285,6 +358,7 @@ export function buildLibrary(app: App, anim: AnimAPI) {
         case 'Home': select(0); break;
         case 'End': select(vis.length - 1); break;
         case 'Enter': if (sel >= 0) load(vis[sel]); break;
+        case ' ': if (sel >= 0) toggleFav(vis[sel]); break;
         case 'Delete': case 'Backspace': if (sel >= 0) remove(vis[sel]); break;
         case 'Escape': close(); break;
         case '/': search.focus(); search.select(); break;

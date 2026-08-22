@@ -273,6 +273,14 @@ a { color: var(--accent2); }
 .lib-grid.lib-virtual .lib-item { position: absolute; box-sizing: border-box; }
 .lib-grid.lib-virtual .lib-item:hover { transform: none; }
 .lib-item .lib-prov { min-height: 13px; }
+.lib-item .lib-tags { font-size: 10px; color: var(--accent2); min-height: 13px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.lib-item .lib-fav, .lib-item .lib-tag {
+  position: absolute; top: 4px; padding: 1px 6px; background: color-mix(in srgb, var(--bg) 70%, transparent);
+}
+.lib-item .lib-fav { left: 4px; color: var(--fg-dim); }
+.lib-item .lib-fav.on { color: var(--accent2); }
+.lib-item .lib-tag { left: 34px; font-size: 11px; }
+.lib-coll { max-width: 220px; height: 30px; }
 .mut-grid { grid-template-columns: repeat(3, 1fr); }
 .lib-item, .mut-item {
   background: var(--bg3); border: 1px solid var(--border); border-radius: 8px;

@@ -35,7 +35,7 @@ export const TOOL_DEFS: ToolDef[] = [
   { type: 'function', function: { name: 'screenshot', description: 'A fresh small render of the current flame (vision models only). Use it to check a result before deciding what to change next.', parameters: { type: 'object', properties: {} } } },
   { type: 'function', function: { name: 'variation_lookup', description: 'Search the variation catalogue (938 JWildfire/flam3 variations) by name substring; returns names and their parameter names.',
     parameters: { type: 'object', properties: { query: { ...str, description: 'substring of the name, e.g. "julia", "blur", "wave"' }, limit: { ...num, description: 'max results (default 15)' } }, required: ['query'] } } },
-  { type: 'function', function: { name: 'library_search', description: "Search the user's flame library by a substring of the name, author or source pack. Returns id, name, author, source for each match.",
+  { type: 'function', function: { name: 'library_search', description: "Search the user's flame library by a substring of the name, author, source pack or tag (query \"★\" lists favourites). Returns id, ★, name, author, source, tags for each match.",
     parameters: { type: 'object', properties: { query: { ...str, description: 'substring to look for ("" lists the newest)' }, limit: { ...num, description: 'max results (default 20)' } }, required: ['query'] } } },
   { type: 'function', function: { name: 'library_load', description: 'Load a flame from the library into the editor by its id (from library_search).',
     parameters: { type: 'object', properties: { id: str }, required: ['id'] } } },
@@ -123,9 +123,9 @@ export async function runTool(name: string, argsJson: string, env: ToolEnv): Pro
         const q = (s('query') ?? '').toLowerCase();
         const limit = Math.max(1, Math.min(100, n('limit') ?? 20));
         const all = await libAll();
-        const hits = q ? all.filter((e) => e.name.toLowerCase().includes(q) || (e.author ?? '').toLowerCase().includes(q) || (e.source ?? '').toLowerCase().includes(q)) : all;
+        const hits = q ? all.filter((e) => e.name.toLowerCase().includes(q) || (e.author ?? '').toLowerCase().includes(q) || (e.source ?? '').toLowerCase().includes(q) || (e.tags ?? []).some((t) => t.toLowerCase().includes(q)) || (q === '★' && e.fav)) : all;
         if (!hits.length) return { text: q ? `No library flame matches "${q}" (${all.length} in the library).` : 'The library is empty.' };
-        const lines = hits.slice(0, limit).map((e) => `${e.id} | ${e.name}${e.author ? ` | by ${e.author}` : ''}${e.source ? ` | ${e.source}` : ''}`);
+        const lines = hits.slice(0, limit).map((e) => `${e.id} | ${e.fav ? '★ ' : ''}${e.name}${e.author ? ` | by ${e.author}` : ''}${e.source ? ` | ${e.source}` : ''}${e.tags?.length ? ` | tags: ${e.tags.join(', ')}` : ''}`);
         return { text: `${hits.length} of ${all.length} flames match${hits.length > limit ? ` (showing ${limit})` : ''}:\n${lines.join('\n')}` };
       }
       case 'library_load': {

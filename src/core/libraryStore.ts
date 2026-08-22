@@ -13,7 +13,14 @@ export interface LibEntry {
   source?: string;
   /** JWildfire meta_info_author, when the file carried one */
   author?: string;
+  /** ★ */
+  fav?: boolean;
+  /** free-form labels; a tag doubles as a collection in the library dialog */
+  tags?: string[];
 }
+
+/** The pack a library entry came from: the zip / pack file / top folder of its source. */
+export const packOf = (e: LibEntry): string | undefined => e.source ? e.source.split(' › ')[0].split('/')[0] : undefined;
 
 const DB = 'wilderfire';
 const STORE = 'library';
