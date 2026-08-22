@@ -269,6 +269,10 @@ a { color: var(--accent2); }
   display: grid; gap: 10px;
 }
 .lib-grid { grid-template-columns: repeat(auto-fill, minmax(140px, 1fr)); }
+.lib-grid.lib-virtual { display: block; position: relative; }
+.lib-grid.lib-virtual .lib-item { position: absolute; box-sizing: border-box; }
+.lib-grid.lib-virtual .lib-item:hover { transform: none; }
+.lib-item .lib-prov { min-height: 13px; }
 .mut-grid { grid-template-columns: repeat(3, 1fr); }
 .lib-item, .mut-item {
   background: var(--bg3); border: 1px solid var(--border); border-radius: 8px;

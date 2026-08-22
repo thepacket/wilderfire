@@ -137,7 +137,7 @@ export function buildLibrary(app: App, anim: AnimAPI) {
     const galBtn = el('button', 'primary', '▶ Gallery');
     galBtn.title = 'Fullscreen slideshow through these flames (the search result, in this order) — ← → browse, Space auto-advances, Esc leaves with the shown flame loaded';
     galBtn.onclick = async () => {
-      const list = vis.map((card) => entries[entryOf(card)]);
+      const list = vis.slice();
       if (!list.length) return;
       const startAt = sel >= 0 ? sel : 0;
       const { openGallery } = await import('./gallery');
@@ -153,73 +153,111 @@ export function buildLibrary(app: App, anim: AnimAPI) {
       body.append(tools, empty);
       return;
     }
-    const grid = el('div', 'lib-grid');
-    const items: HTMLElement[] = [];
-    let vis: HTMLElement[] = items; // the cards the search leaves visible; navigation runs over these
-    let sel = -1; // index into vis
+    // ---- Virtualised grid: only the rows in view exist as DOM; everything else is arithmetic ----
+    // Cards are absolutely positioned in a spacer whose height is rows × rowH, so the scrollbar
+    // behaves as if every card were there. ~40–60 cards live at any time, whatever the library size.
+    const GAP = 10, MIN_W = 140;
+    const grid = el('div', 'lib-grid lib-virtual');
+    let vis: LibEntry[] = entries;   // the search result, in display order
+    let sel = -1;                    // index into vis
+    let cols = 1, cardW = MIN_W, rowH = MIN_W + 66;
+    const cards = new Map<string, HTMLElement>(); // entry id → rendered card
+    const idx = new Map<string, number>();        // entry id → index in vis
+    const hint = el('div', 'hint');
+    const gridTop = () => grid.getBoundingClientRect().top - body.getBoundingClientRect().top + body.scrollTop;
+    const rowOf = (i: number) => Math.floor(i / cols);
+    const rows = () => Math.ceil(vis.length / cols);
+    const layout = () => {
+      const w = grid.clientWidth || body.clientWidth - 28;
+      cols = Math.max(1, Math.floor((w + GAP) / (MIN_W + GAP)));
+      cardW = (w - GAP * (cols - 1)) / cols;
+      const probe = cards.values().next().value as HTMLElement | undefined;
+      rowH = probe ? probe.offsetHeight : Math.round(cardW) + 66;
+      grid.style.height = `${Math.max(0, rows() * (rowH + GAP) - GAP)}px`;
+    };
+    const makeCard = (e: LibEntry, i: number): HTMLElement => {
+      const item = el('div', 'lib-item');
+      item.dataset.id = e.id;
+      const img = el('img') as HTMLImageElement;
+      if (e.thumb) img.src = e.thumb; else img.alt = e.name;
+      const meta = el('div', 'lib-meta');
+      const prov = [e.author ? 'by ' + e.author : '', e.source ?? ''].filter(Boolean).join(' · ');
+      meta.append(el('div', 'lib-name', e.name), el('div', 'lib-date', new Date(e.date).toLocaleString()), el('div', 'lib-prov', prov || '\u00a0'));
+      meta.title = [e.name, e.author ? 'Author: ' + e.author : '', e.source ? 'Source: ' + e.source : ''].filter(Boolean).join('\n');
+      const del = el('button', 'lib-del danger', '✕');
+      del.onclick = (ev) => { ev.stopPropagation(); remove(e); };
+      item.append(img, meta, del);
+      item.onclick = () => load(e);
+      item.onmouseenter = () => select(idx.get(e.id) ?? i, false);
+      return item;
+    };
+    const place = (card: HTMLElement, i: number) => {
+      card.style.left = `${(i % cols) * (cardW + GAP)}px`;
+      card.style.top = `${rowOf(i) * (rowH + GAP)}px`;
+      card.style.width = `${cardW}px`;
+      card.classList.toggle('sel', i === sel);
+    };
+    const render = () => {
+      if (!vis.length) { for (const c of cards.values()) c.remove(); cards.clear(); return; }
+      const top = body.scrollTop - gridTop();
+      const r0 = Math.max(0, Math.floor(top / (rowH + GAP)) - 1);
+      const r1 = Math.min(rows() - 1, Math.ceil((top + body.clientHeight) / (rowH + GAP)) + 1);
+      const i0 = r0 * cols, i1 = Math.min(vis.length, (r1 + 1) * cols);
+      const keep = new Set<string>();
+      for (let i = i0; i < i1; i++) {
+        const e = vis[i];
+        keep.add(e.id);
+        let card = cards.get(e.id);
+        if (!card) { card = makeCard(e, i); cards.set(e.id, card); grid.append(card); }
+        place(card, i);
+      }
+      for (const [id, card] of cards) if (!keep.has(id)) { card.remove(); cards.delete(id); }
+      // the first real card tells the true row height; re-layout once if the guess was off
+      const probe = cards.values().next().value as HTMLElement | undefined;
+      if (probe && Math.abs(probe.offsetHeight - rowH) > 1) { layout(); for (const [id, card] of cards) place(card, idx.get(id)!); }
+    };
+    let renderQueued = false;
+    const scheduleRender = () => { if (renderQueued) return; renderQueued = true; setTimeout(() => { renderQueued = false; render(); }, 0); };
     const select = (i: number, scroll = true) => {
       if (!vis.length) { sel = -1; return; }
       i = Math.max(0, Math.min(vis.length - 1, i));
-      vis[sel]?.classList.remove('sel');
-      sel = i;
-      vis[sel].classList.add('sel');
-      if (scroll) vis[sel].scrollIntoView({ block: 'nearest' });
+      const prev = sel; sel = i;
+      if (prev >= 0) cards.get(vis[prev]?.id ?? '')?.classList.remove('sel');
+      if (scroll) {
+        const rowTop = gridTop() + rowOf(i) * (rowH + GAP);
+        if (rowTop < body.scrollTop) body.scrollTop = rowTop;
+        else if (rowTop + rowH > body.scrollTop + body.clientHeight) body.scrollTop = rowTop + rowH - body.clientHeight;
+      }
+      render();
+      cards.get(vis[i].id)?.classList.add('sel');
     };
-    const entryOf = (card: HTMLElement) => items.indexOf(card); // only on click/Enter/Delete — O(N) per user action, not per render
-    const load = (card: HTMLElement) => {
-      const e = entries[entryOf(card)];
-      if (!e) return;
+    const load = (e: LibEntry) => {
       app.flameSource = e.source ?? `library: ${e.name}`;
       app.setFlame(normalizeFlame(e.flame, app.activeLayer.palette));
       close();
     };
-    const remove = (card: HTMLElement) => {
-      const i = entryOf(card);
-      const e = entries[i];
-      if (!e) return;
+    const remove = (e: LibEntry) => {
       libDelete(e.id).then(() => {
-        const vi = vis.indexOf(card);
-        card.remove(); items.splice(i, 1); entries.splice(i, 1);
+        const vi = idx.get(e.id) ?? -1;
+        const ei = entries.findIndex((x) => x.id === e.id);
+        if (ei >= 0) entries.splice(ei, 1);
+        cards.get(e.id)?.remove(); cards.delete(e.id);
         applyFilter();
         if (vis.length) select(Math.min(Math.max(vi, 0), vis.length - 1)); else sel = -1;
       }).catch((err) => alert('Delete failed: ' + (err as Error).message));
     };
-    entries.forEach((e, i) => {
-      const item = el('div', 'lib-item');
-      const img = el('img') as HTMLImageElement;
-      if (e.thumb) img.src = e.thumb;
-      else img.alt = e.name; // pack import whose thumbnail render failed
-      const meta = el('div', 'lib-meta');
-      meta.append(
-        el('div', 'lib-name', e.name),
-        el('div', 'lib-date', new Date(e.date).toLocaleString()),
-      );
-      const prov = [e.author ? 'by ' + e.author : '', e.source ?? ''].filter(Boolean).join(' · ');
-      if (prov) meta.append(el('div', 'lib-prov', prov));
-      meta.title = [e.name, e.author ? 'Author: ' + e.author : '', e.source ? 'Source: ' + e.source : ''].filter(Boolean).join('\n');
-      const del = el('button', 'lib-del danger', '✕');
-      del.onclick = (ev) => { ev.stopPropagation(); remove(item); };
-      item.append(img, meta, del);
-      item.onclick = () => load(item);
-      item.onmouseenter = () => select(vis.indexOf(item), false);
-      items.push(item);
-      grid.append(item);
-    });
-    const hint = el('div', 'hint');
     const applyFilter = () => {
       const q = search.value.trim().toLowerCase();
-      vis[sel]?.classList.remove('sel');
       sel = -1;
-      vis = [];
-      for (let i = 0; i < items.length; i++) {
-        const en = entries[i];
-        const show = !q || en.name.toLowerCase().includes(q) || (en.author ?? '').toLowerCase().includes(q) || (en.source ?? '').toLowerCase().includes(q);
-        items[i].style.display = show ? '' : 'none';
-        if (show) vis.push(items[i]);
-      }
+      vis = q ? entries.filter((en) => en.name.toLowerCase().includes(q) || (en.author ?? '').toLowerCase().includes(q) || (en.source ?? '').toLowerCase().includes(q)) : entries;
+      idx.clear();
+      vis.forEach((en, i) => idx.set(en.id, i));
+      for (const [id, card] of cards) if (!idx.has(id)) { card.remove(); cards.delete(id); }
       const n = entries.length;
       hint.textContent = (q ? `${vis.length} of ${n} flame${n === 1 ? '' : 's'} match` : `${n} flame${n === 1 ? '' : 's'}`) +
         ' — arrow keys / Page Up / Page Down move, Enter loads, Delete removes, Esc closes';
+      layout();
+      render();
     };
     search.addEventListener('input', applyFilter);
     search.addEventListener('keydown', (ev) => {
@@ -227,28 +265,21 @@ export function buildLibrary(app: App, anim: AnimAPI) {
       if (ev.key === 'Enter' || ev.key === 'ArrowDown') { ev.preventDefault(); body.focus(); select(0); }
       ev.stopPropagation(); // typing must not drive the grid
     });
-    applyFilter();
     body.append(tools, hint, grid);
-    // Keyboard navigation: the grid is a wrapping flex of fixed-width cards, so a row is
-    // however many fit across the body; Page Up/Down jump by the rows the viewport shows.
+    body.addEventListener('scroll', scheduleRender, { passive: true });
+    new ResizeObserver(() => { layout(); render(); }).observe(grid);
+    applyFilter();
+    // Keyboard navigation over the visible (filtered) list; Page Up/Down jump by the rows the viewport shows.
     body.tabIndex = 0;
-    const columns = () => {
-      if (vis.length < 2) return 1;
-      const y0 = vis[0].offsetTop;
-      let n = 1;
-      while (n < vis.length && vis[n].offsetTop === y0) n++;
-      return n;
-    };
-    const pageRows = () => Math.max(1, Math.floor(body.clientHeight / ((vis[0]?.offsetHeight ?? 160) + 10)));
+    const pageRows = () => Math.max(1, Math.floor(body.clientHeight / (rowH + GAP)));
     body.addEventListener('keydown', (ev) => {
       if (ev.target === search) return;
-      const cols = columns();
       const cur = sel < 0 ? 0 : sel;
       switch (ev.key) {
         case 'ArrowRight': select(cur + 1); break;
         case 'ArrowLeft': select(cur - 1); break;
         case 'ArrowDown': select(sel < 0 ? 0 : cur + cols); break;
-        case 'ArrowUp': if (cur - cols < 0 && sel >= 0) { search.focus(); sel >= 0 && vis[sel].classList.remove('sel'); sel = -1; } else select(cur - cols); break;
+        case 'ArrowUp': if (cur - cols < 0 && sel >= 0) { search.focus(); cards.get(vis[sel]?.id ?? '')?.classList.remove('sel'); sel = -1; } else select(cur - cols); break;
         case 'PageDown': select(cur + cols * pageRows()); break;
         case 'PageUp': select(cur - cols * pageRows()); break;
         case 'Home': select(0); break;
