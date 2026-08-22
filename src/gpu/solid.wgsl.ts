@@ -187,7 +187,7 @@ struct SP {
   bgGeom: vec4f,
 };
 struct Light { dir: vec4f, col: vec4f, sh: vec4f }; // dir.xyz = direction (LightViewCalculator), dir.w = intensity; sh.x = casting index (−1 = none), sh.y = 1 − shadowIntensity
-struct Mat { a: vec4f, b: vec4f, c: vec4f };      // a: diffuse, ambient, phong, phongSize; b: phong rgb, diffFunc; c: reflMapIntensity
+struct Mat { a: vec4f, b: vec4f, c: vec4f };      // a: diffuse, ambient, phong, phongSize; b: phong rgb, diffFunc; c: reflMapIntensity, mapping (1 = spherical), reflection texture layer + 1 (0 = none)
 struct SolidLights { lights: array<Light, ${SOLID_MAX_LIGHTS}>, mats: array<Mat, ${SOLID_MAX_MATS}> };
 
 @group(0) @binding(0) var<uniform> S: SP;
@@ -198,6 +198,7 @@ struct SolidLights { lights: array<Light, ${SOLID_MAX_LIGHTS}>, mats: array<Mat,
 @group(0) @binding(5) var<uniform> L: SolidLights;
 @group(0) @binding(6) var<storage, read> aoBuf: array<f32>; // AOCalculator result per cell (zeros when AO is off)
 @group(0) @binding(7) var<storage, read> svis: array<f32>;  // ShadowCalculator visibility per casting light × cell
+@group(0) @binding(8) var reflTex: texture_2d_array<f32>;   // reflection maps, one layer per image (src/core/reflMaps.ts)
 
 @vertex
 fn vs(@builtin(vertex_index) vi: u32) -> @builtin(position) vec4f {
@@ -242,7 +243,21 @@ fn diffFunc(kind: u32, cosa: f32) -> f32 {
   }
 }
 
-struct MatI { diffuse: f32, ambient: f32, phong: f32, phongSize: f32, phongCol: vec3f, f0: u32, f1: u32, fmix: f32, valid: bool };
+struct MatI { diffuse: f32, ambient: f32, phong: f32, phongSize: f32, phongCol: vec3f, f0: u32, f1: u32, fmix: f32, valid: bool, reflI: f32, reflLayer: i32, reflSph: bool };
+
+// UVPairD.getColorFromMap: the texel at (int(W·u), int(H·v)) and its three neighbours (black outside the image),
+// blended with JWildfire's blerp — whose weights are the *global* u and v, not the in-texel fractions
+fn reflColor(layer: i32, u: f32, v: f32) -> vec3f {
+  let dim = textureDimensions(reflTex);
+  let ui = i32(f32(dim.x) * u); let vi = i32(f32(dim.y) * v);
+  let w = i32(dim.x); let h = i32(dim.y);
+  var lu = vec3f(0.0); var ru = vec3f(0.0); var lb = vec3f(0.0); var rb = vec3f(0.0);
+  if (ui >= 0 && ui < w && vi >= 0 && vi < h) { lu = textureLoad(reflTex, vec2i(ui, vi), layer, 0).rgb; }
+  if (ui + 1 >= 0 && ui + 1 < w && vi >= 0 && vi < h) { ru = textureLoad(reflTex, vec2i(ui + 1, vi), layer, 0).rgb; }
+  if (ui >= 0 && ui < w && vi + 1 >= 0 && vi + 1 < h) { lb = textureLoad(reflTex, vec2i(ui, vi + 1), layer, 0).rgb; }
+  if (ui + 1 >= 0 && ui + 1 < w && vi + 1 >= 0 && vi + 1 < h) { rb = textureLoad(reflTex, vec2i(ui + 1, vi + 1), layer, 0).rgb; }
+  return mix(mix(lu, ru, u), mix(lb, rb, u), v);
+}
 
 // SolidRenderSettings.getInterpolatedMaterial (incl. morphMaterial's quirk: the morphed diffuse is the refl-map intensity blend)
 fn materialAt(idx: f32) -> MatI {
@@ -261,8 +276,11 @@ fn materialAt(idx: f32) -> MatI {
   let B = L.mats[to];
   m.valid = true;
   m.f0 = u32(A.b.w + 0.5); m.f1 = u32(B.b.w + 0.5); m.fmix = scl;
+  m.reflI = 0.0; m.reflLayer = -1; m.reflSph = false;
   if (fi == to) {
     m.diffuse = A.a.x; m.ambient = A.a.y; m.phong = A.a.z; m.phongSize = A.a.w; m.phongCol = A.b.xyz;
+    // a blended material has no reflection map in JWildfire (morphMaterial never copies the file name)
+    m.reflI = A.c.x; m.reflLayer = i32(A.c.z + 0.5) - 1; m.reflSph = A.c.y > 0.5;
   } else {
     m.diffuse = mix(A.c.x, B.c.x, scl);
     m.ambient = mix(A.a.y, B.a.y, scl); m.phong = mix(A.a.z, B.a.z, scl); m.phongSize = mix(A.a.w, B.a.w, scl);
@@ -334,6 +352,26 @@ fn shadeCell(cell: u32, bgc: vec3f, out: ptr<function, vec3f>) -> bool {
         if (vr < 1e-8) {
           raw += m.phongCol * (vis * pow(diffResp(m, -vr), m.phongSize) * m.phong * lt.dir.w);
         }
+      }
+      // reflection map (www.reindelsoftware.com/Documents/Mapping/Mapping.html): the view direction reflected on the
+      // normal, mapped onto the image, added per light with its visibility (NOT its intensity — JWildfire's addFrom scale
+      // is visibility · reflectionMapIntensity); SSAO lowers the intensity like the diffuse
+      if (m.reflLayer >= 0 && m.reflI > 1e-8) {
+        var ri = m.reflI;
+        if (S.ao.x > 0.5) { ri = max(0.0, ri - aoBuf[cell] * S.ao.y * S.ao.z); }
+        let rv = vec3f(-2.0 * normal.z * normal.x, -2.0 * normal.z * normal.y, 1.0 - 2.0 * normal.z * normal.z); // reflect((0,0,1), n)
+        var u: f32; var v: f32;
+        if (m.reflSph) {
+          // UVPairD.sphericalOpenGlMapping
+          let mm = 2.0 * sqrt(rv.x * rv.x + rv.y * rv.y + (rv.z + 1.0) * (rv.z + 1.0));
+          u = clamp(rv.x / mm + 0.5, 0.0, 1.0); v = clamp(rv.y / mm + 0.5, 0.0, 1.0);
+        } else {
+          // UVPairD.sphericalBlinnNewellLatitudeMapping (atan of the quotient, as JWildfire writes it)
+          let RPI = 3.14159265358979;
+          let q = select(atan(rv.x / rv.z), select(-RPI * 0.5, RPI * 0.5, rv.x >= 0.0), abs(rv.z) < 1e-30);
+          u = clamp((q + RPI) / (2.0 * RPI), 0.0, 1.0); v = clamp((asin(clamp(rv.y, -1.0, 1.0)) + RPI * 0.5) / RPI, 0.0, 1.0);
+        }
+        raw += reflColor(m.reflLayer, u, v) * (vis * ri);
       }
     }
   }

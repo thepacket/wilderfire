@@ -235,8 +235,18 @@ line for dc_carpet3D and whirligig; tests/preserveZ3d.test.ts. Isolated by varia
 preserve_z off → 1.00, DOF off alone → 0.09.)
 Survey correction: `post_bokeh_*` only ever fires with solid + `cam_dof > 0` — 0 flames in the
 community corpus, 19 in the user's own collection; the "2 %" was JWildfire writing its default 0.005.
-Tracked fixture `Solid_5` (baseline 98). Leftover from the solid plan now: reflection maps,
-`receiveOnlyShadows`, light motion curves. `_sh8`/`_mesh10` resolved 2026-08-22 — neither was geometry: `_sh8` was `checkerboard_wf`'s GPU snippet (int cast, above), `_mesh10` was `hypertile3D2` (p=7, q=5): JWildfire's CPU picks one of p rotations exactly (`random(MAX_INT)·2π/p`, only k mod p matters), its GPU snippets round `RANDFLOAT·0x7fff` and multiply in f32 — tens of thousands of radians whose sine the GPU evaluates coarsely, so the rotation jittered and the tiling smeared into 20 % more covered pixels (in the density render too, faintly; every point counts in a z-buffer). `overrides.ts` rewrites the angle as `(int)(rnd·p)·2π/p` for hypertile2/3D1/3D2/3D2b (period 2p/b there) and phoenix_julia (uniform angle for a fractional power); `_mesh10` 1.25 / 0.90 → **1.00 / 1.00**, oracle 100 % on all six.
+Tracked fixture `Solid_5` (baseline 98). Leftover from the solid plan now: `receiveOnlyShadows`,
+light motion curves. **Reflection maps** (2026-08-22): `MaterialSettings.reflMapFilename` → the image is kept in
+the browser's image store (`src/core/reflMaps.ts`, IndexedDB `images`, name = file name, the .flame's path is
+stripped like obj_mesh_wf's), resampled to 512² into one layer of a `texture_2d_array` bound at the solid tonemap's
+binding 8; `shadeCell` adds, per light, `reflColor(uv) · visibility · intensity` with `reflect((0,0,1), n)` mapped by
+`UVPairD.sphericalBlinnNewellLatitudeMapping` (atan of the quotient) or `sphericalOpenGlMapping`, the SSAO reduction,
+and `getColorFromMap`'s quirk (four texels, black outside, blerp weighted by the *global* u, v). Not multiplied by the
+light's intensity — that cost a 3.6× miss on the first try (flat-grey map: 2 lights ÷ (0.35 + 0.2)). A blended
+material (fractional index) has no map, as `morphMaterial` never copies the file name. Verified with a synthetic
+256×128 gradient image and a flat grey one on a dimmed `_solid1` (`_refl0` control 1.00; `_refl1` Blinn–Newell,
+`_refl2` spherical, `_refl3` grey: ratio 1.00 / blkMAE 0.4 / corr 1.00; JWildfire reads the absolute path written
+in the fixture, WilderFire the same image stored under its basename). `_sh8`/`_mesh10` resolved 2026-08-22 — neither was geometry: `_sh8` was `checkerboard_wf`'s GPU snippet (int cast, above), `_mesh10` was `hypertile3D2` (p=7, q=5): JWildfire's CPU picks one of p rotations exactly (`random(MAX_INT)·2π/p`, only k mod p matters), its GPU snippets round `RANDFLOAT·0x7fff` and multiply in f32 — tens of thousands of radians whose sine the GPU evaluates coarsely, so the rotation jittered and the tiling smeared into 20 % more covered pixels (in the density render too, faintly; every point counts in a z-buffer). `overrides.ts` rewrites the angle as `(int)(rnd·p)·2π/p` for hypertile2/3D1/3D2/3D2b (period 2p/b there) and phoenix_julia (uniform angle for a fractional power); `_mesh10` 1.25 / 0.90 → **1.00 / 1.00**, oracle 100 % on all six.
 
 ### Attributes the importer used to drop (2026-08-21)
 

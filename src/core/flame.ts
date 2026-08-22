@@ -65,9 +65,11 @@ export interface SolidMaterial {
   phongSize: number;
   phongColor: RGB;
   diffFunc: LightDiffFunc;
-  /** reflection map (image) intensity + mapping — kept for round-tripping, not rendered */
+  /** reflection map: an image (by file name, looked up in the browser's image store — src/core/reflMaps.ts), its
+   *  intensity and the mapping of the view reflection onto it */
   reflMapIntensity: number;
   reflMapping: 'BLINN_NEWELL' | 'SPHERICAL';
+  reflMapFilename?: string;
 }
 
 /** JWildfire solid rendering settings (`sld_render_*`). Absent on a flame = off. */
@@ -564,6 +566,7 @@ export function normSolid(s: any): SolidRender {
       phongColor: rgb(m?.phongColor, dm.phongColor),
       diffFunc: LIGHT_DIFF_FUNCS.includes(m?.diffFunc) ? m.diffFunc : 'COSA',
       reflMapIntensity: Math.max(0, num(m?.reflMapIntensity, dm.reflMapIntensity)),
+      ...(typeof m?.reflMapFilename === 'string' && m.reflMapFilename ? { reflMapFilename: m.reflMapFilename } : {}),
       reflMapping: m?.reflMapping === 'SPHERICAL' ? 'SPHERICAL' : 'BLINN_NEWELL',
     };
   }) : d.materials;

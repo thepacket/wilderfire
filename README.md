@@ -89,7 +89,11 @@ in the stack.
   store under its file name; the default cube until one is chosen) are available
   for solid scenes — the meshes are sampled on the GPU from a face CDF, loaded on
   demand; JWildfire's **background gradients** (2×2 corners,
-  optional centre colour) render in both paths
+  optional centre colour) render in both paths; **reflection maps** — an
+  environment image per material (Render → Solid → material → ⬆ image; kept in
+  the browser's image store under its file name, like meshes), reflected through
+  the view direction with JWildfire's Blinn–Newell or spherical mapping and its
+  own bilinear rule, verified against headless JWildfire (ratio 1.00, corr 1.00)
 - **Layers** (up to 8) — each with its own transforms, final transform,
   gradient, density weight, and visibility, blended in one histogram; walker
   threads are partitioned across layers on the GPU

@@ -550,6 +550,9 @@ export function parseFlameXML(text: string, fallbackPalette: RGB[]): Flame[] {
           m.diffFunc = LIGHT_DIFF_FUNCS.includes(df as LightDiffFunc) ? df as LightDiffFunc : 'COSA';
           m.reflMapIntensity = numOr(`sld_render_material_refl_map_intensity${i}`, 0.5);
           m.reflMapping = strA(`sld_render_material_refl_mappping${i}`, 'BLINN_NEWELL') === 'SPHERICAL' ? 'SPHERICAL' : 'BLINN_NEWELL';
+          // the author's full path is useless elsewhere: keep the file name, looked up in this browser's image store
+          const rf = (fe.getAttribute(`sld_render_material_refl_map_filename${i}`) ?? '').replace(/^.*[\\/]/, '').trim(); // (strA upper-cases: enums only)
+          if (rf) m.reflMapFilename = rf;
           return m;
         });
       }
@@ -812,6 +815,7 @@ function solidAttrs(f: Flame): string {
     `sld_render_material_phong_red${i}="${fmt(m.phongColor[0])}"`, `sld_render_material_phong_green${i}="${fmt(m.phongColor[1])}"`, `sld_render_material_phong_blue${i}="${fmt(m.phongColor[2])}"`,
     `sld_render_material_light_diif_func${i}="${m.diffFunc}"`, `sld_render_material_refl_map_intensity${i}="${fmt(m.reflMapIntensity)}"`,
     `sld_render_material_refl_mappping${i}="${m.reflMapping}"`,
+    ...(m.reflMapFilename ? [`sld_render_material_refl_map_filename${i}="${m.reflMapFilename.replace(/&/g, '&amp;').replace(/"/g, '&quot;').replace(/</g, '&lt;')}"`] : []),
   ));
   a.push(`sld_render_ligtht_count="${s.lights.length}"`);
   s.lights.forEach((l, i) => a.push(

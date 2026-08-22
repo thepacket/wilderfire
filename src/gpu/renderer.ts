@@ -8,6 +8,7 @@ import { compileFlame, TONEMAP_WGSL, type CompiledFlame } from './codegen';
 import { buildSpatialFilters, solidFilterWeights, gaussianFilter1D, normFilterKernel, kernelCoeff, kernelSupport, FILT_FLOATS, type FilterKernel } from './filters';
 import { SOLID_POST_WGSL, SOLID_TONEMAP_WGSL, SOLID_AO_WGSL, SOLID_SHADOW_WGSL, SOLID_PDOF_WGSL, SOLID_PDOF_BLIT_WGSL, SOLID_PAY_WORDS, SOLID_MAX_LIGHTS, SOLID_MAX_MATS, SOLID_FILT_FLOATS } from './solid.wgsl';
 import { flameMeshKeys, ensureMesh, meshSampler, meshLayout } from '../core/meshes';
+import { flameReflMaps, loadReflMap, reflMapKey, REFL_SIZE } from '../core/reflMaps';
 
 const XD_FLOATS = 8192;
 /** bytes per raster cell: density histogram (rgba u32) vs solid z-buffer (key + payload + normal) */
@@ -82,6 +83,11 @@ export class FlameRenderer {
   private solidPipe!: GPURenderPipeline;        // → canvas format
   private solidExportPipe!: GPURenderPipeline; // → rgba8
   private solidTmLayout!: GPUBindGroupLayout;
+  /** reflection maps: one REFL_SIZE² layer per image the solid materials use (src/core/reflMaps.ts) */
+  private reflTex!: GPUTexture;
+  private reflLayers = new Map<string, number>(); // image key (name@version) → layer
+  private reflPacked = '';                         // keys currently uploaded, joined
+  private reflLoading = '';
   // Post-process DOF for solid flames (PostDOFCalculator): scatter compute pass + present blit
   private solidMidPipe: GPURenderPipeline | null = null; // solid tonemap into midTex (rgba16float)
   private pdofPipe!: GPUComputePipeline;
@@ -269,8 +275,10 @@ export class FlameRenderer {
         { binding: 5, visibility: F, buffer: { type: 'uniform' } },
         { binding: 6, visibility: F, buffer: { type: 'read-only-storage' } },
         { binding: 7, visibility: F, buffer: { type: 'read-only-storage' } },
+        { binding: 8, visibility: F, texture: { sampleType: 'float', viewDimension: '2d-array' } },
       ],
     });
+    this.reflTex = d.createTexture({ size: [REFL_SIZE, REFL_SIZE, SOLID_MAX_MATS], format: 'rgba8unorm', usage: GPUTextureUsage.TEXTURE_BINDING | GPUTextureUsage.COPY_DST });
     const solidLayout = d.createPipelineLayout({ bindGroupLayouts: [this.solidTmLayout] });
     this.solidPipe = d.createRenderPipeline({
       layout: solidLayout,
@@ -524,6 +532,7 @@ export class FlameRenderer {
           { binding: 5, resource: { buffer: this.lightsBuf } },
           { binding: 6, resource: { buffer: b.ao } },
           { binding: 7, resource: { buffer: b.svis! } },
+          { binding: 8, resource: this.reflTex.createView({ dimension: '2d-array' }) },
         ],
       }),
     };
@@ -859,11 +868,13 @@ export class FlameRenderer {
       }
     }
     const mo = SOLID_MAX_LIGHTS * 12;
+    void this.ensureReflMaps(f);
     for (let i = 0; i < nM; i++) {
       const m = s.materials[i];
       lm.set([m.diffuse, m.ambient, m.phong, m.phongSize], mo + i * 12);
       lm.set([m.phongColor[0], m.phongColor[1], m.phongColor[2], Math.max(0, LIGHT_DIFF_FUNCS.indexOf(m.diffFunc))], mo + i * 12 + 4);
-      lm.set([m.reflMapIntensity, 0, 0, 0], mo + i * 12 + 8);
+      const layer = m.reflMapFilename && m.reflMapIntensity > 1e-9 ? this.reflLayers.get(reflMapKey(m.reflMapFilename)) : undefined;
+      lm.set([m.reflMapIntensity, m.reflMapping === 'SPHERICAL' ? 1 : 0, layer === undefined ? 0 : layer + 1, 0], mo + i * 12 + 8);
     }
     this.device.queue.writeBuffer(this.lightsBuf, 0, lm);
 
@@ -1063,10 +1074,34 @@ export class FlameRenderer {
 
   /** Resolves once everything the current flame needs is on the GPU (mesh primitives load asynchronously;
    *  the live view simply shows them when they arrive, exports wait here). */
+  /** Upload the reflection maps a flame's materials name (resampled to REFL_SIZE², one texture layer each);
+   *  asynchronous — the materials read layer 0 = none until the images are in, then the view is redrawn. */
+  private ensureReflMaps(flame: Flame): Promise<void> {
+    const names = flameReflMaps(flame);
+    const keys = names.map(reflMapKey);
+    const packKey = keys.join('|');
+    if (packKey === this.reflPacked || packKey === this.reflLoading) return Promise.resolve();
+    this.reflLoading = packKey;
+    return Promise.all(names.map(loadReflMap)).then((imgs) => {
+      if (this.reflLoading !== packKey) return; // superseded
+      this.reflLayers.clear();
+      let layer = 0;
+      imgs.forEach((img, i) => {
+        if (!img || layer >= SOLID_MAX_MATS) return;
+        this.device.queue.writeTexture({ texture: this.reflTex, origin: [0, 0, layer] }, img.data, { bytesPerRow: REFL_SIZE * 4, rowsPerImage: REFL_SIZE }, [REFL_SIZE, REFL_SIZE, 1]);
+        this.reflLayers.set(keys[i], layer++);
+      });
+      this.reflPacked = packKey;
+      this.reflLoading = '';
+      this.invalidate();
+    });
+  }
+
   async ready(): Promise<void> {
     if (!this.flame || !this.compiled?.usesMesh) return;
     const keys = flameMeshKeys(this.flame);
     await Promise.all(keys.map(ensureMesh));
+    if (this.solid) await this.ensureReflMaps(this.flame);
     if (!keys.every((k) => meshLayout.has(k)) || keys.join('|') !== this.meshPacked) this.setFlame(this.flame);
   }
 

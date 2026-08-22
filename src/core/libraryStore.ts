@@ -31,17 +31,19 @@ export const packOf = (e: LibEntry): string | undefined => e.source ? e.source.s
 const DB = 'wilderfire';
 const STORE = 'library';
 const MESHES = 'meshes';
+const IMAGES = 'images';
 const LS_LEGACY = 'wilderfire.library';
 
 let dbp: Promise<IDBDatabase> | null = null;
 function db(): Promise<IDBDatabase> {
   if (dbp) return dbp;
   dbp = new Promise((res, rej) => {
-    const req = indexedDB.open(DB, 2);
+    const req = indexedDB.open(DB, 3);
     req.onupgradeneeded = () => {
       const d = req.result;
       if (!d.objectStoreNames.contains(STORE)) d.createObjectStore(STORE, { keyPath: 'id' }).createIndex('date', 'date');
       if (!d.objectStoreNames.contains(MESHES)) d.createObjectStore(MESHES);
+      if (!d.objectStoreNames.contains(IMAGES)) d.createObjectStore(IMAGES); // reflection maps (file name → image Blob)
     };
     req.onsuccess = () => res(req.result);
     req.onerror = () => rej(req.error ?? new Error('IndexedDB unavailable'));
@@ -184,5 +186,29 @@ export async function meshDelete(name: string): Promise<void> {
   const d = await db();
   const tx = d.transaction(MESHES, 'readwrite');
   tx.objectStore(MESHES).delete(name);
+  await done(tx);
+}
+
+// ---- user images (solid-rendering reflection maps) ----
+export async function imagePut(name: string, blob: Blob): Promise<void> {
+  const d = await db();
+  const tx = d.transaction(IMAGES, 'readwrite');
+  tx.objectStore(IMAGES).put(blob, name);
+  await done(tx);
+}
+export async function imageGet(name: string): Promise<Blob | undefined> {
+  const d = await db();
+  const tx = d.transaction(IMAGES, 'readonly');
+  return new Promise((res, rej) => { const r = tx.objectStore(IMAGES).get(name); r.onsuccess = () => res(r.result as Blob | undefined); r.onerror = () => rej(r.error); });
+}
+export async function imageNames(): Promise<string[]> {
+  const d = await db();
+  const tx = d.transaction(IMAGES, 'readonly');
+  return new Promise((res, rej) => { const r = tx.objectStore(IMAGES).getAllKeys(); r.onsuccess = () => res((r.result as IDBValidKey[]).map(String).sort()); r.onerror = () => rej(r.error); });
+}
+export async function imageDelete(name: string): Promise<void> {
+  const d = await db();
+  const tx = d.transaction(IMAGES, 'readwrite');
+  tx.objectStore(IMAGES).delete(name);
   await done(tx);
 }

@@ -1,6 +1,7 @@
 // Render tab — "Solid" section: z-buffer surface shading (lights + materials) instead of density accumulation.
 import { App, el, slider } from './common';
 import { defaultSolidRender, defaultSolidLight, defaultSolidMaterial, LIGHT_DIFF_FUNCS, type RGB, type SolidRender } from '../core/flame';
+import { reflMapNames, storeReflMap } from '../core/reflMaps';
 
 const SRC = 'solid';
 const MAX_LIGHTS = 4;
@@ -105,8 +106,40 @@ export function buildSolidSection(app: App): HTMLElement {
   }
   dfSel.onchange = () => { if (mat() && LIGHT_DIFF_FUNCS.includes(dfSel.value as never)) { mat().diffFunc = dfSel.value as typeof LIGHT_DIFF_FUNCS[number]; app.commitTone(SRC); } };
   dfRow.append(dfSel);
+  // reflection map: an image from the browser's image store (⬆ loads one), its intensity and mapping
+  const rfRow = el('div', 'row');
+  rfRow.append(el('label', '', 'Reflection'));
+  const rfSel = el('select') as HTMLSelectElement;
+  rfSel.title = 'Environment image reflected by this material (JWildfire reflection map). Stored in your browser only — a shared .flame names the file, the other side needs the same image loaded.';
+  const fillRf = async () => {
+    const names = await reflMapNames().catch(() => [] as string[]);
+    const cur = mat()?.reflMapFilename ?? '';
+    if (cur && !names.includes(cur)) names.push(cur);
+    rfSel.replaceChildren(...[['', 'none'], ...names.map((n) => [n, n])].map(([v, t]) => { const o = el('option', '', t) as HTMLOptionElement; o.value = v; return o; }));
+    rfSel.value = cur;
+  };
+  rfSel.onchange = () => { const m = mat(); if (!m) return; if (rfSel.value) m.reflMapFilename = rfSel.value; else delete m.reflMapFilename; app.commitTone(SRC); };
+  const rfLoad = el('button', '', '⬆ image');
+  rfLoad.title = 'Load an image (PNG/JPEG/WebP…) into the image store and reflect it here';
+  const rfFile = el('input') as HTMLInputElement;
+  rfFile.type = 'file'; rfFile.accept = 'image/*'; rfFile.style.display = 'none';
+  rfLoad.onclick = () => rfFile.click();
+  rfFile.onchange = async () => {
+    const f = rfFile.files?.[0]; rfFile.value = '';
+    if (!f || !mat()) return;
+    try { await storeReflMap(f.name, f); mat().reflMapFilename = f.name; await fillRf(); app.commitTone(SRC); }
+    catch (e) { alert('Image load failed: ' + (e as Error).message); }
+  };
+  rfRow.append(rfSel, rfLoad, rfFile);
+  const rfiS = slider({ label: 'Refl. intensity', min: 0, max: 2, step: 0.01, value: 0.5, onInput: (v) => { if (mat()) { mat().reflMapIntensity = v; app.commitTone(SRC); } } });
+  const rfmRow = el('div', 'row');
+  rfmRow.append(el('label', '', 'Mapping'));
+  const rfmSel = el('select') as HTMLSelectElement;
+  for (const [k, t] of [['BLINN_NEWELL', 'Blinn–Newell (latitude)'], ['SPHERICAL', 'spherical']] as const) { const o = el('option', '', t) as HTMLOptionElement; o.value = k; rfmSel.append(o); }
+  rfmSel.onchange = () => { if (mat()) { mat().reflMapping = rfmSel.value === 'SPHERICAL' ? 'SPHERICAL' : 'BLINN_NEWELL'; app.commitTone(SRC); } };
+  rfmRow.append(rfmSel);
   const matBox = el('div');
-  matBox.append(ambS.root, difS.root, spcS.root, shnS.root, mColRow, dfRow);
+  matBox.append(ambS.root, difS.root, spcS.root, shnS.root, mColRow, dfRow, rfRow, rfiS.root, rfmRow);
 
   const refreshMat = () => {
     const s = solid();
@@ -117,7 +150,7 @@ export function buildSolidSection(app: App): HTMLElement {
     matBox.style.display = m ? '' : 'none';
     mDel.disabled = !m;
     mAdd.disabled = s.materials.length >= MAX_MATS;
-    if (m) { ambS.set(m.ambient); difS.set(m.diffuse); spcS.set(m.phong); shnS.set(m.phongSize); mCol.value = toHex(m.phongColor); dfSel.value = m.diffFunc; }
+    if (m) { ambS.set(m.ambient); difS.set(m.diffuse); spcS.set(m.phong); shnS.set(m.phongSize); mCol.value = toHex(m.phongColor); dfSel.value = m.diffFunc; rfiS.set(m.reflMapIntensity); rfmSel.value = m.reflMapping; void fillRf(); }
   };
   mSel.onchange = () => { mi = parseInt(mSel.value); refreshMat(); };
   mAdd.onclick = () => { const s = solid(); if (s.materials.length >= MAX_MATS) return; s.materials.push(defaultSolidMaterial()); mi = s.materials.length - 1; refreshMat(); app.commitTone(SRC); };
