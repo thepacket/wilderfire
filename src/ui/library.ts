@@ -1,7 +1,7 @@
 // Flame library (IndexedDB, see ../core/libraryStore.ts) + session autosave (localStorage).
 import { App, el, openModal } from './common';
 import { normalizeFlame, type Flame } from '../core/flame';
-import { libAll, libPut, libDelete, libClear, type LibEntry } from '../core/libraryStore';
+import { libAll, libPut, libDelete, libDeleteMany, libClear, type LibEntry } from '../core/libraryStore';
 import { saveText } from './saveFile';
 import type { AnimAPI } from './animPanel';
 
@@ -118,7 +118,7 @@ export function buildLibrary(app: App, anim: AnimAPI) {
       for (const e of [...entries].sort((a, b) => a.date - b.date)) { const k = key(e); if (seen.has(k)) dupes.push(e); else seen.add(k); }
       if (!dupes.length) { alert('No duplicates — every flame in the library is different.'); return; }
       if (!confirm(`Remove ${dupes.length} duplicate${dupes.length === 1 ? '' : 's'}, keeping the first instance of each flame?\n\n${dupes.slice(0, 6).map((e) => '• ' + e.name).join('\n')}${dupes.length > 6 ? '\n…' : ''}`)) return;
-      try { for (const e of dupes) await libDelete(e.id); close(); open(); }
+      try { await libDeleteMany(dupes.map((e) => e.id)); close(); open(); }
       catch (e) { alert('Could not remove duplicates: ' + (e as Error).message); }
     };
     const search = el('input', 'lib-search') as HTMLInputElement;
@@ -143,7 +143,7 @@ export function buildLibrary(app: App, anim: AnimAPI) {
       vis[sel].classList.add('sel');
       if (scroll) vis[sel].scrollIntoView({ block: 'nearest' });
     };
-    const entryOf = (card: HTMLElement) => items.indexOf(card);
+    const entryOf = (card: HTMLElement) => items.indexOf(card); // only on click/Enter/Delete — O(N) per user action, not per render
     const load = (card: HTMLElement) => {
       const e = entries[entryOf(card)];
       if (!e) return;
@@ -185,8 +185,12 @@ export function buildLibrary(app: App, anim: AnimAPI) {
       const q = search.value.trim().toLowerCase();
       vis[sel]?.classList.remove('sel');
       sel = -1;
-      vis = q ? items.filter((card, i) => entries[i].name.toLowerCase().includes(q)) : items;
-      for (const card of items) card.style.display = vis.includes(card) ? '' : 'none';
+      vis = [];
+      for (let i = 0; i < items.length; i++) {
+        const show = !q || entries[i].name.toLowerCase().includes(q);
+        items[i].style.display = show ? '' : 'none';
+        if (show) vis.push(items[i]);
+      }
       const n = entries.length;
       hint.textContent = (q ? `${vis.length} of ${n} flame${n === 1 ? '' : 's'} match` : `${n} flame${n === 1 ? '' : 's'}`) +
         ' — arrow keys / Page Up / Page Down move, Enter loads, Delete removes, Esc closes';

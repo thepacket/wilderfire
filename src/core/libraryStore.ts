@@ -57,6 +57,16 @@ export async function libClear(): Promise<void> {
   await done(tx);
 }
 
+/** Remove several entries in one transaction. */
+export async function libDeleteMany(ids: string[]): Promise<void> {
+  if (!ids.length) return;
+  const d = await db();
+  const tx = d.transaction(STORE, 'readwrite');
+  const st = tx.objectStore(STORE);
+  for (const id of ids) st.delete(id);
+  await done(tx);
+}
+
 export async function libDelete(id: string): Promise<void> {
   const d = await db();
   const tx = d.transaction(STORE, 'readwrite');
