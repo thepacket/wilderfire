@@ -136,11 +136,22 @@ export class FlameRenderer {
   private budgetScale = 1;
   private gpuMs = 0;
   private dtMs = 0; // smoothed rAF interval — the UI-stall symptom the budget reacts to
-  /** Compute submissions the GPU has not finished yet. The queue never backpressures the CPU: without a
-   *  gate a heavy kernel lets the loop run minutes ahead of the GPU — the sample counter reaches the cap,
-   *  the status says done, and the GPU grinds on through a backlog nothing can cancel. */
-  private inFlight = 0;
-  private static readonly MAX_IN_FLIGHT = 3;
+  /** Submit times (performance.now) of the compute submissions the GPU has not finished yet, oldest first.
+   *  The queue never backpressures the CPU: without a gate a heavy kernel lets the loop run minutes ahead
+   *  of the GPU — the sample counter reaches the cap, the status says done, and the GPU grinds on through
+   *  a backlog nothing can cancel. The gate is on the *age* of the oldest unfinished submission, not on a
+   *  count: completion callbacks arrive a few frames late even when the GPU is idle (a 120 Hz display
+   *  reaches three frames in flight before the first one resolves), so a count would throttle a healthy
+   *  loop to the floor. */
+  private inFlight: { t: number; iters: number }[] = [];
+  private queuedIters = 0;
+  /** GPU throughput measured over the current busy stretch (iterations per ms; prior ≈ 1 G/s). Used to
+   *  estimate how much work the queue holds — the age of the oldest submission alone lets a 120 Hz loop
+   *  queue thirty full frames before the first one is old enough to gate. */
+  private gpuItersPerMs = 1e6;
+  private busyStart = 0;
+  private busyIters = 0;
+  private static readonly MAX_BACKLOG_MS = 250; // a bounded tail after "done"; wide enough that presentation latency alone never trips it
   private gatedFrames = 0; // consecutive frames skipped because the GPU was that far behind
   private framesSinceGate = 1e9;
   passesPerFrame = 2;
@@ -1254,7 +1265,7 @@ export class FlameRenderer {
     const dt = this.lastT ? (t - this.lastT) / 1000 : 0;
     this.lastT = t;
     if (accumulate && dt > 0 && dt < 0.5) this.liveMs += dt * 1000; // rendering time only: a hidden tab or a pause does not count
-    if (dt > 0.5 && !this.inFlight) { this.gpuMs = 0; this.dtMs = 0; } // we were away (hidden tab): the last probe says nothing about the GPU load
+    if (dt > 0.5 && !this.inFlight.length) { this.gpuMs = 0; this.dtMs = 0; } // we were away (hidden tab): the last probe says nothing about the GPU load
     else if (dt > 0) this.dtMs = this.dtMs ? this.dtMs * 0.8 + dt * 1000 * 0.2 : dt * 1000;
 
     // Idle: converged (or paused) and nothing to redraw → do no GPU work at all.
@@ -1264,21 +1275,25 @@ export class FlameRenderer {
       return;
     }
 
-    // Dispatch gate: never queue more than MAX_IN_FLIGHT compute submissions. Samples are counted when
-    // dispatched, so the gate is what keeps "done" honest (the GPU is at most a few frames behind it)
-    // and keeps the GPU load bounded once the cap is reached.
-    const gated = accumulate && this.inFlight >= FlameRenderer.MAX_IN_FLIGHT;
+    // Dispatch gate: never queue work while the oldest unfinished submission is more than MAX_BACKLOG_MS
+    // old. Samples are counted when dispatched, so the gate is what keeps "done" honest (the GPU is at most
+    // a quarter of a second behind it) and keeps the GPU load bounded once the cap is reached.
+    const now = performance.now();
+    const gated = accumulate && this.inFlight.length > 0 &&
+      (now - this.inFlight[0].t > FlameRenderer.MAX_BACKLOG_MS || this.queuedIters / this.gpuItersPerMs > FlameRenderer.MAX_BACKLOG_MS);
     const dispatch = accumulate && !gated;
     if (gated) this.gatedFrames++; else if (accumulate) { if (this.gatedFrames) this.framesSinceGate = 0; this.gatedFrames = 0; this.framesSinceGate++; }
 
     // Adaptive budget: shrink the iterations per preview pass while the GPU cannot keep up, grow them
     // back (up to the configured count) when there is headroom. Overload shows two ways: the gate above
-    // skipped a frame (the GPU is MAX_IN_FLIGHT frames behind), or the per-submission probe overshoots the
-    // budget while the frame interval has stretched past ~60 fps. Growth waits until the probe shows
-    // headroom and the gate has been quiet for a while.
+    // skipped three frames in a row (the GPU is MAX_BACKLOG_MS behind and staying there — a lone gated
+    // frame is presentation jitter and costs nothing), or the per-submission probe overshoots the
+    // budget while the frame interval has stretched past ~60 fps (a healthy vsync-paced loop never
+    // throttles on the probe alone — it overshoots by the presentation latency). Growth resumes as soon
+    // as either shows headroom, once the gate has been quiet for a while.
     if (this.adaptiveBudget && accumulate) {
-      if (gated || (this.gpuMs > this.frameBudgetMs * 1.3 && this.dtMs > 20)) this.budgetScale = Math.max(1 / 16, this.budgetScale * 0.7);
-      else if (this.framesSinceGate > 30 && this.gpuMs > 0 && (this.gpuMs < this.frameBudgetMs * 0.6 || this.dtMs < 17.5) && this.budgetScale < 1) this.budgetScale = Math.min(1, this.budgetScale * 1.2);
+      if (this.gatedFrames >= 3 || (this.gpuMs > this.frameBudgetMs * 1.3 && this.dtMs > 20)) this.budgetScale = Math.max(1 / 16, this.budgetScale * 0.7);
+      else if (this.framesSinceGate > 30 && (this.gpuMs < this.frameBudgetMs * 0.6 || this.dtMs < 17.5) && this.budgetScale < 1) this.budgetScale = Math.min(1, this.budgetScale * 1.2);
     } else if (!this.adaptiveBudget) this.budgetScale = 1;
     const iters = Math.max(4, Math.round(this.itersPerPass * this.budgetScale));
 
@@ -1311,10 +1326,19 @@ export class FlameRenderer {
       }
       pass.end();
       this.device.queue.submit([cenc.finish()]);
-      this.inFlight++;
       const t0 = performance.now();
+      const submitted = perPass * passes;
+      if (!this.inFlight.length) { this.busyStart = t0; this.busyIters = 0; }
+      this.inFlight.push({ t: t0, iters: submitted });
+      this.queuedIters += submitted;
       const done = () => {
-        this.inFlight--;
+        this.inFlight.shift(); // submissions complete in order
+        this.queuedIters -= submitted;
+        this.busyIters += submitted;
+        const busyMs = performance.now() - this.busyStart;
+        // throughput over the busy stretch (the first completion carries the callback latency, which
+        // under-estimates the rate — the safe direction: the gate closes sooner)
+        if (busyMs > 50) { const rate = this.busyIters / busyMs; this.gpuItersPerMs = this.gpuItersPerMs ? this.gpuItersPerMs * 0.7 + rate * 0.3 : rate; }
         const ms = Math.min(performance.now() - t0, 1000); // capped: one stall must not poison the average for long
         this.gpuMs = this.gpuMs ? this.gpuMs * 0.8 + ms * 0.2 : ms;
       };

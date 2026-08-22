@@ -299,8 +299,18 @@ export function buildRenderPanel(app: App, root: HTMLElement) {
   };
   const restartBtn = el('button', '', '↻ Re-render');
   restartBtn.onclick = () => app.renderer.resetAccumulation();
+  const resetBtn = el('button', '', '↺ Reset');
+  resetBtn.title = 'Put every Engine setting back to its default: Draft mode (Balanced speed, preview hold 10, DE r ≤ 6, 1× oversampling, cap 1000), adaptive budget on, stop after 30 s, and resume if paused';
+  resetBtn.onclick = () => {
+    for (const k of [LS_MODE, LS_ADAPT, LS_TIME]) localStorage.removeItem(k);
+    adaptChk.checked = true; adaptChk.onchange!(new Event('change'));
+    tIn.value = '30'; tIn.onchange!(new Event('change'));
+    modeSel.value = 'draft'; applyMode('draft');
+    app.renderer.setPaused(false); pauseBtn.textContent = '⏸ Pause';
+    app.renderer.resetAccumulation();
+  };
   const pRow = el('div', 'btn-row');
-  pRow.append(pauseBtn, restartBtn);
+  pRow.append(pauseBtn, restartBtn, resetBtn);
   perf.append(modeRow, speedRow, holdS.root, deS.root, deCurveS.root, deLiveRow, osRow, qRow, tRow, adaptRow, pRow);
 
   const LS_MODE = 'wilderfire.render.mode';
