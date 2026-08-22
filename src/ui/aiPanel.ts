@@ -4,6 +4,7 @@
 import { App, el } from './common';
 import { normalizeFlame, type Flame } from '../core/flame';
 import { streamChat, fetchLocalModels, SUGGESTED_MODELS, type ChatMessage, type ChatPart } from '../ai/openrouter';
+import { TOOL_DEFS, MAX_TOOL_ROUNDS, runTool, type ToolEnv } from '../ai/tools';
 import { createModelPicker } from './modelPicker';
 import {
   DEFAULT_CONTEXT, EDITS_SPEC, applyEdits, estimateTokens, flameJSONFor, flameSummary, variationCatalogue,
@@ -22,9 +23,15 @@ function systemPrompt(flame: Flame, o: ContextOpts): string {
   const intro = `You are the WilderFire assistant inside a browser-based fractal flame editor (WebGPU, .flame-compatible with flam3 / Apophysis). ` +
     (o.flame !== 'none' ? `You see the user's current flame${o.screenshot ? ' and a screenshot of the current render' : ''} and you can change it. ` : `You may get a screenshot of the current render. `) +
     (o.screenshot ? 'When a screenshot is attached, look at it and let what you actually see guide your edits. ' : '');
+  const useTools = o.tools && o.reply !== 'text';
   const reply = o.reply === 'text'
     ? 'Answer questions and give advice in prose only; do NOT output flame JSON or edit blocks (the user has disabled edits).'
-    : o.reply === 'edits'
+    : useTools
+      ? `You ACT through function tools: get_flame, apply_edits, set_camera, screenshot, variation_lookup, library_search, library_load, library_save, randomize, mutate, undo, redo, export_png. ` +
+        `Make changes with apply_edits; its "edits" argument is the command language below. After a change you get the result${o.screenshot ? ' and a screenshot of the new render — look at it, judge it against the request, and refine' : ''}; ` +
+        `use at most ${MAX_TOOL_ROUNDS} tool rounds, then finish with a short summary of what you did. Never paste JSON or edit commands into your prose — only into tool arguments.\n` +
+        EDITS_SPEC.split('\n').slice(1).join('\n')
+      : o.reply === 'edits'
       ? EDITS_SPEC
       : `TO APPLY CHANGES: reply with exactly one fenced code block tagged \`flame\` containing the COMPLETE updated flame JSON (not a diff). The app parses and renders it instantly. Keep prose outside the block brief and friendly. If the user only asks a question, answer without a block.`;
   const shape = o.reply === 'json' || o.flame === 'json' ? `
@@ -163,6 +170,8 @@ export function buildAIPanel(app: App, root: HTMLElement) {
     'Attach a small JPEG of the current render so vision models can see what they are editing (~800 tokens).');
   mkChk('Conversation memory (earlier turns)', ctx.memory, (v) => { ctx.memory = v; },
     'Send the previous messages of this conversation. Off = every request stands alone (cheapest); use Clear to reset when on.');
+  mkChk('Tools — the assistant can act (edit, camera, library, screenshot…)', ctx.tools, (v) => { ctx.tools = v; },
+    `Function calling: the model edits the flame, moves the camera, searches and loads your library, randomizes, mutates, saves and exports through tools, sees each result (a screenshot when enabled) and iterates — up to ${MAX_TOOL_ROUNDS} rounds per request. Needs a model that supports tools (most do; some local servers do not). Adds ~1.5k tokens of tool descriptions per request.`);
   ctxBox.append(el('div', 'ai-ctx-head', 'Reply'));
   mkSel<ReplyMode>('Edits as', [['edits', 'edit commands (fast, cheap)'], ['json', 'complete flame JSON'], ['text', 'text only, no edits']], ctx.reply, (v) => { ctx.reply = v; },
     'Edit commands: the model only lists what changes (a few lines). Complete JSON: it re-emits the whole flame (slow, thousands of tokens). Text only: questions and advice, nothing is applied.');
@@ -184,7 +193,7 @@ export function buildAIPanel(app: App, root: HTMLElement) {
     const sys = systemPrompt(f, ctx).length;
     const body = ctx.flame === 'json' ? flameJSONFor(f, ctx.palette).length : ctx.flame === 'summary' ? flameSummary(f, ctx.palette).length : 0;
     const hist = ctx.memory ? history.reduce((a, t) => a + t.content.length, 0) : 0;
-    const tok = estimateTokens(sys + body + hist, ctx.screenshot ? 1 : 0);
+    const tok = estimateTokens(sys + body + hist, ctx.screenshot ? 1 : 0) + (ctx.tools && ctx.reply !== 'text' ? 1500 : 0);
     const out = ctx.reply === 'json' ? '2–8k' : ctx.reply === 'edits' ? '~50–300' : '~100–500';
     estimate.textContent = `≈ ${tok >= 1000 ? (tok / 1000).toFixed(1) + 'k' : tok} tokens sent per turn · reply ${out} tokens`;
   };
@@ -218,10 +227,15 @@ export function buildAIPanel(app: App, root: HTMLElement) {
   const sendBtn = el('button', 'primary', 'Send');
   const clearBtn = el('button', '', 'Clear');
   clearBtn.title = 'Forget the conversation so far — the next message starts a fresh context (the flame is untouched)';
+  const stopBtn = el('button', 'danger', 'Stop');
+  stopBtn.title = 'Abort the request in progress (changes already applied stay; use undo to revert)';
+  stopBtn.style.display = 'none';
+  let abortCtl: AbortController | null = null;
+  stopBtn.onclick = () => abortCtl?.abort();
   const explainBtn = el('button', '', 'Explain');
   explainBtn.title = 'Ask the assistant to describe the current flame — what each transform and variation contributes, how the layers, final transform, palette and camera shape the look — in prose, without changing anything';
   const btnCol = el('div', 'ai-btn-col');
-  btnCol.append(explainBtn, clearBtn, sendBtn);
+  btnCol.append(explainBtn, clearBtn, stopBtn, sendBtn);
   inputRow.append(ta, btnCol);
 
   root.append(cfg, msgs, inputRow);
@@ -280,17 +294,36 @@ export function buildAIPanel(app: App, root: HTMLElement) {
 
   const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
 
-  /** One request/response round; returns whether a flame block was applied.
+  /** A small JPEG of the current render (≤ 448 px) for vision models; null when it cannot be captured. */
+  const captureJpeg = (): string | null => {
+    try {
+      return app.renderer.captureSync((cv) => {
+        const scale = Math.min(1, 448 / Math.max(cv.width, cv.height));
+        const c = document.createElement('canvas');
+        c.width = Math.max(2, Math.round(cv.width * scale));
+        c.height = Math.max(2, Math.round(cv.height * scale));
+        c.getContext('2d')!.drawImage(cv, 0, 0, c.width, c.height);
+        return c.toDataURL('image/jpeg', 0.8);
+      });
+    } catch { return null; }
+  };
+  const shortArgs = (json: string) => { const t = json.replace(/\s+/g, ' ').trim(); return t.length > 140 ? t.slice(0, 137) + '…' : t; };
+
+  /** One user request: a request/response round, or — with tools on — a loop of tool calls until the
+   *  model answers in prose (or the round budget runs out). Returns whether the flame was changed.
    *  `over` adjusts the context options for this turn only (Explain: prose reply, flame always described). */
   async function runTurn(q: string, shownAs: string, over: Partial<ContextOpts> = {}): Promise<boolean> {
     const key = keyInp.value.trim();
     const c: ContextOpts = { ...ctx, ...over };
+    const useTools = c.tools && c.reply !== 'text';
     addMsg('user', shownAs);
     history.push({ role: 'user', content: q });
 
-    const bubble = addMsg('assistant', '…');
+    let bubble = addMsg('assistant', '…');
     let acc = '';
     let applied = false;
+    abortCtl = new AbortController();
+    const env: ToolEnv = { app, ctx: c, screenshot: captureJpeg, confirm: (m) => window.confirm(m) };
     try {
       const desc = c.flame === 'json'
         ? `Current flame JSON:\n\`\`\`json\n${flameJSONFor(app.flame, c.palette)}\n\`\`\`\n\n`
@@ -298,50 +331,63 @@ export function buildAIPanel(app: App, root: HTMLElement) {
       const finalText = `${desc}Request: ${q}`;
       let finalContent: string | ChatPart[] = finalText;
       if (visChk.checked) {
-        try {
-          const dataUrl = app.renderer.captureSync((cv) => {
-            const scale = Math.min(1, 448 / Math.max(cv.width, cv.height));
-            const c = document.createElement('canvas');
-            c.width = Math.max(2, Math.round(cv.width * scale));
-            c.height = Math.max(2, Math.round(cv.height * scale));
-            c.getContext('2d')!.drawImage(cv, 0, 0, c.width, c.height);
-            return c.toDataURL('image/jpeg', 0.8);
-          });
+        const dataUrl = captureJpeg();
+        if (dataUrl) {
           finalContent = [
             { type: 'text', text: finalText + '\n\n(Attached: a screenshot of the current render.)' },
             { type: 'image_url', image_url: { url: dataUrl } },
           ];
-        } catch { /* capture failed — send text only */ }
+        }
       }
       const messages: ChatMessage[] = [
         { role: 'system', content: systemPrompt(app.flame, c) },
         ...(ctx.memory ? history.slice(0, -1) : []),
         { role: 'user', content: finalContent },
       ];
-      await streamChat({
-        apiKey: key,
-        baseUrl: isLocal() ? urlInp.value.trim() : undefined,
-        model: currentModel(),
-        messages,
-        onDelta: (d) => {
-          acc += d;
-          bubble.textContent = displayText(acc) || '…';
+      for (let round = 0; ; round++) {
+        acc = '';
+        const r = await streamChat({
+          apiKey: key,
+          baseUrl: isLocal() ? urlInp.value.trim() : undefined,
+          model: currentModel(),
+          messages,
+          tools: useTools && round < MAX_TOOL_ROUNDS ? TOOL_DEFS : undefined,
+          signal: abortCtl.signal,
+          onDelta: (d) => {
+            acc += d;
+            bubble.textContent = displayText(acc) || '…';
+            msgs.scrollTop = msgs.scrollHeight;
+          },
+        });
+        if (!r.toolCalls.length) { acc = r.text; break; }
+        // the model asked for tools: run them, feed the results (and the render) back, go again
+        if (r.text.trim()) bubble.textContent = displayText(r.text); else bubble.remove();
+        messages.push({ role: 'assistant', content: r.text || null, tool_calls: r.toolCalls.map((tc) => ({ id: tc.id, type: 'function', function: { name: tc.name, arguments: tc.arguments } })) });
+        let image: string | undefined;
+        for (const tc of r.toolCalls) {
+          const line = addMsg('tool', `⚙ ${tc.name} ${shortArgs(tc.arguments)}`);
+          const res = await runTool(tc.name, tc.arguments, env);
+          line.textContent += `\n   → ${res.text.split('\n')[0].slice(0, 200)}`;
+          messages.push({ role: 'tool', tool_call_id: tc.id, content: res.text });
+          if (res.image) image = res.image;
+          if (res.changed) applied = true;
           msgs.scrollTop = msgs.scrollHeight;
-        },
-      });
-      history.push({ role: 'assistant', content: acc });
-      bubble.textContent = displayText(acc) || '(empty reply)';
-      if (tryApplyFlameBlocks(acc, c)) {
-        applied = true;
-        const tag = el('span', 'applied', '✦ flame applied');
-        bubble.append(tag);
+        }
+        if (image) messages.push({ role: 'user', content: [{ type: 'text', text: '(The render after your tool calls is attached.)' }, { type: 'image_url', image_url: { url: image } }] });
+        bubble = addMsg('assistant', '…');
       }
+      history.push({ role: 'assistant', content: acc });
+      bubble.textContent = displayText(acc) || (applied ? 'Done.' : '(empty reply)');
+      if (tryApplyFlameBlocks(acc, c)) applied = true; // models that answer with a block instead of a tool
+      if (applied) bubble.append(el('span', 'applied', '✦ flame changed'));
     } catch (e) {
-      bubble.textContent = '⚠ ' + (e as Error).message;
-      bubble.style.color = 'var(--danger)';
+      const aborted = (e as Error).name === 'AbortError';
+      bubble.textContent = aborted ? '■ stopped' : '⚠ ' + (e as Error).message;
+      if (!aborted) bubble.style.color = 'var(--danger)';
       history.pop();
-      throw e;
+      if (!aborted) throw e;
     } finally {
+      abortCtl = null;
       msgs.scrollTop = msgs.scrollHeight;
     }
     return applied;
@@ -353,6 +399,7 @@ export function buildAIPanel(app: App, root: HTMLElement) {
     if (!readyToSend()) return;
     busy = true;
     sendBtn.disabled = true;
+    stopBtn.style.display = '';
     ta.value = '';
     try {
       let applied = await runTurn(q, q);
@@ -371,6 +418,7 @@ export function buildAIPanel(app: App, root: HTMLElement) {
     } catch { /* already surfaced in the bubble */ } finally {
       busy = false;
       sendBtn.disabled = false;
+      stopBtn.style.display = 'none';
     }
   }
 

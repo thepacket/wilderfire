@@ -20,10 +20,12 @@ export interface ContextOpts {
   screenshot: boolean;
   memory: boolean;
   reply: ReplyMode;
+  /** let the model act through function tools (edit, camera, library, screenshot…) in a loop */
+  tools: boolean;
 }
 
 export const DEFAULT_CONTEXT: ContextOpts = {
-  flame: 'summary', palette: 'stops', vars: 'used', screenshot: true, memory: true, reply: 'edits',
+  flame: 'summary', palette: 'stops', vars: 'used', screenshot: true, memory: true, reply: 'edits', tools: true,
 };
 
 const r3 = (v: number) => Math.round(v * 1000) / 1000;

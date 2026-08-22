@@ -131,6 +131,17 @@ in the stack.
 - **Editor niceties** — reorder transforms (xaos-aware) and layers, copy/paste
   transforms across layers and flames, rotational/mirror **symmetry
   generators**, arrow-key nudging, **collapsible side panes** (`[` / `]`)
+- **AI assistant that acts** — with tools on (default), the model works through
+  function calls: `apply_edits`, `set_camera`, `screenshot`, `variation_lookup`,
+  `library_search` / `library_load` / `library_save`, `randomize`, `mutate`, `undo`,
+  `redo`, `export_png` (asks first) — it sees each result, and the render when
+  screenshots are on, and iterates up to 8 rounds before answering; a Stop button
+  aborts. Works with OpenRouter and any local OpenAI-compatible server that
+  supports tools; switch tools off for models that do not
+- **Provenance** — library entries remember where a flame came from (the dropped
+  file, `zip › entry`, or folder path) and its JWildfire `meta_info_author`; both
+  show on the card and are searchable; author/creation time/uuid round-trip
+  through `.flame` export
 - **Session autosave + flame library** — the working flame and animation
   timeline persist across reloads; a thumbnail library on IndexedDB (no
   practical size limit; an older localStorage library migrates itself) with

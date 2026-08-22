@@ -233,6 +233,10 @@ export interface Flame {
   oversample: number;
   /** JWildfire post symmetry, applied to the plotted point (DefaultRenderIterationState). */
   postSymmetry?: PostSymmetry;
+  /** Provenance written by JWildfire (meta_info_author / meta_info_creation_time / meta_info_uuid) — kept through import/export. */
+  author?: string;
+  created?: string;
+  uuid?: string;
   /** JWildfire solid rendering (z-buffer surface shading instead of density accumulation). Absent = off. */
   solid?: SolidRender;
   /** JWildfire background gradient (`background_type`): 2×2 corner colours, optionally with a centre colour. Absent = single colour `background`. */
@@ -527,6 +531,9 @@ export function normalizeFlame(obj: any, fallbackPalette: RGB[]): Flame {
     oversample: Math.min(3, Math.max(1, Math.round(num(obj?.oversample, 1)))),
     ...(obj?.solid && typeof obj.solid === 'object' ? { solid: normSolid(obj.solid) } : {}),
     ...(obj?.bgGradient && (obj.bgGradient.type === 'GRADIENT_2X2' || obj.bgGradient.type === 'GRADIENT_2X2_C') ? { bgGradient: { type: obj.bgGradient.type, ul: rgb(obj.bgGradient.ul, [0, 0, 0]), ur: rgb(obj.bgGradient.ur, [0, 0, 0]), ll: rgb(obj.bgGradient.ll, [0, 0, 0]), lr: rgb(obj.bgGradient.lr, [0, 0, 0]), cc: rgb(obj.bgGradient.cc, [0, 0, 0]) } } : {}),
+    ...(typeof obj?.author === 'string' && obj.author.trim() ? { author: obj.author.trim() } : {}),
+    ...(typeof obj?.created === 'string' && obj.created.trim() ? { created: obj.created.trim() } : {}),
+    ...(typeof obj?.uuid === 'string' && obj.uuid.trim() ? { uuid: obj.uuid.trim() } : {}),
     ...(obj?.postSymmetry && ['X_AXIS', 'Y_AXIS', 'POINT'].includes(obj.postSymmetry.type) ? { postSymmetry: {
       type: obj.postSymmetry.type as 'X_AXIS' | 'Y_AXIS' | 'POINT',
       order: Math.min(64, Math.max(1, Math.round(num(obj.postSymmetry.order, 3)))),

@@ -9,6 +9,10 @@ export interface LibEntry {
   date: number;
   flame: unknown;
   thumb: string; // jpeg data URL
+  /** where it came from: the dropped file, `zip name › entry path`, or a folder path (set at import) */
+  source?: string;
+  /** JWildfire meta_info_author, when the file carried one */
+  author?: string;
 }
 
 const DB = 'wilderfire';

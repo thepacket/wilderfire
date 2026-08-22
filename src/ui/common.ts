@@ -74,6 +74,8 @@ export class App {
   layerIdx = 0; // active layer
   selected = 0; // xform index within the active layer; -1 => final xform
   xformClipboard: XForm | null = null; // survives flame switches
+  /** Provenance of the loaded flame (dropped file / zip entry / library entry's source); 💾 Save records it. */
+  flameSource: string | undefined;
   /** Motion-curve bridge, registered by the Anim panel (used by .flame export/import). */
   getCurves: () => MotionCurve[] = () => [];
   setCurves: (curves: MotionCurve[]) => void = () => {};

@@ -200,6 +200,7 @@ export function interpFlame(a: Flame, b: Flame, t: number): Flame {
     // discrete settings follow the source flame rather than blending into meaningless in-betweens
     bgTransparency: a.bgTransparency, oversample: a.oversample ?? 1,
     ...(a.postSymmetry ? { postSymmetry: a.postSymmetry } : {}),
+    ...(a.author ? { author: a.author } : {}), ...(a.created ? { created: a.created } : {}), ...(a.uuid ? { uuid: a.uuid } : {}),
     vibrancy: lerp(a.vibrancy, b.vibrancy, t),
     background: [
       lerp(a.background[0], b.background[0], t),

@@ -16,8 +16,11 @@ async function noteUnknown(unknown: string[]) {
   alert(`Loaded, but ${unknown.length} variation${unknown.length > 1 ? 's are' : ' is'} not supported and ${unknown.length > 1 ? 'were' : 'was'} skipped:\n${lines.join('\n')}`);
 }
 
+export interface FlameItem { flame: Flame; source?: string }
+
 /** JWildfire ships flame packs as one file holding many flames: pick one, or add them all to the library. */
-export function openPackChooser(app: App, flames: Flame[], unknown: string[], autoAdd = false) {
+export function openPackChooser(app: App, items: FlameItem[], unknown: string[], autoAdd = false) {
+  const flames = items.map((it) => it.flame);
   const { body, close } = openModal(`Flame pack — ${flames.length} flames`);
   const tools = el('div', 'btn-row');
   const addBtn = el('button', 'primary', `＋ Add all ${flames.length} to the library`) as HTMLButtonElement;
@@ -33,7 +36,7 @@ export function openPackChooser(app: App, flames: Flame[], unknown: string[], au
       const n = await addFlamesToLibrary(app, flames, (done, total, name) => {
         status.textContent = `Rendering thumbnails… ${done}/${total} — ${name}`;
         return !stop;
-      });
+      }, items.map((it) => it.source));
       status.textContent = `Added ${n} flame${n === 1 ? '' : 's'} to the library.`;
     } catch (e) {
       status.textContent = 'Could not add to the library: ' + (e as Error).message;
@@ -46,7 +49,7 @@ export function openPackChooser(app: App, flames: Flame[], unknown: string[], au
   flames.forEach((fl, i) => {
     const item = el('div', 'ugr-item');
     item.append(el('span', 'ugr-name', `${i + 1}. ${fl.name || 'untitled'}`));
-    item.onclick = () => { app.setFlame(fl); close(); void noteUnknown(unknown); };
+    item.onclick = () => { app.flameSource = items[i].source; app.setFlame(fl); close(); void noteUnknown(unknown); };
     grid.append(item);
   });
   body.append(tools, status, grid);
@@ -55,11 +58,11 @@ export function openPackChooser(app: App, flames: Flame[], unknown: string[], au
 
 /** Every flame inside a .zip (flame packs are distributed zipped): each .flame/.flames entry is
  *  parsed, unnamed flames are named after their entry, and the lot is returned as one pack. */
-async function flamesFromZip(app: App, file: File): Promise<{ flames: Flame[]; unknown: string[]; skipped: number }> {
+async function flamesFromZip(app: App, file: File): Promise<{ items: FlameItem[]; unknown: string[]; skipped: number }> {
   const { readZip } = await import('../core/zip');
   const entries = readZip(await file.arrayBuffer()).filter((e) => /\.flames?$/i.test(e.name));
   if (!entries.length) throw new Error('no .flame files inside this zip');
-  const flames: Flame[] = [];
+  const items: FlameItem[] = [];
   const unknown = new Set<string>();
   let skipped = 0;
   for (const e of entries) {
@@ -67,24 +70,28 @@ async function flamesFromZip(app: App, file: File): Promise<{ flames: Flame[]; u
       const r = importFlameText(await e.text(), app.activeLayer.palette);
       const base = e.name.replace(/^.*\//, '').replace(/\.[^.]+$/, '');
       r.flames.forEach((fl, i) => { if (!fl.name || fl.name === 'imported') fl.name = r.flames.length > 1 ? `${base} ${i + 1}` : base; });
-      flames.push(...r.flames);
+      const source = `${file.name} › ${e.name}`;
+      items.push(...r.flames.map((flame) => ({ flame, source })));
       for (const u of r.unknown) unknown.add(u);
     } catch (err) {
       skipped++;
       console.warn(`zip entry ${e.name}: ${(err as Error).message}`);
     }
   }
-  if (!flames.length) throw new Error(`none of the ${entries.length} .flame entries could be read`);
-  return { flames, unknown: [...unknown], skipped };
+  if (!items.length) throw new Error(`none of the ${entries.length} .flame entries could be read`);
+  return { items, unknown: [...unknown], skipped };
 }
+
+/** Folder drops hand us Files without their path; filesFromDrop records each entry's full path here. */
+const pathOf = new WeakMap<File, string>();
 
 /** The flames inside one file (.flame / .flames / .json / .zip). A whole-library export JSON is
  *  merged into the library on the spot and contributes no flames. */
-async function flamesFromFile(app: App, file: File): Promise<{ flames: Flame[]; unknown: string[]; curves: MotionCurve[] }> {
+async function flamesFromFile(app: App, file: File): Promise<{ items: FlameItem[]; unknown: string[]; curves: MotionCurve[] }> {
   if (/\.zip$/i.test(file.name) || file.type === 'application/zip') {
-    const { flames, unknown, skipped } = await flamesFromZip(app, file);
+    const { items, unknown, skipped } = await flamesFromZip(app, file);
     if (skipped) console.info(`${skipped} entr${skipped === 1 ? 'y' : 'ies'} in ${file.name} could not be read (see warnings above).`);
-    return { flames, unknown, curves: [] };
+    return { items, unknown, curves: [] };
   }
   if (/\.(rar|7z)$/i.test(file.name)) throw new Error(`${file.name}: only .zip archives can be opened in the browser — unpack it first`);
   const text = await file.text();
@@ -94,19 +101,20 @@ async function flamesFromFile(app: App, file: File): Promise<{ flames: Flame[]; 
     if (!Array.isArray(entries) || !entries.length) throw new Error('no library entries in this file');
     await libPut(entries);
     console.info(`Merged ${entries.length} library entries from ${file.name}.`);
-    return { flames: [], unknown: [], curves: [] };
+    return { items: [], unknown: [], curves: [] };
   }
   const { flames, count, unknown, curves } = importFlameText(text, app.activeLayer.palette);
   // Packs often carry unnamed flames (the importer's placeholder) — name those after the file.
   const base = file.name.replace(/\.[^.]+$/, '');
   flames.forEach((fl, i) => { if (!fl.name || fl.name === 'imported') fl.name = count > 1 ? `${base} ${i + 1}` : base; });
-  return { flames, unknown, curves };
+  const source = pathOf.get(file) ?? file.name;
+  return { items: flames.map((flame) => ({ flame, source })), unknown, curves };
 }
 
 /** Load any number of files: one flame in total goes into the editor (with its motion curves),
  *  more open the pack chooser. `autoAdd` starts the library import right away (drag-and-drop). */
 export async function importFlameFiles(app: App, files: File[], autoAdd = false): Promise<void> {
-  const all: Flame[] = [];
+  const all: FlameItem[] = [];
   const unknown = new Set<string>();
   let curves: MotionCurve[] = [];
   const failed: string[] = [];
@@ -114,7 +122,7 @@ export async function importFlameFiles(app: App, files: File[], autoAdd = false)
     if (!/\.(flame|flames|json|xml|zip|rar|7z)$/i.test(f.name) && f.type !== 'application/zip') continue; // a folder's pictures, readmes…
     try {
       const r = await flamesFromFile(app, f);
-      all.push(...r.flames);
+      all.push(...r.items);
       for (const u of r.unknown) unknown.add(u);
       if (r.curves.length && files.length === 1) curves = r.curves;
     } catch (e) {
@@ -128,7 +136,8 @@ export async function importFlameFiles(app: App, files: File[], autoAdd = false)
   }
   if (!all.length) return; // e.g. only a library export — already merged
   if (all.length === 1) {
-    app.setFlame(all[0]);
+    app.flameSource = all[0].source;
+    app.setFlame(all[0].flame);
     if (curves.length) {
       app.setCurves(curves);
       console.info(`Loaded ${curves.length} motion curve${curves.length > 1 ? 's' : ''} from the file (Anim tab).`);
@@ -159,6 +168,7 @@ async function filesFromDrop(dt: DataTransfer): Promise<File[]> {
     if (!e) return;
     if (e.isFile) {
       const f = await new Promise<File>((res, rej) => (e as FileSystemFileEntry).file(res, rej));
+      pathOf.set(f, e.fullPath.replace(/^\//, ''));
       out.push(f);
     } else if (e.isDirectory) {
       for (const child of await readDir(e as FileSystemDirectoryEntry)) await walk(child);

@@ -485,6 +485,12 @@ export function parseFlameXML(text: string, fallbackPalette: RGB[]): Flame[] {
     f.fgOpacity = Math.max(0, numOr('fg_opacity', 1));
     f.bgTransparency = numAttr('bg_transparency') !== 0;
     f.oversample = Math.min(3, Math.max(1, Math.round(numOr('oversample', 1))));
+    // Provenance (JWildfire writes these when the author filled the meta-info tab)
+    const strOpt = (n: string) => { const v = (fe.getAttribute(n) ?? '').trim(); return v ? v : undefined; };
+    const author = strOpt('meta_info_author'), created = strOpt('meta_info_creation_time'), uuid = strOpt('meta_info_uuid');
+    if (author) f.author = author;
+    if (created) f.created = created;
+    if (uuid) f.uuid = uuid;
     // Post symmetry (DefaultRenderIterationState): plotted points are mirrored or rotated
     const pst = (fe.getAttribute('post_symmetry_type') ?? 'NONE').toUpperCase();
     if (pst === 'X_AXIS' || pst === 'Y_AXIS' || pst === 'POINT') {
@@ -850,6 +856,7 @@ export function flameToXML(f: Flame, opts: XMLExportOpts = {}): string {
     `de_radius="${fmt(f.deRadius ?? 1)}" de_curve="${fmt(f.deCurve ?? 0.8)}" ` +
     `saturation="${fmt(f.saturation ?? 1)}" fg_opacity="${fmt(f.fgOpacity ?? 1)}" ` +
     `bg_transparency="${f.bgTransparency ? 1 : 0}" oversample="${f.oversample ?? 1}" ` +
+    (f.author ? `meta_info_author="${esc(f.author)}" ` : '') + (f.created ? `meta_info_creation_time="${esc(f.created)}" ` : '') + (f.uuid ? `meta_info_uuid="${esc(f.uuid)}" ` : '') +
     psymAttrs(f) +
     `quality="200" brightness="${fmt(f.brightness)}" gamma="${fmt(f.gamma)}" gamma_threshold="${fmt(f.gammaThreshold)}" ` +
     `contrast="${fmt(f.contrast ?? 1)}" white_level="${fmt(f.whiteLevel ?? 220)}" low_density_brightness="${fmt(f.lowDensityBrightness ?? 0.24)}" ` +

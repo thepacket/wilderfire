@@ -27,6 +27,7 @@ export async function addFlamesToLibrary(
   app: App,
   flames: Flame[],
   onProgress?: (done: number, total: number, name: string) => boolean | void,
+  sources?: (string | undefined)[],
 ): Promise<number> {
   const entries: LibEntry[] = [];
   const now = Date.now();
@@ -40,6 +41,8 @@ export async function addFlamesToLibrary(
         date: now - i, // the grid is newest-first, so descending stamps keep the pack's own order
         flame: JSON.parse(JSON.stringify(f)),
         thumb,
+        ...(sources?.[i] ? { source: sources[i] } : {}),
+        ...(f.author ? { author: f.author } : {}),
       });
       if (onProgress?.(i + 1, flames.length, f.name) === false) break;
     }
@@ -71,6 +74,8 @@ export function buildLibrary(app: App, anim: AnimAPI) {
       date: Date.now(),
       flame: JSON.parse(JSON.stringify(app.flame)),
       thumb: thumbnail(),
+      ...(app.flameSource ? { source: app.flameSource } : {}),
+      ...(app.flame.author ? { author: app.flame.author } : {}),
     };
     libPut(entry).catch((e) => alert('Could not save to the library: ' + (e as Error).message));
   }
@@ -126,8 +131,8 @@ export function buildLibrary(app: App, anim: AnimAPI) {
     };
     const search = el('input', 'lib-search') as HTMLInputElement;
     search.type = 'search';
-    search.placeholder = 'Search names…';
-    search.title = 'Show only flames whose name contains this text (press / to get here, Esc to clear)';
+    search.placeholder = 'Search names, authors, sources…';
+    search.title = 'Show only flames whose name, author or source contains this text (press / to get here, Esc to clear)';
     search.spellcheck = false;
     tools.append(search, expBtn, impBtn, dedupBtn, clearBtn, impFile);
     if (!entries.length) {
@@ -154,6 +159,7 @@ export function buildLibrary(app: App, anim: AnimAPI) {
     const load = (card: HTMLElement) => {
       const e = entries[entryOf(card)];
       if (!e) return;
+      app.flameSource = e.source ?? `library: ${e.name}`;
       app.setFlame(normalizeFlame(e.flame, app.activeLayer.palette));
       close();
     };
@@ -178,7 +184,9 @@ export function buildLibrary(app: App, anim: AnimAPI) {
         el('div', 'lib-name', e.name),
         el('div', 'lib-date', new Date(e.date).toLocaleString()),
       );
-      meta.title = e.name; // the full name, where the grid has to truncate it
+      const prov = [e.author ? 'by ' + e.author : '', e.source ?? ''].filter(Boolean).join(' · ');
+      if (prov) meta.append(el('div', 'lib-prov', prov));
+      meta.title = [e.name, e.author ? 'Author: ' + e.author : '', e.source ? 'Source: ' + e.source : ''].filter(Boolean).join('\n');
       const del = el('button', 'lib-del danger', '✕');
       del.onclick = (ev) => { ev.stopPropagation(); remove(item); };
       item.append(img, meta, del);
@@ -194,7 +202,8 @@ export function buildLibrary(app: App, anim: AnimAPI) {
       sel = -1;
       vis = [];
       for (let i = 0; i < items.length; i++) {
-        const show = !q || entries[i].name.toLowerCase().includes(q);
+        const en = entries[i];
+        const show = !q || en.name.toLowerCase().includes(q) || (en.author ?? '').toLowerCase().includes(q) || (en.source ?? '').toLowerCase().includes(q);
         items[i].style.display = show ? '' : 'none';
         if (show) vis.push(items[i]);
       }

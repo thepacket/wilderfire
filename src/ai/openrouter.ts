@@ -5,10 +5,21 @@ export type ChatPart =
   | { type: 'text'; text: string }
   | { type: 'image_url'; image_url: { url: string } };
 
+export interface ToolCall { id: string; name: string; arguments: string }
+
 export interface ChatMessage {
-  role: 'system' | 'user' | 'assistant';
-  content: string | ChatPart[];
+  role: 'system' | 'user' | 'assistant' | 'tool';
+  content: string | ChatPart[] | null;
+  /** assistant turns that requested tools (OpenAI wire shape) */
+  tool_calls?: { id: string; type: 'function'; function: { name: string; arguments: string } }[];
+  /** tool results */
+  tool_call_id?: string;
 }
+
+/** OpenAI-compatible function-tool definition */
+export interface ToolDef { type: 'function'; function: { name: string; description: string; parameters: Record<string, unknown> } }
+
+export interface StreamResult { text: string; toolCalls: ToolCall[] }
 
 export interface StreamOptions {
   /** OpenRouter key; may be empty for a local endpoint */
@@ -17,6 +28,8 @@ export interface StreamOptions {
   baseUrl?: string;
   model: string;
   messages: ChatMessage[];
+  /** function tools the model may call; tool_calls come back in the result */
+  tools?: ToolDef[];
   onDelta?: (text: string) => void;
   signal?: AbortSignal;
 }
@@ -93,7 +106,7 @@ export async function fetchLocalModels(baseUrl: string): Promise<string[]> {
   return (j.data ?? []).map((m) => String(m.id ?? '')).filter(Boolean);
 }
 
-export async function streamChat(opts: StreamOptions): Promise<string> {
+export async function streamChat(opts: StreamOptions): Promise<StreamResult> {
   const res = await fetch(chatUrl(opts.baseUrl), {
     method: 'POST',
     signal: opts.signal,
@@ -106,6 +119,7 @@ export async function streamChat(opts: StreamOptions): Promise<string> {
       model: opts.model,
       messages: opts.messages,
       stream: true,
+      ...(opts.tools?.length ? { tools: opts.tools, tool_choice: 'auto' } : {}),
     }),
   });
 
@@ -123,6 +137,8 @@ export async function streamChat(opts: StreamOptions): Promise<string> {
   const decoder = new TextDecoder();
   let buffer = '';
   let full = '';
+  // streamed tool calls arrive as deltas keyed by index: the id/name once, the arguments in pieces
+  const calls: { id: string; name: string; arguments: string }[] = [];
 
   for (;;) {
     const { done, value } = await reader.read();
@@ -137,13 +153,21 @@ export async function streamChat(opts: StreamOptions): Promise<string> {
       if (payload === '[DONE]') continue;
       try {
         const j = JSON.parse(payload);
-        const delta: string = j?.choices?.[0]?.delta?.content ?? '';
+        const d = j?.choices?.[0]?.delta;
+        const delta: string = d?.content ?? '';
         if (delta) {
           full += delta;
           opts.onDelta?.(delta);
         }
+        for (const tc of d?.tool_calls ?? []) {
+          const i: number = tc.index ?? calls.length;
+          while (calls.length <= i) calls.push({ id: '', name: '', arguments: '' });
+          if (tc.id) calls[i].id = tc.id;
+          if (tc.function?.name) calls[i].name += tc.function.name;
+          if (tc.function?.arguments) calls[i].arguments += tc.function.arguments;
+        }
       } catch { /* keep-alive or partial line — ignore */ }
     }
   }
-  return full;
+  return { text: full, toolCalls: calls.filter((c) => c.name).map((c, i) => ({ ...c, id: c.id || `call_${i}` })) };
 }

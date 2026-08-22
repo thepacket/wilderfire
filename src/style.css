@@ -217,6 +217,7 @@ input[type="range"]::-moz-range-thumb {
 .ai-panel { flex-direction: column; height: 100%; }
 .tab-body.ai-panel.active { display: flex; }
 .ai-msgs { flex: 1; overflow-y: auto; padding: 10px 12px; display: flex; flex-direction: column; gap: 8px; }
+.ai-msg.tool { font-size: 11px; color: var(--fg-dim); font-family: ui-monospace, SFMono-Regular, Menlo, monospace; white-space: pre-wrap; align-self: stretch; background: transparent; padding: 0 4px; }
 .ai-msg { border-radius: 8px; padding: 7px 10px; font-size: 12px; line-height: 1.5; white-space: pre-wrap; word-break: break-word; }
 .ai-msg.user { background: color-mix(in srgb, var(--accent) 16%, var(--bg3)); align-self: flex-end; max-width: 92%; }
 .ai-msg.assistant { background: var(--bg3); align-self: flex-start; max-width: 96%; }
@@ -278,6 +279,7 @@ a { color: var(--accent2); }
 .lib-item img, .mut-item canvas { width: 100%; display: block; aspect-ratio: 1; object-fit: cover; }
 .lib-item .lib-meta { padding: 5px 8px; font-size: 11px; }
 .lib-item .lib-name { font-weight: 600; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.lib-item .lib-prov { font-size: 10px; color: var(--fg-dim); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .lib-item .lib-date { color: var(--fg-dim); }
 .lib-item .lib-del {
   position: absolute; top: 4px; right: 4px; padding: 1px 6px;
