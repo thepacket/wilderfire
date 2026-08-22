@@ -127,6 +127,19 @@ export function buildPalettePanel(app: App, root: HTMLElement) {
   impFile.style.display = 'none';
   impBtn.onclick = () => impFile.click();
   const useImported = (pal: RGB[]) => { base = pal; shift = 0; shiftS.set(0); sel.value = ''; apply(); initStops(); };
+  app.applyPalette = useImported; // drops of photos on the canvas land here too
+  // Gradient from an image (JWildfire's "grab palette from image": median cut, sorted by hue then brightness)
+  const imgBtn = el('button', '', '🖼 From image…');
+  imgBtn.title = 'Make a gradient from a photo: the 256 most representative colours (median cut, like JWildfire), sorted by hue. Dropping a picture on the canvas does the same.';
+  const imgFile = el('input') as HTMLInputElement;
+  imgFile.type = 'file'; imgFile.accept = 'image/*'; imgFile.style.display = 'none';
+  imgBtn.onclick = () => imgFile.click();
+  imgFile.onchange = async () => {
+    const f = imgFile.files?.[0]; imgFile.value = '';
+    if (!f) return;
+    try { const { paletteFromImageFile } = await import('../core/paletteFromImage'); useImported(await paletteFromImageFile(f)); }
+    catch (e) { alert('Could not read that image: ' + (e as Error).message); }
+  };
   impFile.onchange = async () => {
     const f = impFile.files?.[0];
     if (!f) return;
@@ -165,7 +178,7 @@ export function buildPalettePanel(app: App, root: HTMLElement) {
   const invBtn = el('button', '', '⇆ Invert');
   invBtn.title = 'Reverse the gradient';
   invBtn.onclick = () => useImported([...base].reverse());
-  btnRow.append(randBtn, invBtn, impBtn, impFile, expBtn);
+  btnRow.append(randBtn, invBtn, impBtn, impFile, expBtn, imgBtn, imgFile);
   sec.append(btnRow);
   sec.append(el('div', 'hint', 'Edits the ACTIVE layer’s gradient. Each transform picks its hue via its Color slider (position in this gradient).'));
 

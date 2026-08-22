@@ -85,6 +85,9 @@ async function flamesFromZip(app: App, file: File): Promise<{ items: FlameItem[]
 /** Folder drops hand us Files without their path; filesFromDrop records each entry's full path here. */
 const pathOf = new WeakMap<File, string>();
 
+/** Signals "this picture became the gradient" up to importFlameFiles (not an error for the user). */
+class GradientTaken extends Error { constructor(public file: string) { super(`gradient taken from ${file}`); } }
+
 /** The flames inside one file (.flame / .flames / .json / .zip). A whole-library export JSON is
  *  merged into the library on the spot and contributes no flames. */
 async function flamesFromFile(app: App, file: File): Promise<{ items: FlameItem[]; unknown: string[]; curves: MotionCurve[] }> {
@@ -95,11 +98,17 @@ async function flamesFromFile(app: App, file: File): Promise<{ items: FlameItem[
   }
   if (/\.(rar|7z)$/i.test(file.name)) throw new Error(`${file.name}: only .zip archives can be opened in the browser — unpack it first`);
   let text: string;
-  if (/\.png$/i.test(file.name) || file.type === 'image/png') {
-    // a PNG saved by WilderFire (or flam3) carries its flame in a flam3_genome text chunk
-    const { flameXmlFromPng } = await import('../core/pngMeta');
-    const xml = flameXmlFromPng(new Uint8Array(await file.arrayBuffer()));
-    if (!xml) throw new Error('this PNG carries no flame (only PNGs saved by WilderFire or flam3 do)');
+  const isImage = /\.(png|jpe?g|webp|gif|bmp|avif)$/i.test(file.name) || /^image\//.test(file.type);
+  if (isImage) {
+    // a PNG saved by WilderFire (or flam3) carries its flame in a flam3_genome text chunk;
+    // any other picture becomes the active layer's gradient (JWildfire's grab-palette-from-image)
+    const isPng = /\.png$/i.test(file.name) || file.type === 'image/png';
+    const xml = isPng ? (await import('../core/pngMeta')).flameXmlFromPng(new Uint8Array(await file.arrayBuffer())) : null;
+    if (!xml) {
+      const { paletteFromImageFile } = await import('../core/paletteFromImage');
+      app.applyPalette(await paletteFromImageFile(file));
+      throw new GradientTaken(file.name);
+    }
     text = xml;
   } else {
     text = await file.text();
@@ -128,16 +137,21 @@ export async function importFlameFiles(app: App, files: File[], autoAdd = false)
   let curves: MotionCurve[] = [];
   const failed: string[] = [];
   for (const f of files) {
-    if (!/\.(flame|flames|json|xml|zip|rar|7z|png)$/i.test(f.name) && f.type !== 'application/zip' && f.type !== 'image/png') continue; // a folder's other pictures, readmes…
+    const picture = /\.(png|jpe?g|webp|gif|bmp|avif)$/i.test(f.name) || /^image\//.test(f.type);
+    if (!/\.(flame|flames|json|xml|zip|rar|7z)$/i.test(f.name) && f.type !== 'application/zip' && !picture) continue; // readmes…
+    if (picture && files.length > 1 && !/\.png$/i.test(f.name) && f.type !== 'image/png') { console.info(`${f.name}: skipped (a picture among several files — drop it alone to make a gradient from it)`); continue; }
     try {
       const r = await flamesFromFile(app, f);
       all.push(...r.items);
       for (const u of r.unknown) unknown.add(u);
       if (r.curves.length && files.length === 1) curves = r.curves;
     } catch (e) {
-      const msg = (e as Error).message;
-      if (/\.png$/i.test(f.name) && /carries no flame/.test(msg) && files.length > 1) { console.info(msg); continue; } // a pack's preview images
-      failed.push(`${f.name}: ${msg}`);
+      if (e instanceof GradientTaken) {
+        if (files.length === 1) { console.info(`Gradient taken from ${f.name} (Gradient tab).`); return; }
+        console.info(`${f.name}: a pack's preview image — skipped`); // several files: pictures are not gradients
+        continue;
+      }
+      failed.push(`${f.name}: ${(e as Error).message}`);
     }
   }
   if (failed.length) {

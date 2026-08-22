@@ -341,7 +341,7 @@ export function buildRenderPanel(app: App, root: HTMLElement) {
   const fileInp = el('input') as HTMLInputElement;
   fileInp.type = 'file';
   fileInp.multiple = true;
-  fileInp.accept = '.json,.flame,.flames,.xml,.zip,.png,application/json,application/xml,text/xml,application/zip,image/png';
+  fileInp.accept = '.json,.flame,.flames,.xml,.zip,.png,.jpg,.jpeg,.webp,application/json,application/xml,text/xml,application/zip,image/*';
   fileInp.style.display = 'none';
   fileInp.onchange = async () => {
     const files = Array.from(fileInp.files ?? []);

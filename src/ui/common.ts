@@ -1,5 +1,5 @@
 // Tiny DOM helpers + the shared App context that panels talk to.
-import type { Flame, Layer, XForm } from '../core/flame';
+import type { Flame, Layer, XForm, RGB } from '../core/flame';
 import type { FlameRenderer } from '../gpu/renderer';
 import type { MotionCurve } from '../core/motion';
 
@@ -76,6 +76,8 @@ export class App {
   xformClipboard: XForm | null = null; // survives flame switches
   /** Provenance of the loaded flame (dropped file / zip entry / library entry's source); 💾 Save records it. */
   flameSource: string | undefined;
+  /** Replace the active layer's gradient (registered by the Gradient tab, which owns the stop editor state). */
+  applyPalette: (pal: RGB[]) => void = (pal) => { this.activeLayer.palette = pal; this.commit('palette'); };
   /** Motion-curve bridge, registered by the Anim panel (used by .flame export/import). */
   getCurves: () => MotionCurve[] = () => [];
   setCurves: (curves: MotionCurve[]) => void = () => {};

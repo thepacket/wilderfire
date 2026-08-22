@@ -131,6 +131,9 @@ in the stack.
 - **Editor niceties** — reorder transforms (xaos-aware) and layers, copy/paste
   transforms across layers and flames, rotational/mirror **symmetry
   generators**, arrow-key nudging, **collapsible side panes** (`[` / `]`)
+- **Gradient from an image** — 🖼 From image… on the Gradient tab (or drop a
+  photo on the canvas) turns a picture into the active layer's gradient:
+  JWildfire's median-cut quantizer, 256 colours sorted by hue then brightness
 - **Random flame styles** — the style select next to 🎲 Randomize offers
   JWildfire's own generators, transcribed: Bubbles, Julians, Splits, Spherical,
   Ghosts, Tentacle, Linear, Sierpinsky, Galaxies, Machine, Brokat, Spirals,
