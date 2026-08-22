@@ -131,6 +131,11 @@ in the stack.
 - **Editor niceties** — reorder transforms (xaos-aware) and layers, copy/paste
   transforms across layers and flames, rotational/mirror **symmetry
   generators**, arrow-key nudging, **collapsible side panes** (`[` / `]`)
+- **Animation presets** — on the Anim tab, one click adds seamless-loop motion
+  curves: Spin (either way), Zoom pulse, Drift, Orbit and Wobble (3D), Breathe
+  (transform weights), Variation sway, Twirl (each transform rotates about its
+  own origin), Julia sweep, Fade in/out — 3–20 s per loop; presets combine, and
+  the curves are ordinary ones you can edit afterwards
 - **Gradient from an image** — 🖼 From image… on the Gradient tab (or drop a
   photo on the canvas) turns a picture into the active layer's gradient:
   JWildfire's median-cut quantizer, 256 colours sorted by hue then brightness

@@ -125,8 +125,35 @@ export function buildAnimPanel(app: App, root: HTMLElement, overlay: OverlayHand
   const addCurveBtn = el('button', '', '+ Curve');
   addCurveBtn.title = 'Animate this parameter with its own curve (independent of keyframes)';
   mcTop.append(paramSel, addCurveBtn, el('span', 'hint mc-now', 't = 0.00 s'));
+  // Presets: one click writes looping curves (src/core/animPresets.ts); a path a preset animates replaces an existing curve on it
+  const presetRow = el('div', 'btn-row');
+  const presetSel = el('select') as HTMLSelectElement;
+  presetSel.style.maxWidth = '170px';
+  const durSel = el('select') as HTMLSelectElement;
+  for (const sec of [3, 6, 10, 20]) { const o = el('option', '', `${sec} s`) as HTMLOptionElement; o.value = String(sec); durSel.append(o); }
+  durSel.value = '6';
+  durSel.title = 'Length of one loop';
+  const presetBtn = el('button', '', '+ Preset');
+  presetBtn.title = 'Add this preset\'s curves (seamless loop). Presets combine: Spin + Breathe + Drift each add their own curves.';
+  presetRow.append(presetSel, durSel, presetBtn);
+  void (async () => {
+    const { ANIM_PRESETS } = await import('../core/animPresets');
+    for (const pr of ANIM_PRESETS) { const o = el('option', '', pr.name) as HTMLOptionElement; o.value = pr.id; o.title = pr.what; presetSel.append(o); }
+    presetSel.onchange = () => { presetSel.title = ANIM_PRESETS.find((pr) => pr.id === presetSel.value)?.what ?? ''; };
+    presetSel.onchange(new Event('change'));
+  })();
+  presetBtn.onclick = async () => {
+    const { presetById, mergeCurves } = await import('../core/animPresets');
+    const pr = presetById(presetSel.value);
+    if (!pr) return;
+    const added = pr.make(app.flame, parseFloat(durSel.value));
+    if (!added.length) { alert(`"${pr.name}" has nothing to animate in this flame (${pr.what}).`); return; }
+    curves = mergeCurves(curves, added);
+    loopChk.checked = true;
+    rebuildCurves(); rebuildList(); onChange();
+  };
   const curveList = el('div', 'mc-list');
-  curveSec.append(mcTop, curveList);
+  curveSec.append(mcTop, presetRow, curveList);
   curveSec.append(el('div', 'hint', 'A curve drives one parameter over time. Scrub to a time, adjust the parameter in the editor, then “+ key” to record its value there — or drag points on the graph (double-click adds, Alt-click removes). Curves layer on top of keyframe morphs.'));
 
   function rebuildParamSel() {
