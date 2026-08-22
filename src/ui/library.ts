@@ -78,7 +78,10 @@ export function buildLibrary(app: App, anim: AnimAPI) {
   async function open() {
     const { body, close } = openModal('Flame library');
     let entries: LibEntry[] = [];
-    try { entries = await libAll(); } catch (e) { body.append(el('div', 'hint', '⚠ Library unavailable: ' + (e as Error).message)); return; }
+    // The store returns newest-first (batch export wants that); the dialog shows names in order —
+    // natural numeric order so "Flame 2" sorts before "Flame 10", ties oldest-first.
+    const byName = new Intl.Collator(undefined, { numeric: true, sensitivity: 'base' });
+    try { entries = (await libAll()).sort((a, b) => byName.compare(a.name, b.name) || a.date - b.date); } catch (e) { body.append(el('div', 'hint', '⚠ Library unavailable: ' + (e as Error).message)); return; }
     const tools = el('div', 'btn-row');
     const expBtn = el('button', '', '⬇ Export library');
     expBtn.title = 'Save every entry (flames + thumbnails) as one JSON file — a backup, or to move the library to another browser';
