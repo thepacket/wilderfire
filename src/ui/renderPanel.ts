@@ -319,12 +319,15 @@ export function buildRenderPanel(app: App, root: HTMLElement) {
   const ioRow = el('div', 'btn-row');
   const pngBtn = el('button', 'primary', '⬇ Save PNG');
   const baseName = () => (app.flame.name || 'wilderfire').replace(/[\\/:*?"<>|]+/g, '_');
+  pngBtn.title = 'Save the render as a PNG — the flame itself is embedded in the file (drop the PNG on the canvas to load it again)';
   pngBtn.onclick = async () => {
     // Ask for the destination first: the dialog needs the click's user gesture.
     const target = await pickSave({ suggestedName: `${baseName()}.png`, description: 'PNG image', mime: 'image/png', ext: '.png' });
     if (!target) return;
     const blob = await app.renderer.exportPNG();
-    if (blob) await target.write(blob);
+    if (!blob) return;
+    const { pngWithFlame } = await import('../core/pngMeta');
+    await target.write(await pngWithFlame(blob, app.flame, app.getCurves()));
   };
   const jsonBtn = el('button', '', '⬇ JSON');
   jsonBtn.onclick = () =>
@@ -334,11 +337,11 @@ export function buildRenderPanel(app: App, root: HTMLElement) {
   xmlBtn.onclick = () =>
     saveText(flameToXML(app.flame, { curves: app.getCurves() }), { suggestedName: `${baseName()}.flame`, description: 'Flame XML', mime: 'application/xml', ext: '.flame' });
   const loadBtn = el('button', '', '⬆ Load');
-  loadBtn.title = 'Load WilderFire JSON, .flame XML (flam3 / Apophysis / JWildfire) or .zip files — pick several at once; more than one flame opens a chooser';
+  loadBtn.title = 'Load WilderFire JSON, .flame XML (flam3 / Apophysis / JWildfire), .zip files or PNGs saved by WilderFire/flam3 (the flame is inside) — pick several at once; more than one flame opens a chooser';
   const fileInp = el('input') as HTMLInputElement;
   fileInp.type = 'file';
   fileInp.multiple = true;
-  fileInp.accept = '.json,.flame,.flames,.xml,.zip,application/json,application/xml,text/xml,application/zip';
+  fileInp.accept = '.json,.flame,.flames,.xml,.zip,.png,application/json,application/xml,text/xml,application/zip,image/png';
   fileInp.style.display = 'none';
   fileInp.onchange = async () => {
     const files = Array.from(fileInp.files ?? []);
@@ -393,7 +396,7 @@ export function buildRenderPanel(app: App, root: HTMLElement) {
     r.exporting = true;
     try {
       const blob = await renderHiRes(r, app.flame, {
-        w: fullW, h: fullH, spp, transparent,
+        w: fullW, h: fullH, spp, transparent, curves: app.getCurves(),
         onTile: (n, total) => { hiStatus.textContent = `Hi-res: tile ${n}/${total} (${fullW}×${fullH})…`; },
       });
       hiStatus.textContent = 'Saving PNG…';

@@ -131,6 +131,11 @@ in the stack.
 - **Editor niceties** — reorder transforms (xaos-aware) and layers, copy/paste
   transforms across layers and flames, rotational/mirror **symmetry
   generators**, arrow-key nudging, **collapsible side panes** (`[` / `]`)
+- **The flame travels in the PNG** — every PNG WilderFire saves (Save PNG,
+  hi-res, batch, the assistant's export) carries its `.flame` XML in a
+  `flam3_genome` text chunk, flam3's own convention; drop such a PNG on the
+  canvas (or ⬆ Load it) and the flame comes back, motion curves included. A
+  pack's plain preview PNGs in a folder drop are skipped quietly
 - **Gallery mode** — ▶ Gallery in the library turns the search result into a
   fullscreen slideshow rendered live (quality cap 100–1000 spp, your choice):
   ← → browse, Page Up/Down ±10, Space auto-advances (3–40 s), F browser

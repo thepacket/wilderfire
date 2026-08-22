@@ -32,6 +32,8 @@ export interface HiResOpts {
   onTile?: (done: number, total: number) => void;
   /** set `signal.aborted` to stop after the current tile (an AbortError is thrown) */
   signal?: AbortSignal;
+  /** motion curves to embed with the flame in the PNG */
+  curves?: import('../core/motion').MotionCurve[];
 }
 
 /**
@@ -74,5 +76,7 @@ export async function renderHiRes(renderer: FlameRenderer, flame: Flame, o: HiRe
   }
   const blob = await new Promise<Blob | null>((res) => out.toBlob(res, 'image/png'));
   if (!blob) throw new Error('PNG encoding failed');
-  return blob;
+  // the flame travels inside the PNG (flam3_genome tEXt chunk) — drop the file on the canvas to get it back
+  const { pngWithFlame } = await import('../core/pngMeta');
+  return pngWithFlame(blob, flame, o.curves ?? []);
 }

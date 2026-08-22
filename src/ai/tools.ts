@@ -191,8 +191,9 @@ export async function runTool(name: string, argsJson: string, env: ToolEnv): Pro
         const blob = await app.renderer.exportPNG();
         if (!blob) return { text: 'Nothing to export yet.' };
         const { saveBlob } = await import('../ui/saveFile');
+        const { pngWithFlame } = await import('../core/pngMeta');
         const base = (app.flame.name || 'wilderfire').replace(/[\\/:*?"<>|]+/g, '_');
-        const ok = await saveBlob(blob, { suggestedName: `${base}.png`, description: 'PNG image', mime: 'image/png', ext: '.png' });
+        const ok = await saveBlob(await pngWithFlame(blob, app.flame, app.getCurves()), { suggestedName: `${base}.png`, description: 'PNG image', mime: 'image/png', ext: '.png' });
         return { text: ok ? `Saved ${base}.png.` : 'The save dialog was cancelled.' };
       }
       default:

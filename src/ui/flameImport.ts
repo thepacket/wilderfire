@@ -94,7 +94,16 @@ async function flamesFromFile(app: App, file: File): Promise<{ items: FlameItem[
     return { items, unknown, curves: [] };
   }
   if (/\.(rar|7z)$/i.test(file.name)) throw new Error(`${file.name}: only .zip archives can be opened in the browser — unpack it first`);
-  const text = await file.text();
+  let text: string;
+  if (/\.png$/i.test(file.name) || file.type === 'image/png') {
+    // a PNG saved by WilderFire (or flam3) carries its flame in a flam3_genome text chunk
+    const { flameXmlFromPng } = await import('../core/pngMeta');
+    const xml = flameXmlFromPng(new Uint8Array(await file.arrayBuffer()));
+    if (!xml) throw new Error('this PNG carries no flame (only PNGs saved by WilderFire or flam3 do)');
+    text = xml;
+  } else {
+    text = await file.text();
+  }
   if (/^\s*\{/.test(text) && text.includes('"wilderfireLibrary"')) {
     const { libPut } = await import('../core/libraryStore');
     const entries = JSON.parse(text).entries;
@@ -119,14 +128,16 @@ export async function importFlameFiles(app: App, files: File[], autoAdd = false)
   let curves: MotionCurve[] = [];
   const failed: string[] = [];
   for (const f of files) {
-    if (!/\.(flame|flames|json|xml|zip|rar|7z)$/i.test(f.name) && f.type !== 'application/zip') continue; // a folder's pictures, readmes…
+    if (!/\.(flame|flames|json|xml|zip|rar|7z|png)$/i.test(f.name) && f.type !== 'application/zip' && f.type !== 'image/png') continue; // a folder's other pictures, readmes…
     try {
       const r = await flamesFromFile(app, f);
       all.push(...r.items);
       for (const u of r.unknown) unknown.add(u);
       if (r.curves.length && files.length === 1) curves = r.curves;
     } catch (e) {
-      failed.push(`${f.name}: ${(e as Error).message}`);
+      const msg = (e as Error).message;
+      if (/\.png$/i.test(f.name) && /carries no flame/.test(msg) && files.length > 1) { console.info(msg); continue; } // a pack's preview images
+      failed.push(`${f.name}: ${msg}`);
     }
   }
   if (failed.length) {

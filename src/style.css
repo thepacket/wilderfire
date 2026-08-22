@@ -90,7 +90,7 @@ html, body {
 #overlay { cursor: crosshair; }
 /* Drag a flame file over the canvas (see ui/flameImport.ts) */
 .canvas-wrap.drop-over::after {
-  content: 'Drop .flame / .zip files or a folder — several go to the library';
+  content: 'Drop .flame / .zip / PNG files or a folder — several go to the library';
   position: absolute; inset: 6px; z-index: 3; pointer-events: none;
   display: flex; align-items: center; justify-content: center;
   border: 2px dashed var(--accent); border-radius: 10px;
