@@ -211,6 +211,7 @@ export class FlameRenderer {
       requiredLimits: {
         maxStorageBufferBindingSize: wantBind,
         maxBufferSize: wantBuf,
+        maxTextureDimension2D: adapter.limits.maxTextureDimension2D, // export tiles render into one texture: as wide as the GPU allows
         // the solid kernel binds up to 9 storage buffers (xd, pts, rngs, pal, zkey, zpay, shadow maps + optional mods, mats)
         maxStorageBuffersPerShaderStage: Math.min(Math.max(adapter.limits.maxStorageBuffersPerShaderStage, 8), 10),
       },
@@ -1086,6 +1087,18 @@ export class FlameRenderer {
 
   /** Resolves once everything the current flame needs is on the GPU (mesh primitives load asynchronously;
    *  the live view simply shows them when they arrive, exports wait here). */
+  /** The largest region renderRegion can render in one go on this device: cells bounded by the histogram / z-buffer
+   *  budget (one storage binding) and the readback buffer, the side by the texture limit. The hi-res export sizes its
+   *  tiles from this — one tile for anything that fits, instead of the old fixed 1024 px (each tile re-runs the whole
+   *  chaos game and keeps only its own points, so N tiles cost ~N× the iterations). */
+  exportTileLimit(): { maxCells: number; maxSide: number } {
+    const lim = this.device.limits;
+    const perCell = this.solid ? Math.max(SOLID_PAY_WORDS * 4, SOLID_CELL_BYTES) : HIST_CELL_BYTES;
+    const budget = Math.min(this.maxHistBytes, lim.maxStorageBufferBindingSize, lim.maxBufferSize);
+    const maxCells = Math.floor(Math.min(budget / perCell, lim.maxBufferSize / 4 /* rgba8 readback */, 268_000_000 /* 2D canvas / ImageData sanity */));
+    return { maxCells, maxSide: lim.maxTextureDimension2D };
+  }
+
   /** Upload the reflection maps a flame's materials name (resampled to REFL_SIZE², one texture layer each);
    *  asynchronous — the materials read layer 0 = none until the images are in, then the view is redrawn. */
   private ensureReflMaps(flame: Flame): Promise<void> {

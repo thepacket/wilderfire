@@ -435,8 +435,8 @@ export function buildRenderPanel(app: App, root: HTMLElement) {
       const blob = await renderHiRes(r, app.flame, {
         w: fullW, h: fullH, spp, transparent, curves: app.getCurves(),
         onTile: (n, total) => {
-          hiStatus.textContent = `Hi-res: tile ${n}/${total} (${fullW}×${fullH})…`;
-          busy.set(`Rendering ${fullW}×${fullH} PNG — tile ${n} of ${total}… (${target.name} stays empty until it is written)`);
+          hiStatus.textContent = total > 1 ? `Hi-res: tile ${n}/${total} (${fullW}×${fullH})…` : `Hi-res: rendered ${fullW}×${fullH}, encoding…`;
+          busy.set(total > 1 ? `Rendering ${fullW}×${fullH} PNG — tile ${n} of ${total}… (${target.name} stays empty until it is written)` : `Rendered ${fullW}×${fullH}, encoding…`);
         },
       });
       hiStatus.textContent = 'Saving PNG…';

@@ -41,16 +41,26 @@ export interface HiResOpts {
  * (`renderer.exporting = true`, restored by the caller together with `setFlame(app.flame)`);
  * this sets the flame on the renderer, so it compiles the kernel for it.
  */
+/** Tile size for a w×h export on this device: the whole image when it fits the GPU's budget (the usual case up to
+ *  8K — one render, no seams to hide), else the largest square tiles that fit with their apron. */
+export function planTiles(w: number, h: number, lim: { maxCells: number; maxSide: number }, pad: number): { tile: number; tilesX: number; tilesY: number } {
+  const whole = w <= lim.maxSide && h <= lim.maxSide && w * h <= lim.maxCells;
+  if (whole) return { tile: Math.max(w, h), tilesX: 1, tilesY: 1 };
+  const side = Math.max(256, Math.min(lim.maxSide, Math.floor(Math.sqrt(lim.maxCells))) - 2 * pad);
+  return { tile: side, tilesX: Math.ceil(w / side), tilesY: Math.ceil(h / side) };
+}
+
 export async function renderHiRes(renderer: FlameRenderer, flame: Flame, o: HiResOpts): Promise<Blob> {
-  const TILE = 1024, PAD = 8;
+  const PAD = 8;
   const { w: fullW, h: fullH } = o;
   renderer.setFlame(flame);
   const out = document.createElement('canvas');
   out.width = fullW;
   out.height = fullH;
   const ctx = out.getContext('2d')!;
-  const tilesX = Math.ceil(fullW / TILE);
-  const tilesY = Math.ceil(fullH / TILE);
+  const plan = planTiles(fullW, fullH, renderer.exportTileLimit(), PAD);
+  const TILE = plan.tile, tilesX = plan.tilesX, tilesY = plan.tilesY;
+  const single = tilesX === 1 && tilesY === 1;
   let n = 0;
   for (let ty = 0; ty < tilesY; ty++) {
     for (let tx = 0; tx < tilesX; tx++) {
@@ -58,16 +68,19 @@ export async function renderHiRes(renderer: FlameRenderer, flame: Flame, o: HiRe
       const x0 = tx * TILE, y0 = ty * TILE;
       const tw = Math.min(TILE, fullW - x0);
       const th = Math.min(TILE, fullH - y0);
-      // Render with padding so the DE filter doesn't seam at tile edges.
-      const pw = tw + 2 * PAD, ph = th + 2 * PAD;
+      // Render with padding so the DE filter doesn't seam at tile edges (none needed for a single tile).
+      const pad = single ? 0 : PAD;
+      const pw = tw + 2 * pad, ph = th + 2 * pad;
       const px = await renderer.renderRegion({
-        fullW, fullH, tileX: x0 - PAD, tileY: y0 - PAD,
+        fullW, fullH, tileX: x0 - pad, tileY: y0 - pad,
         tileW: pw, tileH: ph, spp: o.spp, transparent: o.transparent,
       });
-      const img = new ImageData(tw, th);
-      for (let y = 0; y < th; y++) {
-        const srcOff = ((y + PAD) * pw + PAD) * 4;
-        img.data.set(px.subarray(srcOff, srcOff + tw * 4), y * tw * 4);
+      const img = single ? new ImageData(px, tw, th) : new ImageData(tw, th);
+      if (!single) {
+        for (let y = 0; y < th; y++) {
+          const srcOff = ((y + pad) * pw + pad) * 4;
+          img.data.set(px.subarray(srcOff, srcOff + tw * 4), y * tw * 4);
+        }
       }
       ctx.putImageData(img, x0, y0);
       n++;
