@@ -267,7 +267,13 @@ in the stack.
   conversation memory) and what comes back (**edit commands** — a few lines
   like `set T2.weight 0.8`, `addvar T1 julian 0.7 power=3` — or complete
   flame JSON, or text only), with a live per-turn token estimate; the
-  defaults are ~1.6k tokens/turn instead of ~19k. An **Explain** button asks
+  defaults are ~1.6k tokens/turn instead of ~19k, and a **session meter**
+  under it shows what the requests actually cost so far — server-reported
+  token counts and OpenRouter's USD figure (or list price × tokens). A
+  **Critique** button asks the model to judge the flame — composition,
+  colour, detail, what holds it back — and to propose 3–5 concrete edits that
+  appear as one-click buttons under its answer (nothing changes until you
+  click one). An **Explain** button asks
   the model to walk through the current flame — what each transform,
   variation, layer, final transform, palette and camera setting contributes,
   plus a few tweaks to try — in prose, without touching it. Instead of

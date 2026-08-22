@@ -19,7 +19,9 @@ export interface ChatMessage {
 /** OpenAI-compatible function-tool definition */
 export interface ToolDef { type: 'function'; function: { name: string; description: string; parameters: Record<string, unknown> } }
 
-export interface StreamResult { text: string; toolCalls: ToolCall[] }
+/** token accounting of one request, when the server reports it (OpenRouter adds the cost in USD) */
+export interface Usage { promptTokens: number; completionTokens: number; cost?: number }
+export interface StreamResult { text: string; toolCalls: ToolCall[]; usage?: Usage }
 
 export interface StreamOptions {
   /** OpenRouter key; may be empty for a local endpoint */
@@ -119,6 +121,8 @@ export async function streamChat(opts: StreamOptions): Promise<StreamResult> {
       model: opts.model,
       messages: opts.messages,
       stream: true,
+      stream_options: { include_usage: true }, // the last chunk carries the token counts (OpenAI-style servers)
+      ...(opts.baseUrl ? {} : { usage: { include: true } }), // OpenRouter: counts + cost in USD
       ...(opts.tools?.length ? { tools: opts.tools, tool_choice: 'auto' } : {}),
     }),
   });
@@ -137,6 +141,7 @@ export async function streamChat(opts: StreamOptions): Promise<StreamResult> {
   const decoder = new TextDecoder();
   let buffer = '';
   let full = '';
+  let usage: Usage | undefined;
   // streamed tool calls arrive as deltas keyed by index: the id/name once, the arguments in pieces
   const calls: { id: string; name: string; arguments: string }[] = [];
 
@@ -153,6 +158,9 @@ export async function streamChat(opts: StreamOptions): Promise<StreamResult> {
       if (payload === '[DONE]') continue;
       try {
         const j = JSON.parse(payload);
+        if (j?.usage && typeof j.usage.prompt_tokens === 'number') {
+          usage = { promptTokens: j.usage.prompt_tokens, completionTokens: j.usage.completion_tokens ?? 0, ...(typeof j.usage.cost === 'number' ? { cost: j.usage.cost } : {}) };
+        }
         const d = j?.choices?.[0]?.delta;
         const delta: string = d?.content ?? '';
         if (delta) {
@@ -169,5 +177,5 @@ export async function streamChat(opts: StreamOptions): Promise<StreamResult> {
       } catch { /* keep-alive or partial line — ignore */ }
     }
   }
-  return { text: full, toolCalls: calls.filter((c) => c.name).map((c, i) => ({ ...c, id: c.id || `call_${i}` })) };
+  return { text: full, toolCalls: calls.filter((c) => c.name).map((c, i) => ({ ...c, id: c.id || `call_${i}` })), usage };
 }

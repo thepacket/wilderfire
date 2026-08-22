@@ -3,7 +3,7 @@
 // parse, normalize, and apply live.
 import { App, el } from './common';
 import { normalizeFlame, type Flame } from '../core/flame';
-import { streamChat, fetchLocalModels, SUGGESTED_MODELS, type ChatMessage, type ChatPart } from '../ai/openrouter';
+import { streamChat, fetchLocalModels, fetchModels, SUGGESTED_MODELS, type ChatMessage, type ChatPart, type Usage } from '../ai/openrouter';
 import { TOOL_DEFS, MAX_TOOL_ROUNDS, runTool, type ToolEnv } from '../ai/tools';
 import { createModelPicker } from './modelPicker';
 import {
@@ -188,6 +188,34 @@ export function buildAIPanel(app: App, root: HTMLElement) {
   ctxBox.append(autoRow);
   const estimate = el('div', 'hint ai-estimate', '');
   ctxBox.append(estimate);
+  // session meter: what the requests of this page session actually cost (server-reported token counts; OpenRouter's
+  // own USD figure when it sends one, else the model's list price × tokens; local servers: tokens only)
+  const meter = el('div', 'hint ai-meter', '');
+  const meterReset = el('button', 'link', 'reset');
+  meterReset.title = 'Start the session counters again';
+  ctxBox.append(meter);
+  const session = { requests: 0, promptTokens: 0, completionTokens: 0, cost: 0, costKnown: true };
+  const fmtTok = (n: number) => (n >= 1000 ? `${(n / 1000).toFixed(1)}k` : String(n));
+  const renderMeter = () => {
+    if (!session.requests) { meter.textContent = 'This session: no requests yet.'; return; }
+    meter.textContent = `This session: ${session.requests} request${session.requests === 1 ? '' : 's'} · ${fmtTok(session.promptTokens)} in / ${fmtTok(session.completionTokens)} out` +
+      (isLocal() ? ' · local server' : session.costKnown ? ` · $${session.cost < 0.01 ? session.cost.toFixed(4) : session.cost.toFixed(3)}` : ' · cost unknown') + ' ';
+    meter.append(meterReset);
+  };
+  meterReset.onclick = () => { session.requests = 0; session.promptTokens = 0; session.completionTokens = 0; session.cost = 0; session.costKnown = true; renderMeter(); };
+  const recordUsage = async (u: Usage | undefined) => {
+    session.requests++;
+    if (!u) { session.costKnown = false; renderMeter(); return; }
+    session.promptTokens += u.promptTokens; session.completionTokens += u.completionTokens;
+    if (typeof u.cost === 'number') session.cost += u.cost;
+    else if (!isLocal()) {
+      const m = (await fetchModels().catch(() => [])).find((x) => x.id === currentModel());
+      if (m) session.cost += (u.promptTokens * m.promptPerM + u.completionTokens * m.completionPerM) / 1e6;
+      else session.costKnown = false;
+    }
+    renderMeter();
+  };
+  renderMeter();
   const updateEstimate = () => {
     const f = app.flame;
     const sys = systemPrompt(f, ctx).length;
@@ -232,10 +260,12 @@ export function buildAIPanel(app: App, root: HTMLElement) {
   stopBtn.style.display = 'none';
   let abortCtl: AbortController | null = null;
   stopBtn.onclick = () => abortCtl?.abort();
+  const critiqueBtn = el('button', '', 'Critique');
+  critiqueBtn.title = 'Ask the assistant to judge the current flame — composition, colour, detail, what holds it back — and propose a few concrete edits you can apply with one click. Nothing changes until you click.';
   const explainBtn = el('button', '', 'Explain');
   explainBtn.title = 'Ask the assistant to describe the current flame — what each transform and variation contributes, how the layers, final transform, palette and camera shape the look — in prose, without changing anything';
   const btnCol = el('div', 'ai-btn-col');
-  btnCol.append(explainBtn, clearBtn, stopBtn, sendBtn);
+  btnCol.append(critiqueBtn, explainBtn, clearBtn, stopBtn, sendBtn);
   inputRow.append(ta, btnCol);
 
   root.append(cfg, msgs, inputRow);
@@ -359,6 +389,7 @@ export function buildAIPanel(app: App, root: HTMLElement) {
             msgs.scrollTop = msgs.scrollHeight;
           },
         });
+        void recordUsage(r.usage);
         if (!r.toolCalls.length) { acc = r.text; break; }
         // the model asked for tools: run them, feed the results (and the render) back, go again
         if (r.text.trim()) bubble.textContent = displayText(r.text); else bubble.remove();
@@ -440,6 +471,51 @@ export function buildAIPanel(app: App, root: HTMLElement) {
       busy = false;
       sendBtn.disabled = false;
       explainBtn.disabled = false;
+    }
+  };
+  const CRITIQUE_PROMPT = 'Critique this flame as an experienced fractal-flame artist and a frank editor. In prose: what works (composition, focal point, balance of detail and empty space, colour harmony, depth), what holds it back, and what you would change first. ' +
+    'Then propose 3 to 5 concrete, independent improvements. Put ALL of them in ONE fenced block tagged `edits` at the very end, one edit command per line, each preceded by a comment line starting with # that says in a few words what it is for (e.g. "# calmer centre"). ' +
+    'Use only the edit command language you were given and the transform paths from the flame description. Do not apply anything — the user picks which to try.';
+  /** The critique's proposals become buttons: each applies its own edit lines (a # comment names it). */
+  const renderProposals = (bubble: HTMLElement, text: string) => {
+    const m = /```edits?\s*\n([\s\S]*?)```/.exec(text);
+    if (!m) return;
+    const groups: { label: string; lines: string[] }[] = [];
+    for (const raw of m[1].split('\n')) {
+      const line = raw.trim();
+      if (!line) continue;
+      if (line.startsWith('#')) { groups.push({ label: line.replace(/^#+\s*/, ''), lines: [] }); continue; }
+      if (!groups.length) groups.push({ label: '', lines: [] });
+      groups[groups.length - 1].lines.push(line);
+    }
+    const box = el('div', 'ai-proposals');
+    for (const g of groups) {
+      if (!g.lines.length) continue;
+      const b = el('button', '', `✦ ${g.label || g.lines[0]}`);
+      b.title = g.lines.join('\n');
+      b.onclick = () => {
+        const r = applyEdits(app.flame, g.lines.join('\n'), app.layerIdx);
+        if (r.applied) { app.setFlame(r.flame, 'ai'); b.classList.add('applied'); b.textContent = `✓ ${g.label || g.lines[0]}`; }
+        if (r.errors.length) addMsg('system', 'Not understood: ' + r.errors.slice(0, 3).join(' · '));
+      };
+      box.append(b);
+    }
+    if (box.childElementCount) { box.prepend(el('span', 'hint', 'Try one: ')); bubble.after(box); }
+  };
+  critiqueBtn.onclick = async () => {
+    if (busy) return;
+    if (!readyToSend()) return;
+    busy = true;
+    sendBtn.disabled = true; explainBtn.disabled = true; critiqueBtn.disabled = true;
+    const before = msgs.childElementCount;
+    try {
+      await runTurn(CRITIQUE_PROMPT, `✎ Critique "${app.flame.name || 'this flame'}"`, { reply: 'text', flame: ctx.flame === 'none' ? 'summary' : ctx.flame });
+      const last = history[history.length - 1];
+      const bubble = [...msgs.children].slice(before).reverse().find((e) => e.classList.contains('assistant')) as HTMLElement | undefined;
+      if (last?.role === 'assistant' && bubble) renderProposals(bubble, last.content);
+    } catch { /* already surfaced in the bubble */ } finally {
+      busy = false;
+      sendBtn.disabled = false; explainBtn.disabled = false; critiqueBtn.disabled = false;
     }
   };
   clearBtn.onclick = () => {
