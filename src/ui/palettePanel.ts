@@ -1,5 +1,6 @@
 // Right panel — Gradient tab: presets, stop editor, .ugr/.map import (gradient packs open a chooser) and export.
 import { App, el, slider, openModal } from './common';
+import { loadGradientLibrary, searchGradients } from '../core/gradientLibrary';
 import type { RGB } from '../core/flame';
 import { expandStops } from '../core/flame';
 import { PALETTE_PRESETS, paletteFromPreset, randomPalette, rotatePalette, drawPalette } from '../core/palette';
@@ -67,7 +68,7 @@ export function buildPalettePanel(app: App, root: HTMLElement) {
   const sec = el('div', 'section');
   sec.append(el('h3', '', 'Gradient'));
 
-  const strip = el('canvas', 'grad-strip') as HTMLCanvasElement;
+  const strip = el('canvas', 'glib-strip') as HTMLCanvasElement;
   strip.width = 512;
   strip.height = 26;
   sec.append(strip);
@@ -130,6 +131,38 @@ export function buildPalettePanel(app: App, root: HTMLElement) {
   app.applyPalette = useImported; // drops of photos on the canvas land here too
   // Gradient from an image (JWildfire's "grab palette from image": median cut, sorted by hue then brightness)
   const imgBtn = el('button', '', '🖼 From image…');
+  const libBtn = el('button', '', '📚 Library…');
+  libBtn.title = "The 899 gradients JWildfire ships (the classic Apophysis / UltraFractal packs: carr, floral, universe, sky, star) — search, click to use one";
+  libBtn.onclick = async () => {
+    const { body } = openModal('Gradient library');
+    const tools = el('div', 'btn-row');
+    const search = el('input') as HTMLInputElement;
+    search.type = 'search'; search.placeholder = 'search names…'; search.className = 'lib-search';
+    const packSel = el('select') as HTMLSelectElement;
+    const status = el('div', 'hint', 'Loading the library…');
+    tools.append(search, packSel);
+    const list = el('div', 'glib');
+    body.append(tools, status, list);
+    let lib: Awaited<ReturnType<typeof loadGradientLibrary>>;
+    try { lib = await loadGradientLibrary(); } catch (e) { status.textContent = '⚠ ' + (e as Error).message; return; }
+    packSel.replaceChildren(...[['', 'all packs'], ...lib.packs.map((p) => [p, p])].map(([v, t]) => { const o = el('option', '', t) as HTMLOptionElement; o.value = v; return o; }));
+    const render = () => {
+      const hits = searchGradients(lib, search.value, packSel.value || undefined);
+      status.textContent = `${hits.length} of ${lib.entries.length} gradients — click one to use it on the active layer`;
+      list.replaceChildren(...hits.slice(0, 400).map((e) => {
+        const row = el('div', 'glib-row');
+        const strip = el('div', 'glib-strip'); strip.style.backgroundImage = lib.css(e.id);
+        row.append(strip, el('span', 'glib-name', e.name), el('span', 'glib-pack', e.pack));
+        row.title = `${e.name} (${e.pack})`;
+        row.onclick = () => { app.applyPalette(lib.palette(e.id)); list.querySelectorAll('.glib-row.sel').forEach((x) => x.classList.remove('sel')); row.classList.add('sel'); };
+        return row;
+      }));
+      if (hits.length > 400) list.append(el('div', 'hint', `… ${hits.length - 400} more — narrow the search`));
+    };
+    search.oninput = render; packSel.onchange = render;
+    render();
+    search.focus();
+  };
   imgBtn.title = 'Make a gradient from a photo: the 256 most representative colours (median cut, like JWildfire), sorted by hue. Dropping a picture on the canvas does the same.';
   const imgFile = el('input') as HTMLInputElement;
   imgFile.type = 'file'; imgFile.accept = 'image/*'; imgFile.style.display = 'none';
@@ -178,7 +211,7 @@ export function buildPalettePanel(app: App, root: HTMLElement) {
   const invBtn = el('button', '', '⇆ Invert');
   invBtn.title = 'Reverse the gradient';
   invBtn.onclick = () => useImported([...base].reverse());
-  btnRow.append(randBtn, invBtn, impBtn, impFile, expBtn, imgBtn, imgFile);
+  btnRow.append(randBtn, invBtn, impBtn, impFile, expBtn, imgBtn, libBtn, imgFile);
   sec.append(btnRow);
   sec.append(el('div', 'hint', 'Edits the ACTIVE layer’s gradient. Each transform picks its hue via its Color slider (position in this gradient).'));
 

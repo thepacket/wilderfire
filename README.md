@@ -231,7 +231,10 @@ in the stack.
   chaos game, so the picture is presented no more often than every 2× its
   measured cost while the compute runs every frame at full budget. Engine →
   ↺ Reset puts every engine setting back to its default
-- Gradient presets, IQ-cosine **random palettes**, hue rotation, a
+- A **gradient library** — the 899 gradients JWildfire ships (the classic
+  Apophysis / UltraFractal packs: carr, floral, universe, sky, star), bundled
+  as one 0.7 MB file fetched when the library first opens; search by name,
+  filter by pack, click to use. Gradient presets, IQ-cosine **random palettes**, hue rotation, a
   **draggable stop editor**, invert, and **.ugr / .map gradient import and
   export** (a .ugr gradient pack opens a chooser)
 - **Tests menu: the 33 sample flames bundled with the

@@ -476,3 +476,11 @@ a { color: var(--accent2); }
 .ai-msg.md blockquote { margin: 4px 0; padding: 2px 10px; border-left: 3px solid var(--border); color: var(--fg-dim); }
 .ai-msg.md a { color: var(--accent); }
 .ai-msg.md hr { border: none; border-top: 1px solid var(--border); margin: 8px 0; }
+
+/* Gradient library */
+.glib { display: flex; flex-direction: column; gap: 3px; max-height: 60vh; overflow-y: auto; margin-top: 8px; }
+.glib-row { display: grid; grid-template-columns: 1fr 160px 70px; gap: 10px; align-items: center; padding: 3px 6px; border-radius: 6px; cursor: pointer; }
+.glib-row:hover { background: var(--bg3); } .glib-row.sel { outline: 2px solid var(--accent); }
+.glib-strip { height: 16px; border-radius: 4px; border: 1px solid var(--border); }
+.glib-name { font-size: 12px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.glib-pack { font-size: 11px; color: var(--fg-dim); }
