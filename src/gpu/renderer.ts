@@ -132,7 +132,13 @@ export class FlameRenderer {
   private budgetScale = 1;
   private gpuMs = 0;
   private dtMs = 0; // smoothed rAF interval — the UI-stall symptom the budget reacts to
-  private gpuProbeInFlight = false;
+  /** Compute submissions the GPU has not finished yet. The queue never backpressures the CPU: without a
+   *  gate a heavy kernel lets the loop run minutes ahead of the GPU — the sample counter reaches the cap,
+   *  the status says done, and the GPU grinds on through a backlog nothing can cancel. */
+  private inFlight = 0;
+  private static readonly MAX_IN_FLIGHT = 3;
+  private gatedFrames = 0; // consecutive frames skipped because the GPU was that far behind
+  private framesSinceGate = 1e9;
   passesPerFrame = 2;
   targetQuality = 1000; // spp cap (the live view stops accumulating here; exports pick their own quality)
   /** Live-preview cap on the DE estimator radius (px); exports use the flame's full radius. */
@@ -1235,7 +1241,7 @@ export class FlameRenderer {
 
     const dt = this.lastT ? (t - this.lastT) / 1000 : 0;
     this.lastT = t;
-    if (dt > 0.5) { this.gpuMs = 0; this.dtMs = 0; } // we were away (hidden tab, stall): the last probe says nothing about the GPU load
+    if (dt > 0.5 && !this.inFlight) { this.gpuMs = 0; this.dtMs = 0; } // we were away (hidden tab): the last probe says nothing about the GPU load
     else if (dt > 0) this.dtMs = this.dtMs ? this.dtMs * 0.8 + dt * 1000 * 0.2 : dt * 1000;
 
     // Idle: converged (or paused) and nothing to redraw → do no GPU work at all.
@@ -1245,15 +1251,21 @@ export class FlameRenderer {
       return;
     }
 
-    // Adaptive budget: shrink the iterations per preview pass while the GPU time per frame overshoots the
-    // budget, grow them back (up to the configured count) when there is headroom. Measured with
-    // onSubmittedWorkDone on the frame's own submission (queue backlog included — exactly the stall we avoid).
-    // Throttle only when both say so — the GPU probe overshoots the budget AND the frame interval has
-    // stretched past ~60 fps (a healthy vsync-paced loop never throttles, whatever the probe reads);
-    // recover as soon as either shows headroom.
-    if (this.adaptiveBudget && accumulate && this.gpuMs > 0) {
-      if (this.gpuMs > this.frameBudgetMs * 1.3 && this.dtMs > 20) this.budgetScale = Math.max(1 / 16, this.budgetScale * 0.7);
-      else if ((this.gpuMs < this.frameBudgetMs * 0.6 || this.dtMs < 17.5) && this.budgetScale < 1) this.budgetScale = Math.min(1, this.budgetScale * 1.2);
+    // Dispatch gate: never queue more than MAX_IN_FLIGHT compute submissions. Samples are counted when
+    // dispatched, so the gate is what keeps "done" honest (the GPU is at most a few frames behind it)
+    // and keeps the GPU load bounded once the cap is reached.
+    const gated = accumulate && this.inFlight >= FlameRenderer.MAX_IN_FLIGHT;
+    const dispatch = accumulate && !gated;
+    if (gated) this.gatedFrames++; else if (accumulate) { if (this.gatedFrames) this.framesSinceGate = 0; this.gatedFrames = 0; this.framesSinceGate++; }
+
+    // Adaptive budget: shrink the iterations per preview pass while the GPU cannot keep up, grow them
+    // back (up to the configured count) when there is headroom. Overload shows two ways: the gate above
+    // skipped a frame (the GPU is MAX_IN_FLIGHT frames behind), or the per-submission probe overshoots the
+    // budget while the frame interval has stretched past ~60 fps. Growth waits until the probe shows
+    // headroom and the gate has been quiet for a while.
+    if (this.adaptiveBudget && accumulate) {
+      if (gated || (this.gpuMs > this.frameBudgetMs * 1.3 && this.dtMs > 20)) this.budgetScale = Math.max(1 / 16, this.budgetScale * 0.7);
+      else if (this.framesSinceGate > 30 && this.gpuMs > 0 && (this.gpuMs < this.frameBudgetMs * 0.6 || this.dtMs < 17.5) && this.budgetScale < 1) this.budgetScale = Math.min(1, this.budgetScale * 1.2);
     } else if (!this.adaptiveBudget) this.budgetScale = 1;
     const iters = Math.max(4, Math.round(this.itersPerPass * this.budgetScale));
 
@@ -1266,17 +1278,17 @@ export class FlameRenderer {
     // during a fast drag.
     const perPass = this.nPoints * iters;
     let passes = this.passesPerFrame;
-    if (accumulate && this.minDisplaySpp > 0) {
+    if (dispatch && this.minDisplaySpp > 0) {
       const need = Math.ceil((this.minDisplaySpp * w * h - this.samples) / perPass);
       if (need > passes) passes = Math.min(need, this.passesPerFrame * 4);
     }
     this.shadowMode = this.samples >= this.nPoints * FlameRenderer.SHADOW_BOUNDS_ITERS ? 2 : 1; // bounds from the points plotted so far
-    if (accumulate) this.samples += this.countIters(perPass * passes);
+    if (dispatch) this.samples += this.countIters(perPass * passes);
     this.writeUniforms(this.samples / Math.max(w * h, 1), undefined, false, iters); // tonemap spp is per output pixel
 
-    if (accumulate) {
-      // the compute passes go in their own submission so the budget probe measures them (plus any
-      // backlog) without the presentation that follows
+    if (dispatch) {
+      // the compute passes go in their own submission so the probe measures them (plus the bounded
+      // backlog ahead of them) without the presentation that follows
       const cenc = this.device.createCommandEncoder();
       const pass = cenc.beginComputePass();
       pass.setPipeline(this.computePipeline);
@@ -1286,15 +1298,14 @@ export class FlameRenderer {
       }
       pass.end();
       this.device.queue.submit([cenc.finish()]);
-      if (!this.gpuProbeInFlight) {
-        this.gpuProbeInFlight = true;
-        const t0 = performance.now();
-        this.device.queue.onSubmittedWorkDone().then(() => {
-          const ms = Math.min(performance.now() - t0, 200); // capped: one stall must not poison the average for long
-          this.gpuMs = this.gpuMs ? this.gpuMs * 0.8 + ms * 0.2 : ms;
-          this.gpuProbeInFlight = false;
-        }, () => { this.gpuProbeInFlight = false; });
-      }
+      this.inFlight++;
+      const t0 = performance.now();
+      const done = () => {
+        this.inFlight--;
+        const ms = Math.min(performance.now() - t0, 1000); // capped: one stall must not poison the average for long
+        this.gpuMs = this.gpuMs ? this.gpuMs * 0.8 + ms * 0.2 : ms;
+      };
+      this.device.queue.onSubmittedWorkDone().then(done, done);
     }
     const enc = this.device.createCommandEncoder();
     // Present gate: after a reset (every frame while a triangle is dragged) the
@@ -1303,7 +1314,7 @@ export class FlameRenderer {
     // the new one has reached minDisplaySpp — a WebGPU canvas keeps its last
     // frame as long as we don't fetch a new current texture.
     const sppAfter = this.samples / Math.max(w * h, 1);
-    const present = !accumulate || sppAfter >= this.minDisplaySpp || !this.hasPresented;
+    const present = !accumulate || (!gated && sppAfter >= this.minDisplaySpp) || !this.hasPresented;
     if (present) {
       const view = this.context.getCurrentTexture().createView();
       this.presentTo(enc, view, accumulate);
@@ -1312,7 +1323,7 @@ export class FlameRenderer {
     }
     if (present) this.device.queue.submit([enc.finish()]);
 
-    if (accumulate && dt > 0 && dt < 0.5) {
+    if (dispatch && dt > 0 && dt < 0.5) {
       const sps = (perPass * passes) / dt;
       this.emaSps = this.emaSps ? this.emaSps * 0.95 + sps * 0.05 : sps;
     }

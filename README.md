@@ -202,7 +202,10 @@ in the stack.
   Custom engine modes; and an **adaptive preview budget** that shrinks the
   work per frame on very heavy flames (many layers × variations) so the
   editor stays responsive — measured from the GPU's own completion time,
-  scaled back up when there is headroom, never applied to exports
+  scaled back up when there is headroom, never applied to exports. The
+  live loop never queues more than three frames of GPU work: samples are
+  counted when dispatched, so the quality cap stops the GPU when it says
+  it does instead of leaving a backlog grinding on after "done"
 - Gradient presets, IQ-cosine **random palettes**, hue rotation, a
   **draggable stop editor**, invert, and **.ugr / .map gradient import and
   export** (a .ugr gradient pack opens a chooser)
