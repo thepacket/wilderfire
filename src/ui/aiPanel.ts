@@ -8,7 +8,7 @@ import { streamChat, fetchLocalModels, fetchModels, SUGGESTED_MODELS, type ChatM
 import { TOOL_DEFS, MAX_TOOL_ROUNDS, runTool, type ToolEnv } from '../ai/tools';
 import { createModelPicker } from './modelPicker';
 import {
-  DEFAULT_CONTEXT, EDITS_SPEC, applyEdits, estimateTokens, flameJSONFor, flameSummary, variationCatalogue,
+  DEFAULT_CONTEXT, EDITS_SPEC, applyEdits, editsFromUserText, estimateTokens, flameJSONFor, flameSummary, variationCatalogue,
   type ContextOpts, type FlameMode, type PaletteMode, type VarsMode, type ReplyMode,
 } from '../ai/context';
 
@@ -428,6 +428,19 @@ export function buildAIPanel(app: App, root: HTMLElement) {
   async function send() {
     const q = ta.value.trim();
     if (!q || busy) return;
+    // edit commands pasted as the message (e.g. copied from an earlier answer or another session): apply them here,
+    // no model involved
+    const pasted = editsFromUserText(q);
+    if (pasted) {
+      ta.value = '';
+      addMsg('user', q);
+      const r = applyEdits(app.flame, pasted, app.layerIdx);
+      if (r.applied) app.setFlame(r.flame, 'ai');
+      const m = addMsg('system', `${r.applied ? `Applied ${r.applied} edit${r.applied === 1 ? '' : 's'} directly (no request sent).` : 'No edit was applied.'}` +
+        (r.errors.length ? `\nNot understood:\n${r.errors.map((e) => '• ' + e).join('\n')}` : ''));
+      if (r.errors.length) m.style.color = 'var(--danger)';
+      return;
+    }
     if (!readyToSend()) return;
     busy = true;
     sendBtn.disabled = true;

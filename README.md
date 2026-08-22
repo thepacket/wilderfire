@@ -266,7 +266,12 @@ in the stack.
   as 8 stops / full, variation catalogue in-use / all / none, screenshot,
   conversation memory) and what comes back (**edit commands** — a few lines
   like `set T2.weight 0.8`, `addvar T1 julian 0.7 power=3` — or complete
-  flame JSON, or text only), with a live per-turn token estimate; the
+  flame JSON, or text only), with a live per-turn token estimate. Edit
+  commands pasted *into* the chat — copied from an earlier answer, another
+  session, a friend — apply directly without a request, and the parser
+  accepts the ways models tend to write them (`layers.0.xforms.3.affine
+  [a,b,c,d,e,f]`, `add_xform weight=0.1 variations=blur:1`, …), reporting
+  any line it cannot follow; the
   defaults are ~1.6k tokens/turn instead of ~19k, and a **session meter**
   under it shows what the requests actually cost so far — server-reported
   token counts and OpenRouter's USD figure (or list price × tokens). A

@@ -120,9 +120,10 @@ export const estimateTokens = (chars: number, images = 0) => Math.round(chars / 
 
 export const EDITS_SPEC = `TO APPLY CHANGES reply with ONE fenced block tagged \`edits\`, one command per line (numbers only, no prose inside):
   set <path> <number>            e.g. set brightness 4 / set T2.weight 0.8 / set T1.variations.0.params.power 3 / set F.affine.2 0.1 / set layers.0.xforms.1.color 0.4
+  set <T#|F>.affine [a,b,c,d,e,f]  (or .post) the whole matrix at once
   addvar <T#|F> <name> [weight] [param=value ...]   e.g. addvar T2 julian 0.7 power=3 dist=1
   delvar <T#|F> <name>
-  addxform [weight]              (new transform, becomes the next T#)
+  addxform [weight] [color=0.5 colorSpeed=0.3 opacity=1 affine=[a,b,c,d,e,f] variations=name:weight,name:weight]   (new transform, becomes the next T#)
   delxform <T#>
   palette [[t,r,g,b], ...]       3-8 stops, t and rgb in 0..1 (whole gradient of the active layer)
   name <text>
@@ -153,9 +154,21 @@ export function applyEdits(base: Flame, block: string, activeLayer: number): Edi
     if (!line || line.startsWith('#') || line.startsWith('//')) continue;
     const [cmd, ...rest] = line.split(/\s+/);
     try {
-      switch (cmd.toLowerCase()) {
+      // the models' spelling variants: add_xform, del-var, SET …
+      switch (cmd.toLowerCase().replace(/[-_]/g, '')) {
         case 'set': {
           const path = normPath(rest[0] ?? '');
+          const valueText = line.slice(line.indexOf(rest[0] ?? '') + (rest[0] ?? '').length).trim();
+          if (valueText.startsWith('[')) {
+            // a whole affine / post matrix: set T4.affine [a,b,c,d,e,f]
+            const arr = JSON.parse(valueText.replace(/,\s*]/, ']'));
+            if (!Array.isArray(arr) || !arr.every((v) => typeof v === 'number' && isFinite(v))) throw new Error('the array needs numbers');
+            let n = 0;
+            arr.forEach((v: number, i: number) => { if (setParam(f, `${path}.${i}`, v)) n++; });
+            if (!n) throw new Error(`unknown array path ${path}`);
+            applied++;
+            break;
+          }
           const val = parseFloat(rest[1] ?? '');
           if (!isFinite(val)) throw new Error('needs a number');
           if (!setParam(f, path, val)) throw new Error(`unknown path ${path}`);
@@ -194,8 +207,32 @@ export function applyEdits(base: Flame, block: string, activeLayer: number): Edi
         }
         case 'addxform': {
           const x = defaultXForm();
-          const w = parseFloat(rest[0] ?? '');
-          if (isFinite(w)) x.weight = w;
+          // `addxform 0.5` or key=value pairs (weight, color, colorSpeed, opacity, affine=[…], post=[…], variations=name:w,name:w);
+          // a leading layer token such as layers.0 is accepted and ignored (edits always target the active layer)
+          const argText = rest.filter((t) => !/^layers\.\d+$/.test(t)).join(' ');
+          for (const m of argText.matchAll(/([A-Za-z_]\w*)=(\[[^\]]*\]|[^\s]+)|(-?\d*\.?\d+(?:e[-+]?\d+)?)(?=\s|$)/gi)) {
+            if (m[3] !== undefined) { x.weight = parseFloat(m[3]); continue; }
+            const k = m[1], v = m[2];
+            if (k === 'affine' || k === 'post') {
+              const arr = JSON.parse(v);
+              if (!Array.isArray(arr) || arr.length !== 6 || !arr.every((n) => typeof n === 'number')) throw new Error(`${k} needs 6 numbers`);
+              x[k] = arr as typeof x.affine;
+            } else if (k === 'variations') {
+              x.variations = [];
+              for (const spec of v.split(',')) {
+                const vm = /^([A-Za-z_]\w*)(?::(-?[\d.eE+-]+))?(?:\{[^}]*\})?$/.exec(spec.trim());
+                if (!vm || !VARIATIONS[vm[1]]) throw new Error(`unknown variation ${spec}`);
+                const params: Record<string, number> = {};
+                for (const pd of VARIATIONS[vm[1]].params ?? []) params[pd.name] = pd.def;
+                x.variations.push({ name: vm[1], weight: vm[2] !== undefined ? parseFloat(vm[2]) : 1, params });
+              }
+              if (!x.variations.length) x.variations.push({ name: 'linear', weight: 1, params: {} });
+            } else if (k === 'weight' || k === 'color' || k === 'colorSpeed' || k === 'opacity') {
+              const n = parseFloat(v);
+              if (!isFinite(n)) throw new Error(`${k} needs a number`);
+              x[k] = n;
+            } else throw new Error(`unknown field ${k}`);
+          }
           ly.xforms.push(x);
           applied++;
           break;
@@ -232,3 +269,19 @@ export function applyEdits(base: Flame, block: string, activeLayer: number): Edi
 
 /** True if a numeric path exists on the flame (used to validate before applying). */
 export const hasParam = (f: Flame, path: string) => getParam(f, path) !== undefined;
+
+/** Does a user message consist of edit commands (a fenced `edits` block, or only command lines and # comments)?
+ *  Returns the command text to apply, or null. Lets a block copied from an earlier answer be pasted and applied
+ *  directly, without a round trip to the model. */
+export function editsFromUserText(text: string): string | null {
+  const fenced = /```edits?\s*\n([\s\S]*?)```/i.exec(text);
+  if (fenced) return fenced[1];
+  // a bare ``` fence (or any other tag) around command lines counts too; fence lines are ignored
+  const lines = text.split('\n').map((l) => l.trim()).filter((l) => l && !/^```/.test(l));
+  if (!lines.length) return null;
+  const cmd = /^(set|add_?var|del_?var|add_?xform|del_?xform|palette|name)\s/i;
+  const commands = lines.filter((l) => cmd.test(l));
+  if (!commands.length) return null;
+  if (lines.every((l) => cmd.test(l) || l.startsWith('#') || l.startsWith('//'))) return lines.join('\n');
+  return null;
+}
