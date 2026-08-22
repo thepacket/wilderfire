@@ -240,3 +240,15 @@ export const XFORM_COLORS = [
   '#2ee6d6', '#ff8f40', '#7dd35f', '#ff6ac1', '#8892ff',
   '#e6d735', '#54d7ff', '#ff7070', '#70ffb0', '#d0a0ff', '#ffd070',
 ];
+
+/** A transient message over the canvas (saves, exports, errors). Errors stay longer; newer ones stack below. */
+export function toast(message: string, kind: 'info' | 'error' = 'info', ms = kind === 'error' ? 9000 : 4500): void {
+  let box = document.querySelector('.toasts') as HTMLElement | null;
+  if (!box) { box = el('div', 'toasts'); document.getElementById('app')?.append(box); }
+  const t = el('div', 'toast' + (kind === 'error' ? ' error' : ''), message);
+  t.title = 'click to dismiss';
+  const remove = () => { t.classList.add('out'); setTimeout(() => t.remove(), 250); };
+  t.onclick = remove;
+  box.append(t);
+  setTimeout(remove, ms);
+}

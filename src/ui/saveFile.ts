@@ -1,3 +1,4 @@
+import { toast } from './common';
 // Saving files: a real "Save as…" dialog where the browser has the File System
 // Access API (Chrome/Edge), falling back to a plain download elsewhere (Safari,
 // Firefox). Long jobs (hi-res tiles, video encode) should call pickSave() inside
@@ -15,10 +16,18 @@ export interface SaveOpts {
 export interface SaveTarget {
   /** Where the bytes will go — 'file' = user-picked path, 'download' = browser download folder. */
   kind: 'file' | 'download';
+  /** the file name chosen (the dialog's, or the suggested one for a download) */
+  name: string;
   write(blob: Blob): Promise<void>;
 }
 
-type FSHandle = { createWritable(): Promise<{ write(b: Blob): Promise<void>; close(): Promise<void> }> };
+/** The message to show once `blob` went to `target`: "Saved x.png (1.2 MB)" or "Downloaded x.png (…)". */
+export const savedMessage = (target: SaveTarget, blob: Blob): string => {
+  const size = blob.size >= 1e6 ? `${(blob.size / 1e6).toFixed(1)} MB` : `${Math.max(1, Math.round(blob.size / 1e3))} KB`;
+  return `${target.kind === 'file' ? 'Saved' : 'Downloaded'} ${target.name} (${size})`;
+};
+
+type FSHandle = { name?: string; createWritable(): Promise<{ write(b: Blob): Promise<void>; close(): Promise<void> }> };
 type Picker = (o: { suggestedName: string; types: { description: string; accept: Record<string, string[]> }[] }) => Promise<FSHandle>;
 
 export const hasSaveDialog = () => typeof (window as any).showSaveFilePicker === 'function' && window.isSecureContext;
@@ -26,6 +35,7 @@ export const hasSaveDialog = () => typeof (window as any).showSaveFilePicker ===
 function downloadTarget(name: string): SaveTarget {
   return {
     kind: 'download',
+    name,
     async write(blob) {
       const a = document.createElement('a');
       a.href = URL.createObjectURL(blob);
@@ -47,6 +57,7 @@ export async function pickSave(opts: SaveOpts): Promise<SaveTarget | null> {
     });
     return {
       kind: 'file',
+      name: handle.name || opts.suggestedName,
       async write(blob) {
         const w = await handle.createWritable();
         await w.write(blob);
@@ -64,7 +75,9 @@ export async function pickSave(opts: SaveOpts): Promise<SaveTarget | null> {
 export async function saveBlob(blob: Blob, opts: SaveOpts): Promise<boolean> {
   const t = await pickSave(opts);
   if (!t) return false;
-  await t.write(blob);
+  try { await t.write(blob); }
+  catch (e) { toast(`⚠ Could not save ${t.name}: ${(e as Error).message}`, 'error'); throw e; }
+  toast(savedMessage(t, blob));
   return true;
 }
 

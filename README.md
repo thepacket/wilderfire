@@ -242,7 +242,9 @@ in the stack.
   written verbatim the way JWildfire writes and reads them, so those files
   are not strict XML, and the importer's lenient pass takes them back).
   Exports open a real **Save as… dialog** where the browser
-  supports it (Chrome/Edge), falling back to a download elsewhere
+  supports it (Chrome/Edge), falling back to a download elsewhere, and every
+  save ends with a message over the canvas — file name and size, or the
+  reason it failed
 - **Installable & offline** — a web-app manifest and a build-generated service
   worker precache the app (incl. the variation registry and the sample flames),
   so it opens without a network after the first visit; the page itself is

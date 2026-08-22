@@ -1,9 +1,9 @@
 // Right panel — Render tab: camera, tonemap, quality, export.
-import { App, el, slider } from './common';
+import { App, el, slider, toast } from './common';
 import { flameToJSON } from '../core/flame';
 import { flameToXML } from '../core/flameXML';
 import { importFlameFiles } from './flameImport';
-import { pickSave, saveBlob, saveText } from './saveFile';
+import { pickSave, saveBlob, saveText, savedMessage } from './saveFile';
 import { renderHiRes, resolveSize, SIZE_OPTIONS, QUALITY_OPTIONS } from './hiresExport';
 import { openBatchExport } from './batchExport';
 import { buildSolidSection } from './solidPanel';
@@ -352,10 +352,17 @@ export function buildRenderPanel(app: App, root: HTMLElement) {
     // Ask for the destination first: the dialog needs the click's user gesture.
     const target = await pickSave({ suggestedName: `${baseName()}.png`, description: 'PNG image', mime: 'image/png', ext: '.png' });
     if (!target) return;
-    const blob = await app.renderer.exportPNG();
-    if (!blob) return;
-    const { pngWithFlame } = await import('../core/pngMeta');
-    await target.write(await pngWithFlame(blob, app.flame, app.getCurves()));
+    pngBtn.disabled = true;
+    try {
+      const blob = await app.renderer.exportPNG();
+      if (!blob) throw new Error('the render could not be read back');
+      const { pngWithFlame } = await import('../core/pngMeta');
+      const png = await pngWithFlame(blob, app.flame, app.getCurves());
+      await target.write(png);
+      toast(savedMessage(target, png));
+    } catch (e) {
+      toast(`⚠ PNG not saved: ${(e as Error).message}`, 'error');
+    } finally { pngBtn.disabled = false; }
   };
   const jsonBtn = el('button', '', '⬇ JSON');
   jsonBtn.onclick = () =>
@@ -430,8 +437,10 @@ export function buildRenderPanel(app: App, root: HTMLElement) {
       hiStatus.textContent = 'Saving PNG…';
       await target.write(blob);
       hiStatus.textContent = `Saved ${fullW}×${fullH} PNG (${(blob.size / 1e6).toFixed(1)} MB).`;
+      toast(`${savedMessage(target, blob)} — ${fullW}×${fullH}`);
     } catch (e) {
       hiStatus.textContent = '⚠ ' + (e as Error).message;
+      toast(`⚠ Hi-res PNG not saved: ${(e as Error).message}`, 'error');
     } finally {
       r.exporting = false;
       r.setFlame(app.flame);
