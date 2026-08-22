@@ -184,6 +184,11 @@ if (cr0 && esc) {
   }
 }`,
   },
+  checkerboard_wf: {
+    note: 'CPU puts the checker "sides" on checker boundaries (random(_max_checks + 1) is an int); the GPU snippet multiplied by a continuous random, smearing the sides across the board (seen on a solid collection flame, _sh8: with post_curl3D amplifying the z offset, corr 0.87).',
+    patch: [['x = RANDFLOAT()*(_max_checks + 1) *  __checkerboard_wf_checker_size ;', 'x = (int)(RANDFLOAT()*(_max_checks + 1)) *  __checkerboard_wf_checker_size ;'],
+      ['y = RANDFLOAT()*(_max_checks + 1) *  __checkerboard_wf_checker_size ;', 'y = (int)(RANDFLOAT()*(_max_checks + 1)) *  __checkerboard_wf_checker_size ;']],
+  },
   post_point_symmetry_wf: {
     note: 'CPU picks the symmetry index uniformly (random(order)); the GPU rounded rnd·(order−1), halving the weight of the first and last copies.',
     patch: [['int idx = lroundf(RANDFLOAT() * (order-1));', 'int idx = (int)(RANDFLOAT() * (float)order); if (idx >= order) idx = order - 1;']],

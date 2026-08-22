@@ -15794,11 +15794,11 @@ if (((min(max(${p[8]}, 0.0), 1.0) == 0) || (abs(${p[4]}) < 0.000001))) {
   if (((_max_checks > 0) && (rnd(rs) < _side_prob))) {
     (*cp) = min(max(${p[7]}, 0.0), 1.0);
     if ((rnd(rs) < 0.5)) {
-      x = ((rnd(rs) * f32((_max_checks + 1))) * ${p[3]});
+      x = (f32(i32((rnd(rs) * f32((_max_checks + 1))))) * ${p[3]});
       y = rnd(rs);
     } else {
       x = rnd(rs);
-      y = ((rnd(rs) * f32((_max_checks + 1))) * ${p[3]});
+      y = (f32(i32((rnd(rs) * f32((_max_checks + 1))))) * ${p[3]});
     }
     z = (${p[4]} * rnd(rs));
   } else {

@@ -411,7 +411,7 @@ Verified: `_sh2`, `_sh3` (FAST) and the authored `Solid_3` (SMOOTH, two casting 
 0.99–1.00 / blkMAE ≤ 1.5 / corr 1.00, `_sh7` (SMOOTH) 1.00. The remaining collection flames with shadows
 differ exactly as much as they already did with shadows OFF (`_sh4` 0.93 both ways, `_sh8` 0.97 → 0.91:
 its point cloud sits ~0.5 light-units off JWildfire's — a `checkerboard_wf`/`truchet` geometry item, not a
-shadow one; `_sh5` uses the 9600² map). A JWildfire-side probe (`scratchpad/diff/ShProbe.java`: reflection
+shadow one — resolved 2026-08-22: JWildfire's own GPU snippet for `checkerboard_wf` multiplies the checker *sides* by a continuous random where the CPU uses `random(_max_checks + 1)`, an int, so the sides sit on checker boundaries; `overrides.ts` patches the cast back and `_sh8` is at ratio 0.96 / corr 0.99; `_sh5` uses the 9600² map). A JWildfire-side probe (`scratchpad/diff/ShProbe.java`: reflection
 into `ShadowCalculator` — map fill, bounds, per-cell `lz − map` percentiles) confirmed our maps have the
 same sample density and depth distribution as JWildfire's.
 
