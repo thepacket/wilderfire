@@ -213,7 +213,10 @@ even in JWildfire) became a per-cell hash with the same distribution, the cube f
 exact and, as in JWildfire, the amount is ignored; `snowflake_wf` **exact** (1.00 / blkMAE 0.0 / corr 1.00 with a
 `linear` partner — Reiter's hexagonal automaton ported cell for cell: same Marsaglia background noise, freeze /
 diffusion passes, stretched canvas, row→x column→y mapping and per-cell jitter draws; the point list equals
-`SnowflakeWFFunc._points` to float precision and a unit test pins five of the 1622 points); `maurer_lines` 0.97 / 0.5 /
+`SnowflakeWFFunc._points` to float precision and a unit test pins five of the 1622 points; the corpus fixture itself
+stays at corr 0.53 because its other xform carries `curliecue2`, whose transform ignores the input and advances one
+global trajectory by a step per call — JWildfire's few long-lived threads trace the whole curlicue, our short-lived
+walkers only its first steps: the known short-walker limit, recorded in verified.json); `maurer_lines` 0.97 / 0.5 /
 1.00 (rhodonea) — ported as an ordinary kernel variation for the LINES render mode with all 19 parametric curves,
 show_points / show_curve, line thickness and diff_mode; the spline / circle / ellipse / sine / Bézier render modes
 (drawn as the line), cosets, meta modes, filters and the direct-colour measures are not ported — the corpus never sets
