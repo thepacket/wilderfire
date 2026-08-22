@@ -169,8 +169,14 @@ in the stack.
   `library_search` / `library_load` / `library_save`, `randomize`, `mutate`, `undo`,
   `redo`, `export_png` (asks first) — it sees each result, and the render when
   screenshots are on, and iterates up to 8 rounds before answering; a Stop button
-  aborts. Works with OpenRouter and any local OpenAI-compatible server that
-  supports tools; switch tools off for models that do not
+  aborts. A status line under the context controls says whether the next
+  request carries tools and, if not, why (Tools box off, "Edits as" set to
+  text only, or a model the OpenRouter catalogue marks as unable to call
+  tools — models that can are tagged 🛠 in the picker); an endpoint that
+  refuses tools gets the request again without them, and edit commands a
+  model writes into its prose instead of calling `apply_edits` are applied
+  anyway, with a note. Works with OpenRouter and any local OpenAI-compatible
+  server that supports tools
 - **Provenance** — library entries remember where a flame came from (the dropped
   file, `zip › entry`, or folder path) and its JWildfire `meta_info_author`; both
   show on the card and are searchable; author/creation time/uuid round-trip

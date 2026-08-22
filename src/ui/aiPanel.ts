@@ -30,7 +30,8 @@ function systemPrompt(flame: Flame, o: ContextOpts): string {
     : useTools
       ? `You ACT through function tools: get_flame, apply_edits, set_camera, screenshot, variation_lookup, library_search, library_load, library_save, randomize, mutate, undo, redo, export_png. ` +
         `Make changes with apply_edits; its "edits" argument is the command language below. After a change you get the result${o.screenshot ? ' and a screenshot of the new render — look at it, judge it against the request, and refine' : ''}; ` +
-        `use at most ${MAX_TOOL_ROUNDS} tool rounds, then finish with a short summary of what you did. Never paste JSON or edit commands into your prose — only into tool arguments.\n` +
+        `use at most ${MAX_TOOL_ROUNDS} tool rounds, then finish with a short summary of what you did. Never paste JSON or edit commands into your prose — only into tool arguments. ` +
+        `Whenever the user asks for a change of any kind (add, remove, adjust, try, make it…), CALL apply_edits (or the fitting tool) — do not describe the change instead, and never say you cannot control the app: you can.\n` +
         EDITS_SPEC.split('\n').slice(1).join('\n')
       : o.reply === 'edits'
       ? EDITS_SPEC
@@ -126,7 +127,7 @@ export function buildAIPanel(app: App, root: HTMLElement) {
   // Searchable picker fed by OpenRouter's live catalogue; any custom ID is accepted too.
   const modelPicker = createModelPicker(
     localStorage.getItem(LS_MODEL) || SUGGESTED_MODELS[0],
-    (id) => localStorage.setItem(LS_MODEL, id),
+    (id) => { localStorage.setItem(LS_MODEL, id); void renderToolsLine(); },
   );
   modelPicker.root.style.flex = '1';
   modelPicker.root.style.maxWidth = 'none';
@@ -134,7 +135,7 @@ export function buildAIPanel(app: App, root: HTMLElement) {
 
   // ---- Context: what goes in, what comes back (each choice costs tokens) ----
   const ctx = loadCtx();
-  const saveCtx = () => { localStorage.setItem(LS_CTX, JSON.stringify(ctx)); updateEstimate(); };
+  const saveCtx = () => { localStorage.setItem(LS_CTX, JSON.stringify(ctx)); updateEstimate(); void renderToolsLine(); };
   const ctxBox = el('div', 'ai-ctx');
   const mkSel = <T extends string>(label: string, opts: [T, string][], cur: T, on: (v: T) => void, title: string) => {
     const row = el('div', 'row');
@@ -191,12 +192,27 @@ export function buildAIPanel(app: App, root: HTMLElement) {
   ctxBox.append(estimate);
   // session meter: what the requests of this page session actually cost (server-reported token counts; OpenRouter's
   // own USD figure when it sends one, else the model's list price × tokens; local servers: tokens only)
+  const toolsLine = el('div', 'hint ai-tools-line', '');
+  ctxBox.append(toolsLine);
   const meter = el('div', 'hint ai-meter', '');
   const meterReset = el('button', 'link', 'reset');
   meterReset.title = 'Start the session counters again';
   ctxBox.append(meter);
   const session = { requests: 0, promptTokens: 0, completionTokens: 0, cost: 0, costKnown: true };
   const fmtTok = (n: number) => (n >= 1000 ? `${(n / 1000).toFixed(1)}k` : String(n));
+  /** Says plainly whether the next request will carry tools, and why not when it will not. */
+  const renderToolsLine = async () => {
+    if (!ctx.tools) { toolsLine.textContent = 'Tools: off — the model can only answer; switch the Tools box on to let it edit, load, export.'; toolsLine.style.color = 'var(--danger)'; return; }
+    if (ctx.reply === 'text') { toolsLine.textContent = 'Tools: off — "Edits as" is set to text only; choose edit commands to let the model act.'; toolsLine.style.color = 'var(--danger)'; return; }
+    if (isLocal()) { toolsLine.textContent = 'Tools: offered — whether the local server passes them to the model depends on the server and model.'; toolsLine.style.color = ''; return; }
+    const id = currentModel();
+    toolsLine.textContent = 'Tools: on — the model acts through function calls (apply_edits, set_camera, library…, screenshot).'; toolsLine.style.color = ''; // provisional while the catalogue loads
+    const m = (await fetchModels().catch(() => [])).find((x) => x.id === id);
+    if (currentModel() !== id) return; // superseded
+    if (m && !m.tools) { toolsLine.textContent = `Tools: not supported by ${id} (per the OpenRouter catalogue) — pick a model tagged 🛠; edit blocks in its replies are still applied.`; toolsLine.style.color = 'var(--danger)'; return; }
+    toolsLine.textContent = 'Tools: on — the model acts through function calls (apply_edits, set_camera, library…, screenshot).';
+    toolsLine.style.color = '';
+  };
   const renderMeter = () => {
     if (!session.requests) { meter.textContent = 'This session: no requests yet.'; return; }
     meter.textContent = `This session: ${session.requests} request${session.requests === 1 ? '' : 's'} · ${fmtTok(session.promptTokens)} in / ${fmtTok(session.completionTokens)} out` +
@@ -215,6 +231,7 @@ export function buildAIPanel(app: App, root: HTMLElement) {
       else session.costKnown = false;
     }
     renderMeter();
+  void renderToolsLine();
   };
   renderMeter();
   const updateEstimate = () => {
@@ -375,21 +392,34 @@ export function buildAIPanel(app: App, root: HTMLElement) {
         ...(ctx.memory ? history.slice(0, -1) : []),
         { role: 'user', content: finalContent },
       ];
+      let toolsRefused = false;
       for (let round = 0; ; round++) {
         acc = '';
-        const r = await streamChat({
+        const request = (withTools: boolean) => streamChat({
           apiKey: key,
           baseUrl: isLocal() ? urlInp.value.trim() : undefined,
           model: currentModel(),
           messages,
-          tools: useTools && round < MAX_TOOL_ROUNDS ? TOOL_DEFS : undefined,
-          signal: abortCtl.signal,
+          tools: withTools ? TOOL_DEFS : undefined,
+          signal: abortCtl!.signal,
           onDelta: (d) => {
             acc += d;
             setMarkdown(bubble, displayText(acc) || '…');
             msgs.scrollTop = msgs.scrollHeight;
           },
         });
+        let r;
+        try {
+          r = await request(useTools && !toolsRefused && round < MAX_TOOL_ROUNDS);
+        } catch (e) {
+          // an endpoint that cannot do function calling (OpenRouter: "No endpoints found that support tool use")
+          if (useTools && !toolsRefused && /tool/i.test((e as Error).message) && (e as Error).name !== 'AbortError') {
+            toolsRefused = true;
+            addMsg('system', `${currentModel()} cannot call tools (${(e as Error).message.slice(0, 120)}) — asking again without them; edit blocks in the reply are still applied.`);
+            acc = '';
+            r = await request(false);
+          } else throw e;
+        }
         void recordUsage(r.usage);
         if (!r.toolCalls.length) { acc = r.text; break; }
         // the model asked for tools: run them, feed the results (and the render) back, go again
@@ -410,7 +440,10 @@ export function buildAIPanel(app: App, root: HTMLElement) {
       }
       history.push({ role: 'assistant', content: acc });
       setMarkdown(bubble, displayText(acc) || (applied ? 'Done.' : '(empty reply)'));
-      if (tryApplyFlameBlocks(acc, c)) applied = true; // models that answer with a block instead of a tool
+      if (tryApplyFlameBlocks(acc, c)) { // models that answer with a block instead of a tool
+        if (!applied && useTools && !toolsRefused) addMsg('system', 'Applied from the reply — this model wrote edit commands instead of calling apply_edits.');
+        applied = true;
+      }
       if (applied) bubble.append(el('span', 'applied', '✦ flame changed'));
     } catch (e) {
       const aborted = (e as Error).name === 'AbortError';

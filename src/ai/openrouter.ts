@@ -59,11 +59,12 @@ export interface ORModel {
   promptPerM: number;     // USD per 1M input tokens
   completionPerM: number; // USD per 1M output tokens
   vision: boolean;        // accepts image input
+  tools: boolean;         // supports function calling (OpenRouter supported_parameters includes "tools")
   created: number;        // unix seconds
 }
 
 const MODELS_URL = 'https://openrouter.ai/api/v1/models';
-const LS_MODELS = 'wilderfire.openrouter.models';
+const LS_MODELS = 'wilderfire.openrouter.models.v2'; // v2: + tools
 const MODELS_TTL_MS = 24 * 3600 * 1000;
 
 /** Live model catalogue (public endpoint, no key), cached in localStorage for a day.
@@ -91,6 +92,7 @@ export async function fetchModels(opts: { force?: boolean } = {}): Promise<ORMod
       promptPerM: Number(m.pricing?.prompt ?? 0) * 1e6,
       completionPerM: Number(m.pricing?.completion ?? 0) * 1e6,
       vision: Array.isArray(m.architecture?.input_modalities) && m.architecture.input_modalities.includes('image'),
+      tools: Array.isArray(m.supported_parameters) && m.supported_parameters.includes('tools'),
       created: Number(m.created ?? 0),
     }));
   try { localStorage.setItem(LS_MODELS, JSON.stringify({ at: Date.now(), models })); } catch { /* quota */ }

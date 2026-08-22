@@ -99,7 +99,7 @@ export function createModelPicker(initial: string, onPick?: (id: string) => void
       const it = el('div', 'vpick-item mpick-item' + (m.id === value ? ' cur' : ''));
       const main = el('div', 'mpick-main');
       main.append(el('span', 'vpick-name', m.name), el('span', 'mpick-id', m.id));
-      const meta = el('span', 'vpick-tags', `${fmtCtx(m.context)} ctx · ${fmtPrice(m)}${m.vision ? ' · 👁' : ''}`);
+      const meta = el('span', 'vpick-tags', `${fmtCtx(m.context)} ctx · ${fmtPrice(m)}${m.vision ? ' · 👁' : ''}${m.tools ? ' · 🛠' : ''}`);
       meta.title = `context ${m.context.toLocaleString()} tokens · $${m.promptPerM.toFixed(2)} in / $${m.completionPerM.toFixed(2)} out per 1M tokens${m.vision ? ' · accepts images' : ' · text only'}`;
       it.append(main, meta);
       it.onclick = () => pick(m.id);
@@ -117,7 +117,7 @@ export function createModelPicker(initial: string, onPick?: (id: string) => void
       list.textContent = '';
       firstPick = null;
       const q = search.value.trim().toLowerCase();
-      const all = models ?? SUGGESTED_MODELS.map((id) => ({ id, name: id, provider: id.split('/')[0], context: 0, promptPerM: 0, completionPerM: 0, vision: true, created: 0 } as ORModel));
+      const all = models ?? SUGGESTED_MODELS.map((id) => ({ id, name: id, provider: id.split('/')[0], context: 0, promptPerM: 0, completionPerM: 0, vision: true, tools: true, created: 0 } as ORModel));
       const inChip = (m: ORModel) => lastChip === 'All' ? true : lastChip === 'Other' ? !PINNED_PROVIDERS.includes(m.provider) : m.provider === lastChip;
       // every whitespace-separated token must appear in the id or name ("claude 5" → claude-opus-5)
       const toks = q.split(/\s+/).filter(Boolean);
