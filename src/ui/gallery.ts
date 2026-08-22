@@ -33,7 +33,7 @@ export function openGallery(app: App, entries: LibEntry[], start = 0) {
   const nextBtn = el('button', 'icon', '▶'); nextBtn.title = 'Next (→)';
   nextBtn.textContent = '▶'; prevBtn.textContent = '◀';
   const capSel = el('select') as HTMLSelectElement;
-  for (const q of [100, 250, 500, 1000]) { const o = el('option', '', `${q} spp`) as HTMLOptionElement; o.value = String(q); capSel.append(o); }
+  for (const q of [50, 100, 250, 500, 1000]) { const o = el('option', '', `${q} spp`) as HTMLOptionElement; o.value = String(q); capSel.append(o); }
   capSel.value = String(prefs.cap);
   capSel.title = 'Quality cap while in the gallery — lower is faster';
   capSel.onchange = () => { prefs.cap = parseInt(capSel.value); app.renderer.targetQuality = prefs.cap; app.renderer.invalidate(); savePrefs(); };
