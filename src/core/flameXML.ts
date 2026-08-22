@@ -250,7 +250,7 @@ function parseXFormEl(elm: Element, ctx?: CurveCtx): XForm {
       const pn = name.slice(us + 1);
       const res = resolve(vn);
       // (a param name with spaces/punctuation — "Density Pixels" — arrives sanitised by the lenient pre-parser)
-      const pd = VARIATIONS[res?.vname ?? '']?.params?.find((p) => p.name === pn || p.name.replace(/[^\w.-]/g, '_') === pn);
+      const pd = VARIATIONS[res?.vname ?? '']?.params?.find((p) => p.name === pn || sanitizeAttrName(p.name) === pn);
       if (res && pd) {
         (params[attr.name.slice(0, attr.name.length - name.length + us)] ??= {})[pd.name] = val;
         matched = true;
@@ -382,6 +382,10 @@ function resample(colors: RGB[]): RGB[] {
   return out;
 }
 
+/** What the lenient pre-parser turns a non-XML attribute name into (the importer matches parameter
+ *  names through the same function). */
+const sanitizeAttrName = (name: string) => name.trim().replace(/[^\w-]/g, '_');
+
 /** JWildfire writes one attribute per variation instance, so an xform with two
  *  `bubble` variations yields a duplicate attribute (invalid XML). Rename the
  *  later occurrences (and their trailing params) to `name__dup<k>`. */
@@ -390,8 +394,9 @@ function dedupeAttributes(text: string): string {
   text = text.replace(/([A-Za-z_]\w*)#(\d+)#/g, (_m, n: string, k: string) => `${n}__dup${Number(k) + 1}`);
   return text.replace(/<(xform|finalxform)\b([^>]*)>/g, (m, tag: string, attrs: string) => {
     // Attribute names may contain spaces or punctuation ("foo_show/hide(1/0)",
-    // "glsl_x_Density Pixels"): tokenize on name="value" pairs and sanitize.
-    attrs = attrs.replace(/([^\s"=][^"=]*?)\s*=\s*"([^"]*)"/g, (_m, name: string, val: string) => ` ${name.trim().replace(/[^\w.-]/g, '_')}="${val}"`);
+    // "glsl_x_Density Pixels", "glsl_x_Red Fac."): tokenize on name="value" pairs and sanitize
+    // (dots too — legal in XML names, but not every parser agrees about a trailing one).
+    attrs = attrs.replace(/([^\s"=][^"=]*?)\s*=\s*"([^"]*)"/g, (_m, name: string, val: string) => ` ${sanitizeAttrName(name)}="${val}"`);
     const seen = new Map<string, number>();
     let cur: { base: string; k: number } | null = null;
     const out = attrs.replace(/([A-Za-z_][\w.-]*)(\s*=\s*"[^"]*")/g, (_m, name: string, rest: string) => {
@@ -733,6 +738,10 @@ function xformToXML(x: XForm, tag: string, nXForms: number, extraAttrs: string[]
       if (!VARIATIONS[vi.name]) continue;
       attrs.push(`${prefix}${vi.name}="${fmt(vi.weight)}"`);
       if (vi.priority !== undefined) attrs.push(`${prefix}${vi.name}_fx_priority="${vi.priority}"`); // JWildfire per-instance priority
+      // Parameter names are written as JWildfire writes them, spaces and dots included ("glsl_x_Density
+      // Pixels", "crop_trapezoid_Base Sup."): JWildfire's reader matches them verbatim, so an encoded
+      // form would silently drop the value there. Such a file is not strict XML; our importer's lenient
+      // pre-parser (dedupeAttributes) takes it back, as does JWildfire.
       for (const pd of VARIATIONS[vi.name].params ?? []) {
         attrs.push(`${prefix}${vi.name}_${pd.name}="${fmt(vi.params[pd.name] ?? pd.def)}"`);
       }

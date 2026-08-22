@@ -67,8 +67,9 @@ function scale(x: JX, s: number, xs: boolean, ys: boolean, post = false) {
 
 // ---------- variations ----------
 const known = (name: string) => name in VARIATIONS;
-// A few exotic variations (glsl_*, crop_trapezoid…) carry parameter NAMES with spaces, which cannot be
-// XML attributes: a flame using them could never be saved as .flame. The random pickers avoid them.
+// A few exotic variations (glsl_*, crop_trapezoid…) carry parameter NAMES with spaces, which JWildfire
+// writes verbatim — their .flame files are not strict XML (WilderFire and JWildfire read them, other
+// tools may not). The random pickers avoid them; a flame that arrives with one is kept and saved as is.
 const XML_NAME = /^[A-Za-z_][\w.-]*$/;
 const saveable = (name: string) => ((VARIATIONS[name] as { params?: { name: string }[] })?.params ?? []).every((p) => XML_NAME.test(p.name));
 const flagsOf = (name: string): string[] => ((VARIATIONS[name] as { flags?: string[] })?.flags ?? []);
