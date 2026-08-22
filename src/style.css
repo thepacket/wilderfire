@@ -323,6 +323,7 @@ a { color: var(--accent2); }
   color: var(--fg); font: inherit; font-weight: 600; text-overflow: ellipsis;
 }
 .header .flame-name:hover { border-color: var(--border); }
+.header .flame-prov { font-size: 11px; color: var(--fg-dim); max-width: 28vw; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .header .flame-name:focus { border-color: var(--accent); background: var(--bg3); outline: none; text-overflow: clip; }
 
 /* ---- variation picker ---- */

@@ -78,6 +78,7 @@ async function boot() {
   };
   presetSel.onchange = async () => {
     const v = presetSel.value;
+    app.flameSource = undefined;
     if (v.startsWith('p:')) {
       const p = PRESETS[parseInt(v.slice(2))];
       if (p) app.setFlame(p.make());
@@ -90,7 +91,7 @@ async function boot() {
   };
 
   const randBtn = el('button', 'primary', '🎲 Randomize');
-  randBtn.onclick = () => app.setFlame(randomFlame());
+  randBtn.onclick = () => { app.flameSource = undefined; app.setFlame(randomFlame()); };
 
   const mutBtn = el('button', '', '🧬 Mutate');
   mutBtn.title = 'Explore mutations of the current flame';
@@ -174,14 +175,20 @@ async function boot() {
   nameInp.placeholder = 'untitled';
   nameInp.spellcheck = false;
   nameInp.title = 'Name of the loaded flame — click to rename';
+  // Provenance next to the name: "by author" and/or where the flame came from (dropped file, zip entry, library source)
+  const provEl = el('span', 'flame-prov');
   const showName = () => {
     nameInp.value = app.flame.name ?? '';
-    nameInp.title = (app.flame.name || 'untitled') + ' — click to rename';
+    const prov = [app.flame.author ? 'by ' + app.flame.author : '', app.flameSource ?? ''].filter(Boolean);
+    provEl.textContent = prov.join(' · ');
+    provEl.title = [app.flame.author ? 'Author: ' + app.flame.author : '', app.flameSource ? 'Source: ' + app.flameSource : '', app.flame.created ? 'Created: ' + app.flame.created : ''].filter(Boolean).join('\n');
+    provEl.style.display = prov.length ? '' : 'none';
+    nameInp.title = (app.flame.name || 'untitled') + (prov.length ? '\n' + provEl.title : '') + '\nclick to rename';
     document.title = (app.flame.name ? app.flame.name + ' — ' : '') + 'WilderFire';
   };
   nameInp.addEventListener('change', () => { app.flame.name = nameInp.value.trim(); app.commitTone('name'); showName(); });
   nameInp.addEventListener('keydown', (e) => { if (e.key === 'Enter' || e.key === 'Escape') { if (e.key === 'Escape') showName(); nameInp.blur(); } });
-  header.append(logo, presetSel, randBtn, mutBtn, undoBtn, redoBtn, nameInp, saveBtn, libBtn, triBtn, themeBtn, aboutBtn);
+  header.append(logo, presetSel, randBtn, mutBtn, undoBtn, redoBtn, nameInp, provEl, saveBtn, libBtn, triBtn, themeBtn, aboutBtn);
 
   // ---------- Layout ----------
   const main = el('div', 'main');
