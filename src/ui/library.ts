@@ -119,6 +119,11 @@ export function buildLibrary(app: App, anim: AnimAPI) {
     } catch (e) { alert('Could not save to the library: ' + (e as Error).message); }
   }
 
+  // Where the dialog was when it was last closed, so reopening lands on the same page: the scroll
+  // offset, the search text and the collection (a "≈ similar" view is transient — its target is gone,
+  // so it comes back as "All flames"). Kept for the session, not stored.
+  const view = { scrollTop: 0, search: '', collection: 'all' };
+
   async function open() {
     releaseThumbSrcs(); // object URLs of the previous dialog's pictures
     const { body, close } = openModal('Flame library');
@@ -175,6 +180,7 @@ export function buildLibrary(app: App, anim: AnimAPI) {
       catch (e) { alert('Could not remove duplicates: ' + (e as Error).message); }
     };
     const search = el('input', 'lib-search') as HTMLInputElement;
+    search.value = view.search;
     search.type = 'search';
     search.placeholder = 'Search names, authors, sources…';
     search.title = 'Show only flames whose name, author or source contains this text (press / to get here, Esc to clear)';
@@ -192,7 +198,7 @@ export function buildLibrary(app: App, anim: AnimAPI) {
     // Collections: ★ favourites, every tag, every source pack — one pass over the entries for the counts
     const collSel = el('select', 'lib-coll') as HTMLSelectElement;
     collSel.title = 'Show one collection: your favourites, a tag, or the pack the flames came from';
-    let collection = 'all';
+    let collection = view.collection; // refreshCollections falls back to "all" if that collection is gone
     const refreshCollections = () => {
       let favs = 0;
       const tags = new Map<string, number>();
@@ -349,6 +355,12 @@ export function buildLibrary(app: App, anim: AnimAPI) {
     };
     let renderQueued = false;
     const scheduleRender = () => { if (renderQueued) return; renderQueued = true; setTimeout(() => { renderQueued = false; render(); }, 0); };
+    // remember the page for the next opening (every close path scrolls or filters through here)
+    const saveView = () => {
+      view.scrollTop = body.scrollTop;
+      view.search = search.value;
+      view.collection = collection === 'similar' ? 'all' : collection;
+    };
     const select = (i: number, scroll = true) => {
       if (!vis.length) { sel = -1; return; }
       i = Math.max(0, Math.min(vis.length - 1, i));
@@ -426,6 +438,7 @@ export function buildLibrary(app: App, anim: AnimAPI) {
         ' — arrows move, Enter loads, Space ★, Delete removes, Esc closes';
       layout();
       render();
+      saveView();
     };
     search.addEventListener('input', applyFilter);
     search.addEventListener('keydown', (ev) => {
@@ -434,10 +447,18 @@ export function buildLibrary(app: App, anim: AnimAPI) {
       ev.stopPropagation(); // typing must not drive the grid
     });
     body.append(tools, tools2, hint, grid);
-    body.addEventListener('scroll', scheduleRender, { passive: true });
+    body.addEventListener('scroll', () => { saveView(); scheduleRender(); }, { passive: true });
     new ResizeObserver(() => { layout(); render(); }).observe(grid);
     refreshCollections();
+    const wanted = view.scrollTop; // applyFilter saves the (still zero) scroll, so keep it first
     applyFilter();
+    // back to the page the dialog was closed on (twice: the row height is only exact once real cards
+    // exist, so the grid — and with it the scrollable range — settles one frame later)
+    if (wanted > 0) {
+      const restore = () => { body.scrollTop = wanted; render(); };
+      restore();
+      requestAnimationFrame(restore);
+    }
     // Keyboard navigation over the visible (filtered) list; Page Up/Down jump by the rows the viewport shows.
     body.tabIndex = 0;
     const pageRows = () => Math.max(1, Math.floor(body.clientHeight / (rowH + GAP)));
