@@ -1038,6 +1038,8 @@ struct TP {
 @group(0) @binding(1) var<storage, read> hist: array<u32>;
 @group(0) @binding(2) var<storage, read> sfilt: array<f32>;
 @group(0) @binding(3) var midTex: texture_2d<f32>;
+@group(0) @binding(4) var bgTex: texture_2d<f32>; // background_image (1×1 when none)
+@group(0) @binding(5) var bgSamp: sampler;
 
 /** pow for the gamma exponent: exponent 0 gives 1 even at x = 0 (fast-math pow(0, 0) may be NaN) */
 fn gpow(x: f32, g: f32) -> f32 { return select(pow(x, g), 1.0, g == 0.0); }
@@ -1244,6 +1246,13 @@ fn bgAt(x: i32, y: i32) -> vec3f {
   if (kind == 0) { return T.bg.rgb; }
   let px = f32(x) + T.bgGeom.x; let py = f32(y) + T.bgGeom.y;
   let W = T.bgGeom.z; let H = T.bgGeom.w;
+  if (kind == 3) {
+    // JWildfire LogDensityFilter.calculateBGColor: the image stretched to the full image, bilinear between the four
+    // texels around (px·(iw−1)/(W−1), py·(ih−1)/(H−1)) — a linear sample at that texel-centre coordinate
+    let dims = vec2f(textureDimensions(bgTex));
+    let xc = px * (dims.x - 1.0) / max(W - 1.0, 1.0); let yc = py * (dims.y - 1.0) / max(H - 1.0, 1.0);
+    return floor(textureSampleLevel(bgTex, bgSamp, (vec2f(xc, yc) + 0.5) / dims, 0.0).rgb * 255.0 + 0.5) / 255.0; // Tools.roundColor, then the 0..1 the callers expect
+  }
   let UL = floor(T.bgUL.rgb * 255.0 + 0.5); let UR = floor(T.bgUR.rgb * 255.0 + 0.5);
   let LL = floor(T.bgLL.rgb * 255.0 + 0.5); let LR = floor(T.bgLR.rgb * 255.0 + 0.5); let CC = floor(T.bgCC.rgb * 255.0 + 0.5);
   var c00 = UL; var c10 = UR; var c01 = LL; var c11 = LR;

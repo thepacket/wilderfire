@@ -7,6 +7,7 @@ import { pickSave, saveBlob, saveText, savedMessage } from './saveFile';
 import { renderHiRes, resolveSize, SIZE_OPTIONS, QUALITY_OPTIONS } from './hiresExport';
 import { openBatchExport } from './batchExport';
 import { buildSolidSection } from './solidPanel';
+import { imagePut, imageNames } from '../core/libraryStore';
 import { FILTER_KERNELS, normFilterKernel, type FilterKernel } from '../gpu/filters';
 
 const SRC = 'render';
@@ -153,6 +154,29 @@ export function buildRenderPanel(app: App, root: HTMLElement) {
     app.commitTone(SRC);
   });
   bgRow.append(bgInp);
+  // JWildfire background_image: a picture from the browser's image store, stretched behind the flame
+  const biSel = el('select') as HTMLSelectElement;
+  biSel.title = 'Background image (JWildfire background_image): stretched to the full image behind the flame; pictures live in this browser\'s image store';
+  const fillBi = async () => {
+    const names = await imageNames();
+    const cur = app.flame.bgImage ?? '';
+    biSel.replaceChildren(...[['', 'no image'], ...names.map((n) => [n, n]), ...(cur && !names.includes(cur) ? [[cur, cur + ' (missing)']] : [])].map(([v, t]) => { const o = el('option', '', t) as HTMLOptionElement; o.value = v; return o; }));
+    biSel.value = cur;
+  };
+  void fillBi();
+  biSel.onchange = () => { if (biSel.value) app.flame.bgImage = biSel.value; else delete app.flame.bgImage; app.commitTone(SRC); };
+  const biLoad = el('button', '', '⬆ image');
+  biLoad.title = 'Load a picture (PNG/JPEG/WebP…) into the image store and use it as the background';
+  const biFile = el('input') as HTMLInputElement;
+  biFile.type = 'file'; biFile.accept = 'image/*'; biFile.style.display = 'none';
+  biLoad.onclick = () => biFile.click();
+  biFile.onchange = async () => {
+    const f = biFile.files?.[0]; biFile.value = '';
+    if (!f) return;
+    try { await imagePut(f.name, f); app.flame.bgImage = f.name; app.renderer.invalidateBgImage(); await fillBi(); app.commitTone(SRC); }
+    catch (e) { alert('Image load failed: ' + (e as Error).message); }
+  };
+  bgRow.append(biSel, biLoad, biFile);
   const satS = slider({
     label: 'Saturation', min: 0, max: 2, step: 0.01, value: app.flame.saturation ?? 1,
     onInput: (v) => { app.flame.saturation = v; app.commitTone(SRC); },

@@ -48,6 +48,8 @@ in the stack.
   their reason in `scripts/jwf-port/data/unportable.json` (user code compiled
   at run time, external content such as sub-flames/images/meshes/SVG/text,
   the remaining CPU-built point sets, …); the importer names the reason when a flame uses one.
+  Also ported: the TARGET / TARGETG colour types, JWildfire's DOF blur shapes, the channel mixer and
+  `background_image` (the picture from the browser's image store).
   JWildfire's **point-set variations** — the `DrawFunc` family (`sunflower`, `szubieta`, `gpattern`, `curliecue`,
   `mandala`, `mandala2`, `nsudoku`), the simulations (`dla_wf`, `snowflake_wf`, `natural_foam`), the `_js` turtle
   fractals (`dragon_js`, `koch_js`, `hilbert_js`, `htree_js`, `tree_js`, `brownian_js`, `gosperisland_js`,

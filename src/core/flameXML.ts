@@ -525,6 +525,8 @@ export function parseFlameXML(text: string, fallbackPalette: RGB[]): Flame[] {
         distance: numOr('post_symmetry_distance', 1.25), rotation: numOr('post_symmetry_rotation', 6),
       };
     }
+    const bgi = fe.getAttribute('background_image') ?? '';
+    if (bgi.trim()) f.bgImage = bgi.slice(Math.max(bgi.lastIndexOf('/'), bgi.lastIndexOf('\\')) + 1);
     const bg = nums(fe.getAttribute('background'));
     if (bg.length === 3) {
       // Old files use 0-255, new ones 0-1 — sniff by magnitude.
@@ -894,7 +896,7 @@ export function flameToXML(f: Flame, opts: XMLExportOpts = {}): string {
     `antialias_amount="${fmt(f.antialiasAmount ?? 0.25)}" antialias_radius="${fmt(f.antialiasRadius ?? 0.5)}" ` +
     `de_radius="${fmt(f.deRadius ?? 1)}" de_curve="${fmt(f.deCurve ?? 0.8)}" ` +
     `saturation="${fmt(f.saturation ?? 1)}" fg_opacity="${fmt(f.fgOpacity ?? 1)}" ` +
-    `bg_transparency="${f.bgTransparency ? 1 : 0}" oversample="${f.oversample ?? 1}" ` + mixerAttrs(f) +
+    `bg_transparency="${f.bgTransparency ? 1 : 0}" oversample="${f.oversample ?? 1}" ` + mixerAttrs(f) + (f.bgImage ? `background_image="${f.bgImage.replace(/&/g, '&amp;').replace(/"/g, '&quot;').replace(/</g, '&lt;')}" ` : '') +
     (f.author ? `meta_info_author="${esc(f.author)}" ` : '') + (f.created ? `meta_info_creation_time="${esc(f.created)}" ` : '') + (f.uuid ? `meta_info_uuid="${esc(f.uuid)}" ` : '') +
     psymAttrs(f) +
     `quality="200" brightness="${fmt(f.brightness)}" gamma="${fmt(f.gamma)}" gamma_threshold="${fmt(f.gammaThreshold)}" ` +

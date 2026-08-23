@@ -255,6 +255,35 @@ starting vertex and orientation (the probe shows 29 counter-clockwise / 21 clock
 decomposition and the area-signed colours of mode 0 (`fmod(1 + area, 1)`: a or 1 − |a|) differ per cell: colour by
 index (mode 1) 0.99 / corr 0.96, area colours 1.03 / 0.89. `taprats` stays out (library not in the tree).
 
+**Engine leftovers, second look (2026-08-23).** The old list was mostly stale or empty: `receiveOnlyShadows`, light
+motion curves, `smooth_gradient` and gradient maps have no corpus flame setting them (every
+`*_receive_only_shadows` in 5623 flames is 0), `dc_carpet3D` (f8313ea) and `_sh8` / `_mesh10` (6b12c8b) were already
+fixed. The four real ones are in:
+* **Colour types TARGET / TARGETG** (70 uses): `TransformationTargetColorStep` — unless a direct-colour variation
+  set the RGB, the point's carried colour (the palette entry of its index, or the RGB a DISTANCE/TARGET step gave it)
+  is lerped towards `targetcolor` by t = (symmetry + 1)/2; the index is kept (c1 = 1). TARGETG targets the palette
+  entry at the xform's `color` and blends the index like DIFFUSION. Plot-colour tier 0.5 in the kernel (a later
+  gradient step replaces it), xd slots 66..68. Butterfly (TARGET) 0.97 / blkMAE 1.3 / corr 1.00; Fake Widow Spider
+  (19 xforms mixing both) 0.84 / 0.95. Not modelled: a point carrying a TARGET colour through a *later iteration*
+  into the next TARGET xform (the carried RGB is re-derived from the index each iteration).
+* **DOF blur shapes** (21 flames with cam_dof > 0): `DOFBlurShapeType` runs a blur variation on the jitter with
+  weight dr = 0.1·cam_dof·dist·scale·fade and `cam_dof_param1..6` as its parameters, the offset rotated by
+  `cam_dof_rotate`: starblur, xheart_blur_wf (|dr|), flower (|dr|·2, random input), taurus (|dr|·0.25, random
+  angles·fade), cloverleaf_wf (random input·fade), sineblur (no rotation), square (RECT, x × width). The variation's
+  snippet is wrapped into a kernel function `dofShape_` like the oracle harness does; NBLUR, SNOWFLAKE, CANNABISCURVE,
+  PERLIN_NOISE, BRUSH_STROKE and SUBFLAME fall back to the bubble disc. Mini Hearts (HEART) 1.03 / 1.7 / 1.00, Warper
+  (FLOWER) 0.97 / 2.9 / 0.99, Snow (STARBLUR) 0.88 / 0.5 / 0.99, A snowball fight (NBLUR → bubble) 1.05 / 0.94.
+* **Channel mixer** (`mixer_mode` RGB / BRIGHTNESS / FULL, 18 flames): `LogDensityFilter` hands the nine curves the
+  pixel's *average* raw colour (rp.red·100/count — hence the 0..25600 axis) and puts the result ×count back before
+  log scaling. 9 LUTs of 257 entries (our `evalCurve` is already JWildfire's SPLINE envelope) in the filter buffer,
+  applied in tonemap pass A after density estimation. FULL 1.00 / 3.6 / 0.99, RGB 0.99 / 0.5 / 1.00, BRIGHTNESS
+  1.03 / 4.0 / 1.00.
+* **background_image** (61 flames): `calculateBGColor` stretches the picture to the full image and samples it
+  bilinearly — a linear texture sample at the texel-centre coordinate in tonemap pass B (bindings 4/5, a 1×1 fallback
+  while absent). The file name is kept (basename) and the picture comes from the browser's image store (Render →
+  Background → ⬆ image / chooser), like reflection maps. Compare with JWildfire loading the same PNG: 1.04 / 1.6 /
+  1.00.
+
 **Short-walker variations (2026-08-23).** A JWildfire variation whose `transform` ignores its input and advances one
 global state per call draws, per render thread, the first Q steps of that state's trajectory, Q = the thread's iteration
 count; our 65k walkers each live a few hundred iterations, so the generated port only ever drew the first steps. Of the

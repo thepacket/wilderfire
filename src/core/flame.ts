@@ -246,6 +246,9 @@ export interface Flame {
   /** JWildfire `bg_transparency`: the background stays transparent in the saved image. */
   bgTransparency: boolean;
   mixer?: ChannelMixer;
+  /** JWildfire background_image (file name only): the image, stretched to the full image, replaces the background colour;
+   *  the picture itself comes from the browser's image store (Render tab → Background → ⬆ image) */
+  bgImage?: string;
   /** JWildfire `oversample` (spatial oversampling, 1–3): histogram supersampling factor. */
   oversample: number;
   /** JWildfire post symmetry, applied to the plotted point (DefaultRenderIterationState). */
@@ -536,6 +539,7 @@ export function normalizeFlame(obj: any, fallbackPalette: RGB[]): Flame {
     camDOFExponent: Math.max(0.1, num(obj?.camDOFExponent, 2)), camDOFScale: num(obj?.camDOFScale, 1),
     camDOFShape: typeof obj?.camDOFShape === 'string' ? obj.camDOFShape : 'BUBBLE', camDOFRotate: num(obj?.camDOFRotate, 0),
     mixer: normMixer(obj?.mixer),
+    bgImage: typeof obj?.bgImage === 'string' && obj.bgImage ? obj.bgImage : undefined,
     camDOFParams: Array.isArray(obj?.camDOFParams) ? Array.from({ length: 6 }, (_, i) => num(obj.camDOFParams[i], 0)) : [0, 0, 0, 0, 0, 0],
     camDOFFade: clamp01(num(obj?.camDOFFade, 1)), newDOF: !!obj?.newDOF,
     focusX: num(obj?.focusX, 0), focusY: num(obj?.focusY, 0), focusZ: num(obj?.focusZ, 0), camZ: num(obj?.camZ, 0),

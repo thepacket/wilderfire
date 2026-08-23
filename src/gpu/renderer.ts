@@ -8,6 +8,7 @@ import { compileFlame, TONEMAP_WGSL, type CompiledFlame } from './codegen';
 import { buildSpatialFilters, solidFilterWeights, gaussianFilter1D, normFilterKernel, kernelCoeff, kernelSupport, FILT_FLOATS, MIX_LUT_BASE, MIX_LUT_N, type FilterKernel } from './filters';
 import { MIXER_KEYS } from '../core/flame';
 import { evalCurve } from '../core/motion';
+import { imageGet } from '../core/libraryStore';
 import { SOLID_POST_WGSL, SOLID_TONEMAP_WGSL, SOLID_AO_WGSL, SOLID_SHADOW_WGSL, SOLID_PDOF_WGSL, SOLID_PDOF_BLIT_WGSL, SOLID_PAY_WORDS, SOLID_MAX_LIGHTS, SOLID_MAX_MATS, SOLID_FILT_FLOATS } from './solid.wgsl';
 import { flameMeshKeys, ensureMesh, meshSampler, meshLayout } from '../core/meshes';
 import { flamePointSetKeys, pointSetFor, pointSetLayout, PSET_STRIDE } from '../core/pointSets';
@@ -238,6 +239,8 @@ export class FlameRenderer {
     this.palBuf = d.createBuffer({ size: MAX_LAYERS * 256 * 16, usage: GPUBufferUsage.STORAGE | GPUBufferUsage.COPY_DST });
     this.paramsBuf = d.createBuffer({ size: 512, usage: GPUBufferUsage.UNIFORM | GPUBufferUsage.COPY_DST });
     this.tmBuf = d.createBuffer({ size: 256, usage: GPUBufferUsage.UNIFORM | GPUBufferUsage.COPY_DST });
+    this.bgImgFallback = d.createTexture({ size: { width: 1, height: 1 }, format: 'rgba8unorm', usage: GPUTextureUsage.TEXTURE_BINDING | GPUTextureUsage.COPY_DST });
+    this.bgImgSamp = d.createSampler({ magFilter: 'linear', minFilter: 'linear', addressModeU: 'clamp-to-edge', addressModeV: 'clamp-to-edge' });
     this.filtBuf = d.createBuffer({ size: FILT_FLOATS * 4, usage: GPUBufferUsage.STORAGE | GPUBufferUsage.COPY_DST });
     this.matsBuf = d.createBuffer({ size: this.nPoints * 4, usage: GPUBufferUsage.STORAGE | GPUBufferUsage.COPY_DST });
     this.meshBuf = d.createBuffer({ size: 16, usage: GPUBufferUsage.STORAGE | GPUBufferUsage.COPY_DST });
@@ -795,6 +798,8 @@ export class FlameRenderer {
     // JWildfire background gradient (corner colours + kind in bgUL.w; the gradient spans the FULL image, tiles offset into it)
     const bgWords = this.bgGradientWords(f, tile ? tile.tileX : 0, tile ? tile.tileY : 0, fullW / os, fullH / os);
     tf32.set(bgWords, 20);
+    this.ensureBgImage(f);
+    if (f.bgImage && this.bgImgTex) tf32[23] = 3; // background kind 3: the image
     // GammaCorrectionFilter: saturation is an HSL shift of (saturation − 1), clamped at −1;
     // foreground opacity scales alpha by 1 − atan(3·(v − 1))/1.25.
     // JWildfire channel mixer: mode + where its LUTs sit in the filter buffer
@@ -986,6 +991,8 @@ export class FlameRenderer {
           { binding: 1, resource: { buffer: exportFmt ? this.offHist! : this.histBuf } },
           { binding: 2, resource: { buffer: this.filtBuf } },
           { binding: 3, resource: this.midTex!.createView() },
+          { binding: 4, resource: (this.bgImgTex ?? this.bgImgFallback).createView() },
+          { binding: 5, resource: this.bgImgSamp },
         ],
       });
       if (exportFmt) this.bgBExport = bgB; else this.bgB = bgB;
@@ -1109,6 +1116,29 @@ export class FlameRenderer {
 
   /** Upload the JWildfire spatial-filter kernels for the flame's settings; returns [Ncolour, Nintensity]. */
   private mixKey = '';
+  // background_image: a texture from the browser's image store (1×1 fallback while absent/loading)
+  private bgImgTex: GPUTexture | null = null;
+  private bgImgFallback!: GPUTexture;
+  private bgImgSamp!: GPUSampler;
+  private bgImgName = '';
+  /** Forget the current background image so the next frame reloads it (after a new upload under the same name). */
+  invalidateBgImage() { this.bgImgName = ''; }
+  private ensureBgImage(f: Flame) {
+    const name = f.bgImage ?? '';
+    if (name === this.bgImgName) return;
+    this.bgImgName = name;
+    const set = (tex: GPUTexture | null) => { if (this.bgImgTex && this.bgImgTex !== tex) this.bgImgTex.destroy(); this.bgImgTex = tex; this.bgB = null; this.bgBExport = null; this.needsPresent = true; };
+    if (!name) { set(null); return; }
+    imageGet(name).then(async (blob) => {
+      if (this.bgImgName !== name) return;
+      if (!blob) { console.warn(`background image "${name}" is not in this browser's image store (Render → Background → ⬆ image); rendering the background colour`); set(null); return; }
+      const bmp = await createImageBitmap(blob);
+      if (this.bgImgName !== name) return;
+      const tex = this.device.createTexture({ size: { width: bmp.width, height: bmp.height }, format: 'rgba8unorm', usage: GPUTextureUsage.TEXTURE_BINDING | GPUTextureUsage.COPY_DST | GPUTextureUsage.RENDER_ATTACHMENT });
+      this.device.queue.copyExternalImageToTexture({ source: bmp }, { texture: tex }, { width: bmp.width, height: bmp.height });
+      set(tex);
+    }).catch((e) => { console.warn('background image load failed', e); set(null); });
+  }
   /** The channel mixer's nine curves as 257-entry LUTs over the average raw colour 0..256 (JWildfire's x = value·100), y / 100 */
   private uploadMixer(f: Flame) {
     const key = f.mixer ? JSON.stringify(f.mixer) : '';
