@@ -217,6 +217,7 @@ export async function openBatchExport(app: App) {
             : await renderHiRes(r, j.flame!, {
               w: j.w, h: j.h, spp, transparent, signal: abort.signal,
               onTile: (d, n) => { j.status.textContent = n > 1 ? `tile ${d}/${n}` : 'rendering…'; },
+              onProgress: (f) => { j.status.textContent = `rendering ${Math.round(f * 100)} %`; },
             });
           j.status.textContent = 'saving…';
           await target.write(fileNameOf(j), blob);

@@ -1259,6 +1259,8 @@ export class FlameRenderer {
     fullW: number; fullH: number;
     tileX: number; tileY: number; tileW: number; tileH: number;
     spp: number; transparent?: boolean;
+    /** called between the render's chunks with the fraction of the requested samples plotted so far (0..1) */
+    onProgress?: (frac: number) => void;
   }): Promise<Uint8ClampedArray<ArrayBuffer>> {
     this.regionDepth++;
     try {
@@ -1274,6 +1276,7 @@ export class FlameRenderer {
     fullW: number; fullH: number;
     tileX: number; tileY: number; tileW: number; tileH: number;
     spp: number; transparent?: boolean;
+    onProgress?: (frac: number) => void;
   }): Promise<Uint8ClampedArray<ArrayBuffer>> {
     const d = this.device;
     if (!this.flame || !this.computePipeline) throw new Error('No compiled flame.');
@@ -1333,6 +1336,7 @@ export class FlameRenderer {
     const perPass = this.nPoints * this.itersPerPass;
     // enough passes for spp plotted samples per pixel on top of the fuse iterations
     let passes = Math.max(2, Math.min(Math.ceil((o.spp * o.fullW * o.fullH + this.fuseDebt) / perPass), 40000));
+    const passesTotal = passes;
     let done = 0;
     const CHUNK = 32;
     let first = true;
@@ -1357,6 +1361,7 @@ export class FlameRenderer {
       d.queue.submit([enc.finish()]);
       // Wait between chunks so submissions stay short and the tab responsive.
       await d.queue.onSubmittedWorkDone();
+      o.onProgress?.(1 - passes / passesTotal);
     }
 
     if (solid && this.shadowCasters() > 0) this.offShadowsReady = true;

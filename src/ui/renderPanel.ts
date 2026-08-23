@@ -497,6 +497,11 @@ export function buildRenderPanel(app: App, root: HTMLElement) {
           hiStatus.textContent = total > 1 ? `Hi-res: tile ${n}/${total} (${fullW}×${fullH})…` : `Hi-res: rendered ${fullW}×${fullH}, encoding…`;
           busy.set(total > 1 ? `Rendering ${fullW}×${fullH} PNG — tile ${n} of ${total}… (${target.name} stays empty until it is written)` : `Rendered ${fullW}×${fullH}, encoding…`);
         },
+        onProgress: (f) => {
+          const pct = Math.round(f * 100);
+          hiStatus.textContent = `Hi-res: rendering ${fullW}×${fullH}… ${pct} %`;
+          busy.set(`Rendering ${fullW}×${fullH} PNG — ${pct} %… (${target.name} stays empty until it is written)`);
+        },
       });
       hiStatus.textContent = 'Saving PNG…';
       busy.set(`Encoding and writing ${target.name} (${(blob.size / 1e6).toFixed(1)} MB)…`);

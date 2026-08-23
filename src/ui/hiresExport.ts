@@ -30,6 +30,8 @@ export interface HiResOpts {
   transparent?: boolean;
   /** called after every tile: done/total tiles */
   onTile?: (done: number, total: number) => void;
+  /** called while rendering with the overall fraction done (tiles finished + the current tile's progress, 0..1) */
+  onProgress?: (frac: number) => void;
   /** set `signal.aborted` to stop after the current tile (an AbortError is thrown) */
   signal?: AbortSignal;
   /** motion curves to embed with the flame in the PNG */
@@ -71,9 +73,11 @@ export async function renderHiRes(renderer: FlameRenderer, flame: Flame, o: HiRe
       // Render with padding so the DE filter doesn't seam at tile edges (none needed for a single tile).
       const pad = single ? 0 : PAD;
       const pw = tw + 2 * pad, ph = th + 2 * pad;
+      const tiles = tilesX * tilesY, tileIdx = n;
       const px = await renderer.renderRegion({
         fullW, fullH, tileX: x0 - pad, tileY: y0 - pad,
         tileW: pw, tileH: ph, spp: o.spp, transparent: o.transparent,
+        onProgress: o.onProgress && ((f) => o.onProgress!((tileIdx + f) / tiles)),
       });
       const img = single ? new ImageData(px, tw, th) : new ImageData(tw, th);
       if (!single) {
