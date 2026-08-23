@@ -182,7 +182,7 @@ function parseXFormEl(elm: Element, ctx?: CurveCtx): XForm {
   // (and the target/distance/cyclic modes we do not model) never blend towards `color`
   const ctype = (elm.getAttribute('color_type') ?? '').toUpperCase();
   if (ctype === 'CYCLIC' || ctype === 'DISTANCE' || ctype === 'TARGET' || ctype === 'TARGETG') x.colorType = ctype; // symmetry (1 − 2·colorSpeed) is their parameter
-  else if (ctype === 'NONE' || (elm.tagName.toLowerCase() === 'finalxform' && ctype !== 'DIFFUSION')) x.colorSpeed = 0;
+  else if (ctype === 'NONE' || (elm.tagName.toLowerCase() === 'finalxform' && ctype !== 'DIFFUSION')) { x.colorType = 'NONE'; x.colorSpeed = 0; }
   if (ctype === 'TARGET' || ctype === 'TARGETG') { const tc = nums(elm.getAttribute('targetcolor')); x.targetColor = tc.length === 3 ? tc.map((v) => Math.min(1, Math.max(0, v))) as [number, number, number] : [0, 0, 0]; }
   const chaos = nums(elm.getAttribute('chaos'));
   if (chaos.length) x.xaos = chaos.map((v) => Math.max(0, v));
@@ -748,7 +748,7 @@ function xformToXML(x: XForm, tag: string, nXForms: number, extraAttrs: string[]
   attrs.push(`symmetry="${fmt(1 - 2 * x.colorSpeed)}"`);
   if (x.colorType) attrs.push(`color_type="${x.colorType}"`);
   if (x.colorType === 'TARGET' || x.colorType === 'TARGETG') attrs.push(`targetcolor="${(x.targetColor ?? [0, 0, 0]).map(fmt).join(' ')}"`);
-  else if (tag === 'finalxform' && x.colorSpeed > 0) attrs.push('color_type="DIFFUSION"'); // JWildfire finals default to NONE (no recolouring)
+  else if (tag === 'finalxform') attrs.push('color_type="DIFFUSION"'); // JWildfire finals default to NONE (no recolouring): say so when this one recolours
   if (x.wfield) {
     const w = x.wfield;
     attrs.push(`wfield_type="${w.type}"`, `wfield_input="${w.input}"`, `wfield_color_intensity="${fmt(w.color)}"`, `wfield_var_amount_intensity="${fmt(w.varAmount)}"`,

@@ -79,6 +79,7 @@ export class FlameRenderer {
 
   // ---- JWildfire solid rendering (z-buffer + shading; see solid.wgsl.ts) ----
   private matsBuf!: GPUBuffer;      // per-point material index (bound when the compiled flame tracks materials)
+  private crgbBuf!: GPUBuffer;      // per-point carried RGB + tier (bound when a colour step depends on the previous iteration's colour)
   private meshBuf!: GPUBuffer;      // obj_mesh_primitive_wf samplers (face CDFs + triangles), packed per flame
   private meshPacked = '';          // keys packed into meshBuf
   private psetBuf!: GPUBuffer;      // CPU-built point sets (dragon_js, sunflower, …), packed per flame
@@ -243,6 +244,7 @@ export class FlameRenderer {
     this.bgImgSamp = d.createSampler({ magFilter: 'linear', minFilter: 'linear', addressModeU: 'clamp-to-edge', addressModeV: 'clamp-to-edge' });
     this.filtBuf = d.createBuffer({ size: FILT_FLOATS * 4, usage: GPUBufferUsage.STORAGE | GPUBufferUsage.COPY_DST });
     this.matsBuf = d.createBuffer({ size: this.nPoints * 4, usage: GPUBufferUsage.STORAGE | GPUBufferUsage.COPY_DST });
+    this.crgbBuf = d.createBuffer({ size: this.nPoints * 16, usage: GPUBufferUsage.STORAGE | GPUBufferUsage.COPY_DST });
     this.meshBuf = d.createBuffer({ size: 16, usage: GPUBufferUsage.STORAGE | GPUBufferUsage.COPY_DST });
     this.psetBuf = d.createBuffer({ size: 16, usage: GPUBufferUsage.STORAGE | GPUBufferUsage.COPY_DST });
     this.sppBuf = d.createBuffer({ size: 32, usage: GPUBufferUsage.UNIFORM | GPUBufferUsage.COPY_DST });
@@ -457,6 +459,7 @@ export class FlameRenderer {
         { binding: 10, resource: { buffer: solid.smaps! } },
       ] : []),
       ...(this.compiled?.usesMat ? [{ binding: 9, resource: { buffer: this.matsBuf } }] : []),
+      ...(this.compiled?.usesCarry ? [{ binding: 14, resource: { buffer: this.crgbBuf } }] : []),
       ...(this.compiled?.usesMesh ? [{ binding: 12, resource: { buffer: this.meshBuf } }] : []),
       ...(this.compiled?.usesPset ? [{ binding: 13, resource: { buffer: this.psetBuf } }] : []),
     ];
@@ -675,6 +678,7 @@ export class FlameRenderer {
     this.device.queue.writeBuffer(this.rngBuf, 0, rng);
     if (this.compiled?.usesMods) this.device.queue.writeBuffer(this.modsBuf, 0, new Float32Array(this.nPoints * 4)); // JWildfire starts every point with zero modifiers
     if (this.compiled?.usesMat) this.device.queue.writeBuffer(this.matsBuf, 0, Float32Array.from({ length: this.nPoints }, () => Math.random())); // JWildfire: p.material = random()
+    if (this.compiled?.usesCarry) this.device.queue.writeBuffer(this.crgbBuf, 0, Float32Array.from({ length: this.nPoints * 4 }, (_, i) => (i & 3) === 3 ? 0.5 : 0)); // JWildfire: a new point's redColor/greenColor/blueColor are 0 (black on the palette scale)
   }
 
   /** Something tone-related changed (or the view): redraw even when the

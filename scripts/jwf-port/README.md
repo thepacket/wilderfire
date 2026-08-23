@@ -347,6 +347,37 @@ Two engine findings from the `_ps_rgbctl` leftover, both root causes rather than
   `_ps_hoshi`, `_ps_kaleid`, `_ps_cutweb` 0.99 / corr 1.00. Lesson: when a luma ratio looks "close enough", check
   the channels — the 0.78 scale error and the pattern error were cancelling in `Machine_1`.
 
+### The carried colour (2026-08-23)
+
+JWildfire's point carries an **RGB** across iterations (`XYZPoint.redColor/greenColor/blueColor`, initially 0 = black on
+the RenderColor scale), and an xform's colour step only ever edits that: DIFFUSION/CYCLIC replace it with the palette
+entry of the (blended) index (`GradientColorStep`), TARGET/TARGETG lerp *from it* towards the target, DISTANCE replaces
+it, **NONE has no colour step at all** (the point keeps what it carried — finals default to NONE), and a direct-colour
+variation overwrites it (the `rgbColor` flag that makes the steps skip is reset per transform, so in the next iteration
+a TARGET/DISTANCE step applies to the direct values). The index travels separately and is only read by gradient steps
+(`c1 = 1, c2 = 0` for every type but DIFFUSION/TARGETG). Finals work on a copy (`q`): they read the carried colour but
+do not change it. Ours rebuilt the colour from the index every iteration, so TARGET always lerped from
+`palette[index]`, NONE plotted `palette[index]`, and a direct colour never reached a later TARGET.
+
+Now `colorType` has a real `NONE` (importer: explicit NONE and finals without DIFFUSION; legacy JSON finals with
+colorSpeed 0 normalise to it; the exporter writes `color_type="DIFFUSION"` on a recolouring final; the speed slider
+turns a NONE final into DIFFUSION above 0 and back), and when a normal xform is TARGET/TARGETG/DISTANCE/NONE or writes
+a direct colour (`usesCarry`) the kernel keeps the point's RGB in a per-walker buffer (binding 14 `crgb`, vec4: rgb +
+tier — 0 = palette[index], 0.5 = palette-scale RGB, 1 = direct this iteration, 0.8 = direct carried over, 0..255 scale).
+DIFFUSION/CYCLIC reset it to tier 0 before their variations; TARGETG pins a tier-0 colour to the palette entry *before*
+it blends the index (the carried colour is palette[old index] — this was also wrong for TARGETG finals); the plot looks
+the palette up the way `GradientColorStep` does (`(int)(c·254 + 0.5)`, it used flam3's `c·255.99`). The signature
+carries each xform's colour type (a TARGET → DISTANCE edit did not regenerate the kernel before).
+
+Compare (old → new): `_ct2` blkMAE 3.9 → 0.4, `_ct3` 1.17 → 0.99, `_ct4` 13.4 → 5.5 (corr 0.75 → 0.89), `_ct4n`
+(NONE) 37.6 → 8.3, `_sh4` 1.12 → 1.00, `_sh6` 1.09 → 0.97, `_ps_sunflower` 0.96 → 1.00, synthetic chains `_carry1`
+(dc_truchet → NONE → TARGET) 1.16 → 0.99, `_carry2` (DISTANCE → NONE → TARGET) 1.19 → 0.99, `_carry3/4/5`
+(DIFFUSION → TARGET → TARGET, + NONE + TARGETG) 0.99 / corr 1.00; across fixtures + samples 14 flames moved, all
+towards JWildfire (TINA0019 2.4 → 0.4, Machine_0 1.1 → 0.3) bar noise. Left: `_ct_target2` (Fake Widow Spider, 17
+`line` xforms under xaos) 0.82 with a pre-existing coverage gap (0.14 vs 0.18: thin random-point lines, the
+isolated-dot class) though its structure improved (3.3 → 2.1); `Bokeh_0` shows a red excess (channel ratios 1.22 / 1.03
+/ 1.17) that predates this — to look at.
+
 ## Image comparison (2026-08-17)
 
 Whole-image metrics vs headless JWildfire at 512 px / quality 100 (see the

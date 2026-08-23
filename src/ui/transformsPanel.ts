@@ -218,7 +218,7 @@ export function buildTransformsPanel(app: App, root: HTMLElement) {
       app.selected = -1;
     } else {
       const fx = defaultXForm();
-      fx.colorSpeed = 0; // like JWildfire: a final transform does not recolour unless asked to
+      fx.colorSpeed = 0; fx.colorType = 'NONE'; // like JWildfire: a final transform does not recolour unless asked to
       layer().final = fx;
       app.selected = -1;
       app.commit();
@@ -383,7 +383,13 @@ export function buildTransformsPanel(app: App, root: HTMLElement) {
     }).root);
     editorSec.append(slider({
       label: 'Color speed', min: 0, max: 1, step: 0.01, value: x.colorSpeed,
-      onInput: (v) => { x.colorSpeed = v; app.commit(SRC); },
+      onInput: (v) => {
+        x.colorSpeed = v;
+        // NONE (no colour step) is how a final says "no recolouring"; moving its speed up asks for DIFFUSION, back to 0 for none
+        if (v > 0 && x.colorType === 'NONE') delete x.colorType;
+        else if (v === 0 && x.colorType === undefined && x === layer().final) x.colorType = 'NONE';
+        app.commit(SRC);
+      },
     }).root);
     editorSec.append(slider({
       label: 'Opacity', min: 0, max: 1, step: 0.01, value: x.opacity,

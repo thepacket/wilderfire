@@ -275,13 +275,39 @@ describe('JWildfire colour types CYCLIC / DISTANCE', () => {
     const [a, b, c] = flame.layers[0].xforms;
     expect(a.colorType).toBe('DISTANCE'); expect(a.colorSpeed).toBeCloseTo((1 + 0.83) / 2, 6);
     expect(b.colorType).toBe('CYCLIC'); expect(b.colorSpeed).toBeCloseTo((1 - 0.25) / 2, 6);
-    expect(c.colorType).toBeUndefined(); expect(c.colorSpeed).toBe(0);
+    expect(c.colorType).toBe('NONE'); expect(c.colorSpeed).toBe(0);
     const back = roundTrip(flame).flame;
-    expect(back.layers[0].xforms.map((x) => x.colorType)).toEqual(['DISTANCE', 'CYCLIC', undefined]);
+    expect(back.layers[0].xforms.map((x) => x.colorType)).toEqual(['DISTANCE', 'CYCLIC', 'NONE']);
     const { compileFlame } = await import('../src/gpu/codegen');
-    const w = compileFlame(flame, 1024).wgsl;
+    const compiled = compileFlame(flame, 1024);
+    const w = compiled.wgsl;
     expect(w).toContain('c = fract(c + (1.0 - 2.0 * xd[');
     expect(w).toContain('length(np - p) * (2.0 - 2.0 * xd[');
     expect(w).toContain('rgbo.w > 0.25');
+    // DISTANCE / NONE normal xforms: the point's RGB is carried across iterations (JWildfire XYZPoint.redColor)
+    expect(compiled.usesCarry).toBe(true);
+    expect(w).toContain('var<storage, read_write> crgb');
+    expect(w).toContain('var rgbo = crgbv;');
+    expect(w).toContain('crgb[idx] = crgbv;');
+  });
+
+  it('a pure DIFFUSION flame carries nothing; finals default to NONE and a recolouring final exports as DIFFUSION', async () => {
+    const xml = '<flame name="d" size="64 64" scale="10"><xform weight="1" color="0.3" linear="1" coefs="1 0 0 1 0 0"/><finalxform color="0.5" symmetry="0.5" linear="1" coefs="1 0 0 1 0 0"/></flame>';
+    const { flame } = importFlameText(xml, GREY);
+    expect(flame.layers[0].final?.colorType).toBe('NONE');
+    const { compileFlame } = await import('../src/gpu/codegen');
+    const c1 = compileFlame(flame, 1024);
+    expect(c1.usesCarry).toBe(false);
+    expect(c1.wgsl).not.toContain('crgb');
+    expect(c1.wgsl).toContain('var rgbo = vec4f(0.0);');
+    // a legacy JSON final (colorSpeed 0, no colour type) normalises to NONE; speed > 0 means DIFFUSION
+    const { normalizeFlame } = await import('../src/core/flame');
+    const legacy = JSON.parse(JSON.stringify(flame)); delete legacy.layers[0].final.colorType;
+    expect(normalizeFlame(legacy, GREY).layers[0].final?.colorType).toBe('NONE');
+    legacy.layers[0].final.colorSpeed = 0.4;
+    const n2 = normalizeFlame(legacy, GREY);
+    expect(n2.layers[0].final?.colorType).toBeUndefined();
+    expect(flameToXML(n2, { curves: [] })).toMatch(/<finalxform [^>]*color_type="DIFFUSION"/);
+    expect(flameToXML(flame, { curves: [] })).toMatch(/<finalxform [^>]*color_type="NONE"/);
   });
 });

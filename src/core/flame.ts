@@ -135,9 +135,10 @@ export interface XForm {
    *  colour (m' = m·(1+speed)/2 + material·(1−speed)/2). Absent = 0 (the first material). */
   material?: number;
   materialSpeed?: number;
-  /** JWildfire colour type beyond DIFFUSION/NONE: CYCLIC = colour index += symmetry (mod 1); DISTANCE = the plotted colour is
-   *  the palette entry at color + |Δposition|·(symmetry+1) while the index stays. symmetry = 1 − 2·colorSpeed. */
-  colorType?: 'CYCLIC' | 'DISTANCE' | 'TARGET' | 'TARGETG';
+  /** JWildfire colour type beyond DIFFUSION (undefined): NONE = no colour step at all — the point keeps the RGB it carries
+   *  (finals default to it); CYCLIC = colour index += symmetry (mod 1); DISTANCE = the plotted colour is the palette entry
+   *  at color + |Δposition|·(symmetry+1) while the index stays. symmetry = 1 − 2·colorSpeed. */
+  colorType?: 'NONE' | 'CYCLIC' | 'DISTANCE' | 'TARGET' | 'TARGETG';
   /** TARGET: the point's RGB is lerped towards this colour (0..1) by (symmetry + 1)/2; TARGETG: towards the palette entry at `color` */
   targetColor?: [number, number, number];
   opacity: number;     // 0..1 plot opacity
@@ -355,12 +356,11 @@ function strHash(s: string): string { let h = 5381; for (let i = 0; i < s.length
 export function flameSignature(f: Flame): string {
   // (a subflame_wf instance's sub-flame is compiled into the kernel: its XML is part of the structure)
   const names = (l?: VarInstance[]) => (l ?? []).map((v) => v.name + (v.priority !== undefined ? '@' + v.priority : '') + (v.name === 'subflame_wf' ? '{' + strHash(v.res?.flame ?? '') + '}' : '')).join(',');
-  const sig = (x: XForm) => `${names(x.preVariations)}<${names(x.variations)}>${names(x.postVariations)}` + (x.wfield ? `~wf(${x.wfield.params.map((p) => p.varName + '.' + p.paramName).join(',')})` : '');
+  const sig = (x: XForm) => `${names(x.preVariations)}<${names(x.variations)}>${names(x.postVariations)}` + (x.colorType ? '~' + x.colorType : '') + (x.wfield ? `~wf(${x.wfield.params.map((p) => p.varName + '.' + p.paramName).join(',')})` : '');
   return visibleLayers(f)
     .map((l) => l.xforms.map(sig).join('|') + '#' + [l.final, ...l.moreFinals].map((x) => (x ? sig(x) : '-')).join('#'))
     .join('@@') + (visibleLayers(f).some((l) => [...l.xforms, l.final, ...l.moreFinals].some((x) => x?.colorMods?.some((v) => v !== 0))) ? '~mods' : '')
     + (f.solid?.enabled ? '~solid' : '') + (usesMaterials(f) ? '~mat' : '')
-    + (visibleLayers(f).some((l) => [...l.xforms, l.final, ...l.moreFinals].some((x) => x?.colorType)) ? '~ctype' : '')
     + (f.camDOF > 0 && f.camDOFShape && f.camDOFShape !== 'BUBBLE' ? `~dof(${f.camDOFShape},${(f.camDOFParams ?? []).map((v) => +v.toPrecision(6)).join(',')})` : '')
     // post-symmetry constants are baked into the kernel, so every field belongs in the signature
     + (f.postSymmetry ? `~psym(${f.postSymmetry.type},${f.postSymmetry.order},${f.postSymmetry.centreX},${f.postSymmetry.centreY},${f.postSymmetry.distance},${f.postSymmetry.rotation})` : '');
@@ -432,7 +432,7 @@ function normXForm(x: any): XForm {
     opacity: clamp01(num(x?.opacity, 1)),
     variations: vars.length ? vars : d.variations,
   };
-  if (x?.colorType === 'CYCLIC' || x?.colorType === 'DISTANCE' || x?.colorType === 'TARGET' || x?.colorType === 'TARGETG') out.colorType = x.colorType;
+  if (x?.colorType === 'NONE' || x?.colorType === 'CYCLIC' || x?.colorType === 'DISTANCE' || x?.colorType === 'TARGET' || x?.colorType === 'TARGETG') out.colorType = x.colorType;
   if (Array.isArray(x?.targetColor) && x.targetColor.length === 3) out.targetColor = x.targetColor.map((v: unknown) => clamp01(num(v, 0))) as [number, number, number];
   if (num(x?.material, 0) !== 0) out.material = num(x.material, 0);
   if (num(x?.materialSpeed, 0) !== 0) out.materialSpeed = Math.min(1, Math.max(-1, num(x.materialSpeed, 0)));
@@ -499,14 +499,21 @@ function normPalette(obj: any, fallback: RGB[]): RGB[] {
   return fallback;
 }
 
+/** A final transform saved before colour type NONE existed carried "no recolouring" as colorSpeed 0 (the importer's
+ *  mapping of JWildfire's final default): that is NONE. */
+function normFinal(x: any): XForm {
+  const out = normXForm(x);
+  if (out.colorType === undefined && out.colorSpeed === 0) out.colorType = 'NONE';
+  return out;
+}
 function normLayer(obj: any, fallbackPalette: RGB[]): Layer {
   const xforms = Array.isArray(obj?.xforms) && obj.xforms.length
     ? obj.xforms.slice(0, MAX_XFORMS).map(normXForm)
     : [defaultXForm()];
   return {
     xforms,
-    final: obj?.final ? normXForm(obj.final) : null,
-    moreFinals: Array.isArray(obj?.moreFinals) ? obj.moreFinals.map(normXForm) : [],
+    final: obj?.final ? normFinal(obj.final) : null,
+    moreFinals: Array.isArray(obj?.moreFinals) ? obj.moreFinals.map(normFinal) : [],
     palette: normPalette(obj, fallbackPalette),
     weight: Math.max(0, num(obj?.weight, 1)),
     visible: obj?.visible !== false,

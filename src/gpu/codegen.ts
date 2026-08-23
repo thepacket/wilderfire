@@ -53,6 +53,9 @@ export interface CompiledFlame {
   solid: boolean;
   /** The kernel carries a per-point material index (binding 9 `mats`). */
   usesMat: boolean;
+  /** The kernel carries a per-point RGB across iterations (binding 14 `crgb`; JWildfire's XYZPoint.redColor) — a normal
+   *  xform is TARGET/TARGETG/DISTANCE/NONE or sets a direct colour, so a later xform's colour depends on the carried one. */
+  usesCarry: boolean;
   /** A variation samples the shared mesh buffer (binding 12 `mesh`; obj_mesh_primitive_wf). */
   usesMesh: boolean;
   /** A variation samples a CPU-built point set (binding 13 `pset`; dragon_js, sunflower, …). */
@@ -426,6 +429,11 @@ export function compileFlame(flame: Flame, nPoints: number): CompiledFlame {
   const usesMat = solid && usesMaterials(flame);
   const usesMesh = layers.some((ly) => [...ly.xforms, ...(ly.final ? [ly.final] : []), ...ly.moreFinals].some((x) => varLists(x).some((l) => l.some((vi) => VARIATIONS[vi.name]?.flags?.includes('mesh')))));
   const usesPset = layers.some((ly) => [...ly.xforms, ...(ly.final ? [ly.final] : []), ...ly.moreFinals].some((x) => varLists(x).some((l) => l.some((vi) => VARIATIONS[vi.name]?.flags?.includes('pset')))));
+  // JWildfire carries an RGB on the point across iterations (XYZPoint.redColor…): it only matters when a normal xform's
+  // colour step does not simply rewrite it from the index — TARGET/TARGETG/DISTANCE/NONE — or a variation sets a direct
+  // colour (then a later NONE/TARGET/DISTANCE xform sees it). Pure DIFFUSION/CYCLIC flames replace it every iteration.
+  const writesRgb = (d: VariationDef | undefined) => !!d && (/\(\*rgb\)/.test(String(d.code)) || /\(\*rgb\)/.test(d.funcs ?? ''));
+  const usesCarry = layers.some((ly) => ly.xforms.some((x) => (x.colorType !== undefined && x.colorType !== 'CYCLIC') || varLists(x).some((l) => l.some((vi) => vi.name === 'subflame_wf' || writesRgb(VARIATIONS[vi.name])))));
   const L = layers.length;
 
   // ---- Layout ----
@@ -458,9 +466,13 @@ export function compileFlame(flame: Flame, nPoints: number): CompiledFlame {
   // JWildfire TransformationTargetColorStep: unless a direct-colour variation set the RGB, the point's carried colour —
   // the palette entry of its index (the previous gradient step) or the RGB a DISTANCE/TARGET step already gave it —
   // is lerped towards the target (slots 66..68) by t = (symmetry + 1)/2 = 1 − colorSpeed; the result is a plot colour a
-  // later gradient step replaces (tier 0.5), like JWildfire's redColor/greenColor/blueColor
+  // later gradient step replaces (tier 0.5), like JWildfire's redColor/greenColor/blueColor.
+  // rgbo.w tiers: 0 = palette[index]; 0.5 = an RGB on the palette scale (TARGET/DISTANCE result, or the carried black a
+  // fresh point starts with); 1 = a direct colour set this iteration (0..255 scale, colour steps skip it — JWildfire's
+  // rgbColor); 0.8 = a direct colour carried from an earlier iteration (0..255 scale; rgbColor is false again, so
+  // TARGET/DISTANCE steps apply to it)
   const targetStep = (b: number, li: number, cvar: string) => `
-        if (rgbo.w < 0.75) { let tci = clamp(i32(${cvar} * 254.0 + 0.5), 0, 255); let cur_ = select(pal[${li * 256}u + u32(tci)].xyz, rgbo.xyz, rgbo.w > 0.25); rgbo = vec4f(mix(vec3f(xd[${b + 66}u], xd[${b + 67}u], xd[${b + 68}u]), cur_, 1.0 - xd[${b + 13}u]), 0.5); }`;
+        if (rgbo.w < 0.9) { let tci = clamp(i32(${cvar} * 254.0 + 0.5), 0, 255); let cur_ = select(pal[${li * 256}u + u32(tci)].xyz, rgbo.xyz * select(1.0, 256.0 / 200.0, rgbo.w > 0.7), rgbo.w > 0.25); rgbo = vec4f(mix(vec3f(xd[${b + 66}u], xd[${b + 67}u], xd[${b + 68}u]), cur_, 1.0 - xd[${b + 13}u]), 0.5); }`;
   let funcs = dofDef ? dofShapeFn(dofDef) + '\n\n' : '';
   let iterFns = '';
   layers.forEach((ly, li) => {
@@ -484,10 +496,15 @@ export function compileFlame(flame: Flame, nPoints: number): CompiledFlame {
       // (DIFFUSION/CYCLIC final) replaces, unlike a direct-colour variation's (rgbo.w 0.5 vs 1)
       // TARGET keeps the index (c1 = 1); TARGETG blends it like DIFFUSION
       const cstep = ct === 'CYCLIC' ? `        c = fract(c + (1.0 - 2.0 * xd[${b + 13}u]));`
-        : ct === 'DISTANCE' || ct === 'TARGET' ? '' : `        let cs = xd[${b + 13}u];\n        c = c * (1.0 - cs) + xd[${b + 12}u] * cs;`;
-      const dstep = ct === 'DISTANCE' ? `\n        if (rgbo.w < 0.75) { let dci = i32((xd[${b + 12}u] + length(np - p) * (2.0 - 2.0 * xd[${b + 13}u])) * 254.0 + 0.5) % 256; rgbo = vec4f(pal[${li * 256}u + u32(dci)].xyz, 0.5); }`
+        : ct === 'DISTANCE' || ct === 'TARGET' || ct === 'NONE' ? '' : `        let cs = xd[${b + 13}u];\n        c = c * (1.0 - cs) + xd[${b + 12}u] * cs;`;
+      // the carried RGB: a gradient step (DIFFUSION/CYCLIC) replaces it with palette[index] — tier 0 — unless a direct-colour
+      // variation then sets one; NONE keeps whatever the point carried; TARGET/DISTANCE read it after the variations
+      const gstep = usesCarry && (ct === undefined || ct === 'CYCLIC') ? '\n        rgbo = vec4f(0.0);'
+        : ct === 'TARGETG' ? `\n        if (rgbo.w < 0.25) { rgbo = vec4f(pal[${li * 256}u + u32(clamp(i32(c * 254.0 + 0.5), 0, 255))].xyz, 0.5); } // the carried RGB is palette[index] as it was: pin it before TARGETG blends the index` : '';
+      const dstep = ct === 'DISTANCE' ? `\n        if (rgbo.w < 0.9) { let dci = i32((xd[${b + 12}u] + length(np - p) * (2.0 - 2.0 * xd[${b + 13}u])) * 254.0 + 0.5) % 256; rgbo = vec4f(pal[${li * 256}u + u32(dci)].xyz, 0.5); }`
         : ct === 'TARGET' || ct === 'TARGETG' ? targetStep(b, li, 'c') : '';
       return `      case ${i}u: {
+${gstep}
 ${cstep}
         op = xd[${b + 14}u];${usesMods ? `\n        m = modBlend(m, ${b}u);` : ''}${usesMat ? `\n        mt = mt * (1.0 + xd[${b + 65}u]) * 0.5 + xd[${b + 64}u] * (1.0 - xd[${b + 65}u]) * 0.5;` : ''}
         np = applyX${li}_${i}(p, &c, &rs, &hide, &rgbo);${dstep}
@@ -496,10 +513,10 @@ ${cstep}
     // final transforms run in sequence (JWildfire: each further final takes the previous output)
     const isTarget = (x: XForm) => x.colorType === 'TARGET' || x.colorType === 'TARGETG';
     const finalStep = (fn: string, base: number, input: string, fx: XForm) => `
-      {
-        ${fx.colorType === 'CYCLIC' ? `dc = fract(dc + (1.0 - 2.0 * xd[${base + 13}u]));` : fx.colorType === 'DISTANCE' || fx.colorType === 'TARGET' ? '' : `let fcs = xd[${base + 13}u];\n        dc = dc * (1.0 - fcs) + xd[${base + 12}u] * fcs;`}${usesMods ? `\n        dm = modBlend(dm, ${base}u);` : ''}${fx.colorType !== 'DISTANCE' && !isTarget(fx) && (fx.colorType === 'CYCLIC' || fx.colorSpeed > 0) ? '\n        if (rgbo.w < 0.75) { rgbo = vec4f(0.0); } // gradient step: a DISTANCE plot colour is replaced by palette[index]' : ''}
+      {${fx.colorType === 'TARGETG' ? `\n        if (rgbo.w < 0.25) { rgbo = vec4f(pal[${li * 256}u + u32(clamp(i32(dc * 254.0 + 0.5), 0, 255))].xyz, 0.5); } // carried RGB = palette[index] as it was, before TARGETG blends the index` : ''}
+        ${fx.colorType === 'CYCLIC' ? `dc = fract(dc + (1.0 - 2.0 * xd[${base + 13}u]));` : fx.colorType === 'DISTANCE' || fx.colorType === 'TARGET' || fx.colorType === 'NONE' ? '' : `let fcs = xd[${base + 13}u];\n        dc = dc * (1.0 - fcs) + xd[${base + 12}u] * fcs;`}${usesMods ? `\n        dm = modBlend(dm, ${base}u);` : ''}${fx.colorType === undefined || fx.colorType === 'CYCLIC' ? '\n        rgbo = vec4f(0.0); // gradient step (DIFFUSION/CYCLIC): the carried RGB is replaced by palette[index] (a NONE final keeps it)' : ''}
       }
-      dp = ${fn}(${input}, &dc, &rs, &hide, &rgbo);${fx.colorType === 'DISTANCE' ? `\n      if (rgbo.w < 0.75) { let dci = i32((xd[${base + 12}u] + length(dp - ${input}) * (2.0 - 2.0 * xd[${base + 13}u])) * 254.0 + 0.5) % 256; rgbo = vec4f(pal[${li * 256}u + u32(dci)].xyz, 0.5); }` : isTarget(fx) ? targetStep(base, li, 'dc') : ''}`;
+      dp = ${fn}(${input}, &dc, &rs, &hide, &rgbo);${fx.colorType === 'DISTANCE' ? `\n      if (rgbo.w < 0.9) { let dci = i32((xd[${base + 12}u] + length(dp - ${input}) * (2.0 - 2.0 * xd[${base + 13}u])) * 254.0 + 0.5) % 256; rgbo = vec4f(pal[${li * 256}u + u32(dci)].xyz, 0.5); }` : isTarget(fx) ? targetStep(base, li, 'dc') : ''}`;
     let finalBlock = ly.final ? finalStep(`applyF${li}`, info.finalBase, 'p', ly.final) : '';
     ly.moreFinals.forEach((fx, k) => { finalBlock += finalStep(`applyF${li}_${k}`, info.moreBases[k], 'dp', fx); }); // dp starts as p
 
@@ -513,7 +530,7 @@ fn iterLayer${li}(idx: u32) {
   // variation instance (pre_stabilize resets there) — a few iterations, so an xform with a small weight is reached too
   var age = (rngs[idx].y >> 28u) & 7u;${solid ? '\n  var bdone = (rngs[idx].y & 0x80000000u) != 0u; // shadow maps: this walker already contributed its light-space bounds sample' : ''}
   var p = pt.xyz;
-  var c = pt.w;${usesMods ? '\n  var m = mods[idx];' : ''}${usesMat ? '\n  var mt = mats[idx];' : ''}
+  var c = pt.w;${usesMods ? '\n  var m = mods[idx];' : ''}${usesMat ? '\n  var mt = mats[idx];' : ''}${usesCarry ? '\n  var crgbv = crgb[idx];' : ''}
   let ca = cos(P.rotation);
   let sa = sin(P.rotation);
   let offX = P.fullW * 0.5 - P.tileX;
@@ -528,11 +545,12 @@ ${sel}
     var np = p;
     var op = 1.0;
     var hide = false;
-    var rgbo = vec4f(0.0); // direct RGB colour from dc_* variations (w = 1 when set)
+${usesCarry ? `    var rgbo = crgbv; // the RGB the point carries (JWildfire XYZPoint.redColor; tiers: see targetStep)` : `    var rgbo = vec4f(0.0); // direct RGB colour from dc_* variations (w = 1 when set)`}
     switch xi {
 ${cases}
       default: {}
     }
+    if (rgbo.w > 0.9) { rgbo.w = 0.8; } // a direct colour set this iteration becomes a carried one: the finals' colour steps apply to it (JWildfire resets rgbColor per transform)${usesCarry ? '\n    crgbv = rgbo;' : ''}
     prev = xi;
     p = np;
 
@@ -638,15 +656,15 @@ ${solid ? `    // JWildfire solid rendering: no density — the nearest point pe
     if (drawn && P.shadow.x == 2u) { shadowSplat(dp); }
     else if (drawn && P.shadow.x == 1u && !bdone) { bdone = true; shadowSplat(dp); }
     if (visible && fx >= 0.0 && fy >= 0.0 && fx < f32(P.width) && fy < f32(P.height) && drawn) {
-      var col = pal[${li * 256}u + min(u32(clamp(dc, 0.0, 1.0) * 255.99), 255u)];
-      if (rgbo.w > 0.25) { col = vec4f(clamp(rgbo.xyz, vec3f(0.0), vec3f(1.0)) * (256.0 / 200.0), 1.0); } // direct RGB is 0..255 in JWildfire, the palette 0..199.2 (RenderColor ×200/256): ×1.28 on our palette-relative scale
+      var col = pal[${li * 256}u + u32(clamp(i32(dc * 254.0 + 0.5), 0, 255))]; // JWildfire GradientColorStep: (int)(color·254 + 0.5), clamped
+      if (rgbo.w > 0.25) { col = vec4f(clamp(rgbo.xyz, vec3f(0.0), vec3f(1.0)) * select(1.0, 256.0 / 200.0, rgbo.w > 0.7), 1.0); } // direct RGB is 0..255 in JWildfire, the palette 0..199.2 (RenderColor ×200/256): ×1.28 on our palette-relative scale; tier-0.5 colours are already palette-scale
       if (dz < 1.0) { col = vec4f(mix(P.dimColor.xyz, col.xyz, dz), col.w); }
       let lw = xd[${8 + li}u] * (200.0 / 256.0); // JWildfire RenderColor scale: the shading sees palette·200/256/255
       solidSplat(u32(fy) * P.width + u32(fx), cz, dp, col.xyz * lw, ${usesMat ? 'mt' : '0.0'});
     }` : `    if (visible && fx >= 0.0 && fy >= 0.0 && fx < f32(P.width) && fy < f32(P.height)) {
       let hi = (u32(fy) * P.width + u32(fx)) * 4u;
-      var col = pal[${li * 256}u + min(u32(clamp(dc, 0.0, 1.0) * 255.99), 255u)];
-      if (rgbo.w > 0.25) { col = vec4f(clamp(rgbo.xyz, vec3f(0.0), vec3f(1.0)) * (256.0 / 200.0), 1.0); } // direct RGB is 0..255 in JWildfire, the palette 0..199.2 (RenderColor ×200/256): ×1.28 on our palette-relative scale${usesMods ? '\n      col = vec4f(applyColorMods(col.xyz, dm), col.w);' : ''}
+      var col = pal[${li * 256}u + u32(clamp(i32(dc * 254.0 + 0.5), 0, 255))]; // JWildfire GradientColorStep: (int)(color·254 + 0.5), clamped
+      if (rgbo.w > 0.25) { col = vec4f(clamp(rgbo.xyz, vec3f(0.0), vec3f(1.0)) * select(1.0, 256.0 / 200.0, rgbo.w > 0.7), 1.0); } // direct RGB is 0..255 in JWildfire, the palette 0..199.2 (RenderColor ×200/256): ×1.28 on our palette-relative scale; tier-0.5 colours are already palette-scale${usesMods ? '\n      col = vec4f(applyColorMods(col.xyz, dm), col.w);' : ''}
       if (dz < 1.0) { col = vec4f(mix(P.dimColor.xyz, col.xyz, dz), col.w); }
       let lw = op * xd[${8 + li}u]; // JWildfire layer weight: colour intensity multiplier (the density count is unaffected)
       // fixed-point colour accumulation is dithered so dim contributions (small weights/opacities) stay unbiased
@@ -659,7 +677,7 @@ ${solid ? `    // JWildfire solid rendering: no density — the nearest point pe
 ${symN > 1 ? '    }' : ''}
   }
 
-  pts[idx] = vec4f(p, c);${usesMods ? '\n  mods[idx] = m;' : ''}${usesMat ? '\n  mats[idx] = mt;' : ''}
+  pts[idx] = vec4f(p, c);${usesMods ? '\n  mods[idx] = m;' : ''}${usesMat ? '\n  mats[idx] = mt;' : ''}${usesCarry ? '\n  crgb[idx] = crgbv;' : ''}
   rngs[idx] = vec2u(rs, prev | (u32(fuse) << 8u) | (age << 28u)${solid ? ' | select(0u, 0x80000000u, bdone)' : ''});
 }
 `;
@@ -805,7 +823,7 @@ struct Params {
 @group(0) @binding(3) var<storage, read_write> rngs: array<vec2u>; // x: rng state, y: prev xform
 @group(0) @binding(4) var<storage, read_write> hist: array<atomic<u32>>;
 @group(0) @binding(5) var<storage, read> pal: array<vec4f>;
-${symWgsl}${usesMods ? MODS_WGSL : ''}${solid ? SOLID_KERNEL_WGSL : ''}${usesMat ? '\n@group(0) @binding(9) var<storage, read_write> mats: array<f32>; // per-point material index (JWildfire p.material)\n' : ''}${usesPset ? '\n@group(0) @binding(13) var<storage, read> pset: array<f32>; // CPU-built point sets (src/core/pointSets.ts), ' + PSET_STRIDE + ' floats per record' : ''}${usesMesh ? '\n@group(0) @binding(12) var<storage, read> mesh: array<f32>; // mesh samplers: face CDFs + triangles (src/core/meshes.ts)\n' : ''}
+${symWgsl}${usesMods ? MODS_WGSL : ''}${solid ? SOLID_KERNEL_WGSL : ''}${usesMat ? '\n@group(0) @binding(9) var<storage, read_write> mats: array<f32>; // per-point material index (JWildfire p.material)\n' : ''}${usesCarry ? '\n@group(0) @binding(14) var<storage, read_write> crgb: array<vec4f>; // per-point carried RGB + tier (JWildfire XYZPoint.redColor/greenColor/blueColor)\n' : ''}${usesPset ? '\n@group(0) @binding(13) var<storage, read> pset: array<f32>; // CPU-built point sets (src/core/pointSets.ts), ' + PSET_STRIDE + ' floats per record' : ''}${usesMesh ? '\n@group(0) @binding(12) var<storage, read> mesh: array<f32>; // mesh samplers: face CDFs + triangles (src/core/meshes.ts)\n' : ''}
 
 fn rnd(state: ptr<function, u32>) -> f32 {
   var x = *state;
@@ -965,7 +983,7 @@ ${lcases}
     });
   };
 
-  return { wgsl, dataSize, writeData, usesMods, solid, usesMat, usesMesh, usesPset };
+  return { wgsl, dataSize, writeData, usesMods, solid, usesMat, usesMesh, usesPset, usesCarry };
 }
 
 // ---- JWildfire DOF blur shapes (DOFBlurShapeType): the DOF jitter is a blur *variation* applied with weight dr =
