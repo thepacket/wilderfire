@@ -381,6 +381,21 @@ hundred extra faint-fringe pixels (GLOBAL_SHARPENING + DOF, the DE-fringe class)
 1 % — read the channel ratios against the channel means. `sunvoroni`'s region order stays approximate on purpose: no
 corpus flame uses the variation and an exact order means porting QuickHull3D itself.
 
+### Flame attributes that used to be dropped (2026-08-24)
+
+`smooth_gradient` (per layer; `SmoothGradientColorStep`: the gradient step lerps between entry `(int)(c·254)` and the next,
+black outside the map) is rendered — the kernel's gradient lookup is a per-layer function, stepped or smooth; Brokat_0
+with it on: 0.98 / blkMAE 4.7 / corr 0.98. `motion_blur_length/_timestep/_decay` are modelled and rendered as JWildfire's
+sub-frame packets (frame + length·step/2 − p·step, layer weights 1 − p²·decay·0.07/length, low-density brightness off),
+averaged after tonemapping by the video exporter (offscreen) and the single-tile hi-res export — approximate, since
+JWildfire iterates the packets into one raster. `gradient_map` + `gradient_map_hoffset/hscale/voffset/vscale/
+lcolor_add/lcolor_scale` round-trip (file basename, like `background_image`) but do not render yet: the step samples
+an image bilinearly at the transformed point (`TransformationGradientMapColorStep`: x' = (x·(1−s) + x·s·c + a·c)·hscale
++ hoffset, mirrored tiling on |x|), which needs a texture binding in the compute kernel and the image-store load the
+background image already has — the next piece. `post_noise`, `respect_cam_z_for_gradient` and `sld_render_bg_*` are
+not attributes of this JWildfire version (neither reader nor writer knows them; 0 corpus files) — struck from the list.
+`mixer_*` and `background_image` were done earlier (008f5e1, daf90cb).
+
 ## Image comparison (2026-08-17)
 
 Whole-image metrics vs headless JWildfire at 512 px / quality 100 (see the
