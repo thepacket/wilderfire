@@ -460,6 +460,7 @@ export class FlameRenderer {
       ] : []),
       ...(this.compiled?.usesMat ? [{ binding: 9, resource: { buffer: this.matsBuf } }] : []),
       ...(this.compiled?.usesCarry ? [{ binding: 14, resource: { buffer: this.crgbBuf } }] : []),
+      ...(this.compiled?.usesGmap ? [{ binding: 15, resource: (this.gmapTex ?? this.bgImgFallback).createView() }] : []),
       ...(this.compiled?.usesMesh ? [{ binding: 12, resource: { buffer: this.meshBuf } }] : []),
       ...(this.compiled?.usesPset ? [{ binding: 13, resource: { buffer: this.psetBuf } }] : []),
     ];
@@ -803,6 +804,7 @@ export class FlameRenderer {
     const bgWords = this.bgGradientWords(f, tile ? tile.tileX : 0, tile ? tile.tileY : 0, fullW / os, fullH / os);
     tf32.set(bgWords, 20);
     this.ensureBgImage(f);
+    this.ensureGradientMap(f);
     if (f.bgImage && this.bgImgTex) tf32[23] = 3; // background kind 3: the image
     // GammaCorrectionFilter: saturation is an HSL shift of (saturation − 1), clamped at −1;
     // foreground opacity scales alpha by 1 − atan(3·(v − 1))/1.25.
@@ -1126,7 +1128,27 @@ export class FlameRenderer {
   private bgImgSamp!: GPUSampler;
   private bgImgName = '';
   /** Forget the current background image so the next frame reloads it (after a new upload under the same name). */
-  invalidateBgImage() { this.bgImgName = ''; }
+  invalidateBgImage() { this.bgImgName = ''; this.gmapName = ''; }
+  private gmapTex: GPUTexture | null = null;
+  private gmapName = '';
+  /** The gradient map of the first layer that has one (JWildfire keeps it on single-layer flames): image store → texture;
+   *  the compute bind group is rebuilt when it lands. */
+  private ensureGradientMap(f: Flame) {
+    const name = f.layers.find((l) => l.gradientMap)?.gradientMap?.file ?? '';
+    if (name === this.gmapName) return;
+    this.gmapName = name;
+    const set = (tex: GPUTexture | null) => { if (this.gmapTex && this.gmapTex !== tex) this.gmapTex.destroy(); this.gmapTex = tex; this.rebuildComputeBG(); this.resetAccumulation(); };
+    if (!name) { set(null); return; }
+    imageGet(name).then(async (blob) => {
+      if (this.gmapName !== name) return;
+      if (!blob) { console.warn(`gradient map "${name}" is not in this browser's image store (Render → Background → ⬆ image loads pictures into it); colouring black`); set(null); return; }
+      const bmp = await createImageBitmap(blob);
+      if (this.gmapName !== name) return;
+      const tex = this.device.createTexture({ size: { width: bmp.width, height: bmp.height }, format: 'rgba8unorm', usage: GPUTextureUsage.TEXTURE_BINDING | GPUTextureUsage.COPY_DST | GPUTextureUsage.RENDER_ATTACHMENT });
+      this.device.queue.copyExternalImageToTexture({ source: bmp }, { texture: tex }, { width: bmp.width, height: bmp.height });
+      set(tex);
+    }).catch((e) => { console.warn('gradient map load failed', e); set(null); });
+  }
   private ensureBgImage(f: Flame) {
     const name = f.bgImage ?? '';
     if (name === this.bgImgName) return;

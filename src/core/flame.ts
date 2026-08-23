@@ -366,7 +366,7 @@ export function flameSignature(f: Flame): string {
   const names = (l?: VarInstance[]) => (l ?? []).map((v) => v.name + (v.priority !== undefined ? '@' + v.priority : '') + (v.name === 'subflame_wf' ? '{' + strHash(v.res?.flame ?? '') + '}' : '')).join(',');
   const sig = (x: XForm) => `${names(x.preVariations)}<${names(x.variations)}>${names(x.postVariations)}` + (x.colorType ? '~' + x.colorType : '') + (x.wfield ? `~wf(${x.wfield.params.map((p) => p.varName + '.' + p.paramName).join(',')})` : '');
   return visibleLayers(f)
-    .map((l) => l.xforms.map(sig).join('|') + '#' + [l.final, ...l.moreFinals].map((x) => (x ? sig(x) : '-')).join('#') + (l.smoothGradient ? '~smooth' : '') + (l.gradientMap ? '~gmap' : ''))
+    .map((l) => l.xforms.map(sig).join('|') + '#' + [l.final, ...l.moreFinals].map((x) => (x ? sig(x) : '-')).join('#') + (l.smoothGradient ? '~smooth' : '') + (l.gradientMap ? `~gmap(${[l.gradientMap.hOffset, l.gradientMap.hScale, l.gradientMap.vOffset, l.gradientMap.vScale, l.gradientMap.lcolorAdd, l.gradientMap.lcolorScale].map((v) => +v.toPrecision(6)).join(',')})` : ''))
     .join('@@') + (visibleLayers(f).some((l) => [...l.xforms, l.final, ...l.moreFinals].some((x) => x?.colorMods?.some((v) => v !== 0))) ? '~mods' : '')
     + (f.solid?.enabled ? '~solid' : '') + (usesMaterials(f) ? '~mat' : '')
     + (f.camDOF > 0 && f.camDOFShape && f.camDOFShape !== 'BUBBLE' ? `~dof(${f.camDOFShape},${(f.camDOFParams ?? []).map((v) => +v.toPrecision(6)).join(',')})` : '')

@@ -60,6 +60,8 @@ export interface CompiledFlame {
   usesMesh: boolean;
   /** A variation samples a CPU-built point set (binding 13 `pset`; dragon_js, sunflower, …). */
   usesPset: boolean;
+  /** A layer colours by gradient map: binding 15 `gmTex` (the image, sampled at the transformed point) must be bound. */
+  usesGmap: boolean;
 }
 
 /** All variation lists of an xform in serialized order: pre, main, post. */
@@ -422,6 +424,8 @@ export function kernelLayers(flame: Flame): Layer[] {
   return [...layers, ...subflameInstances(layers).map((vi) => parseSubFlame(vi.res?.flame, layers[0]?.palette ?? [])?.layer).filter((l): l is Layer => !!l)];
 }
 
+/** a WGSL f32 literal */
+const fl = (v: number) => { const t = Number.isFinite(v) ? v : 0; const str = String(t); return /[.e]/.test(str) ? str : str + '.0'; };
 export function compileFlame(flame: Flame, nPoints: number): CompiledFlame {
   const dofDef = dofShapeDef(flame);
   const layers = visibleLayers(flame);
@@ -443,6 +447,7 @@ export function compileFlame(flame: Flame, nPoints: number): CompiledFlame {
   // colour step does not simply rewrite it from the index — TARGET/TARGETG/DISTANCE/NONE — or a variation sets a direct
   // colour (then a later NONE/TARGET/DISTANCE xform sees it). Pure DIFFUSION/CYCLIC flames replace it every iteration.
   const writesRgb = (d: VariationDef | undefined) => !!d && (/\(\*rgb\)/.test(String(d.code)) || /\(\*rgb\)/.test(d.funcs ?? ''));
+  const usesGmap = layers.some((ly) => !!ly.gradientMap);
   const usesCarry = layers.some((ly) => ly.xforms.some((x) => (x.colorType !== undefined && x.colorType !== 'CYCLIC') || varLists(x).some((l) => l.some((vi) => vi.name === 'subflame_wf' || writesRgb(VARIATIONS[vi.name])))));
   const L = layers.length;
 
@@ -495,6 +500,23 @@ export function compileFlame(flame: Flame, nPoints: number): CompiledFlame {
   let rc = select(vec4f(0.0), pal[${li * 256}u + u32(clamp(r, 0, 255))], r >= 0 && r < 256);
   return vec4f(mix(lc.xyz, rc.xyz, ci - floor(ci)), 1.0); }\n\n`
       : `fn grad${li}(c: f32) -> vec4f { return pal[${li * 256}u + u32(clamp(i32(c * 254.0 + 0.5), 0, 255))]; }\n\n`;
+    if (ly.gradientMap) {
+      // TransformationGradientMapColorStep: the image sampled bilinearly at the transformed point, mirrored tiling on |x|,
+      // the local-colour terms (s = lcolor_scale, a = lcolor_add) letting the colour index shift the lookup; 0 outside
+      const g = ly.gradientMap;
+      funcs += `fn gmap${li}(p: vec3f, c: f32) -> vec3f {
+  let s = ${fl(g.lcolorScale)}; let a = ${fl(g.lcolorAdd)};
+  let x = (p.x * (1.0 - s) + p.x * s * c + a * c) * ${fl(g.hScale)} + ${fl(g.hOffset)};
+  let y = (p.y * (1.0 - s) + p.y * s * c + a * c) * ${fl(g.vScale)} + ${fl(g.vOffset)};
+  let dims = vec2i(textureDimensions(gmTex)); let W = f32(dims.x - 2); let H = f32(dims.y - 2);
+  if (W <= 0.0 || H <= 0.0) { return vec3f(0.0); }
+  let fx = abs(x); var ix = (fx * W) % W; if ((i32(fx) & 1) != 0) { ix = W - ix; }
+  let fy = abs(y); var iy = (fy * H) % H; if ((i32(fy) & 1) != 0) { iy = H - iy; }
+  let x0 = i32(ix); let y0 = i32(iy); let tx = ix - floor(ix); let ty = iy - floor(iy);
+  let lu = gmLoad(x0, y0, dims); let ru = gmLoad(x0 + 1, y0, dims); let lb = gmLoad(x0, y0 + 1, dims); let rb = gmLoad(x0 + 1, y0 + 1, dims);
+  return mix(mix(lu, ru, tx), mix(lb, rb, tx), ty);
+}\n\n`;
+    }
     ly.xforms.forEach((x, i) => {
       funcs += genXformFn(`applyX${li}_${i}`, x, info.bases[i], li * 256) + '\n\n';
     });
@@ -525,7 +547,7 @@ export function compileFlame(flame: Flame, nPoints: number): CompiledFlame {
 ${gstep}
 ${cstep}
         op = xd[${b + 14}u];${usesMods ? `\n        m = modBlend(m, ${b}u);` : ''}${usesMat ? `\n        mt = mt * (1.0 + xd[${b + 65}u]) * 0.5 + xd[${b + 64}u] * (1.0 - xd[${b + 65}u]) * 0.5;` : ''}
-        np = applyX${li}_${i}(p, &c, &rs, &hide, &rgbo);${dstep}
+        np = applyX${li}_${i}(p, &c, &rs, &hide, &rgbo);${dstep}${ly.gradientMap && (ct === undefined || ct === 'CYCLIC') ? `\n        if (rgbo.w < 0.9) { rgbo = vec4f(gmap${li}(np, c), 0.8); } // gradient map: the step's colour is the image at the point (0..255 scale, like a direct colour)` : ''}
       }`;
     }).join('\n');
     // final transforms run in sequence (JWildfire: each further final takes the previous output)
@@ -534,7 +556,7 @@ ${cstep}
       {${fx.colorType === 'TARGETG' ? `\n        if (rgbo.w < 0.25) { rgbo = vec4f(grad${li}(dc).xyz, 0.5); } // carried RGB = palette[index] as it was, before TARGETG blends the index` : ''}
         ${fx.colorType === 'CYCLIC' ? `dc = fract(dc + (1.0 - 2.0 * xd[${base + 13}u]));` : fx.colorType === 'DISTANCE' || fx.colorType === 'TARGET' || fx.colorType === 'NONE' ? '' : `let fcs = xd[${base + 13}u];\n        dc = dc * (1.0 - fcs) + xd[${base + 12}u] * fcs;`}${usesMods ? `\n        dm = modBlend(dm, ${base}u);` : ''}${fx.colorType === undefined || fx.colorType === 'CYCLIC' ? '\n        rgbo = vec4f(0.0); // gradient step (DIFFUSION/CYCLIC): the carried RGB is replaced by palette[index] (a NONE final keeps it)' : ''}
       }
-      dp = ${fn}(${input}, &dc, &rs, &hide, &rgbo);${fx.colorType === 'DISTANCE' ? `\n      if (rgbo.w < 0.9) { let dci = i32((xd[${base + 12}u] + length(dp - ${input}) * (2.0 - 2.0 * xd[${base + 13}u])) * 254.0 + 0.5) % 256; rgbo = vec4f(pal[${li * 256}u + u32(dci)].xyz, 0.5); }` : isTarget(fx) ? targetStep(base, li, 'dc') : ''}`;
+      dp = ${fn}(${input}, &dc, &rs, &hide, &rgbo);${ly.gradientMap && (fx.colorType === undefined || fx.colorType === 'CYCLIC') ? `\n      if (rgbo.w < 0.9) { rgbo = vec4f(gmap${li}(dp, dc), 0.8); }` : ''}${fx.colorType === 'DISTANCE' ? `\n      if (rgbo.w < 0.9) { let dci = i32((xd[${base + 12}u] + length(dp - ${input}) * (2.0 - 2.0 * xd[${base + 13}u])) * 254.0 + 0.5) % 256; rgbo = vec4f(pal[${li * 256}u + u32(dci)].xyz, 0.5); }` : isTarget(fx) ? targetStep(base, li, 'dc') : ''}`;
     let finalBlock = ly.final ? finalStep(`applyF${li}`, info.finalBase, 'p', ly.final) : '';
     ly.moreFinals.forEach((fx, k) => { finalBlock += finalStep(`applyF${li}_${k}`, info.moreBases[k], 'dp', fx); }); // dp starts as p
 
@@ -841,7 +863,7 @@ struct Params {
 @group(0) @binding(3) var<storage, read_write> rngs: array<vec2u>; // x: rng state, y: prev xform
 @group(0) @binding(4) var<storage, read_write> hist: array<atomic<u32>>;
 @group(0) @binding(5) var<storage, read> pal: array<vec4f>;
-${symWgsl}${usesMods ? MODS_WGSL : ''}${solid ? SOLID_KERNEL_WGSL : ''}${usesMat ? '\n@group(0) @binding(9) var<storage, read_write> mats: array<f32>; // per-point material index (JWildfire p.material)\n' : ''}${usesCarry ? '\n@group(0) @binding(14) var<storage, read_write> crgb: array<vec4f>; // per-point carried RGB + tier (JWildfire XYZPoint.redColor/greenColor/blueColor)\n' : ''}${usesPset ? '\n@group(0) @binding(13) var<storage, read> pset: array<f32>; // CPU-built point sets (src/core/pointSets.ts), ' + PSET_STRIDE + ' floats per record' : ''}${usesMesh ? '\n@group(0) @binding(12) var<storage, read> mesh: array<f32>; // mesh samplers: face CDFs + triangles (src/core/meshes.ts)\n' : ''}
+${symWgsl}${usesMods ? MODS_WGSL : ''}${solid ? SOLID_KERNEL_WGSL : ''}${usesMat ? '\n@group(0) @binding(9) var<storage, read_write> mats: array<f32>; // per-point material index (JWildfire p.material)\n' : ''}${usesCarry ? '\n@group(0) @binding(14) var<storage, read_write> crgb: array<vec4f>; // per-point carried RGB + tier (JWildfire XYZPoint.redColor/greenColor/blueColor)\n' : ''}${usesGmap ? '\n@group(0) @binding(15) var gmTex: texture_2d<f32>; // gradient map image (1×1 while absent)\nfn gmLoad(x: i32, y: i32, dims: vec2i) -> vec3f { if (x < 0 || y < 0 || x >= dims.x || y >= dims.y) { return vec3f(0.0); } return textureLoad(gmTex, vec2i(x, y), 0).xyz; } // getARGBValueIgnoreBounds: 0 outside\n' : ''}${usesPset ? '\n@group(0) @binding(13) var<storage, read> pset: array<f32>; // CPU-built point sets (src/core/pointSets.ts), ' + PSET_STRIDE + ' floats per record' : ''}${usesMesh ? '\n@group(0) @binding(12) var<storage, read> mesh: array<f32>; // mesh samplers: face CDFs + triangles (src/core/meshes.ts)\n' : ''}
 
 fn rnd(state: ptr<function, u32>) -> f32 {
   var x = *state;
@@ -1001,7 +1023,7 @@ ${lcases}
     });
   };
 
-  return { wgsl, dataSize, writeData, usesMods, solid, usesMat, usesMesh, usesPset, usesCarry };
+  return { wgsl, dataSize, writeData, usesMods, solid, usesMat, usesMesh, usesPset, usesCarry, usesGmap };
 }
 
 // ---- JWildfire DOF blur shapes (DOFBlurShapeType): the DOF jitter is a blur *variation* applied with weight dr =

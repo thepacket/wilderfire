@@ -348,6 +348,14 @@ describe('layer colouring options: smooth_gradient and gradient_map', () => {
     expect(roundTrip(g).flame.layers.map((l) => !!l.smoothGradient)).toEqual([true, false]);
     const { compileFlame } = await import('../src/gpu/codegen');
     expect(compileFlame(g, 1024).wgsl).toContain('mix(lc.xyz, rc.xyz, ci - floor(ci))');
+    // the gradient map: a texture binding, the sampling function with the layer's constants, the step after the transform
+    const cm = compileFlame(f, 1024);
+    expect(cm.usesGmap).toBe(true);
+    expect(cm.wgsl).toContain('@binding(15) var gmTex');
+    expect(cm.wgsl).toContain('fn gmap0(p: vec3f, c: f32)');
+    expect(cm.wgsl).toContain('* 2.0 + 0.1;'); // hscale, hoffset baked in
+    expect(cm.wgsl).toContain('rgbo = vec4f(gmap0(np, c), 0.8);');
+    expect(compileFlame(g, 1024).usesGmap).toBe(false);
     expect(normalizeFlame(JSON.parse(JSON.stringify(f)), GREY).layers[0].gradientMap?.lcolorAdd).toBe(0.5);
   });
 });

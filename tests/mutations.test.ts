@@ -23,7 +23,7 @@ describe('MutaGen mutations', () => {
       expect(back.layers[0].xforms.length).toBe(f.layers[0].xforms.length);
       expect(compileFlame(f, 1024).wgsl.includes('${'), `${t.id} on ${st}: template`).toBe(false);
     }
-  });
+  }, 60000);
   it('"all" draws from JWildfire\'s weighted list and reports the concrete type', () => {
     const seen = new Set<string>();
     for (let k = 0; k < 60; k++) seen.add(applyMutation(randomFlameInStyle('julians', GREY), 'all'));

@@ -389,10 +389,13 @@ with it on: 0.98 / blkMAE 4.7 / corr 0.98. `motion_blur_length/_timestep/_decay`
 sub-frame packets (frame + length·step/2 − p·step, layer weights 1 − p²·decay·0.07/length, low-density brightness off),
 averaged after tonemapping by the video exporter (offscreen) and the single-tile hi-res export — approximate, since
 JWildfire iterates the packets into one raster. `gradient_map` + `gradient_map_hoffset/hscale/voffset/vscale/
-lcolor_add/lcolor_scale` round-trip (file basename, like `background_image`) but do not render yet: the step samples
-an image bilinearly at the transformed point (`TransformationGradientMapColorStep`: x' = (x·(1−s) + x·s·c + a·c)·hscale
-+ hoffset, mirrored tiling on |x|), which needs a texture binding in the compute kernel and the image-store load the
-background image already has — the next piece. `post_noise`, `respect_cam_z_for_gradient` and `sld_render_bg_*` are
+lcolor_add/lcolor_scale` (file basename, like `background_image`) render: the compute kernel binds the image (binding 15
+`gmTex`, loaded from the image store like the background image; 1×1 while absent) and a per-layer `gmap()` samples it
+bilinearly at the transformed point the way `TransformationGradientMapColorStep` does — x' = (x·(1−s) + x·s·c + a·c)·hscale
++ hoffset over width−2, mirrored tiling on |x|, 0 outside — replacing the gradient step of DIFFUSION/CYCLIC transforms and
+finals (the colour is on the 0..255 scale, like a direct colour). `_gmap1` (the background-image fixture with the PNG as
+gradient map, hscale/vscale 0.7): 0.99 / blkMAE 0.3 / corr 0.99; without the map the same render's channel means are
+92/35/47 against 24/10/8 with it. The map's picture goes into the image store through the background-image uploader. `post_noise`, `respect_cam_z_for_gradient` and `sld_render_bg_*` are
 not attributes of this JWildfire version (neither reader nor writer knows them; 0 corpus files) — struck from the list.
 `mixer_*` and `background_image` were done earlier (008f5e1, daf90cb).
 
