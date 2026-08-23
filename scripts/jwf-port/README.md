@@ -240,7 +240,7 @@ java.util.Random(1000); the 1296-row transform machinery is exact), `mandala` 1.
 grey-ramp palette and 1.03–1.05 / 1.00 with real palettes (the rotator-map orbits, step counts and java.awt.Color
 HSB/RGB colour maps are unit-tested against Java reflection probes), `mandala2` (step grid and colours exact by the
 same probes; its image is a lattice of single points, so the two renderers' treatment of isolated dots dominates the
-Compare numbers — 1.2–1.5), `point_mirror_symmetry` (exact without the crop, 0.42–0.74 with it: JWildfire keeps
+Compare numbers — ≈1.5 for both its direct-colour and its index-colour modes once direct colours sit on JWildfire's scale), `point_mirror_symmetry` (exact without the crop, 0.42–0.74 with it: JWildfire keeps
 one ring of the last `buffer_size` valid points per render thread and feeds cropped points from it; ours is a
 per-walker ring of at most 32, a different sampling of the same set — approximate by design).
 
