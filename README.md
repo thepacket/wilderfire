@@ -168,7 +168,11 @@ in the stack.
   Julia3D, Solid Labyrinth, Spherical, Spherical3D, Spirals, Spirals3D, Splits,
   SubFlame, Synth, Tentacle, Tile Ball, Underwater, Xenomorph — or "Any", which
   picks one at random like JWildfire's "All"; the WilderFire randomizer stays as
-  its own entry. Not transcribed: the generators built on user images, scripts
+  its own entry. Two more selects pick the **random symmetry** (X axis / Y
+  axis / Point, any, sparse) and the **random weighting field** (basic,
+  cellular, fractal noise, any, sparse) generators JWildfire adds on top, and
+  🎲 samples like its random batch: up to eight candidates, the first whose
+  probe render covers enough of the picture. Not transcribed: the generators built on user images, scripts
   or downloads (ColorMap, Raster, WikimediaCommons, RunRandomScript,
   FlameWithBackground, Layers) and the three whose look rests on an unported
   variation (Duckies, Painterly, Rays)
@@ -242,7 +246,14 @@ in the stack.
   Loading a **flame pack** (a JWildfire `.flame` file holding many flames)
   opens a chooser: load one, or add them all to the library at once — each
   entry gets a thumbnail rendered on the spot
-- **Mutation grid** (MutaGen-style) — 3×3 explorer of random mutations
+- **Mutation grid** (JWildfire's MutaGen) — a 3×3 explorer around the current
+  flame: edge tiles carry one mutation, corners two, of the selected **trend**
+  (All, Add transform, Add variation, Change weight/xaos, Gradient position,
+  Local gamma, Affine, Affine 3D, Bokeh, Background colour, Random flame,
+  Random Z transform, Random gradient, Random parameter, Similar gradient,
+  Weighting field, Colour type — MutaGen's own mutations, transcribed) at a
+  chosen strength; like MutaGen, a candidate must cover enough of a small probe
+  render and differ enough from the base before it earns a tile
   rendered offscreen; click to adopt and keep exploring
 - Progressive refinement with a quality cap and a **wall-clock limit** (Engine →
   Stop after, 30 s by default; whichever comes first ends the live render,

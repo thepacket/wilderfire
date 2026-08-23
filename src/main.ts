@@ -5,7 +5,7 @@ import './style.css';
 import { App, el, openModal } from './ui/common';
 import { FlameRenderer } from './gpu/renderer';
 import { PRESETS } from './core/presets';
-import { randomFlame } from './core/random';
+
 import { buildTransformsPanel } from './ui/transformsPanel';
 import { buildRenderPanel } from './ui/renderPanel';
 import { buildPalettePanel } from './ui/palettePanel';
@@ -94,13 +94,23 @@ async function boot() {
   const LS_STYLE = 'wilderfire.randomStyle';
   const styleSel = el('select', 'rand-style') as HTMLSelectElement;
   styleSel.title = 'Style of the next random flame — "Any" picks one of JWildfire\'s generators at random; "WilderFire" is the built-in contractive randomizer';
+  // JWildfire's random-batch companions: a post symmetry and a weighting field, each drawn by a generator of its own
+  const LS_SYMM = 'wilderfire.randomSymmetry', LS_WFIELD = 'wilderfire.randomWField';
+  const symmSel = el('select', 'rand-style') as HTMLSelectElement;
+  symmSel.title = 'Symmetry of the next random flame (JWildfire\'s random symmetry generators): None, one of the three at random, sparse (a third of the flames get one), or X axis / Y axis / Point';
+  const wfieldSel = el('select', 'rand-style') as HTMLSelectElement;
+  wfieldSel.title = 'Weighting field of the next random flame (JWildfire\'s random weighting-field generators): None, any noise at random, sparse (a third of the flames get one), or basic / cellular / fractal noise';
   const randBtn = el('button', 'primary', '🎲 Randomize');
   randBtn.onclick = async () => {
-    app.flameSource = undefined;
-    const style = styleSel.value;
-    if (style === 'wilderfire') { app.setFlame(randomFlame()); return; }
-    const { randomFlameInStyle } = await import('./core/randomStyles');
-    app.setFlame(randomFlameInStyle(style));
+    if (randBtn.disabled) return;
+    randBtn.disabled = true;
+    try {
+      const { sampleRandomFlame } = await import('./ui/randomSampler');
+      // JWildfire's LOW batch quality (8 candidates, coverage ≥ 0.32) within a few seconds — every candidate costs a kernel compile
+      const f = await sampleRandomFlame(app, { style: styleSel.value, symmetry: (symmSel.value || 'sparse') as never, wfield: (wfieldSel.value || 'sparse') as never, quality: 'low', budgetMs: 3000, onProgress: (i, n) => { randBtn.textContent = `🎲 ${i}/${n}`; } });
+      app.flameSource = undefined;
+      app.setFlame(f);
+    } finally { randBtn.disabled = false; randBtn.textContent = '🎲 Randomize'; }
   };
   (async () => {
     const { RANDOM_STYLES } = await import('./core/randomStyles');
@@ -110,8 +120,15 @@ async function boot() {
     }
     styleSel.value = localStorage.getItem(LS_STYLE) ?? 'any';
     if (!styleSel.value) styleSel.value = 'any';
+    const { SYMMETRY_KINDS, WFIELD_KINDS } = await import('./core/mutations');
+    for (const k of SYMMETRY_KINDS) { const o = el('option', '', 'Symmetry: ' + k.name) as HTMLOptionElement; o.value = k.id; symmSel.append(o); }
+    for (const k of WFIELD_KINDS) { const o = el('option', '', 'Field: ' + k.name) as HTMLOptionElement; o.value = k.id; wfieldSel.append(o); }
+    symmSel.value = localStorage.getItem(LS_SYMM) ?? 'sparse'; if (!symmSel.value) symmSel.value = 'sparse'; // JWildfire's defaults: "(All, sparse)" for both
+    wfieldSel.value = localStorage.getItem(LS_WFIELD) ?? 'sparse'; if (!wfieldSel.value) wfieldSel.value = 'sparse';
   })();
   styleSel.onchange = () => localStorage.setItem(LS_STYLE, styleSel.value);
+  symmSel.onchange = () => localStorage.setItem(LS_SYMM, symmSel.value);
+  wfieldSel.onchange = () => localStorage.setItem(LS_WFIELD, wfieldSel.value);
 
   const mutBtn = el('button', '', '🧬 Mutate');
   mutBtn.title = 'Explore mutations of the current flame';
@@ -213,7 +230,7 @@ async function boot() {
   };
   nameInp.addEventListener('change', () => { app.flame.name = nameInp.value.trim(); app.commitTone('name'); showName(); });
   nameInp.addEventListener('keydown', (e) => { if (e.key === 'Enter' || e.key === 'Escape') { if (e.key === 'Escape') showName(); nameInp.blur(); } });
-  header.append(logo, presetSel, styleSel, randBtn, mutBtn, undoBtn, redoBtn, nameInp, provEl, shareBtn, saveBtn, libBtn, triBtn, themeBtn, aboutBtn);
+  header.append(logo, presetSel, styleSel, symmSel, wfieldSel, randBtn, mutBtn, undoBtn, redoBtn, nameInp, provEl, shareBtn, saveBtn, libBtn, triBtn, themeBtn, aboutBtn);
 
   // ---------- Layout ----------
   const main = el('div', 'main');

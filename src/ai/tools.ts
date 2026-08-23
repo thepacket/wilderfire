@@ -58,9 +58,10 @@ export const TOOL_DEFS: ToolDef[] = [
     parameters: { type: 'object', properties: { id: str }, required: ['id'] } } },
   { type: 'function', function: { name: 'library_save', description: 'Save the current flame into the library (with a thumbnail), optionally renaming it first.',
     parameters: { type: 'object', properties: { name: { ...str, description: 'new name (optional)' } } } } },
-  { type: 'function', function: { name: 'randomize', description: 'Replace the flame with a fresh random flame (a starting point; the old one is in undo). Styles: any (default, one of JWildfire\'s generators), wilderfire (the built-in contractive randomizer), or a JWildfire style id: bubbles, julians, splits, spherical, ghosts, tentacle, linear, sierpinsky, galaxies, machine, brokat, spirals, phoenix, juliandisc, julianrings, xenomorph, outlines, duality.',
-    parameters: { type: 'object', properties: { style: { ...str, description: 'style id (default any)' } } } } },
-  { type: 'function', function: { name: 'mutate', description: 'Apply one random mutation to the current flame (a variation on the theme; the old one is in undo).', parameters: { type: 'object', properties: {} } } },
+  { type: 'function', function: { name: 'randomize', description: 'Replace the flame with a fresh random flame (a starting point; the old one is in undo), sampled like JWildfire\'s random batch (up to 16 candidates, the first that covers enough of the picture). Styles: any (default, one of JWildfire\'s 48 generators), wilderfire (the built-in contractive randomizer), or a style id — bubbles, julians, splits, spherical, ghosts, tentacle, linear, sierpinsky, galaxies, machine, brokat, spirals, phoenix, juliandisc, julianrings, xenomorph, outlines, duality, simple, simple_experimental, affine3d, edisc, mandelbrot, orchids, simpletiling, synth, tileball, underwater, gnarl, gnarl_experimental, bubbles3d, bubbles3d_experimental, flowers3d, flowers3d_filled, spherical3d, cross, brokat3d, gnarl3d, spirals3d, subflame, blackandwhite, bokeh, solid_experimental, solid_julia3d, solid_labyrinth, solid_stunning, solid_recursive, solid_shadows.',
+    parameters: { type: 'object', properties: { style: { ...str, description: 'style id (default any)' }, symmetry: { type: 'string', enum: ['none', 'all', 'sparse', 'xaxis', 'yaxis', 'point'], description: 'post symmetry generator (default sparse: a third of the flames get one)' }, wfield: { type: 'string', enum: ['none', 'all', 'sparse', 'basic', 'cellular', 'fractal'], description: 'weighting-field generator (default sparse)' } } } } },
+  { type: 'function', function: { name: 'mutate', description: 'Apply a MutaGen mutation to the current flame (a variation on the theme; the old one is in undo). Types: all (default, one at random), add_transform, add_variation, change_weight (xaos), gradient_position, local_gamma, affine, affine_3d, bokeh, random_bg_color, random_flame, random_ztransform, random_gradient, random_parameter, similar_gradient, weighting_field, color_type.',
+    parameters: { type: 'object', properties: { type: { ...str, description: 'mutation type (default all)' }, strength: { ...num, description: '0.1…3, default 1' }, count: { ...num, description: 'how many mutations to apply in a row (1…5, default 1)' } } } } },
   { type: 'function', function: { name: 'undo', description: 'Undo the last change to the flame.', parameters: { type: 'object', properties: {} } } },
   { type: 'function', function: { name: 'redo', description: 'Redo the change undone last.', parameters: { type: 'object', properties: {} } } },
   { type: 'function', function: { name: 'share_link', description: 'A link that opens the current flame in WilderFire (the flame is encoded in the URL itself; nothing is uploaded). Show it to the user.', parameters: { type: 'object', properties: {} } } },
@@ -207,16 +208,21 @@ export async function runTool(name: string, argsJson: string, env: ToolEnv): Pro
         return { text: `Saved "${app.flame.name || 'untitled'}" to the library.` };
       }
       case 'randomize': {
+        const { sampleRandomFlame } = await import('../ui/randomSampler');
+        const sym = s('symmetry'), wf = s('wfield');
+        const f = await sampleRandomFlame(app, { style: s('style') ?? 'any', symmetry: (['none', 'all', 'sparse', 'xaxis', 'yaxis', 'point'].includes(sym ?? '') ? sym : 'sparse') as never, wfield: (['none', 'all', 'sparse', 'basic', 'cellular', 'fractal'].includes(wf ?? '') ? wf : 'sparse') as never });
         app.flameSource = undefined;
-        const style = s('style') ?? 'any';
-        if (style === 'wilderfire') { const { randomFlame } = await import('../core/random'); app.setFlame(randomFlame(), 'ai'); }
-        else { const { randomFlameInStyle } = await import('../core/randomStyles'); app.setFlame(randomFlameInStyle(style), 'ai'); }
-        return afterChange(env, `Random flame "${app.flame.name}" loaded.`);
+        app.setFlame(f, 'ai');
+        return afterChange(env, `Random flame "${app.flame.name}" loaded${f.postSymmetry ? ` (post symmetry ${f.postSymmetry.type})` : ''}.`);
       }
       case 'mutate': {
-        const { mutateFlame } = await import('../ui/mutate');
-        app.setFlame(mutateFlame(app.flame), 'ai');
-        return afterChange(env, 'Mutation applied.');
+        const { mutateFlameWith } = await import('../ui/mutate');
+        const { MUTATION_TYPES } = await import('../core/mutations');
+        const type = s('type') ?? 'all';
+        if (!MUTATION_TYPES.some((t) => t.id === type)) return { text: `Unknown mutation type "${type}" — one of ${MUTATION_TYPES.map((t) => t.id).join(', ')}.` };
+        const { flame, applied } = mutateFlameWith(app.flame, type as never, Math.max(0.1, Math.min(3, n('strength') ?? 1)), Math.max(1, Math.min(5, Math.round(n('count') ?? 1))));
+        app.setFlame(flame, 'ai');
+        return afterChange(env, `Mutation applied: ${applied.join(' + ')}.`);
       }
       case 'get_engine': {
         if (!app.engine) return { text: 'Engine settings are not available in this view.' };

@@ -114,12 +114,12 @@ const FNCLST_EXPERIMENTAL_RAW = ['blur3D', 'bubble', 'escher', 'rays', 'epispira
   'sintrange', 'waves2b', 'elliptic', 'waves', 'swirl', 'glynnSim1', 'eclipse', 'bwraps7', 'layered_spiral', 'heart_wf', 'colorscale_wf', 'boarders', 'secant2', 'waffle', 'lissajous', 'hypertile', 'circus',
   'lazyTravis', 'ovoid3d', 'circleblur', 'sineblur', 'starblur', 'lace_js', 'japanese_maple_leaf', 'fdisc'];
 let FNCLST_EXPERIMENTAL: string[] | null = null; // filtered on first use: the JWildfire registry loads lazily at startup
-const experimental = () => { if (!FNCLST_EXPERIMENTAL) FNCLST_EXPERIMENTAL = filterVariations(FNCLST_EXPERIMENTAL_RAW); return FNCLST_EXPERIMENTAL[randomInt(FNCLST_EXPERIMENTAL.length)]; };
+export const experimental = () => { if (!FNCLST_EXPERIMENTAL) FNCLST_EXPERIMENTAL = filterVariations(FNCLST_EXPERIMENTAL_RAW); return FNCLST_EXPERIMENTAL[randomInt(FNCLST_EXPERIMENTAL.length)]; };
 
 /** VariationFuncList.getRandomVariationname: any variation this build renders (the registry minus image/text ones,
  *  which are not in it anyway); optionally only 2D (no 3d/z flag) or 3D ones. */
 let allNames: string[] | null = null;
-function randomVariationName(type?: '2d' | '3d'): string {
+export function randomVariationName(type?: '2d' | '3d'): string {
   if (!allNames) allNames = Object.keys(VARIATIONS).filter(saveable);
   for (let tries = 0; tries < 200; tries++) {
     const n = allNames[randomInt(allNames.length)];
@@ -144,12 +144,10 @@ const v = (name: string, weight: number, params: Record<string, number> = {}, pr
 };
 const addVar = (x: JX, weight: number, name: string, params?: Record<string, number>, priority?: number) => { x.vars.push(v(name, weight, params, priority)); return x.vars[x.vars.length - 1]; };
 
-/** VariationFunc.mutate on a random variation of the layer (RandomParamMutation.setRandomFlameProperty) */
-function mutateRandomParam(xs: JX[], amount: number) {
-  const all = xs.flatMap((x) => x.vars).filter((vi) => Object.keys(vi.params).length);
-  if (!all.length) return;
-  const vi = all[randomInt(all.length)];
+/** VariationFunc.mutate: nudge one random parameter of the instance (ints by ≥1, doubles by a tenth of the amount or a percentage) */
+export function varMutate(vi: VarInstance, amount: number) {
   const keys = Object.keys(vi.params);
+  if (!keys.length) return;
   const k = keys[randomInt(keys.length)];
   const def = (VARIATIONS[vi.name] as { params?: { name: string; int?: boolean }[] })?.params?.find((p) => p.name === k);
   const o = vi.params[k];
@@ -160,6 +158,12 @@ function mutateRandomParam(xs: JX[], amount: number) {
     else step = o >= 0 ? (o / 100) * amount : (o / -100) * amount;
     vi.params[k] = o + step;
   }
+}
+/** VariationFunc.mutate on a random variation of the layer (RandomParamMutation.setRandomFlameProperty) */
+function mutateRandomParam(xs: JX[], amount: number) {
+  const all = xs.flatMap((x) => x.vars).filter((vi) => Object.keys(vi.params).length);
+  if (!all.length) return;
+  varMutate(all[randomInt(all.length)], amount);
 }
 const randomParamMutation = (xs: JX[], strength = 1) => {
   mutateRandomParam(xs, 6 * (0.25 + 0.75 * rnd()) * strength);
