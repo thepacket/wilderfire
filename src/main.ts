@@ -104,7 +104,8 @@ async function boot() {
   };
   (async () => {
     const { RANDOM_STYLES } = await import('./core/randomStyles');
-    for (const [value, label] of [['any', 'Any style'], ['wilderfire', 'WilderFire'], ...RANDOM_STYLES.map((s) => [s.id, s.name] as [string, string])]) {
+    const byName = [...RANDOM_STYLES].sort((a, b) => a.name.localeCompare(b.name)); // JWildfire lists its generators alphabetically
+    for (const [value, label] of [['any', 'Any style'], ['wilderfire', 'WilderFire'], ...byName.map((s) => [s.id, s.name] as [string, string])]) {
       const o = el('option', '', label) as HTMLOptionElement; o.value = value; styleSel.append(o);
     }
     styleSel.value = localStorage.getItem(LS_STYLE) ?? 'any';

@@ -6,16 +6,16 @@ import { flameToXML, importFlameText } from '../src/core/flameXML';
 const GREY = Array.from({ length: 256 }, (_, i) => [i / 255, i / 255, i / 255] as [number, number, number]);
 
 describe('random flame styles', () => {
-  it('lists 18 styles with distinct ids', () => {
-    expect(RANDOM_STYLES).toHaveLength(18);
-    expect(new Set(RANDOM_STYLES.map((s) => s.id)).size).toBe(18);
+  it('lists 48 styles with distinct ids (18 + the 30 of the second batch)', () => {
+    expect(RANDOM_STYLES).toHaveLength(48);
+    expect(new Set(RANDOM_STYLES.map((s) => s.id)).size).toBe(48);
   });
   it('every style makes valid, renderable flames — repeatedly (the generators are random)', () => {
     for (const { id, name } of RANDOM_STYLES) {
       for (let k = 0; k < 12; k++) {
         const f = randomFlameInStyle(id, GREY);
         expect(f.name.startsWith(name + ' - ')).toBe(true);
-        expect(f.layers).toHaveLength(1);
+        expect([1, 2]).toContain(f.layers.length); // Solid (shadows) — also behind Black&White / Bokeh — adds a floor layer
         expect(f.layers[0].xforms.length).toBeGreaterThan(0);
         for (const x of [...f.layers[0].xforms, f.layers[0].final, ...f.layers[0].moreFinals].filter(Boolean)) {
           for (const c of [...x!.affine, ...x!.post]) expect(Number.isFinite(c)).toBe(true);
@@ -31,7 +31,18 @@ describe('random flame styles', () => {
         // survives the .flame round trip
         const back = importFlameText(flameToXML(f), GREY).flame;
         expect(back.layers[0].xforms).toHaveLength(f.layers[0].xforms.length);
+        expect(back.layers.length).toBe(f.layers.length);
+        if (id.startsWith('solid')) expect(!!back.solid?.enabled).toBe(!!f.solid?.enabled);
       }
+    }
+  });
+  it('every style compiles to a kernel', async () => {
+    const { compileFlame } = await import('../src/gpu/codegen');
+    for (const { id } of RANDOM_STYLES) for (let k = 0; k < 3; k++) {
+      const f = randomFlameInStyle(id, GREY);
+      const c = compileFlame(f, 1024);
+      expect(c.wgsl.length, id).toBeGreaterThan(1000);
+      expect(c.wgsl.includes('${'), `${id}: unexpanded template`).toBe(false);
     }
   });
   it('"any" picks a style and an unknown id falls back to a random one', () => {

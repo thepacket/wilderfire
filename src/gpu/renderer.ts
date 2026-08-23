@@ -4,7 +4,7 @@
 
 import type { Flame } from '../core/flame';
 import { flameSignature, visibleLayers, MAX_LAYERS, LIGHT_DIFF_FUNCS } from '../core/flame';
-import { compileFlame, TONEMAP_WGSL, type CompiledFlame } from './codegen';
+import { compileFlame, kernelLayers, TONEMAP_WGSL, type CompiledFlame } from './codegen';
 import { buildSpatialFilters, solidFilterWeights, gaussianFilter1D, normFilterKernel, kernelCoeff, kernelSupport, FILT_FLOATS, MIX_LUT_BASE, MIX_LUT_N, type FilterKernel } from './filters';
 import { MIXER_KEYS } from '../core/flame';
 import { evalCurve } from '../core/motion';
@@ -468,7 +468,7 @@ export class FlameRenderer {
   /** Point-set variations: build (cached) and pack every set the flame uses into `psetBuf`; synchronous, so
    *  writeData right after sees the final offsets. */
   private ensurePointSets(flame: Flame) {
-    const keys = flamePointSetKeys(flame);
+    const keys = flamePointSetKeys({ layers: kernelLayers(flame) }); // sub-flames included
     const packKey = keys.join('|');
     if (!keys.length || packKey === this.psetPacked) return;
     const sets = keys.map(pointSetFor);
@@ -490,7 +490,7 @@ export class FlameRenderer {
    *  (cdf + triangles per key, offsets in `meshLayout` for the data writer). Returns false when something is
    *  still loading — the flame is re-set once it is. */
   private ensureMeshes(flame: Flame): boolean {
-    const keys = flameMeshKeys(flame);
+    const keys = flameMeshKeys({ layers: kernelLayers(flame) }); // sub-flames included
     if (!keys.length) return true;
     const packKey = keys.join('|');
     if (keys.every((k) => meshSampler(k))) {
@@ -516,7 +516,7 @@ export class FlameRenderer {
       }
       return true;
     }
-    Promise.all(keys.map(ensureMesh)).then(() => { if (this.flame && flameMeshKeys(this.flame).join('|') === packKey) this.setFlame(this.flame); }).catch((e) => this.onError?.(String(e)));
+    Promise.all(keys.map(ensureMesh)).then(() => { if (this.flame && flameMeshKeys({ layers: kernelLayers(this.flame) }).join('|') === packKey) this.setFlame(this.flame); }).catch((e) => this.onError?.(String(e)));
     return false;
   }
 

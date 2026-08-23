@@ -415,6 +415,13 @@ fn symApply(q: vec3f, i: u32) -> vec3f {
 `;
 }
 
+/** Every layer the kernel iterates: the flame's visible layers plus the first layer of each sub-flame a subflame_wf
+ *  instance embeds — the point sets / meshes those use must be packed like the flame's own. */
+export function kernelLayers(flame: Flame): Layer[] {
+  const layers = visibleLayers(flame);
+  return [...layers, ...subflameInstances(layers).map((vi) => parseSubFlame(vi.res?.flame, layers[0]?.palette ?? [])?.layer).filter((l): l is Layer => !!l)];
+}
+
 export function compileFlame(flame: Flame, nPoints: number): CompiledFlame {
   const dofDef = dofShapeDef(flame);
   const layers = visibleLayers(flame);
@@ -427,8 +434,11 @@ export function compileFlame(flame: Flame, nPoints: number): CompiledFlame {
   const symN = !psym ? 1 : psym.type === 'POINT' ? Math.min(64, Math.max(1, Math.round(psym.order))) + 1 : 2;
   const symWgsl = !psym ? '' : symmetryWgsl(psym, symN);
   const usesMat = solid && usesMaterials(flame);
-  const usesMesh = layers.some((ly) => [...ly.xforms, ...(ly.final ? [ly.final] : []), ...ly.moreFinals].some((x) => varLists(x).some((l) => l.some((vi) => VARIATIONS[vi.name]?.flags?.includes('mesh')))));
-  const usesPset = layers.some((ly) => [...ly.xforms, ...(ly.final ? [ly.final] : []), ...ly.moreFinals].some((x) => varLists(x).some((l) => l.some((vi) => VARIATIONS[vi.name]?.flags?.includes('pset')))));
+  // buffer-backed variations anywhere in the kernel — the layers and the sub-flames subflame_wf instances embed
+  const allXForms = (ly: Layer) => [...ly.xforms, ...(ly.final ? [ly.final] : []), ...ly.moreFinals];
+  const hasFlag = (flag: string) => kernelLayers(flame).some((ly) => allXForms(ly).some((x) => varLists(x).some((l) => l.some((vi) => VARIATIONS[vi.name]?.flags?.includes(flag)))));
+  const usesMesh = hasFlag('mesh');
+  const usesPset = hasFlag('pset');
   // JWildfire carries an RGB on the point across iterations (XYZPoint.redColor…): it only matters when a normal xform's
   // colour step does not simply rewrite it from the index — TARGET/TARGETG/DISTANCE/NONE — or a variation sets a direct
   // colour (then a later NONE/TARGET/DISTANCE xform sees it). Pure DIFFUSION/CYCLIC flames replace it every iteration.

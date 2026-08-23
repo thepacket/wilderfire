@@ -158,11 +158,20 @@ in the stack.
   photo on the canvas) turns a picture into the active layer's gradient:
   JWildfire's median-cut quantizer, 256 colours sorted by hue then brightness
 - **Random flame styles** — the style select next to 🎲 Randomize offers
-  JWildfire's own generators, transcribed: Bubbles, Julians, Splits, Spherical,
-  Ghosts, Tentacle, Linear, Sierpinsky, Galaxies, Machine, Brokat, Spirals,
-  Phoenix, Julian disc, Julian rings, Xenomorph, Outlines, Duality — or "Any",
-  which picks one at random like JWildfire's "All"; the WilderFire randomizer
-  stays as its own entry
+  48 of JWildfire's own generators, transcribed one for one (the same random
+  draws, constants, variation lists and affine moves): Affine3D, Black&White,
+  Bokeh, Brokat, Brokat3D, Bubbles, Bubbles3D (+ experimental), Cross, Duality,
+  EDisc, Flowers3D (stunning / filled), Galaxies, Ghosts, Gnarl (+ experimental),
+  Gnarl3D, Julian disc, Julian rings, Julians, Linear, Machine, Mandelbrot,
+  Orchids, Outlines, Phoenix, Sierpinsky, Simple (stunning / experimental),
+  Simple tiling, Solid (experimental / stunning / recursive / shadows), Solid
+  Julia3D, Solid Labyrinth, Spherical, Spherical3D, Spirals, Spirals3D, Splits,
+  SubFlame, Synth, Tentacle, Tile Ball, Underwater, Xenomorph — or "Any", which
+  picks one at random like JWildfire's "All"; the WilderFire randomizer stays as
+  its own entry. Not transcribed: the generators built on user images, scripts
+  or downloads (ColorMap, Raster, WikimediaCommons, RunRandomScript,
+  FlameWithBackground, Layers) and the three whose look rests on an unported
+  variation (Duckies, Painterly, Rays)
 - **Share links** — 🔗 in the header copies a link that opens the flame in
   WilderFire; the flame's `.flame` XML is deflated into the URL hash, so nothing
   is uploaded and the link works offline (a typical flame is ~2 KB of URL)
