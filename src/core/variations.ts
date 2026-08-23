@@ -15,12 +15,22 @@
 import type { JwfVariationDef } from './variations.jwf.ts';
 import { PSET_STRIDE, JavaRandom } from './pointSets';
 import { DF_HASH_FUNCS } from './wgslDf';
+import { PLOT_VARIATIONS } from './plots';
+import { KNOTS3D_PRESETS } from './plotPresets';
+
+/** A variation instance as the registry sees it (src/core/flame.ts VarInstance without the import). */
+export interface VarInst { params: Record<string, number>; res?: Record<string, string> }
 
 export interface VariationDef {
   /** numbers computed on the CPU from the params, written into the hidden `extra` slots (codegen data hook) */
   derive?: (params: Record<string, number>, res?: Record<string, string>) => number[];
   params?: { name: string; def: number; int?: boolean }[];
-  code: (w: string, p: string[], A: (i: number) => string) => string;
+  /** The snippet. `inst` is the instance being compiled (params + resources) for entries whose code depends on it
+   *  (the plot family inlines the instance's formula); such entries also give a `sigKey`. */
+  code: (w: string, p: string[], A: (i: number) => string, inst?: VarInst) => string;
+  /** What else of an instance the kernel code depends on (beyond the name/priority): its effective formula text, …
+   *  Part of the flame signature, so a change recompiles the kernel. */
+  sigKey?: (inst: VarInst) => string;
   /** JWildfire "prepost" pair: runs first in the stage (priority -2) on the input point (the inverse), while `code` runs last (priority 2) on the output. */
   preCode?: (w: string, p: string[], A: (i: number) => string) => string;
   /** JWildfire priority: -1 pre (mutates the input point t), 0 normal (adds to v), 1 post (mutates v). Default 0. */
@@ -245,6 +255,8 @@ export function kleinGenerators(P: Record<string, number>): number[] {
 }
 
 const HAND_VARIATIONS: Record<string, VariationDef> = {
+  // JWildfire's formula plot family (yplot2d_wf … isosfplot3d_wf): src/core/plots.ts
+  ...PLOT_VARIATIONS,
   // ---- klein_group (Möbius generators a, b and their inverses from a recipe; one picked per point, optionally never
   // the inverse of the previous one — that memory is a per-thread private, like JWildfire's prev_matrix field) ----
   klein_group: {
@@ -1581,6 +1593,26 @@ fn invMaxCurve(shape: i32, tin: f32, rot: f32, sc: f32, a: f32, b: f32, c: f32, 
     funcNames: ['meshPick'],
     funcs: MESH_FUNCS,
     code: (w, p) => meshCode(w, p, 17),
+  },
+
+  // ---- JWildfire knots3D (Knots3DFunc): a closed curve x(t), y(t), z(t) (t = 2π·step/steps) swept into a tube of
+  // `radius` with `facets` sides by Ammeraal's cable builder, sampled as a mesh (src/core/knots.ts builds it on the CPU).
+  // The formulas are preset `presetId`'s (src/core/plotPresets.ts) while presetId ≥ 0 — JWildfire's reading order — else
+  // the instance's xformula/yformula/zformula resources. Params in JWildfire's order, then the shared mesh params (the
+  // mesh scale defaults to 0.02: the preset knots are hundreds of units across); defaults are preset 0's.
+  knots3D: {
+    params: [
+      { name: 'presetId', def: 0, int: true }, { name: 'steps', def: KNOTS3D_PRESETS[0]?.p.steps ?? 1000, int: true }, { name: 'radius', def: KNOTS3D_PRESETS[0]?.p.radius ?? 1 }, { name: 'facets', def: KNOTS3D_PRESETS[0]?.p.facets ?? 4, int: true },
+      ...['a', 'b', 'c', 'd', 'e', 'f', 'g', 'h'].map((c) => ({ name: `param_${c}`, def: KNOTS3D_PRESETS[0]?.p[`param_${c}`] ?? 1 })),
+      ...MESH_PARAMS.map((pd) => (/^scale_/.test(pd.name) ? { ...pd, def: 0.02 } : pd)),
+    ],
+    extra: 3,
+    res: ['xformula', 'yformula', 'zformula', 'presetId_reference'],
+    flags: ['3d', 'z', 'mesh'],
+    types: ['3D', 'BASE_SHAPE', 'SIMULATION'],
+    funcNames: ['meshPick'],
+    funcs: MESH_FUNCS,
+    code: (w, p) => meshCode(w, p, 12),
   },
 
   // ---- JWildfire subflame_wf: a nested flame's chaos game (its first layer) run one step per call, the point returned

@@ -43,6 +43,7 @@ JWildfire source ──Oracle.java─▶ oracle-out.jsonl ◀── oracle-spec.
 | `../../src/dev/flameTest.ts` | Browser harness: imports every fixture flame, reports unsupported variations, compiles the kernel. |
 | `../../src/dev/renderCheck.ts`, `render-baseline.json` | **Render-regression check** (`await window.wilderfire.renderCheck()`, ~8 s): renders the fixtures, the JWildfire samples and the presets offscreen (256 px, 200 spp), reduces each image to a signature (mean luma, covered fraction, 8×8 block means, 16-bin luma histogram) and compares it with the checked-in baseline — a per-flame failure with the numbers when a change alters what WilderFire renders (engine semantics, tonemap, a port, the importer). Tolerances sit ~4× above the run-to-run noise (block MAE 0.02 vs 0.005 measured), so it catches a wrong variation / broken tonemap / dropped layer, not 1 % shifts. After an *intended* change: `renderCheck({ update: true })` re-records the baseline through the dev-server sink. Needs WebGPU, so it is a manual pre-push check, not CI. **The baseline is environment-sensitive at the coverage threshold** (2/255 luma — faint stray speckle): a browser/Dawn/driver update can flip those pixels and fail a *block* of borderline flames on coverage alone while mean/blocks/histogram still pass (seen 2026-08-21: ~10 flames uniformly −0.03 coverage on byte-identical code, run-to-run spread ≤ 0.014). That signature — coverage-only failures, all in the same direction, on code that matches the recording commit — means *re-record*, not debug. A genuine code regression shows in mean/blocks/histogram too, or on flames outside the borderline set. |
 | `mkfix.mjs`, `extract2.mjs`, `probes/*.java` | Fixture tools: `node scripts/jwf-port/mkfix.mjs <id> '<xform attrs>' [scale] [white\|gray\|graymin] [min]` writes a two-xform fixture around one variation (a corpus header, or `min` for a plain one — keep `saturation` at 1: JWildfire's saturation shift turns greys red); `node scripts/jwf-port/extract2.mjs '<regex>' <id> [skip]` picks the first corpus flame matching a regex with no unportable variation; the probes (compile against the JWildfire tree: `javac -d out -cp "$CP" probes/MProbe.java`) print a variation's private tables by reflection — mandala primitives / mandala2 grids (`MProbe`), snowflake points (`SProbe`), sunvoroni edges/regions/triangles (`VProbe`), klein_group generators (`KProbe`), java.awt.Color maps (`CProbe`) — the way to tell a table bug from a kernel bug. |
+| `plot-presets.mjs` | Generates `src/core/plotPresets.ts` (the formula presets of the plot family and knots3D) from the JWildfire tree's `plot/*_presets.txt`, parsed the way `WFFuncPresets` parses them (see *The formula plot family*). `node scripts/jwf-port/plot-presets.mjs <jwf tree>`. |
 | `../../src/dev/flameCompare.ts`, `RenderOne.java`, `Compare.java` | Whole-image comparison against headless JWildfire: `await window.wilderfire.flameCompare()` renders the fixtures, the bundled JWildfire samples and the authored presets offscreen (512 px wide, quality 100) into `compare-out/` (PNG + the exact .flame XML, gitignored); `java … Compare <repo>/compare-out` renders the same XML with JWildfire (cached as `<id>.jwf.png`) and prints per-flame metrics — mean luma of both, ratio, coverage, 16×16-block MAE, luma-histogram intersection, block correlation, per-channel R/G/B mean ratios (flag `channel` when one strays > 0.2 from the luma ratio: a colour-scale error cancelling a pattern error hid behind a 1.04 luma ratio once) — with flags. Numbers only; no pixels are judged by eye. `RenderOne.java` renders one .flame to PNG. |
 
 ## Regenerating
@@ -97,9 +98,10 @@ hash of the continuous input point, `iconattractor_js` presetId table,
 itself is order-dependent (`dc_circuits` accumulates a member `S` across
 points, `dc_gnarly` updates only 2 of its 6 gaussian summands — `& 5` — so its
 blur depends on the render's init randoms). Together with the 70 hand-written
-flam3 entries the app registry has 940 variations.
+flam3 entries the app registry has 940 variations; with the hand ports of the point-set family, the meshes,
+the formula plots and knots3D (below) it holds **983 of JWildfire's 1,026**.
 
-### What is not ported (50)
+### What is not ported (43)
 
 `data/unportable.json` is the definitive list — every JWildfire variation is
 either in the registry or in that file with a category, and `gen.ts` writes it
@@ -108,8 +110,8 @@ variation was skipped. Categories:
 
 | category | count | why |
 |---|---|---|
-| user-code | 21 | compiles user-supplied code or a formula at run time (`custom_wf`, `dc_code`, `glsl_code`, `c_var`, `ducks`, `fract_formula_*`, the `yplot2d_wf`… plot family, `colordomain`); the WebGPU kernel has no run-time compiler |
-| external-content | 25 | renders external content that would have to be uploaded to the GPU: sub-flames (`ringsubflame`, `glynns3subfl`), images (`post_bumpmap_wf`, `displacemap_wf`, `colormap_wf`, `kaleidoimg`, `plane_wf`, `wangtiles`), meshes (`terrain3D`, `metaballs3d_wf`, `knots3D`; `sattractor3D` IS ported — its formulas run through a small safe evaluator, src/core/formula.ts, and the tube is built on the CPU, src/core/sattractor.ts), `svg_wf`, `text_wf`, L-systems, brushes (`obj_mesh_wf` IS ported — the user loads the OBJ file into the browser's mesh store; `subflame_wf` IS ported — the sub-flame is compiled into the kernel) |
+| user-code | 15 | compiles user-supplied *code* at run time — Java (`custom_wf`, `custom_wf_full`, `pre_/post_custom_wf`, `dc_code`), GLSL (`glsl_code`), or a Java method body over a Complex class (`c_var`/`pre_/post_c_var`, `ducks`, `f_complex`, `colordomain`, `cut_c`) or the `fract_formula_*` complex syntax; the WebGPU kernel has no run-time compiler. **The formula-text plot family IS ported** (`yplot2d_wf`, `yplot3d_wf`, `parplot2d_wf`, `polarplot2d_wf`, `polarplot3d_wf`, `isosfplot3d_wf`, see *The formula plot family* below) |
+| external-content | 24 | renders external content that would have to be uploaded to the GPU: sub-flames (`ringsubflame`, `glynns3subfl`), images (`post_bumpmap_wf`, `displacemap_wf`, `colormap_wf`, `kaleidoimg`, `plane_wf`, `wangtiles`), meshes (`terrain3D`, `metaballs3d_wf`; `sattractor3D` and `knots3D` ARE ported — their formulas run through the safe evaluator of src/core/formula.ts and the tubes are built on the CPU, src/core/sattractor.ts / src/core/knots.ts), `svg_wf`, `text_wf`, L-systems, brushes (`obj_mesh_wf` IS ported — the user loads the OBJ file into the browser's mesh store; `subflame_wf` IS ported — the sub-flame is compiled into the kernel) |
 | point-set | 1 | `taprats` (needs the csk.taprats tiling library, which the sparse JWildfire tree does not carry); `neuron3D` builds a seed-shuffled 512-entry Perlin permutation table per instance. **Ported through the point-set mechanism (see below):** `dragon_js`, `sunflower`, `scrambly`, `dla_wf`, `snowflake_wf`, `brownian_js`, `htree_js`, `koch_js`, `tree_js`, `hilbert_js`, `klein_group`, `grid3d_wf`, `maurer_lines` (lines render mode), `szubieta`, `gpattern`, `curliecue`, `gosperisland_js`, `rsquares_js`, `arctruchet`, `triantruchet`, `meeple`, `mandala`, `mandala2`, `nsudoku`, `natural_foam`, `geometricPrimitives`, `point_mirror_symmetry`, `neuron3D`, `sunvoroni` |
 | engine | 2 | needs an engine feature WilderFire lacks: a variation instantiating another (`sphtiling3v2`), `post_dcztransl` (no Java class) |
 | resource-params | 1 | `dc_triantess` keeps its colours as byte-array ressources |
@@ -315,6 +317,64 @@ JWildfire — `GammaCorrectionFilter` keeps the exponent 0, i.e. `pow(intensity,
 above the threshold. The importer used to reject it and keep gamma 4 (renders at 0.5–0.6 of JWildfire's luma); now
 gamma 0 is kept, both tonemaps use exponent 0 for it (`gpow` keeps 0⁰ = 1 under fast-math), the JSON normaliser
 preserves it. `_ps_brownian_js` went from 0.51 / blkMAE 69 / corr 0.83 to 1.01 / 3.9 / 0.97.
+
+### The formula plot family and knots3D (2026-08-24)
+
+JWildfire's `yplot2d_wf`, `yplot3d_wf`, `parplot2d_wf`, `polarplot2d_wf`, `polarplot3d_wf` and `isosfplot3d_wf` evaluate a
+user formula per point — Java expression text (`sin(param_a*x)/cos(x*x)`, `pow((2*z),200)+pow((y/3),200)-1`, …) that
+JWildfire wraps in a method under `import static MathLib.*` and compiles with Janino at run time. The GPU snippets the
+dump carries for them are unusable (the dumper NPE'd on their palette lookup), so they are hand ports around a
+**formula compiler** (`src/core/formula.ts`): the text is parsed once into an AST with Java's typing — an int literal
+stays an int, so `1/2` is 0 and `1/2*x` is 0 while `x/2` is a double; comparisons and `&&`/`||`/`!` are booleans; `?:`
+unifies its branches — and emitted either as closures for the CPU (`compileFormula`, which `sattractor3D` and `knots3D`
+use) or as one WGSL expression (`formulaToWgsl`) that the variation snippet inlines (`let pl_y = …`). MathLib's
+functions and constants map to WGSL (`pow` → `powc` for negative bases with integral exponents, `atan2` → `atan2j`,
+`round` → `floor(x + 0.5)`, `rint` → `round`, `sign` → an int, `erf`/`lgamma` as helpers, `Math.`/`MathLib.` prefixes
+accepted); anything else — an unknown name, a method call, a statement — is rejected, and a rejected formula plots the
+zero curve with a console warning (JWildfire throws at init). Since the formula is part of the kernel, the registry
+entry's `code` now receives the *instance* (params + ressources) and a `sigKey` hook puts the effective formula text
+into the flame signature, so an edit recompiles the kernel.
+
+**Presets and ressources.** `scripts/jwf-port/plot-presets.mjs` reads JWildfire's `plot/*_presets.txt` exactly as
+`WFFuncPresets.parsePresets` does (`##id` blocks, prefix-matched tokens, `---` comments, JEP values such as `2.0 * pi`
+— and a trailing `;` JEP tolerates) into `src/core/plotPresets.ts` (136 plot presets + 24 knots). Which formula an
+instance evaluates follows JWildfire's *reading order*: `AbstractFlameReader` sets the ressources before the params, and
+`setParameter("preset_id", id ≥ 0)` calls `refreshFormulaFromPreset`, so **a preset id ≥ 0 overrides the formula
+ressource** and the ressource only counts at −1 (the editor sets −1 whenever the text or the preset's ranges are edited,
+`validatePresetId`); an id outside the table resolves to `createDefaultPreset` (`0.0`, `u/0.0/v`, `1.0`, `x`). The
+refresh also copies the preset's ranges and `param_a…f` — which a JWildfire-written file always carries explicitly, so
+the importer keeps plain defaults and only the transform editor's "↺ preset" button replays the refresh. (`sattractor3D`
+still resolves the other way round — own ressources first, the preset's when they are empty — which only differs for a
+hand-edited file that sets both a preset id and formulas.) The colormap /
+displacement-map ressources (images) round-trip but are not rendered: their colour modes leave the colour, as JWildfire
+does with no map loaded. `parplot2d_wf`'s `solid = 0` (u, v from the affine point instead of randoms; 0 corpus uses)
+is ported but was not Compare-verified — the resulting orbit is divergent in both renderers. The Solid random styles'
+`getRandom3DShape` now draws the five plot cases too (preset chosen like `getRandomPresetId`, never the last id).
+
+Compare (512 px / quality 100, grey-ramp fixtures so luma measures the colour index; fixtures `_pl_*`): `yplot2d_wf`
+preset 3 0.99 / blkMAE 0.2 / corr 1.00, an own formula with int division, `%`, `?:` and `pow` (`x*x*x/2 - 1/2*x +
+param_a*sin(3*x) + (x>1?0.5:0) + fabs(x)%0.7 - pow(x,2)/3`) **1.00 / 0.1 / 1.00**, `yplot3d_wf` 0.98 / 0.2 / 1.00,
+`parplot2d_wf` presets 0 and 13 0.99 / 0.2–0.3 / 1.00, `polarplot2d_wf` 0.99 / 0.1 / 1.00, `polarplot3d_wf` cylindrical
+and spherical 0.99 / 0.3 / 1.00, `isosfplot3d_wf` 0.99 / 0.2 / 1.00; corpus flames: three `parplot2d_wf` flames 1.00 /
+0.5–1.5 / 1.00, `polarplot3d_wf` 1.00 / 1.00, `yplot2d_wf` 0.99 / 1.00, an 8-xform / 11-final `isosfplot3d_wf` flame
+1.05 / 0.91, a 2-layer `polarplot2d_wf` flame 1.14 / 0.97 (the multi-layer remainder is not in the plot xforms).
+
+**knots3D** (`src/core/knots.ts`, 8 corpus uses) is `Knots3DFunc` line for line: the curve (x(t), y(t), z(t)) at
+t = 2π·step/steps, the first cross-section circle in the plane through the second curve point, every next circle the
+previous one rotated (Ammeraal's `initrotate`/`rotate`) about the axis through the intersection point of the chord
+planes, faces between consecutive rings, no caps; it shares the preset/ressource mechanism (`presetId`) and the mesh
+pipeline of `sattractor3D` (the mesh scale defaults to 0.02 like JWildfire's constructor — the preset knots are hundreds
+of units across). A reflection probe of `Knots3DFunc.getMesh()` gave the same ring centres to 1e-2 for a degenerate
+5-step / 60-facet corpus knot. Compare: preset 7 0.98 / 0.2 / 1.00, a 32-xform / 5-layer corpus flame 1.00 / 0.3 /
+1.00, the 5-step knot flame 1.00 / 1.4 / 0.99.
+
+Two things found on the way. (1) **Offscreen renders of a not-yet-loaded mesh were empty**: `renderRegion` awaits
+`ready()`, which called `setFlame` to pack the freshly prepared mesh — but a `setFlame` during a region is *deferred* to
+the region's end (the af00edb race fix), so the region rendered with 0 faces (a hi-res export or Compare of a mesh flame
+that had never been rendered live). `ready()` now packs the mesh and rewrites the data block in place. (2)
+**`post_point_symmetry_wf` capped `order` at 36** — JWildfire's GPU snippet sizes its sin/cos tables `[36]` while the
+Java allows any order (a corpus flame uses 60): the override computes the angle directly; that flame went from corr
+0.36 to 0.99.
 
 ### Direct colour scale and G.atan2 (2026-08-23)
 

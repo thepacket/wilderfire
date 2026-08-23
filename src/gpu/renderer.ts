@@ -1234,10 +1234,18 @@ export class FlameRenderer {
 
   async ready(): Promise<void> {
     if (!this.flame || !this.compiled?.usesMesh) return;
-    const keys = flameMeshKeys(this.flame);
+    const keys = flameMeshKeys({ layers: kernelLayers(this.flame) });
     await Promise.all(keys.map(ensureMesh));
     if (this.solid) await this.ensureReflMaps(this.flame);
-    if (!keys.every((k) => meshLayout.has(k)) || keys.join('|') !== this.meshPacked) this.setFlame(this.flame);
+    if (!keys.every((k) => meshLayout.has(k)) || keys.join('|') !== this.meshPacked) {
+      if (this.regionDepth > 0) {
+        // inside renderRegion a setFlame would be deferred to the region's end (the in-flight-region rule), so a mesh
+        // that finished loading just now is packed here and the data block rewritten (its face counts were 0)
+        this.ensureMeshes(this.flame);
+        this.compiled.writeData(this.flame, this.xdData);
+        this.device.queue.writeBuffer(this.xdBuf, 0, this.xdData, 0, this.compiled.dataSize);
+      } else this.setFlame(this.flame);
+    }
   }
 
   /** Offline stepping for video export: accumulate `passes` compute dispatches

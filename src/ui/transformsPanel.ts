@@ -1,7 +1,8 @@
 // Left panel: layer stack + xform list + editor for the selected transform.
 // All transform edits operate on the active layer.
 import { App, el, slider, numberInput, formatNum, XFORM_COLORS } from './common';
-import { compileFormula } from '../core/formula';
+import { compileFormula, formulaToWgsl } from '../core/formula';
+import { PLOT_FAMILIES, plotFormulas, plotPreset } from '../core/plots';
 import { sattractorFormulas } from '../core/sattractor';
 import { SATTRACTOR_PRESETS } from '../core/sattractorPresets';
 import type { XForm } from '../core/flame';
@@ -639,9 +640,54 @@ export function buildTransformsPanel(app: App, root: HTMLElement) {
           row.append(vp);
           item.append(row);
         }
+        // the plot family (yplot2d_wf … isosfplot3d_wf): the formula(s) the kernel compiles — the preset's while
+        // preset_id ≥ 0, the instance's own text once edited (JWildfire's validatePresetId sets preset_id to −1 then);
+        // "↺ preset" copies the preset's ranges and param_a…f as well, like refreshFormulaFromPreset
+        if (PLOT_FAMILIES[vi.name]) {
+          const fam = PLOT_FAMILIES[vi.name];
+          const row = el('div', 'var-params sattr-formulas');
+          const current = () => plotFormulas(vi.name, vi.params[fam.idParam] ?? -1, vi.res);
+          const inputs: HTMLInputElement[] = [];
+          for (const k of fam.formulas) {
+            const vp = el('span', 'vp');
+            const inp = el('input') as HTMLInputElement;
+            inp.type = 'text'; inp.spellcheck = false; inp.className = 'sattr-formula';
+            inp.value = current()[k];
+            inp.title = `${k}: a formula of ${fam.vars.join(', ')}, param_a…param_${fam.letters[fam.letters.length - 1]} and pi (JWildfire syntax: + - * / ?: and MathLib functions). Editing it sets ${fam.idParam} to -1.`;
+            inp.onchange = () => {
+              const text = inp.value.trim() || fam.dflt.f[k];
+              const vs: Record<string, string> = {}; for (const v of fam.vars) vs[v] = v; for (const c of fam.letters) vs['param_' + c] = 'p' + c;
+              try { formulaToWgsl(text, vs); } catch (e) { alert(`${k}: ${(e as Error).message}`); inp.classList.add('bad'); return; }
+              inp.classList.remove('bad');
+              // the other formulas of the family keep their current (preset) text as the instance's own
+              const cur = current();
+              vi.res ??= {};
+              for (const k2 of fam.formulas) vi.res[k2] = k2 === k ? text : cur[k2];
+              vi.params[fam.idParam] = -1;
+              app.commit();
+            };
+            inputs.push(inp);
+            vp.append(el('span', '', k === 'formula' ? 'f' : k[0]), inp);
+            row.append(vp);
+          }
+          const reset = el('button', '', '↺ preset');
+          reset.title = `Take every value of the chosen ${fam.idParam} (formulas, ranges, param_a…) like JWildfire does when the preset changes`;
+          reset.onclick = () => {
+            const id = Math.round(vi.params[fam.idParam] ?? 0);
+            const pr = plotPreset(vi.name, id);
+            if (vi.res) { for (const k of fam.formulas) delete vi.res[k]; if (!Object.keys(vi.res).length) delete vi.res; }
+            if (pr.id < 0) { vi.res ??= {}; for (const k of fam.formulas) vi.res[k] = pr.f[k]; vi.params[fam.idParam] = -1; }
+            for (const k of fam.refresh) if (k in pr.p) vi.params[k] = pr.p[k];
+            for (const c of fam.letters) vi.params['param_' + c] = pr.p['param_' + c] ?? 0;
+            app.commit();
+            rebuildEditor();
+          };
+          row.append(reset);
+          item.append(row);
+        }
         // sattractor3D: the x/y/z formulas (resources) — empty = the preset's (shown greyed); "↺ preset" reloads every
         // preset value like JWildfire does when presetId changes
-        if (VARIATIONS[vi.name]?.res?.includes('xformula')) {
+        else if (VARIATIONS[vi.name]?.res?.includes('xformula')) {
           const row = el('div', 'var-params sattr-formulas');
           const placeholders = () => sattractorFormulas(vi.params.presetId ?? 0);
           const inputs: Record<string, HTMLInputElement> = {};

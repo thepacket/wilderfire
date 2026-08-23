@@ -11,6 +11,7 @@
 
 import { meshGet, meshPut, meshNames, meshDelete } from './libraryStore.ts';
 import { buildSAttractorMesh, sattractorFormulas, type SAttractorSpec } from './sattractor';
+import { buildKnotMesh, knotsFormulas, type KnotSpec } from './knots';
 
 export const MESH_PRIMITIVES = ['ball', 'capsule', 'cone', 'diamond', 'torus', 'box', 'gear15', 'icosahedron', 'tetrahedron', 'octahedron', 'dodecahedron', 'wedge',
   'icosidodecahedron', 'cubeoctahedron', 'gears6a', 'gears6s', 'gears8a', 'gears8s', 'gears12a', 'gears12s', 'gears16a', 'gears16s', 'gears24a', 'gears24s', 'mandelbulb', 'drop'];
@@ -212,9 +213,10 @@ function meshKeyOf(source: string, subdivLevel: number, smoothPasses: number, la
 /** sattractor3D meshes are generated from their spec (src/core/sattractor.ts); the source part of the key is a
  *  hash of the spec, kept here so loadRaw can build it. */
 const sattrSpecs = new Map<string, SAttractorSpec>();
+const knotSpecs = new Map<string, KnotSpec>();
 const fnv = (s: string) => { let h = 0x811c9dc5; for (let i = 0; i < s.length; i++) { h ^= s.charCodeAt(i); h = Math.imul(h, 0x01000193) >>> 0; } return h.toString(16).padStart(8, '0'); };
 
-/** The key of an obj_mesh_primitive_wf / obj_mesh_wf / sattractor3D instance (undefined for anything else). */
+/** The key of an obj_mesh_primitive_wf / obj_mesh_wf / sattractor3D / knots3D instance (undefined for anything else). */
 export function meshKeyFor(vi: { name: string; params: Record<string, number>; res?: Record<string, string> }): MeshKey | undefined {
   const P = vi.params;
   if (vi.name === 'sattractor3D') {
@@ -227,6 +229,14 @@ export function meshKeyFor(vi: { name: string; params: Record<string, number>; r
     const json = JSON.stringify(spec);
     const source = `sattr:${fnv(json)}${json.length.toString(36)}`;
     if (!sattrSpecs.has(source)) sattrSpecs.set(source, spec);
+    return meshKeyOf(source, P.subdiv_level ?? 0, P.subdiv_smooth_passes ?? 12, P.subdiv_smooth_lambda ?? 0.42, P.subdiv_smooth_mu ?? -0.45);
+  }
+  if (vi.name === 'knots3D') {
+    const f = knotsFormulas(P.presetId ?? 0, vi.res);
+    const spec: KnotSpec = { ...f, steps: P.steps ?? 1000, radius: P.radius ?? 1, facets: P.facets ?? 4, params: ['a', 'b', 'c', 'd', 'e', 'f', 'g', 'h'].map((c) => P[`param_${c}`] ?? 1) };
+    const json = JSON.stringify(spec);
+    const source = `knots:${fnv(json)}${json.length.toString(36)}`;
+    if (!knotSpecs.has(source)) knotSpecs.set(source, spec);
     return meshKeyOf(source, P.subdiv_level ?? 0, P.subdiv_smooth_passes ?? 12, P.subdiv_smooth_lambda ?? 0.42, P.subdiv_smooth_mu ?? -0.45);
   }
   if (vi.name === 'obj_mesh_primitive_wf') return meshKey(P.primitive ?? 0, P.subdiv_level ?? 0, P.subdiv_smooth_passes ?? 12, P.subdiv_smooth_lambda ?? 0.42, P.subdiv_smooth_mu ?? -0.45);
@@ -249,6 +259,9 @@ async function loadRaw(source: string): Promise<Mesh> {
     if (source.startsWith('sattr:')) {
       const spec = sattrSpecs.get(source);
       p = Promise.resolve(spec ? buildSAttractorMesh(spec) : defaultMesh());
+    } else if (source.startsWith('knots:')) {
+      const spec = knotSpecs.get(source);
+      p = Promise.resolve(spec ? buildKnotMesh(spec) : defaultMesh());
     } else if (source.startsWith('obj:')) {
       const file = source.slice(4, source.lastIndexOf('@'));
       p = meshGet(file).then((bin) => {

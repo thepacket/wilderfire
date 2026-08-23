@@ -26,11 +26,15 @@ in the stack.
 
 ## Features
 
-- **947 variations** — 77 hand-written entries (the flam3 classics, JWildfire's
+- **954 variations** — 84 hand-written entries (the flam3 classics, JWildfire's
   `obj_mesh_primitive_wf` — its 26 built-in meshes ship as compact binaries and are
   subdivided/smoothed exactly like JWildfire — `sattractor3D` — a strange attractor
   (21 JWildfire presets or your own x/y/z formulas) swept into a faceted tube on the
-  CPU — and `obj_mesh_wf` — your own OBJ
+  CPU — `knots3D` — a knot curve swept the same way — the **formula plot family**
+  `yplot2d_wf`, `yplot3d_wf`, `parplot2d_wf`, `polarplot2d_wf`, `polarplot3d_wf`,
+  `isosfplot3d_wf` — JWildfire's 136 presets or your own formula text, compiled
+  into the GPU kernel by a small Java-expression compiler (src/core/formula.ts)
+  instead of Janino — and `obj_mesh_wf` — your own OBJ
   files, loaded into the browser from the transform editor —, `subflame_wf` — a
   whole flame nested as a variation, compiled into the same GPU kernel —,
   `inversion`, `mobius3D_with_inverse` and `pre_stabilize`) plus **938 JWildfire
@@ -44,11 +48,12 @@ in the stack.
   JWildfire's own GPU≠CPU snippet bugs are patched back to the Java, and
   shader hashes on cell ids run in double-float so cut/worley patterns
   match — see [`scripts/jwf-port/README.md`](scripts/jwf-port/README.md)).
-  **976 of JWildfire's 1,026 variations** are in the registry (938 transpiled +
-  38 hand ports: every CPU-built point set but `taprats`, meshes, sub-flames,
-  inversion, attractors). The 50 that are *not* are listed with their reason
-  in `scripts/jwf-port/data/unportable.json` — user code compiled at run time
-  (the plot family, `custom_wf`, `glsl_code`…), external content (images,
+  **983 of JWildfire's 1,026 variations** are in the registry (938 transpiled +
+  45 hand ports: every CPU-built point set but `taprats`, meshes, the formula
+  plots, sub-flames, inversion, attractors). The 43 that are *not* are listed
+  with their reason in `scripts/jwf-port/data/unportable.json` — user *code*
+  compiled at run time (`custom_wf`, `glsl_code`, `dc_code`, the complex-function
+  classes `c_var`/`ducks`/`f_complex`/`colordomain`/`fract_formula_*`), external content (images,
   text, SVG, L-systems, brushes, further sub-flame variants), two engine-level
   ones, `dc_triantess`, `taprats` — and the importer names the reason when a
   flame uses one.
@@ -382,9 +387,11 @@ src/
               latter a lazily loaded, separately cached ~300 KB gz chunk),
               palettes, presets, randomizer, .flame XML I/O (flameXML.ts),
               keyframe morphing (animate.ts), motion curves (motion.ts),
-              library store (libraryStore.ts), meshes + the sattractor3D
-              formula evaluator and tube builder (meshes.ts, formula.ts,
-              sattractor.ts), similarity, share links, PNG metadata
+              library store (libraryStore.ts), meshes + the sattractor3D /
+              knots3D tube builders (meshes.ts, sattractor.ts, knots.ts), the
+              JWildfire formula compiler (formula.ts: CPU closures + WGSL) and
+              the plot family with its preset tables (plots.ts, plotPresets.ts),
+              similarity, share links, PNG metadata
   gpu/        codegen.ts  — flame → WGSL compute kernel + data layout
               renderer.ts — WebGPU pipelines, atomic histogram, tonemap, camera
   ui/         panels (transforms, render, gradient, anim, AI), triangle

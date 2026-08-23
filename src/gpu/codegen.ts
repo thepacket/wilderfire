@@ -172,7 +172,7 @@ function genXformFn(name: string, x: XForm, B: number, palBase: number, pzCond =
       if (ovr === 0 && dprio === -1) return null;
       const forced = ovr !== undefined && dprio === 0 && (ovr === -1 || ovr === 1) ? ovr : 0;
       const forcedZero = ovr === 0 && dprio === 1;
-      return { def, name: vi.name, w, p, prio: forced !== 0 ? forced : forcedZero ? 0 : dprio, forced, forcedZero };
+      return { def, name: vi.name, w, p, prio: forced !== 0 ? forced : forcedZero ? 0 : dprio, forced, forcedZero, vi };
     }).filter((b): b is NonNullable<typeof b> => b !== null);
     // …then emit in priority order.
     let snips = '';
@@ -183,24 +183,24 @@ function genXformFn(name: string, x: XForm, B: number, palBase: number, pzCond =
         if (prio === -2 && b.def.preCode) { snips += '    ' + b.def.preCode(b.w, b.p, A) + '\n'; continue; }
         if (b.prio !== prio) continue;
         // a 2D variation's preserve-z clause (JWildfire adds w·z of its input point to its output z)
-        const snippet = b.def.code(b.w, b.p, A);
+        const snippet = b.def.code(b.w, b.p, A, b.vi);
         const pzLine = zOut && (!(b.def.flags ?? []).includes('z') || Z_PRESERVE_TOO.has(b.name)) ? `    if ${pzCond} { pz_ += ${b.w} * z_; }\n` : '';
         // the few pre/post-priority JWildfire functions that carry the clause too (their input is the affine point, the
         // output the accumulator, so it is the same line) — unless the port already writes pz_ itself
         const pzPrePost = zOut && prio !== 0 && PREPOST_PRESERVE_Z.has(b.name) && !/\bpz_\b/.test(snippet) ? `    if ${pzCond} { pz_ += ${b.w} * z_; }\n` : '';
         if (b.forced === -1) {
           // enforced pre: input ← input + w·f(input) (the snippet adds into v; v is borrowed and restored)
-          snips += `    {\n      let v_keep = v; let pz_keep = pz_; v = t; pz_ = z_;\n    ${b.def.code(b.w, b.p, A)}\n${pzLine}      t = v; z_ = pz_; v = v_keep; pz_ = pz_keep;\n    }\n` + precalc;
+          snips += `    {\n      let v_keep = v; let pz_keep = pz_; v = t; pz_ = z_;\n    ${snippet}\n${pzLine}      t = v; z_ = pz_; v = v_keep; pz_ = pz_keep;\n    }\n` + precalc;
           continue;
         }
         if (b.forced === 1) {
           // enforced post: output ← output + w·f(output) (the snippet reads t; t is borrowed and restored)
-          snips += `    {\n      let t_keep = t; let z_keep = z_; t = v; z_ = pz_;\n` + precalc + `    ${b.def.code(b.w, b.p, A)}\n${pzLine}      t = t_keep; z_ = z_keep;\n    }\n` + precalc;
+          snips += `    {\n      let t_keep = t; let z_keep = z_; t = v; z_ = pz_;\n` + precalc + `    ${snippet}\n${pzLine}      t = t_keep; z_ = z_keep;\n    }\n` + precalc;
           continue;
         }
         if (b.forcedZero) {
           // a post-priority function at normal priority: it rewrites the output; its "affine" argument is a copy of the output
-          snips += `    {\n      let t_keep = t; let z_keep = z_; t = v; z_ = pz_;\n` + precalc + `    ${b.def.code(b.w, b.p, A)}\n      t = t_keep; z_ = z_keep;\n    }\n` + precalc;
+          snips += `    {\n      let t_keep = t; let z_keep = z_; t = v; z_ = pz_;\n` + precalc + `    ${snippet}\n      t = t_keep; z_ = z_keep;\n    }\n` + precalc;
           continue;
         }
         snips += '    ' + snippet + '\n';

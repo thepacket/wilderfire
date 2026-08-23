@@ -24,6 +24,8 @@ licence rather than a permissive one.
 |---|---|---|---|
 | 668 ported variations (WGSL transpiled from JWildfire's CUDA GPU snippets) | `src/core/variations.jwf.ts`, `src/core/variations.jwf.unverified.ts` | JWildfire `org.jwildfire.create.tina.variation.*` | LGPL-2.1-or-later |
 | sattractor3D presets (21 attractor formulas) and the AttractorCurve tube builder | `src/core/sattractorPresets.ts`, `src/core/sattractor.ts` | JWildfire `resources/…/plot/sattractor3d_wf_presets.txt`, `Strange3DFunc` (Jesus Sosa) | LGPL-2.1-or-later |
+| Formula presets of the plot family (yplot2d/yplot3d/parplot2d/polarplot2d/polarplot3d/isosfplot3d: 136 formulas) and knots3D (24 knots) | `src/core/plotPresets.ts` (built by `scripts/jwf-port/plot-presets.mjs`) | JWildfire `…/variation/plot/*_presets.txt` (formulas by Andreas Maschke, Rick Sidwell, Frank Baumann, Jesus Sosa and other contributors) | LGPL-2.1-or-later |
+| The plot variations' sampling / colour modes and the knots3D tube builder (Ammeraal's cable algorithm) | `src/core/plots.ts`, `src/core/knots.ts` | JWildfire `YPlot2DWFFunc` … `IsoSFPlot3DWFFunc` (Andreas Maschke), `Knots3DFunc` (Jesus Sosa) | LGPL-2.1-or-later |
 | Gradient library (899 gradients: the classic Apophysis / UltraFractal packs carr, floral, universe, sky, star, as bundled with JWildfire) | `public/gradients/jwildfire.bin` (built by `scripts/jwf-port/ugr2bin.mjs`) | JWildfire `resources/org/jwildfire/create/tina/io/scripts/*.ugr` | LGPL-2.1-or-later (as part of the JWildfire tree) |
 | Variation catalogue dump (metadata + GPU code) | `scripts/jwf-port/data/jwf-variations.jsonl` | JWildfire | LGPL-2.1-or-later |
 | GPU helper library | `scripts/jwf-port/data/kernel-lib.cu` | JWildfire `Flam4_3dKernal_TemplateJWF.cu` | LGPL-2.1-or-later |

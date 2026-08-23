@@ -15454,26 +15454,19 @@ if (false) {
 fn atan2j(y: f32, x: f32) -> f32 { if (x == 0.0 && y == 0.0) { return select(0.0, PI, (bitcast<u32>(x) >> 31u) == 1u) * select(1.0, -1.0, (bitcast<u32>(y) >> 31u) == 1u); } return atan2(y, x); }`,
     code: (w, p) => `{
 var order: i32 = i32(roundc(${p[2]}));
-if ((order > 36)) {
-  order = 36;
-}
-var _sina: array<f32, 36>;
-var _cosa: array<f32, 36>;
 var da: f32 = ((2.0 * PI) / f32(order));
 var angle: f32 = 0.0;
-for (var i: i32 = 0; (i < order); i++) {
-  _sina[i] = sin(angle);
-  _cosa[i] = cos(angle);
-  angle += da;
-}
 var dx: f32 = ((v.x - ${p[0]}) * ${w});
 var dy: f32 = ((v.y - ${p[1]}) * ${w});
 var idx: i32 = i32((rnd(rs) * f32(order)));
 if ((idx >= order)) {
   idx = (order - 1);
 }
-v.x = ((${p[0]} + (dx * _cosa[idx])) + (dy * _sina[idx]));
-v.y = ((${p[1]} + (dy * _cosa[idx])) - (dx * _sina[idx]));
+var pps_ang: f32 = (f32(idx) * da);
+var pps_c: f32 = cos(pps_ang);
+var pps_s: f32 = sin(pps_ang);
+v.x = ((${p[0]} + (dx * pps_c)) + (dy * pps_s));
+v.y = ((${p[1]} + (dy * pps_c)) - (dx * pps_s));
 (*cp) = (((*cp) + (f32(idx) * ${p[3]})) % 1.0);
 }`,
   },

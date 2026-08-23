@@ -5,6 +5,7 @@
 import type { Flame, XForm, VarInstance, RGB } from './flame';
 import { defaultFlame, defaultXForm, defaultLayer, defaultSolidRender, normalizeFlame } from './flame';
 import { VARIATIONS, defaultParams } from './variations';
+import { PLOT_FAMILIES, plotPreset } from './plots';
 import { randomPalette } from './palette';
 import { flameToXML } from './flameXML';
 
@@ -1148,10 +1149,26 @@ function solidSettings(j: JFlame, enabled = true) {
 }
 /** SolidRandomFlameGenerator.getRandomVariation: none of the fract, inflate, pre_, post_, prepost_ names nor flatten */
 const solidRandomVariation = () => randomVariationNamePlain();
-/** SolidRandomFlameGenerator.getRandom3DShape: the 23 cases; the plot / text / terrain / knots / dla families are not in this build, so their cases are re-drawn */
+/** WFFuncPresets.getRandomPresetId: minId + (int)((maxId − minId)·random) — never the last id; the preset's param_a…f
+ *  come along (refreshFormulaFromPreset), the generator's explicit ranges override the preset's */
+const randomPlotPreset = (name: string): Record<string, number> => {
+  const fam = PLOT_FAMILIES[name];
+  const ids = fam.presets.map((p) => p.id);
+  const id = Math.min(...ids) + Math.floor((Math.max(...ids) - Math.min(...ids)) * rnd());
+  const pr = plotPreset(name, id);
+  const out: Record<string, number> = { preset_id: id };
+  for (const c of 'abcdef') out['param_' + c] = pr.p['param_' + c] ?? 0;
+  return out;
+};
+/** SolidRandomFlameGenerator.getRandom3DShape: the 23 cases; the text / terrain / knots / dla cases are not in this build, so they are re-drawn */
 function random3DShape(): VarInstance {
   for (;;) {
     switch (randomInt(23)) {
+      case 0: return v('yplot2d_wf', 1, { ...randomPlotPreset('yplot2d_wf'), xmin: -3, xmax: 2, ymin: -4, ymax: 4, zmin: -2, zmax: 2, direct_color: 1 });
+      case 2: return v('yplot3d_wf', 1, { ...randomPlotPreset('yplot3d_wf'), xmin: -3, xmax: 2, ymin: -2, ymax: 2, zmin: -2, zmax: 2, direct_color: 1 });
+      case 6: return v('polarplot2d_wf', 1, { ...randomPlotPreset('polarplot2d_wf'), tmin: -Math.PI, tmax: Math.PI, rmin: -4, rmax: 4, zmin: -2, zmax: 2, direct_color: 1 });
+      case 11: return v('polarplot3d_wf', 1, { ...randomPlotPreset('polarplot3d_wf'), tmin: -Math.PI, tmax: Math.PI, umin: -Math.PI, umax: Math.PI, rmin: -2, rmax: 2, direct_color: 1 });
+      case 16: return v('parplot2d_wf', 1, { ...randomPlotPreset('parplot2d_wf'), umin: -Math.PI, umax: Math.PI, vmin: -3, vmax: 8, direct_color: 1, color_mode: rnd() > 0.666 ? 2 : rnd() < 0.5 ? 0 : 1 });
       case 1: return v('seashell3D', 1, { height: 3 + rnd() * 3, inner_radius: 0.2 + rnd() * 0.4, final_radius: 0.2 + rnd() * 0.4 });
       case 5: return v('superShape3d', 1);
       case 7: return v('sunflower', 1);
@@ -1166,7 +1183,7 @@ function random3DShape(): VarInstance {
       case 20: return v('oscilloscope2', 1);
       case 21: return v('spirograph', 1);
       case 22: return v('primitives_wf', 1, { shape: randomInt(6) });
-      default: continue; // yplot2d_wf, yplot3d_wf, text_wf, terrain3D, polarplot2d_wf, polarplot3d_wf, knots3D, parplot2d_wf, dla3d_wf
+      default: continue; // text_wf, terrain3D, knots3D, dla3d_wf
     }
   }
 }

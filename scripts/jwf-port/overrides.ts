@@ -207,8 +207,12 @@ if (cr0 && esc) {
       'float pj_n = fabsf(__phoenix_julia_power); float a = atan2f(preY, preX) * _invN + ((fabsf(pj_n - lroundf(pj_n)) < 1e-6f) ? (float)((int)(RANDFLOAT() * pj_n)) * _inv2PI_N : RANDFLOAT() * 2.0f * PI);']],
   },
   post_point_symmetry_wf: {
-    note: 'CPU picks the symmetry index uniformly (random(order)); the GPU rounded rnd·(order−1), halving the weight of the first and last copies.',
-    patch: [['int idx = lroundf(RANDFLOAT() * (order-1));', 'int idx = (int)(RANDFLOAT() * (float)order); if (idx >= order) idx = order - 1;']],
+    note: 'CPU picks the symmetry index uniformly (random(order)); the GPU rounded rnd·(order−1), halving the weight of the first and last copies. The GPU also capped order at 36 (its sin/cos tables) where the CPU allows any order (a corpus flame uses 60): the angle is computed directly.',
+    patch: [['int idx = lroundf(RANDFLOAT() * (order-1));', 'int idx = (int)(RANDFLOAT() * (float)order); if (idx >= order) idx = order - 1; float pps_ang = (float)idx * da; float pps_c = cosf(pps_ang); float pps_s = sinf(pps_ang);'],
+      ['if(order>36) order=36;', ''],
+      [/float _sina\[36\];\s*float _cosa\[36\];/, ''],
+      [/for \(int i = 0; i < order; i\+\+\) \{\s*_sina\[i\] = sinf\(angle\);\s*_cosa\[i\] = cosf\(angle\);\s*angle \+= da;\s*\}/, ''],
+      ['dx * _cosa[idx] + dy * _sina[idx]', 'dx * pps_c + dy * pps_s'], ['dy * _cosa[idx] - dx * _sina[idx]', 'dy * pps_c - dx * pps_s']],
   },
   ...Object.fromEntries(['cut_glypho', 'cut_fingerprint'].map((n) => [n, {
     note: 'CPU returns right after hiding (point stays at 0,0); the GPU snippet fell through and wrote the position anyway.',

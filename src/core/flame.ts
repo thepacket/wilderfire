@@ -4,6 +4,7 @@
 // all accumulating into the shared histogram. Camera and tone are global.
 
 import { normFilterKernel, type FilterKernel } from '../gpu/filters';
+import { VARIATIONS } from './variations';
 
 export type Affine = [number, number, number, number, number, number]; // x' = a x + b y + c ; y' = d x + e y + f
 export type RGB = [number, number, number]; // 0..1
@@ -363,7 +364,8 @@ function strHash(s: string): string { let h = 5381; for (let i = 0; i < s.length
 /** Structural signature — when this changes, the WGSL shader must be regenerated. */
 export function flameSignature(f: Flame): string {
   // (a subflame_wf instance's sub-flame is compiled into the kernel: its XML is part of the structure)
-  const names = (l?: VarInstance[]) => (l ?? []).map((v) => v.name + (v.priority !== undefined ? '@' + v.priority : '') + (v.name === 'subflame_wf' ? '{' + strHash(v.res?.flame ?? '') + '}' : '')).join(',');
+  // (a registry entry whose kernel code depends on the instance — a formula, a sub-flame — contributes its sigKey)
+  const names = (l?: VarInstance[]) => (l ?? []).map((v) => v.name + (v.priority !== undefined ? '@' + v.priority : '') + (v.name === 'subflame_wf' ? '{' + strHash(v.res?.flame ?? '') + '}' : '') + (VARIATIONS[v.name]?.sigKey ? '{' + strHash(VARIATIONS[v.name].sigKey!(v)) + '}' : '')).join(',');
   const sig = (x: XForm) => `${names(x.preVariations)}<${names(x.variations)}>${names(x.postVariations)}` + (x.colorType ? '~' + x.colorType : '') + (x.wfield ? `~wf(${x.wfield.params.map((p) => p.varName + '.' + p.paramName).join(',')})` : '');
   return visibleLayers(f)
     .map((l) => l.xforms.map(sig).join('|') + '#' + [l.final, ...l.moreFinals].map((x) => (x ? sig(x) : '-')).join('#') + (l.smoothGradient ? '~smooth' : '') + (l.gradientMap ? `~gmap(${[l.gradientMap.hOffset, l.gradientMap.hScale, l.gradientMap.vOffset, l.gradientMap.vScale, l.gradientMap.lcolorAdd, l.gradientMap.lcolorScale].map((v) => +v.toPrecision(6)).join(',')})` : ''))
