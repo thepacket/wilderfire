@@ -13,11 +13,12 @@
 // remain as fallbacks for anything the port pipeline does not cover.
 
 import type { JwfVariationDef } from './variations.jwf.ts';
-import { PSET_STRIDE } from './pointSets';
+import { PSET_STRIDE, JavaRandom } from './pointSets';
+import { DF_HASH_FUNCS } from './wgslDf';
 
 export interface VariationDef {
   /** numbers computed on the CPU from the params, written into the hidden `extra` slots (codegen data hook) */
-  derive?: (params: Record<string, number>) => number[];
+  derive?: (params: Record<string, number>, res?: Record<string, string>) => number[];
   params?: { name: string; def: number; int?: boolean }[];
   code: (w: string, p: string[], A: (i: number) => string) => string;
   /** JWildfire "prepost" pair: runs first in the stage (priority -2) on the input point (the inverse), while `code` runs last (priority 2) on the output. */
@@ -104,10 +105,15 @@ const meshCode = (w: string, p: string[], b: number) => `{ let mc = u32(${p[b + 
 
 /** Point-set sampler (src/core/pointSets.ts records): DrawFunc.getPrimitive picks uniformly by index; then plotBlur /
  *  plotLine / plotTriangle / nBlur's randXY — transcribed. `col` receives the primitive's colour. */
-const PSET_FUNCS = `fn psetSample(base: u32, n: u32, amount: f32, rs: ptr<function, u32>, col: ptr<function, f32>) -> vec2f {
+const PSET_FUNCS = `var<private> pset_kind: u32 = 0u;
+
+var<private> pset_off: u32 = 0u;
+
+fn psetSample(base: u32, n: u32, amount: f32, rs: ptr<function, u32>, col: ptr<function, f32>) -> vec2f {
   if (n == 0u) { return vec2f(0.0); }
   let o = (base + min(u32(rnd(rs) * f32(n)), n - 1u)) * ${PSET_STRIDE}u;
   let kind = u32(pset[o] + 0.5);
+  pset_kind = kind; pset_off = o;
   *col = pset[o + 1u];
   if (kind == 0u) { // point: plotBlur, a disc of radius amount·rnd
     let r = rnd(rs) * 6.283185307179586; let r2 = amount * rnd(rs);
@@ -185,8 +191,8 @@ const turtleCode = (w: string, p: string[], base: number, lines: string, points:
   v += (${w} * ${gain}) * psetLineOrDot(u32(${p[base]}), u32(${p[base + 1]}), lf_, ${pointTh} / 100.0, rs); }`;
 
 /** `b` = index of the first hidden slot (record base; count follows) */
-const psetCode = (w: string, p: string[], b: number, dc: boolean) =>
-  `{ var c_: f32 = 0.0; let q = psetSample(u32(${p[b]}), u32(${p[b + 1]}), ${w}, rs, &c_); v += ${w} * q;${dc ? ' (*cp) = c_;' : ''} }`;
+const psetCode = (w: string, p: string[], b: number, dc: boolean, gain = '1.0', blur?: string) =>
+  `{ var c_: f32 = 0.0; let q = psetSample(u32(${p[b]}), u32(${p[b + 1]}), ${blur ?? w}, rs, &c_); v += (${w} * ${gain}) * q;${dc ? ' (*cp) = c_;' : ''} }`;
 
 /** KleinGroupFunc's generator recipes (Grandma, Maskit, modified Maskit, Jorgensen, Riley, modified Riley, Maskit-Leys) as
  *  the four matrices [a, A, b, B] (A = a⁻¹, B = b⁻¹ by JWildfire's matrixInverse: [d, −b, −c, a]), 8 floats each. */
@@ -365,6 +371,252 @@ fn cdivk(a: vec2f, b: vec2f) -> vec2f { let d = b.x * b.x + b.y * b.y; return ve
     }
     if (${p[23]} >= 1.0) { v = t + ${w} * (out - t); pz_ = z_ - ${w} * z_; } else { v += ${w} * out; } }`,
   },
+  // ---- triantruchet (TrianTruchetFunc): a random tile of a rows×cols grid, its right triangle rotated by a quarter turn
+  // picked per tile parity from four seeded counts n1..n4 (java.util.Random(seed), first draw discarded; seed 0 = the
+  // four digits of the 'string' resource), uniform in the triangle, colour = tile index / tiles ----
+  triantruchet: {
+    params: [{ name: 'seed', def: 10000, int: true }, { name: 'Size', def: 2 }, { name: 'TilesPerRow', def: 10, int: true }, { name: 'TilesPerColumn', def: 10, int: true }],
+    res: ['string'], resDef: { string: '0132' },
+    extra: 4, flags: ['dc'], types: ['2D', 'DC', 'SIMULATION'],
+    derive: (P, R) => {
+      const seed = Math.trunc(P.seed ?? 10000);
+      const rnd = new JavaRandom(seed); rnd.nextDouble();
+      const n = [0, 1, 2, 3].map(() => Math.trunc(rnd.nextDouble() * 4));
+      if (seed === 0) { const s = R?.string ?? '0132'; const d = [0, 1, 2, 3].map((k) => parseInt(s.slice(k, k + 1), 10)); if (d.every((v) => Number.isFinite(v))) return d; }
+      return n;
+    },
+    code: (w, p) => `{
+    let rows = f32(clamp(i32(${p[2]}), 2, 600)); let cols = f32(clamp(i32(${p[3]}), 2, 600));
+    let ts = clamp(${p[1]}, 0.0, 10.0) / rows;
+    let i = i32(rnd(rs) * rows); let j = i32(rnd(rs) * cols);
+    let cx = f32(i) * ts + ts / 2.0; let cy = f32(j) * ts + ts / 2.0;
+    let n = select(select(${p[7]}, ${p[5]}, j % 2 == 0), select(${p[6]}, ${p[4]}, j % 2 == 0), i % 2 == 0);
+    let tilt = n * 1.5707963267948966; let ct = cos(tilt); let st = sin(tilt); let h = ts / 2.0;
+    let x1 = -h * ct + -h * st + cx; let y1 = h * st + -h * ct + cy;
+    let x2 = -h * ct + h * st + cx; let y2 = h * st + h * ct + cy;
+    let x3 = h * ct + h * st + cx; let y3 = -h * st + h * ct + cy;
+    let s1 = sqrt(rnd(rs)); let r2 = rnd(rs); let a = 1.0 - s1; let b = s1 * (1.0 - r2); let c = r2 * s1;
+    let dx = a * x1 + b * x2 + c * x3; let dy = a * y1 + b * y2 + c * y3;
+    (*cp) = (rows * f32(j) + f32(i)) / (rows * cols);
+    v += ${w} * vec2f(dx - ts * rows / 2.0, dy - ts * cols / 2.0); }`,
+  },
+  // ---- natural_foam (NaturalFoamFunc): the point is pushed out of the seeded bubbles (iterations × density), random-walk
+  // blurred inside them, optionally inverted towards the nearest bubble; colour by radius / pressure / index ----
+  natural_foam: {
+    params: [{ name: 'density', def: 50, int: true }, { name: 'iterations', def: 3, int: true }, { name: 'scale', def: 0.8 }, { name: 'spread', def: 1 }, { name: 'minRadius', def: 0.1 }, { name: 'maxRadius', def: 0.9 }, { name: 'seed', def: 123, int: true }, { name: 'shapeAmount', def: 0 }, { name: 'blur_radius', def: 0.1 }, { name: 'blur_quality', def: 1, int: true }, { name: 'color_data', def: 0, int: true }, { name: 'zoom', def: 1 }],
+    extra: 2, flags: ['pset', '3d', 'z', 'dc'], types: ['3D', 'SIMULATION'],
+    code: (w, p) => `{
+    let D = clamp(i32(${p[0]}), 0, 2000); let iters = clamp(i32(${p[1]}), 0, 64); let scl = ${p[2]}; let shapeAmt = ${p[7]};
+    let br = ${p[8]}; let bq = clamp(i32(${p[9]}), 0, 256); let cdata = clamp(i32(${p[10]}), 0, 3); let zoom = ${p[11]};
+    let tb = u32(${p[12]}) * ${PSET_STRIDE}u;
+    var x = t.x; var y = t.y; var z = z_;
+    for (var it = 0; it < iters; it++) {
+      for (var j = 0; j < D; j++) {
+        let o = tb + u32(j) * 4u; let bx = pset[o]; let by = pset[o + 1u]; let bz = pset[o + 2u]; let brd = pset[o + 3u];
+        let dx = x - bx; let dy = y - by; let dz = z - bz; let d2 = dx * dx + dy * dy + dz * dz;
+        if (d2 < brd * brd) { let dist = sqrt(d2); if (dist > 1.0e-6) { let pf = (brd - dist) / dist; x += dx * pf * scl; y += dy * pf * scl; z += dz * pf * scl; } }
+      }
+    }
+    if (br > 0.0 && bq > 0) {
+      let stepSz = br / f32(bq);
+      for (var i = 0; i < bq; i++) {
+        let px = x; let py = y; let pz = z;
+        x += (rnd(rs) - 0.5) * 2.0 * stepSz; y += (rnd(rs) - 0.5) * 2.0 * stepSz; z += (rnd(rs) - 0.5) * 2.0 * stepSz;
+        var inside = false;
+        for (var j = 0; j < D; j++) { let o = tb + u32(j) * 4u; let dx = x - pset[o]; let dy = y - pset[o + 1u]; let dz = z - pset[o + 2u]; let r_ = pset[o + 3u]; if (dx * dx + dy * dy + dz * dz < r_ * r_) { inside = true; break; } }
+        if (!inside) { x = px; y = py; z = pz; }
+      }
+    }
+    var nearest = -1; var minD2 = 3.4e38;
+    if (shapeAmt > 0.0 || cdata > 0) {
+      for (var j = 0; j < D; j++) { let o = tb + u32(j) * 4u; let dx = x - pset[o]; let dy = y - pset[o + 1u]; let dz = z - pset[o + 2u]; let d2 = dx * dx + dy * dy + dz * dz; if (d2 < minD2) { minD2 = d2; nearest = j; } }
+    }
+    if (shapeAmt > 0.0 && nearest >= 0) {
+      let o = tb + u32(nearest) * 4u; let lx = x - pset[o]; let ly = y - pset[o + 1u]; let lz = z - pset[o + 2u]; let r_ = pset[o + 3u];
+      let inv = r_ * r_ / (lx * lx + ly * ly + lz * lz + 1.0e-9);
+      let bxp = lx * inv + pset[o]; let byp = ly * inv + pset[o + 1u]; let bzp = lz * inv + pset[o + 2u];
+      x = x * (1.0 - shapeAmt) + bxp * shapeAmt; y = y * (1.0 - shapeAmt) + byp * shapeAmt; z = z * (1.0 - shapeAmt) + bzp * shapeAmt;
+      // JWildfire finds the nearest bubble again for the colour, from the moved point
+      nearest = -1; minD2 = 3.4e38;
+      for (var j = 0; j < D; j++) { let o2 = tb + u32(j) * 4u; let dx = x - pset[o2]; let dy = y - pset[o2 + 1u]; let dz = z - pset[o2 + 2u]; let d2 = dx * dx + dy * dy + dz * dz; if (d2 < minD2) { minD2 = d2; nearest = j; } }
+    }
+    if (cdata > 0) {
+      var ci = 0.5;
+      if (nearest >= 0) {
+        if (cdata == 1) { let rr = ${p[5]} - ${p[4]}; if (rr > 1.0e-6) { ci = (pset[tb + u32(nearest) * 4u + 3u] - ${p[4]}) / rr; } }
+        else if (cdata == 2) { var cnt = 0; for (var j = 0; j < D; j++) { let o = tb + u32(j) * 4u; let dx = x - pset[o]; let dy = y - pset[o + 1u]; let dz = z - pset[o + 2u]; let r_ = pset[o + 3u]; if (dx * dx + dy * dy + dz * dz < r_ * r_) { cnt++; } } if (D > 0) { ci = f32(cnt) / f32(D); } }
+        else { if (D > 1) { ci = f32(nearest) / f32(D - 1); } }
+      }
+      (*cp) = clamp(ci, 0.0, 1.0);
+    }
+    v += vec2f(x, y) * zoom * ${w}; pz_ += z * zoom * ${w}; }`,
+  },
+  // ---- geometricPrimitives (GeometricPrimitivesFunc): a grid of hashed cells — a shape (circle / square / triangle /
+  // hexagon, filled or hollow) or a line to a neighbouring cell (optionally with shapes along it); the cell hash
+  // frac(sin(13.9898·gx + 73.233·gy + salt)·43758.5453) runs in double-float so the cells match the Java f64 ----
+  geometricPrimitives: {
+    params: [{ name: 'line_vs_shape_mix', def: 0.5 }, { name: 'density', def: 0.5 }, { name: 'scale', def: 2 }, { name: 'gridSize', def: 1 }, { name: 'seed', def: 0 }, { name: 'grid_jitter', def: 0 }, { name: 'shape_type', def: 0, int: true }, { name: 'shape_mix_enable', def: 0, int: true }, { name: 'fill_prob', def: 0.5 }, { name: 'radius', def: 0.45 }, { name: 'hollow', def: 0.8 }, { name: 'square_size', def: 0.9 }, { name: 'connection_mode', def: 0, int: true }, { name: 'recursion_depth', def: 0, int: true }, { name: 'recursion_shape_mix', def: 0.5 }, { name: 'recursion_scale', def: 0.25 }],
+    flags: ['hide'], types: ['2D', 'BASE_SHAPE'],
+    funcNames: ['op_', 'df_ts', 'df_qts', 'df_add', 'df_mul', 'df_mulf', 'df_sin', 'df_cos', 'hsin_', 'gpCell', 'gpCircle', 'gpSquare', 'gpTri', 'gpHex'],
+    funcs: DF_HASH_FUNCS + `
+
+fn gpCell(gx: f32, gy: f32, salt: f32) -> f32 {
+  let f = hsin_(df_add(df_add(df_mulf(vec2f(13.989800453186035, -4.531860327006143e-7), gx), df_mulf(vec2f(73.23300170898438, -0.0000017089844277506927), gy)), vec2f(salt, 0.0)), vec2f(43758.546875, -0.0015750000020489097));
+  return f;
+}
+
+fn gpCircle(filled: bool, c: vec2f, rad: f32, hol: f32, rs: ptr<function, u32>) -> vec2f {
+  let a = rnd(rs) * 6.283185307179586;
+  var r: f32;
+  if (filled) { r = sqrt(rnd(rs)) * rad; } else { let ir = rad * hol; r = ir + rnd(rs) * (rad - ir); }
+  return c + r * vec2f(cos(a), sin(a));
+}
+
+fn gpSquare(filled: bool, c: vec2f, size: f32, rs: ptr<function, u32>) -> vec2f {
+  let hw = size * 0.5;
+  if (filled) { return c + vec2f((rnd(rs) * 2.0 - 1.0) * hw, (rnd(rs) * 2.0 - 1.0) * hw); }
+  let side = floor(rnd(rs) * 4.0); let tt = (rnd(rs) * 2.0 - 1.0) * hw;
+  if (side == 0.0) { return c + vec2f(tt, hw); } else if (side == 1.0) { return c + vec2f(tt, -hw); } else if (side == 2.0) { return c + vec2f(hw, tt); }
+  return c + vec2f(-hw, tt);
+}
+
+fn gpTri(filled: bool, c: vec2f, size: f32, rs: ptr<function, u32>) -> vec2f {
+  let v1 = c + vec2f(0.0, size); let v2 = c + vec2f(-size * 0.866, -size * 0.5); let v3 = c + vec2f(size * 0.866, -size * 0.5);
+  if (filled) { var r1 = rnd(rs); var r2 = rnd(rs); if (r1 + r2 > 1.0) { r1 = 1.0 - r1; r2 = 1.0 - r2; } return (1.0 - r1 - r2) * v1 + r1 * v2 + r2 * v3; }
+  let side = floor(rnd(rs) * 3.0); let tt = rnd(rs);
+  if (side == 0.0) { return v1 * (1.0 - tt) + v2 * tt; } else if (side == 1.0) { return v2 * (1.0 - tt) + v3 * tt; }
+  return v3 * (1.0 - tt) + v1 * tt;
+}
+
+fn gpHex(filled: bool, c: vec2f, size: f32, rs: ptr<function, u32>) -> vec2f {
+  if (filled) {
+    let seg = floor(rnd(rs) * 6.0); let a1 = seg * 1.0471975511965976; let a2 = (seg + 1.0) * 1.0471975511965976;
+    let v1 = c + size * vec2f(cos(a1), sin(a1)); let v2 = c + size * vec2f(cos(a2), sin(a2));
+    var r1 = rnd(rs); var r2 = rnd(rs); if (r1 + r2 > 1.0) { r1 = 1.0 - r1; r2 = 1.0 - r2; }
+    return (1.0 - r1 - r2) * c + r1 * v1 + r2 * v2;
+  }
+  let ang = rnd(rs) * 6.283185307179586; let seg = floor(ang / 1.0471975511965976); let a1 = seg * 1.0471975511965976; let a2 = (seg + 1.0) * 1.0471975511965976;
+  let v1 = c + size * vec2f(cos(a1), sin(a1)); let v2 = c + size * vec2f(cos(a2), sin(a2)); let tt = rnd(rs);
+  return v1 * (1.0 - tt) + v2 * tt;
+}`,
+    code: (w, p) => `{
+    let mix_ = clamp(${p[0]}, 0.0, 1.0); let dens = ${p[1]}; let gsz = ${p[3]}; let seed = ${p[4]}; let jit = ${p[5]};
+    let stype = clamp(i32(${p[6]}), 0, 3); let smix = clamp(i32(${p[7]}), 0, 1); let fprob = ${p[8]}; let rad = ${p[9]}; let hol = clamp(${p[10]}, 0.0, 1.0);
+    let ssz = ${p[11]}; let cmode = clamp(i32(${p[12]}), 0, 1); let rdepth = clamp(i32(${p[13]}), 0, 50); let rmix = clamp(${p[14]}, 0.0, 1.0); let rscale = ${p[15]};
+    let u = t.x * ${p[2]}; let vv = t.y * ${p[2]};
+    let gx = floor(u + 0.5); let gy = floor(vv + 0.5);
+    var jx = 0.0; var jy = 0.0;
+    if (jit > 0.0) { let mj = jit * gsz * 0.5; jx = (gpCell(gx, gy, seed + 40.0) * 2.0 - 1.0) * mj; jy = (gpCell(gx, gy, seed + 50.0) * 2.0 - 1.0) * mj; }
+    let cxy = vec2f(gx * gsz + jx, gy * gsz + jy);
+    var out = vec2f(0.0); var valid = false;
+    let exists = gpCell(gx, gy, seed) < dens;
+    if (rnd(rs) < mix_) {
+      if (exists) {
+        var nx = gx; var ny = gy;
+        if (cmode == 0) { let dir = rnd(rs) * 4.0; if (dir < 1.0) { nx += 1.0; } else if (dir < 2.0) { nx -= 1.0; } else if (dir < 3.0) { ny += 1.0; } else { ny -= 1.0; } }
+        else {
+          var cand: array<vec2f, 4>; var nc = 0;
+          if (gpCell(gx + 1.0, gy, seed) < dens) { cand[nc] = vec2f(gx + 1.0, gy); nc++; }
+          if (gpCell(gx - 1.0, gy, seed) < dens) { cand[nc] = vec2f(gx - 1.0, gy); nc++; }
+          if (gpCell(gx, gy + 1.0, seed) < dens) { cand[nc] = vec2f(gx, gy + 1.0); nc++; }
+          if (gpCell(gx, gy - 1.0, seed) < dens) { cand[nc] = vec2f(gx, gy - 1.0); nc++; }
+          if (nc > 0) { let k = min(i32(floor(rnd(rs) * f32(nc))), nc - 1); nx = cand[k].x; ny = cand[k].y; }
+        }
+        if (nx != gx || ny != gy) {
+          var njx = 0.0; var njy = 0.0;
+          if (jit > 0.0) { let mj = jit * gsz * 0.5; njx = (gpCell(nx, ny, seed + 40.0) * 2.0 - 1.0) * mj; njy = (gpCell(nx, ny, seed + 50.0) * 2.0 - 1.0) * mj; }
+          let ncx = vec2f(nx * gsz + njx, ny * gsz + njy);
+          if (rdepth > 0) {
+            let stp = i32(floor(rnd(rs) * f32(rdepth)));
+            let tt = (f32(stp) + 0.5) / f32(rdepth);
+            let sc = cxy * (1.0 - tt) + ncx * tt;
+            let isF = gpCell(gx, gy, seed + 30.0 + f32(stp)) < fprob;
+            if (rnd(rs) < rmix) { out = gpSquare(isF, sc, ssz * rscale, rs); } else { out = gpCircle(isF, sc, rad * rscale, hol, rs); }
+          } else { let tt = rnd(rs); out = cxy * (1.0 - tt) + ncx * tt; }
+          valid = true;
+        }
+      }
+    } else if (exists) {
+      var fst = stype;
+      if (smix == 1) { fst = i32(floor(gpCell(gx, gy, seed + 10.0) * 4.0)); }
+      let isF = gpCell(gx, gy, seed + 20.0) < fprob;
+      // a mixed type from a negative hash (frac keeps the sign) hits no case in the Java switch: the point stays at the origin
+      if (fst == 0) { out = gpCircle(isF, cxy, gpCell(gx, gy, -seed) * rad * gsz, hol, rs); }
+      else if (fst == 1) { out = gpSquare(isF, cxy, gpCell(gx, gy, 1.0 - seed) * ssz * gsz, rs); }
+      else if (fst == 2) { out = gpTri(isF, cxy, gpCell(gx, gy, 2.0 - seed) * rad * gsz, rs); }
+      else if (fst == 3) { out = gpHex(isF, cxy, gpCell(gx, gy, 3.0 - seed) * rad * gsz, rs); }
+      valid = true;
+    }
+    if (valid) { (*hd) = false; v += out * ${w}; } else { (*hd) = true; } }`,
+  },
+  // ---- point_mirror_symmetry (PointMirrorSymmetryFunc): rotational symmetry with a side/end crop; cropped points jump
+  // to one of the last `buffer_size` valid points. JWildfire's buffer is one ring shared by every point; here it is a
+  // per-thread ring of at most 32 entries (same distribution in the limit). Assigns the output, as the Java does ----
+  point_mirror_symmetry: {
+    params: [{ name: 'symmetry', def: 3, int: true }, { name: 'side crop enable', def: 1, int: true }, { name: 'crop end enable', def: 1, int: true }, { name: 'crop end distance', def: 1 }, { name: 'zx Multiply', def: 1 }, { name: 'zy Multiply', def: 0 }, { name: 'collidoscopic', def: 1, int: true }, { name: 'color_preserve', def: 0, int: true }, { name: 'buffer_size', def: 12, int: true }],
+    flags: ['z', 'dc', 'state', 'hide'], types: ['2D'],
+    funcNames: ['pms_buf', 'pms_idx', 'pms_n'], funcs: `var<private> pms_buf: array<vec4f, 32>;
+
+var<private> pms_idx: i32 = 0;
+
+var<private> pms_n: i32 = 0;`,
+    code: (w, p) => `{
+    let sym = clamp(i32(${p[0]}), 1, 99); let sideCrop = clamp(i32(${p[1]}), 0, 1); let cropEnd = clamp(i32(${p[2]}), 0, 1); let cropDist = ${p[3]};
+    let collido = clamp(i32(${p[6]}), 0, 1); let colPres = clamp(i32(${p[7]}), 0, 1); let bsize = clamp(i32(${p[8]}), 1, 32);
+    let randSym = min(i32(rnd(rs) * f32(sym)), sym - 1);
+    let rotSym = 3.141592653589793 / f32(sym); let rotRS = rotSym * f32(randSym) * 2.0;
+    var x = t.x * ${p[4]} - t.y * ${p[5]}; var y = t.x * ${p[5]} + t.y * ${p[4]}; var z = z_;
+    if (sideCrop == 1) {
+      let r = sqrt(x * x + y * y); let xLine = r * cos(rotSym);
+      if (collido == 1 && y < 0.0) { x = 0.0; y = 0.0; }
+      if (x < xLine) { x = 0.0; y = 0.0; }
+      var x2 = x * cos(rotSym) + y * sin(rotSym);
+      if (cropEnd == 1 && x2 > cropDist) { x = 0.0; y = 0.0; }
+      x2 = x * cos(-rotSym) + y * sin(-rotSym);
+      if (cropEnd == 1 && x2 > cropDist) { x = 0.0; y = 0.0; }
+      if (x == 0.0 && y == 0.0) {
+        if (pms_n == 0) { (*hd) = true; } // JWildfire emits (0, 0) until its shared ring has a point; a fresh walker here hides instead of spiking the origin
+        if (pms_n > 0) {
+          let idx = min(i32(rnd(rs) * f32(bsize)), bsize - 1);
+          var bp = vec4f(0.1, 0.1, 0.0, 0.5);
+          if (idx < pms_n) { bp = pms_buf[idx]; }
+          x = bp.x; y = bp.y; z = bp.z;
+          if (colPres == 0) { (*cp) = bp.w; }
+        }
+      } else {
+        pms_buf[pms_idx] = vec4f(x, y, z, (*cp)); pms_idx = (pms_idx + 1) % bsize; pms_n = min(pms_n + 1, bsize);
+      }
+    }
+    if (collido == 1 && rnd(rs) < 0.5) { y = -y; }
+    if (randSym % 2 == 0) { y = -y; }
+    v = ${w} * vec2f(x * cos(rotRS) - y * sin(rotRS), y * cos(rotRS) + x * sin(rotRS)); pz_ = ${w} * z; }`,
+  },
+  // ---- meeple (MeepleFunc): a random point on the outline of a meeple shape (14 control points, mirrored), optionally
+  // filled towards the origin ----
+  meeple: {
+    params: [{ name: 'scale', def: 2.5 }, { name: 'filled', def: 1 }, { name: 'headWidth', def: 1 }, { name: 'headHeight', def: 1 }, { name: 'armLength', def: 2 }, { name: 'armSpread', def: 1 }, { name: 'bodyWidth', def: 1 }, { name: 'legHeight', def: 1 }, { name: 'legSpread', def: 1 }, { name: 'legSeparationWidth', def: 0.1 }, { name: 'legSeparationHeight', def: 0 }],
+    types: ['2D', 'BASE_SHAPE'],
+    code: (w, p) => `{
+    var bx = array<f32, 14>(0.00, 0.15, 0.28, 0.35, 0.35, 0.40, 0.55, 0.55, 0.45, 0.40, 0.45, 0.40, 0.20, 0.00);
+    var by = array<f32, 14>(-1.00, -0.99, -0.90, -0.75, -0.60, -0.50, -0.45, -0.25, -0.15, 0.10, 0.80, 0.98, 1.00, 0.85);
+    let hw = ${p[2]}; let hh = ${p[3]}; let al = ${p[4]}; let asp = ${p[5]}; let bw = ${p[6]}; let lh = ${p[7]}; let ls = ${p[8]}; let lsw = ${p[9]}; let lsh = ${p[10]};
+    let sepY = by[9] - lsh;
+    var mx: array<f32, 14>; var my: array<f32, 14>;
+    for (var i = 0; i < 14; i++) {
+      var x = bx[i]; var y = by[i];
+      if (i <= 4) { x *= hw; y *= hh; }
+      else if (i <= 8) { x = bx[4] * bw + (bx[i] - bx[4]) * al; y = by[4] * hh + (by[i] - by[4]) * asp; }
+      else if (i == 9) { x *= bw; y = sepY; }
+      else { let oy = by[i] - by[9]; y = by[9] + oy * lh; if (i == 13) { y = sepY + oy * lh; } if (i <= 12) { x = bx[i] * ls + lsw; } }
+      mx[i] = x; my[i] = y;
+    }
+    let st = rnd(rs) * 13.0; var si = i32(st); if (si >= 13) { si = 12; } let ft = st - f32(si);
+    var lx = mx[si] + ft * (mx[si + 1] - mx[si]); let ly = my[si] + ft * (my[si + 1] - my[si]);
+    if (rnd(rs) < 0.5) { lx = -lx; }
+    let filled = clamp(${p[1]}, 0.0, 1.0);
+    var r = 1.0; if (filled > 0.0) { if (filled > rnd(rs)) { r = rnd(rs); } }
+    v += (r * ${p[0]} * ${w}) * vec2f(lx, ly); }`,
+  },
   // ---- Point-set variations (src/core/pointSets.ts builds the primitives on the CPU; binding 13) ----
   dragon_js: {
     params: [{ name: 'level', def: 2, int: true }, { name: 'line_thickness', def: 0.5 }],
@@ -388,6 +640,81 @@ fn cdivk(a: vec2f, b: vec2f) -> vec2f { let d = b.x * b.x + b.y * b.y; return ve
     params: [{ name: 'buffer_size', def: 128, int: true }, { name: 'max_iter', def: 500, int: true }, { name: 'bg_freeze_level', def: 0.5 }, { name: 'fg_freeze_speed', def: 0.0005 }, { name: 'diffusion_speed', def: 0.01 }, { name: 'diffusion_asymmetry', def: 1 }, { name: 'rnd_bg_noise', def: 0.25 }, { name: 'threshold', def: 0.65 }, { name: 'seed', def: 12345, int: true }, { name: 'scale', def: 1 }, { name: 'jitter', def: 0.001 }, { name: 'dc_color', def: 1, int: true }, { name: 'dc_color_scale', def: 2 }, { name: 'dc_color_offset', def: 0.1 }],
     extra: 2, flags: ['pset', 'dc'], types: ['2D', 'DC', 'SIMULATION', 'BASE_SHAPE'],
     code: (w, p) => `{ let n_ = u32(${p[15]}); if (n_ > 0u) { let o_ = (u32(${p[14]}) + min(u32(rnd(rs) * f32(n_)), n_ - 1u)) * ${PSET_STRIDE}u; v += ${w} * vec2f(pset[o_ + 2u], pset[o_ + 3u]); if (${p[11]} > 0.0) { (*cp) = pset[o_ + 1u] * ${p[12]} + ${p[13]}; } } }`,
+  },
+  // mandala (MandalaFunc): the rotator-map orbit cells as unit squares × size, ×0.01; colour HSB(frac(log n), .85, 1)
+  // as RGB (color id 0) or its hue (1)
+  mandala: {
+    params: [{ name: 'width', def: 300, int: true }, { name: 'size', def: 0.6 }, { name: 'num', def: 1, int: true }, { name: 'denom', def: 3, int: true }, { name: 'minsky', def: 0, int: true }, { name: 'wobble', def: 0, int: true }, { name: 'wrap_range', def: 0, int: true }, { name: 'hskew', def: 0, int: true }, { name: 'color id', def: 1, int: true }],
+    extra: 2, flags: ['pset', 'dc', 'rgb'], types: ['2D', 'SIMULATION', 'DC', 'BASE_SHAPE'], funcNames: ['psetSample'], funcs: PSET_FUNCS,
+    code: (w, p) => `{ var c_: f32 = 0.0; let q = psetSample(u32(${p[9]}), u32(${p[10]}), ${w}, rs, &c_); v += (${w} * 0.01) * q;
+    if (i32(${p[8]}) == 0) { (*rgb) = vec4f(pset[pset_off + 9u], pset[pset_off + 10u], pset[pset_off + 11u], 1.0); } else { (*cp) = c_; } }`,
+  },
+  // mandala2 (Mandala2Func): a random grid cell, coloured by its orbit's step count (RGB for color id 1..3, hue for 0)
+  mandala2: {
+    params: [{ name: 'width', def: 500, int: true }, { name: 'num', def: 1, int: true }, { name: 'denom', def: 3, int: true }, { name: 'minsky', def: 0, int: true }, { name: 'wobble', def: 0, int: true }, { name: 'wrap_range', def: 0, int: true }, { name: 'hskew', def: 0, int: true }, { name: 'color id', def: 0, int: true }],
+    extra: 2, flags: ['pset', 'dc', 'rgb'], types: ['SIMULATION', 'DC', 'BASE_SHAPE'],
+    code: (w, p) => `{ let W = f32(clamp(i32(${p[0]}), 100, 2000)); let Wi = u32(W);
+    let x = u32(rnd(rs) * W); let y = u32(rnd(rs) * W);
+    let cv = pset[u32(${p[8]}) * ${PSET_STRIDE}u + x * Wi + y];
+    if (clamp(i32(${p[7]}), 0, 3) >= 1) { let pk = u32(cv + 0.5); (*rgb) = vec4f(f32(pk >> 16u), f32((pk >> 8u) & 255u), f32(pk & 255u), 255.0) / 255.0; } else { (*cp) = cv; }
+    v += ${w} * vec2f(f32(x) / W - 0.5, f32(y) / W - 0.5); }`,
+  },
+  // nsudoku (NSudokuFunc): nested sudoku boards of n-gons, colour = digit / 9 (see the builder about JWildfire's unseeded board)
+  nsudoku: {
+    params: [{ name: 'Level', def: 5, int: true }, { name: 'thickness', def: 0.5 }, { name: 'size', def: 0.5 }, { name: 'angle', def: 0 }, { name: 'type', def: 4, int: true }],
+    extra: 2, flags: ['pset', 'dc'], types: ['2D', 'SIMULATION', 'BASE_SHAPE'], funcNames: ['psetSample'], funcs: PSET_FUNCS,
+    code: (w, p) => psetCode(w, p, 5, true),
+  },
+  // szubieta (SZubietaFunc): the n-gon grid, output ×0.1
+  szubieta: {
+    params: [{ name: 'width', def: 128, int: true }, { name: 'height', def: 128, int: true }, { name: 'type', def: 0, int: true }, { name: 'scale', def: 0.5 }],
+    extra: 2, flags: ['pset', 'dc'], types: ['2D', 'SIMULATION', 'BASE_SHAPE'], funcNames: ['psetSample'], funcs: PSET_FUNCS,
+    code: (w, p) => psetCode(w, p, 4, true, '0.1'),
+  },
+  // gpattern (GPatternFunc): n-gon rows; JWildfire applies the amount to lines/triangles but NOT to its n-gons — kept
+  gpattern: {
+    params: [{ name: 'seed', def: 10000, int: true }, { name: 'width', def: 4 }, { name: 'height', def: 2 }, { name: 'lineheight', def: 0.15 }, { name: 'angle', def: 0 }, { name: 'randPos', def: 0 }, { name: 'randSize', def: 0 }, { name: 'fill', def: 1, int: true }, { name: 'ouline', def: 0, int: true }, { name: 'fill color', def: 0 }, { name: 'fill color speed', def: 1 }, { name: 'outline color', def: 0 }],
+    res: ['string'], resDef: { string: '3,4,5,6,5,4,3' },
+    extra: 2, flags: ['pset', 'dc'], types: ['2D', 'SIMULATION', 'BASE_SHAPE'], funcNames: ['psetSample'], funcs: PSET_FUNCS,
+    code: (w, p) => `{ var c_: f32 = 0.0; let q = psetSample(u32(${p[12]}), u32(${p[13]}), ${w}, rs, &c_); v += select(${w}, 1.0, pset_kind == 3u) * q; (*cp) = c_; }`,
+  },
+  // curliecue (CurliecueFunc): points are blurred by `scale` (plotBlur), lines and n-gons as they are
+  curliecue: {
+    params: [{ name: 'Points', def: 500, int: true }, { name: 'seed', def: 1000, int: true }, { name: 'type', def: 0, int: true }, { name: 'sides', def: 4, int: true }, { name: 'scale', def: 0.02 }, { name: 'symmetry', def: 1, int: true }, { name: 'eccentricity', def: 0 }, { name: 'showlines', def: 1, int: true }],
+    extra: 2, flags: ['pset', 'dc'], types: ['2D', 'DC', 'SIMULATION', 'BASE_SHAPE'], funcNames: ['psetSample'], funcs: PSET_FUNCS,
+    code: (w, p) => psetCode(w, p, 8, true, '1.0', `clamp(${p[4]}, 0.0, 1.0)`),
+  },
+  gosperisland_js: {
+    params: [{ name: 'level', def: 2, int: true }, { name: 'line_thickness', def: 0.5 }],
+    extra: 2, flags: ['pset'], types: ['2D', 'SIMULATION', 'BASE_SHAPE'], funcNames: ['psetLineOrDot'], funcs: PSET_LINE_OR_DOT,
+    code: (w, p) => turtleCode(w, p, 2, '1.0', '0.0', '0.0'),
+  },
+  rsquares_js: {
+    params: [{ name: 'level', def: 2, int: true }, { name: 'show_lines', def: 1, int: true }, { name: 'line_thickness', def: 0.5 }, { name: 'show_points', def: 0, int: true }, { name: 'point_thickness', def: 3 }],
+    extra: 2, flags: ['pset'], types: ['2D', 'SIMULATION', 'BASE_SHAPE'], funcNames: ['psetLineOrDot'], funcs: PSET_LINE_OR_DOT,
+    code: (w, p) => turtleCode(w, p, 5, `f32(i32(${p[1]}))`, `f32(i32(${p[3]}))`, p[4]),
+  },
+  // arctruchet (ArcTruchetFunc): a quarter-circle arc of `thickness` (radius 0.25, tiles of 0.5) in a random tile, rotated by
+  // the tile's seeded quarter turn (the table), either the 0..90° or the 180..270° arc
+  arctruchet: {
+    params: [{ name: 'seed', def: 10000, int: true }, { name: 'thickness', def: 0.025 }, { name: 'TilesPerRow', def: 10, int: true }, { name: 'TilesPerColumn', def: 10, int: true }],
+    extra: 2, flags: ['pset'], types: ['BASE_SHAPE'],
+    code: (w, p) => `{
+    let rows = f32(clamp(i32(${p[2]}), 1, 100)); let cols = f32(clamp(i32(${p[3]}), 1, 100)); let th = clamp(${p[1]}, 0.0, 1.0);
+    let R = 0.25; let ts = 0.5;
+    let i = i32(rnd(rs) * rows); let j = i32(rnd(rs) * cols);
+    let x = f32(i) * ts + ts / 2.0; let y = f32(j) * ts + ts / 2.0;
+    let n = i32(pset[u32(${p[4]}) * ${PSET_STRIDE}u + u32(j) * u32(rows) + u32(i)]);
+    let ang = f32(n) * 90.0 * 3.141592653589793 / 180.0;
+    let first = rnd(rs) < 0.5;
+    let phi10 = select(3.141592653589793, 0.0, first); let delta = 1.5707963267948966;
+    let gamma = th * (2.0 * R + th) / (R + th);
+    let r = R + th - gamma * rnd(rs); let Phi = phi10 + delta * rnd(rs);
+    let xp = r * cos(Phi); let yp = r * sin(Phi);
+    var px = xp * cos(ang) + yp * sin(ang); var py = -xp * sin(ang) + yp * cos(ang);
+    let radio = select(-R, R, first);
+    px -= radio * cos(ang) + radio * sin(ang); py -= -radio * sin(ang) + radio * cos(ang);
+    v += ${w} * vec2f(px + x - ts * rows / 2.0, py + y - ts * cols / 2.0); }`,
   },
   // the `_js` turtle family (Jesus Sosa): line segments built on the CPU, lines or dots per point
   brownian_js: {

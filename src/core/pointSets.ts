@@ -14,7 +14,7 @@
 export const PSET_STRIDE = 12;
 
 export interface PointSet { data: Float32Array; count: number }
-export type PointSetBuilder = (params: Record<string, number>) => PointSet;
+export type PointSetBuilder = (params: Record<string, number>, res?: Record<string, string>) => PointSet;
 
 export class PointSetWriter {
   private arr: number[] = [];
@@ -29,8 +29,8 @@ export class PointSetWriter {
   line(x1: number, y1: number, x2: number, y2: number, thickness = 0, color = 0) { this.push(1, color, x1, y1, x2, y2, thickness); }
   triangle(x1: number, y1: number, x2: number, y2: number, x3: number, y3: number, color = 0) { this.push(2, color, x1, y1, x2, y2, x3, y3); }
   /** JWildfire Ngon(sides, scale, angle°, pos, color, fill) */
-  ngon(x: number, y: number, sides: number, scale: number, angleDeg: number, fill: number, color = 0) {
-    this.push(3, color, x, y, Math.max(3, Math.round(sides)), scale, Math.cos(angleDeg * Math.PI / 180), Math.sin(angleDeg * Math.PI / 180), fill);
+  ngon(x: number, y: number, sides: number, scale: number, angleDeg: number, fill: number, color = 0, rgb?: [number, number, number]) {
+    this.push(3, color, x, y, Math.max(3, Math.round(sides)), scale, Math.cos(angleDeg * Math.PI / 180), Math.sin(angleDeg * Math.PI / 180), fill, ...(rgb ?? []));
   }
   dot(x: number, y: number, thickness: number, color = 0) { this.push(4, color, x, y, thickness); }
   /** raw numbers (tables): `n` values per record, padded */
@@ -74,10 +74,13 @@ export function registerPointSet(name: string, b: PointSetBuilder) { builders.se
 export const hasPointSet = (name: string) => builders.has(name);
 
 /** The point-set key of a variation instance (name + the params its builder reads), undefined for others. */
-export function pointSetKeyFor(vi: { name: string; params: Record<string, number> }): string | undefined {
+export function pointSetKeyFor(vi: { name: string; params: Record<string, number>; res?: Record<string, string> }): string | undefined {
   if (!builders.has(vi.name)) return undefined;
-  return `${vi.name}#${JSON.stringify(vi.params)}`;
+  const key = `${vi.name}#${JSON.stringify(vi.params)}#${JSON.stringify(vi.res ?? {})}`;
+  if (!keyArgs.has(key)) keyArgs.set(key, { params: vi.params, res: vi.res });
+  return key;
 }
+const keyArgs = new Map<string, { params: Record<string, number>; res?: Record<string, string> }>();
 const cache = new Map<string, PointSet>();
 /** Build (or fetch from cache) the set for a key. Synchronous: builders run on the main thread at setFlame. */
 export function pointSetFor(key: string): PointSet {
@@ -85,9 +88,9 @@ export function pointSetFor(key: string): PointSet {
   if (!ps) {
     const hash = key.indexOf('#');
     const name = key.slice(0, hash);
-    const params = JSON.parse(key.slice(hash + 1)) as Record<string, number>;
+    const args = keyArgs.get(key) ?? { params: JSON.parse(key.slice(hash + 1, key.lastIndexOf('#'))) as Record<string, number> };
     const t0 = performance.now();
-    try { ps = builders.get(name)!(params); }
+    try { ps = builders.get(name)!(args.params, args.res); }
     catch (e) { console.warn(`${name}: point set failed (${(e as Error).message}); rendering nothing`); ps = { data: new Float32Array(0), count: 0 }; }
     const ms = performance.now() - t0;
     if (ms > 200) console.info(`${name}: ${ps.count} primitives in ${ms.toFixed(0)} ms`);
@@ -216,6 +219,13 @@ export class JavaRandom {
   constructor(seed: number) { this.seed = (BigInt(Math.trunc(seed)) ^ JavaRandom.MULT) & JavaRandom.MASK; }
   private next(bits: number): number { this.seed = (this.seed * JavaRandom.MULT + BigInt(11)) & JavaRandom.MASK; return Number(this.seed >> BigInt(48 - bits)); }
   nextDouble(): number { return (this.next(26) * 134217728 + this.next(27)) / 9007199254740992; }
+  /** java.util.Random.nextInt(bound) */
+  nextInt(bound: number): number {
+    let r = this.next(31); const m = bound - 1;
+    if ((bound & m) === 0) return Number((BigInt(bound) * BigInt(r)) >> BigInt(31));
+    for (let u = r; u - (r = u % bound) + m < 0 || u - r + m > 2147483647; u = this.next(31));
+    return r;
+  }
 }
 
 // ---- the `_js` turtle family: line segments; the kernel draws a random point along one (plotLine, ± line_thickness)
@@ -296,6 +306,294 @@ registerPointSet('snowflake_wf', (P) => {
     }
   }
   return w.done();
+});
+
+// ---- the rest of the DrawFunc family and the seeded tables (2026-08-23) ----
+const limit = (v: number, lo: number, hi: number) => Math.min(hi, Math.max(lo, v));
+const ilimit = (v: number, lo: number, hi: number) => Math.trunc(limit(v, lo, hi));
+
+// szubieta (SZubietaFunc): a width×height grid of 20-gons coloured by an integer bit pattern (CircleSquares / Square Tile)
+registerPointSet('szubieta', (P) => {
+  const W = ilimit(P.width ?? 128, 32, 256), H = ilimit(P.height ?? 128, 32, 256), type = ilimit(P.type ?? 0, 0, 1), scale = limit(P.scale ?? 0.5, 0, 1);
+  const w = new PointSetWriter();
+  for (let i = 0; i < W; i++) for (let j = 0; j < H; j++) {
+    let x = type === 0 ? ((i * i - 2 * (i | j) + j * j) | 0) % 255 : (i & ((j - 2 * (i ^ j) + j) | 0) & i) % 256;
+    x = Math.abs(x);
+    w.ngon(i - W / 2, j - H / 2, 20, scale, 0, 0, x / 255);
+  }
+  return w.done();
+});
+
+// gpattern (GPatternFunc): rows of n-gons (the side counts cycle through the 'string' resource), java.util.Random(seed) jitter
+registerPointSet('gpattern', (P, R) => {
+  const polys = ((R?.string ?? '3,4,5,6,5,4,3').split(',')).map((s) => { const v = parseInt(s, 10); return !Number.isFinite(v) || v > 20 || v < 3 ? 3 : v; });
+  const seed = Math.trunc(P.seed ?? 10000), width = limit(P.width ?? 4, 0, 10), height = limit(P.height ?? 2, 0, 10), lineheight = limit(P.lineheight ?? 0.15, 0.01, 1.5);
+  const angle = P.angle ?? 0, randPos = P.randPos ?? 0, randSize = limit(P.randSize ?? 0, -1, 1), fill = ilimit(P.fill ?? 1, 0, 1), outline = ilimit(P.ouline ?? 0, 0, 1);
+  const color = limit(P['fill color'] ?? 0, 0, 1), speedcolor = limit(P['fill color speed'] ?? 1, 0, 1), outlinecolor = limit(P['outline color'] ?? 0, 0, 1);
+  const rnd = new JavaRandom(seed);
+  const random = (r1: number, r2: number) => r1 + (r2 - r1) * rnd.nextDouble();
+  const w = new PointSetWriter();
+  if (polys.length === 0) return w.done();
+  const polyWidth = lineheight;
+  for (let posj = 0; posj <= width; posj += polyWidth) {
+    let y = 0;
+    for (let polyCntr = 0; y <= height; polyCntr++) {
+      const x = posj + random(-randPos, randPos);
+      const r = Math.fround(polyWidth / 2) + random(-randSize, randSize);
+      if (outline === 1) w.ngon(x, y, polys[polyCntr], r, angle, outline, outlinecolor);
+      if (fill === 1) { const cc = ((color + speedcolor * rnd.nextDouble()) % 1 + 1) % 1; w.ngon(x, y, polys[polyCntr], r, angle, 0, cc); }
+      if (polyCntr > polys.length - 2) polyCntr = -1;
+      y += lineheight;
+    }
+  }
+  return w.done();
+});
+
+// curliecue (CurliecueFunc): the curlicue trajectory (s = java.util.Random(seed).nextDouble()) as points (blur radius =
+// scale) / lines / n-gons, mirrored by the symmetry mode; (float) casts where the Java has them
+registerPointSet('curliecue', (P) => {
+  const size = ilimit(P.Points ?? 500, 1, 10000), seed = Math.trunc(P.seed ?? 1000), type = ilimit(P.type ?? 0, 0, 1), sides = ilimit(P.sides ?? 4, 3, 20);
+  const scale = limit(P.scale ?? 0.02, 0, 1), sym = ilimit(P.symmetry ?? 1, 1, 4), ecce = limit(P.eccentricity ?? 0, 0, 1), showlines = ilimit(P.showlines ?? 1, 0, 1);
+  const rnd = new JavaRandom(seed); const s = rnd.nextDouble();
+  const w = new PointSetWriter(); const F = Math.fround;
+  let theta = 0, phi = 0, x0 = ecce, y0 = ecce;
+  for (let i = 0; i < size; i++) {
+    const x1 = x0 + 0.01 * Math.cos(phi), y1 = y0 + 0.01 * Math.sin(phi), c = i / size;
+    const pt = (x: number, y: number) => { if (type === 0) w.point(x, y, c); else w.ngon(x, y, sides, scale, 0, 0, c); };
+    const ln = (a: number, b: number, d: number, e: number) => { if (showlines === 1) w.line(F(a), F(b), F(d), F(e), 0, c); };
+    if (sym === 1) {
+      if (type === 0) { pt(F(x0), F(-y0)); pt(F(x1), F(-y1)); } else { pt(x0, -y0); pt(x1, -y1); }
+      ln(x0, -y0, x1, -y1);
+    } else if (sym === 2) {
+      pt(x0, -y0); pt(x1, -y1); pt(-x0, y0); pt(-x1, y1); pt(y0, x0); pt(y1, x1); pt(-y0, -x0); pt(-y1, -x1);
+      if (type === 0) { ln(-y0, -x0, -y1, -x1); ln(y0, x0, y1, x1); ln(-x0, y0, -x1, y1); ln(x0, -y0, x1, -y1); }
+      else { ln(x0, -y0, x1, -y1); ln(-x0, y0, -x1, y1); ln(y0, x0, y1, x1); ln(-y0, -x0, -y1, -x1); }
+    } else if (sym === 3) {
+      pt(x0, -y0); pt(x1, -y1); pt(-x0, y0); pt(-x1, y1); pt(-x0, -y0); pt(-x1, -y1); pt(x0, y0); pt(x1, y1);
+      if (type === 0) { ln(x0, y0, x1, y1); ln(-x0, -y0, -x1, -y1); ln(-x0, y0, -x1, y1); ln(x0, -y0, x1, -y1); }
+      else { ln(x0, -y0, x1, -y1); ln(-x0, y0, -x1, y1); ln(-x0, -y0, -x1, -y1); ln(x0, y0, x1, y1); }
+    } else {
+      pt(x0, -y0); pt(x1, -y1); pt(-x0, y0); pt(-x1, y1); pt(y0, x0); pt(y1, x1); pt(-y0, -x0); pt(-y1, -x1);
+      pt(x0, y0); pt(x1, y1); pt(-x0, -y0); pt(-x1, -y1); pt(y0, -x0); pt(y1, -x1); pt(-y0, x0); pt(-y1, x1);
+      ln(-y0, x0, -y1, x1); ln(y0, -x0, y1, -x1); ln(-x0, -y0, -x1, -y1); ln(x0, y0, x1, y1); ln(-y0, -x0, -y1, -x1); ln(y0, x0, y1, x1); ln(-x0, y0, -x1, y1); ln(x0, -y0, x1, -y1);
+    }
+    x0 = x1; y0 = y1;
+    phi = (theta + phi) % (2 * Math.PI);
+    theta = (theta + 2 * Math.PI * s) % (2 * Math.PI);
+  }
+  return w.done();
+});
+
+// gosperisland_js (GosperIslandFunc): six Gosper curves of order `level` around (9/32, 1/8); 6·7^level unit segments,
+// so the level is capped at 6 here (JWildfire allows 10: 1.7 billion segments)
+registerPointSet('gosperisland_js', (P) => {
+  const n = ilimit(Math.trunc((P.level ?? 2) + 0.5), 1, 6), ANGLE = 19.106605350869094394;
+  const t = new Turtle(9 / 32, 1 / 8, 0);
+  const gosper = (k: number): void => { if (k === 0) { t.goForward(1); return; } t.turnLeft(-ANGLE); gosper(k - 1); t.turnLeft(60); gosper(k - 1); t.turnLeft(-60); gosper(k - 1); t.turnLeft(ANGLE); };
+  for (let i = 0; i < 6; i++) { gosper(n); t.turnLeft(60); }
+  return turtleLines(t.segs, (P.line_thickness ?? 0.5) / 100);
+});
+
+// rsquares_js (RsquaresFunc): a square of side 1 at (0.5, 0.5), four squares of side/2.2 at its corners, `level` deep
+registerPointSet('rsquares_js', (P) => {
+  const segs: number[] = [];
+  const sq = (x: number, y: number, s: number) => { const h = s / 2; segs.push(x - h, y - h, x - h, y + h, x - h, y + h, x + h, y + h, x + h, y + h, x + h, y - h, x + h, y - h, x - h, y - h); };
+  const draw = (n: number, x: number, y: number, s: number): void => { if (n === 0) return; sq(x, y, s); const r = 2.2; draw(n - 1, x - s / 2, y - s / 2, s / r); draw(n - 1, x - s / 2, y + s / 2, s / r); draw(n - 1, x + s / 2, y - s / 2, s / r); draw(n - 1, x + s / 2, y + s / 2, s / r); };
+  draw(ilimit(Math.trunc((P.level ?? 2) + 0.5), 1, 9), 0.5, 0.5, 1);
+  return turtleLines(segs, (P.line_thickness ?? 0.5) / 100);
+});
+
+// arctruchet (ArcTruchetFunc): the per-tile rotation table, java.util.Random(seed) (first draw discarded), as a raw table
+registerPointSet('arctruchet', (P) => {
+  const rows = ilimit(P.TilesPerRow ?? 10, 1, 100), cols = ilimit(P.TilesPerColumn ?? 10, 1, 100), seed = ilimit(P.seed ?? 10000, 0, 100000);
+  const rnd = new JavaRandom(seed); rnd.nextDouble();
+  const tilt = new Array<number>(rows * cols).fill(0);
+  for (let i = 0; i < rows; i++) for (let j = 0; j < cols; j++) tilt[j * rows + i] = Math.trunc(rnd.nextDouble() * 4);
+  const w = new PointSetWriter(); w.raw(tilt); return w.done();
+});
+
+// ---- the mandala rotator maps (js/mandala/RotatorMap, Mandala2Func): Minsky/Givens integer rotations on a grid of
+// cells; every cell traces its orbit until it returns (or max_n_steps), the orbit's cells are stamped with that step
+// count. `wrapLoop` = Mandala2Func's loop condition (keeps tracing while wrap_range > 0), RotatorMap stops at max.
+const ROT_MAX = 20000;
+const WOBBLE_PICKS = 9, WRAP_DAT = [0, 12, 8, 6, 4, 3, 2, 1.5, 1], SKEW_DAT = [0, 1, 2, 3, 4, 5, 6, 7, 8, 11, 12, 15, 16, 23, 24, 25, 31, 32, 36, 47, 48, 63, 64];
+function rotatorTrace(width: number, height: number, num: number, denom: number, minsky: boolean, wobble: number, wrap: number, extraHskew: number, wrapLoop: boolean, onVisit?: (px: number, py: number, n: number) => void): Int32Array {
+  const showBase = -Math.trunc(width / 2), biggest = Math.max(width, height);
+  let size = wrap === 0 ? biggest * 2 : Math.trunc(biggest * wrap);
+  size |= 1;
+  let base = Math.trunc(size / 2);
+  if (base + (showBase + biggest) > size) base = -(showBase + biggest) + size;
+  let hskew1: Int32Array | null = null, vskew = new Int32Array(0), hskew2 = new Int32Array(0), smin = 0, smax = 0;
+  const adjust = (v: number): number => {
+    if (wrap === 0) { while (base + v < 0 || base + v >= size) { size *= 2; base = Math.trunc(size / 2); hskew1 = null; } }
+    if (!hskew1) {
+      smin = -base; smax = smin + size - 1;
+      hskew1 = new Int32Array(size); vskew = new Int32Array(size); hskew2 = new Int32Array(size);
+      const lowangle = num / ((1 + wobble) * denom), hiangle = num / ((1 - wobble) * denom), wf = 1 / 512;
+      for (let i = -base; i + base < size; i++) {
+        const x = i * 2 * Math.PI * wf;
+        const angle = Math.PI * 2 * (lowangle - (Math.cos(x) - 1) / 2 * (hiangle - lowangle));
+        if (minsky) { const eps = Math.sqrt(2 * (1 - Math.cos(angle))); hskew1[i + base] = -Math.round(eps * i + 1e-8) + extraHskew; vskew[i + base] = Math.round(eps * i + 1e-8); hskew2[i + base] = 0; }
+        else { const s = Math.sin(angle), c = (Math.cos(angle) - 1) / s; hskew1[i + base] = Math.round(c * i); vskew[i + base] = Math.round(s * i + 1e-8); hskew2[i + base] = hskew1[i + base] + extraHskew; }
+      }
+    }
+    return v - size * Math.floor((base + v) / size);
+  };
+  adjust(0);
+  const steps = new Int32Array(width * height);
+  const offs = -showBase, minX = showBase, maxX = minX + width - 1, minY = showBase, maxY = minY + height - 1;
+  let px = 0, py = 0;
+  const step = () => { for (let d = 0; d < denom; d++) { px += hskew1![py + base]; if (px < smin || px > smax) px = adjust(px); py += vskew[px + base]; if (py < smin || py > smax) py = adjust(py); px += hskew2[py + base]; if (px < smin || px > smax) px = adjust(px); } };
+  for (let x = minX; x <= maxX; x++) for (let y = minY; y <= maxY; y++) {
+    if (steps[(x + offs) * height + (y + offs)] !== 0) continue;
+    px = x; py = y;
+    let n: number, guard = 0;
+    for (n = 1; n <= ROT_MAX || (wrapLoop && wrap > 0); n++) { step(); if (px === x && py === y) break; if (n > ROT_MAX) n = ROT_MAX; if (++guard > 40 * ROT_MAX) { n = ROT_MAX; break; } }
+    px = x; py = y;
+    for (let k = 1; k <= n; k++) {
+      if (px >= minX && px <= maxX && py >= minY && py <= maxY) {
+        const idx = (px + offs) * height + (py + offs);
+        if (steps[idx] !== 0) break;
+        onVisit?.(px, py, n);
+        steps[idx] = n;
+      }
+      step(); if (px === x && py === y) break;
+    }
+  }
+  return steps;
+}
+/** java.awt.Color.HSBtoRGB (8-bit ints), float arithmetic as in Java */
+export function javaHSBtoRGB(hue: number, sat: number, bri: number): [number, number, number] {
+  const F = Math.fround;
+  if (sat === 0) { const v = Math.trunc(F(bri * 255 + 0.5)); return [v, v, v]; }
+  const h = F((hue - Math.floor(hue)) * 6), f = F(h - Math.floor(h));
+  const p = F(bri * (1 - sat)), q = F(bri * (1 - sat * f)), t = F(bri * (1 - sat * (1 - f)));
+  let c: [number, number, number];
+  switch (Math.trunc(h)) { case 0: c = [bri, t, p]; break; case 1: c = [q, bri, p]; break; case 2: c = [p, bri, t]; break; case 3: c = [p, q, bri]; break; case 4: c = [t, p, bri]; break; case 5: c = [bri, p, q]; break; default: c = [0, 0, 0]; }
+  return c.map((v) => Math.trunc(F(v * 255 + 0.5))) as [number, number, number];
+}
+/** java.awt.Color.RGBtoHSB's hue (float arithmetic) */
+export function javaRGBtoHue(r: number, g: number, b: number): number {
+  const F = Math.fround;
+  const cmax = Math.max(r, g, b), cmin = Math.min(r, g, b);
+  if (cmax === 0 || cmax === cmin) return 0;
+  const d = F(cmax - cmin), redc = F((cmax - r) / d), greenc = F((cmax - g) / d), bluec = F((cmax - b) / d);
+  let h = r === cmax ? F(bluec - greenc) : g === cmax ? F(F(2 + redc) - bluec) : F(F(4 + greenc) - redc);
+  h = F(h / 6); if (h < 0) h = F(h + 1);
+  return h;
+}
+/** The mandala colour maps by orbit step count: mode 0 = Color(n%91/90, n%123/122, n%17/16), 1 = HSB(frac(log n), .85, 1),
+ *  2 = HSB(frac(n / 6.333333), .85, 1); n = max_n_steps + 1 is black. Returns the 8-bit RGB and its RGBtoHSB hue. */
+export function mandalaColor(n: number, mode: number): { rgb: [number, number, number]; hue: number } {
+  const F = Math.fround;
+  let rgb: [number, number, number];
+  if (n >= ROT_MAX + 1) rgb = [0, 0, 0];
+  else if (mode === 1) { const z = F(Math.log(n)); rgb = javaHSBtoRGB(F(z - Math.floor(z)), 0.85, 1); }
+  else if (mode === 2) { const z = F(n / 6.333333); rgb = javaHSBtoRGB(F(z - Math.floor(z)), 0.85, 1); }
+  else rgb = [F((n % 91) / 90), F((n % 123) / 122), F((n % 17) / 16)].map((v) => Math.trunc(F(v * 255 + 0.5))) as [number, number, number];
+  return { rgb, hue: javaRGBtoHue(rgb[0], rgb[1], rgb[2]) };
+}
+const mandalaParams = (P: Record<string, number>, wmin: number, wmax: number) => {
+  const width = ilimit(P.width ?? (wmax === 1000 ? 300 : 500), wmin, wmax);
+  // JWildfire's setParameter order (num, then denom) with its "2·num must not be a multiple of denom" bumps
+  let n = Math.max(1, P.num ?? 1); if ((n * 2) % 3 === 0) n++; const num = ilimit(n, 1, 15);
+  let d = Math.max(3, P.denom ?? 3); if ((num * 2) % d === 0) d++; const denom = ilimit(d, 3, 16);
+  const minsky = ilimit(P.minsky ?? 0, 0, 1) === 1;
+  const wp = ilimit(P.wobble ?? 0, 0, WOBBLE_PICKS) % WOBBLE_PICKS, wrp = ilimit(P.wrap_range ?? 0, 0, WRAP_DAT.length) % WRAP_DAT.length, hp = ilimit(P.hskew ?? 0, 0, SKEW_DAT.length) % SKEW_DAT.length;
+  return { width, num, denom, minsky, wobble: wp === 0 ? 0 : Math.pow(10, -6 + 0.5 * wp), wrap: WRAP_DAT[wrp], extra: SKEW_DAT[hp] };
+};
+// mandala (MandalaFunc + RotatorMap): one unit 4-gon (scale = size) per orbit cell; colour slot = the hue of the
+// HSB(frac(log n), .85, 1) colour (color id 1), slots 9..11 its RGB in 0..1 (color id 0)
+registerPointSet('mandala', (P) => {
+  const m = mandalaParams(P, 100, 1000), size = limit(P.size ?? 0.6, 0, 1);
+  const w = new PointSetWriter(); const cache = new Map<number, { rgb: [number, number, number]; hue: number }>();
+  rotatorTrace(m.width, m.width, m.num, m.denom, m.minsky, m.wobble, m.wrap, m.extra, false, (px, py, n) => {
+    let c = cache.get(n); if (!c) { c = mandalaColor(n, 1); cache.set(n, c); }
+    w.ngon(px, py, 4, size, 0, 0, c.hue, [c.rgb[0] / 255, c.rgb[1] / 255, c.rgb[2] / 255]);
+  });
+  return w.done();
+});
+// mandala2 (Mandala2Func): the per-cell colour as a raw table ([x][y] → x·width + y): the hue of the mode-0 colour for
+// color id 0, else the 8-bit RGB packed into one float (r·65536 + g·256 + b)
+registerPointSet('mandala2', (P) => {
+  const m = mandalaParams(P, 100, 2000), cid = ilimit(P['color id'] ?? 0, 0, 3);
+  const steps = rotatorTrace(m.width, m.width, m.num, m.denom, m.minsky, m.wobble, m.wrap, m.extra, true);
+  const cache = new Map<number, number>();
+  const tab = Array.from(steps, (n) => { let v = cache.get(n); if (v === undefined) { const c = mandalaColor(n, cid === 1 ? 1 : cid === 2 ? 2 : 0); v = cid === 0 ? c.hue : c.rgb[0] * 65536 + c.rgb[1] * 256 + c.rgb[2]; cache.set(n, v); } return v; });
+  const w = new PointSetWriter(); w.raw(tab); return w.done();
+});
+
+// nsudoku (NSudokuFunc): `level` nested sudoku boards of n-gons. JWildfire's board comes from an unseeded
+// java.util.Random (a new one per cell) and a static generator shared by every instance — never reproducible — so
+// both draw from java.util.Random(1000) here (the generator's 81 makeHoles draws included); the row-transform
+// machinery (tSudoku: 1296 permutation rows, Compare / updateTotal / peek) is exact.
+registerPointSet('nsudoku', (P) => {
+  const level = ilimit(P.Level ?? 5, 1, 9), thickness = 1 - limit(P.thickness ?? 0.5, 0, 1), size = limit(P.size ?? 0.5, 0.3, 1), angle = P.angle ?? 0, type = ilimit(P.type ?? 4, 3, 6);
+  const boardRnd = new JavaRandom(1000), rnd = new JavaRandom(1000);
+  const board: number[][] = Array.from({ length: 9 }, () => new Array(9).fill(0));
+  const legal = (x: number, y: number, c: number) => {
+    for (let i = 0; i < 9; i++) if (c === board[x][i]) return false;
+    for (let i = 0; i < 9; i++) if (c === board[i][y]) return false;
+    const cx = x > 2 ? (x > 5 ? 6 : 3) : 0, cy = y > 2 ? (y > 5 ? 6 : 3) : 0;
+    for (let i = cx; i < 10 && i < cx + 3; i++) for (let j = cy; j < 10 && j < cy + 3; j++) if (c === board[i][j]) return false;
+    return true;
+  };
+  const nextCell = (x: number, y: number): boolean => {
+    const toCheck = [1, 2, 3, 4, 5, 6, 7, 8, 9];
+    for (let i = toCheck.length - 1; i > 0; i--) { const cur = boardRnd.nextInt(i); const tmp = toCheck[cur]; toCheck[cur] = toCheck[i]; toCheck[i] = tmp; }
+    for (let i = 0; i < toCheck.length; i++) {
+      if (legal(x, y, toCheck[i])) {
+        board[x][y] = toCheck[i];
+        let nx = x, ny = y;
+        if (x === 8) { if (y === 8) return true; nx = 0; ny = y + 1; } else nx = x + 1;
+        if (nextCell(nx, ny)) return true;
+      }
+    }
+    board[x][y] = 0; return false;
+  };
+  nextCell(0, 0);
+  for (let i = 0; i < 81; i++) rnd.nextDouble(); // makeHoles(0)
+  // tSudoku.M
+  const perm = [[1, 2, 3], [1, 3, 2], [2, 1, 3], [2, 3, 1], [3, 1, 2], [3, 2, 1]];
+  let total: number[][] = [];
+  for (let n = 0; n < 6; n++) for (let m = 0; m < 6; m++) for (let l = 0; l < 6; l++) for (let j = 0; j < 6; j++) {
+    const c = [...perm[n], ...perm[m], ...perm[l], ...perm[j]];
+    const row = c.slice();
+    for (let i = 0; i < 9; i++) row[i] = c[i] + 3 * c[i > 5 ? 11 : i > 2 ? 10 : 9] - 3;
+    total.push(row);
+  }
+  const compare = (tot: number[][], x: number[]) => tot.map((r) => { let k = 0; for (let j = 0; j < x.length; j++) if (r[j] === x[j]) k++; return k; });
+  const vec = (s: number[][]) => { const v = new Array(81).fill(0); for (let i = 0; i < 9; i++) for (let j = 0; j < 9; j++) v[9 * i + j] = s[j][i]; return v; };
+  const w = new PointSetWriter();
+  const poly = (color: number[], scale: number) => {
+    for (let i = 0; i < 9; i++) for (let j = 0; j < 9; j++) {
+      const radius = size * (scale / level) / 9, area = (1 - 1 / scale) === 0 ? 0 : thickness;
+      w.ngon(i / 9 - 0.5, j / 9 - 0.5, type, radius, angle, area, color[9 * i + j] / 9);
+    }
+  };
+  let cmp: number[] = [];
+  for (let n = level; n > 0; n--) {
+    let sv: number[];
+    if (n === level) { const tran = [1, 2, 3, 4, 5, 6, 7, 8, 9]; cmp = compare(total, tran); sv = vec(board); }
+    else {
+      if (total.length === 0) break;
+      const tran = total[Math.trunc(rnd.nextDouble() * total.length)].slice(0, 9);
+      const ns = Array.from({ length: 9 }, (_, i) => board[tran[i] - 1].slice());
+      cmp = compare(total, tran); sv = vec(ns);
+    }
+    poly(sv, n);
+    total = total.filter((_, i) => cmp[i] === 0);
+  }
+  return w.done();
+});
+
+// natural_foam (NaturalFoamFunc): the bubble table [x, y, z, radius] from java.util.Random(seed)
+registerPointSet('natural_foam', (P) => {
+  const density = ilimit(P.density ?? 50, 0, 2000), spread = P.spread ?? 1, minR = P.minRadius ?? 0.1, maxR = P.maxRadius ?? 0.9;
+  const rnd = new JavaRandom(Math.trunc(P.seed ?? 123));
+  const t: number[] = [];
+  for (let i = 0; i < density; i++) { const x = (2 * rnd.nextDouble() - 1) * spread, y = (2 * rnd.nextDouble() - 1) * spread, z = (2 * rnd.nextDouble() - 1) * spread, r = minR + (maxR - minR) * rnd.nextDouble(); t.push(x, y, z, r); }
+  const w = new PointSetWriter(); w.raw(t); return w.done();
 });
 
 // htree_js (HtreeFunc.draw): an H of `size` at the origin, four half-size H-trees at its tips, `level` deep

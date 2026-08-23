@@ -903,7 +903,7 @@ ${lcases}
             let k = 0;
             if (def.derive) {
               // data hook: numbers the registry entry derives from the params on the CPU (klein_group's generator matrices, …)
-              const d = def.derive(vi.params);
+              const d = def.derive(vi.params, vi.res);
               for (let i = 0; i < d.length && i < def.extra; i++) out[o++] = d[i];
               k = Math.min(d.length, def.extra);
             } else if (def.flags?.includes('pset')) {

@@ -97,7 +97,7 @@ points, `dc_gnarly` updates only 2 of its 6 gaussian summands — `& 5` — so i
 blur depends on the render's init randoms). Together with the 70 hand-written
 flam3 entries the app registry has 940 variations.
 
-### What is not ported (66)
+### What is not ported (52)
 
 `data/unportable.json` is the definitive list — every JWildfire variation is
 either in the registry or in that file with a category, and `gen.ts` writes it
@@ -108,7 +108,7 @@ variation was skipped. Categories:
 |---|---|---|
 | user-code | 21 | compiles user-supplied code or a formula at run time (`custom_wf`, `dc_code`, `glsl_code`, `c_var`, `ducks`, `fract_formula_*`, the `yplot2d_wf`… plot family, `colordomain`); the WebGPU kernel has no run-time compiler |
 | external-content | 25 | renders external content that would have to be uploaded to the GPU: sub-flames (`ringsubflame`, `glynns3subfl`), images (`post_bumpmap_wf`, `displacemap_wf`, `colormap_wf`, `kaleidoimg`, `plane_wf`, `wangtiles`), meshes (`terrain3D`, `metaballs3d_wf`, `knots3D`; `sattractor3D` IS ported — its formulas run through a small safe evaluator, src/core/formula.ts, and the tube is built on the CPU, src/core/sattractor.ts), `svg_wf`, `text_wf`, L-systems, brushes (`obj_mesh_wf` IS ported — the user loads the OBJ file into the browser's mesh store; `subflame_wf` IS ported — the sub-flame is compiled into the kernel) |
-| point-set | 17 | builds a point/segment list on the CPU at init and samples it per point — the rest of the `DrawFunc` family (`gpattern`, `mandala`, `mandala2`, `nsudoku`, `szubieta`, `triantruchet`, `curliecue`, `taprats`, `sunvoroni`, `arctruchet`, `geometricPrimitives`, `meeple`, `point_mirror_symmetry`), `gosperisland_js`, `rsquares_js`, `natural_foam`; `neuron3D` builds a seed-shuffled 512-entry Perlin permutation table per instance. **Ported through the point-set mechanism (see below):** `dragon_js`, `sunflower`, `scrambly`, `dla_wf`, `snowflake_wf`, `brownian_js`, `htree_js`, `koch_js`, `tree_js`, `hilbert_js`, `klein_group`, `grid3d_wf`, `maurer_lines` (lines render mode) |
+| point-set | 3 | `taprats` (needs the csk.taprats tiling library, not in the sparse JWildfire tree), `sunvoroni` (a Voronoi diagram of the sunflower points — JWildfire uses a quickhull jar), `neuron3D` (seed-shuffled Perlin table + 48-bit java.util.Random cell hashes); `neuron3D` builds a seed-shuffled 512-entry Perlin permutation table per instance. **Ported through the point-set mechanism (see below):** `dragon_js`, `sunflower`, `scrambly`, `dla_wf`, `snowflake_wf`, `brownian_js`, `htree_js`, `koch_js`, `tree_js`, `hilbert_js`, `klein_group`, `grid3d_wf`, `maurer_lines` (lines render mode), `szubieta`, `gpattern`, `curliecue`, `gosperisland_js`, `rsquares_js`, `arctruchet`, `triantruchet`, `meeple`, `mandala`, `mandala2`, `nsudoku`, `natural_foam`, `geometricPrimitives`, `point_mirror_symmetry` |
 | engine | 2 | needs an engine feature WilderFire lacks: a variation instantiating another (`sphtiling3v2`), `post_dcztransl` (no Java class) |
 | resource-params | 1 | `dc_triantess` keeps its colours as byte-array ressources |
 
@@ -224,6 +224,35 @@ them. The generator matrices of every recipe are unit-tested
 against values probed from `KleinGroupFunc.init()` (`tests/pointSets.test.ts`). Quirks kept: JWildfire reads
 the brownian canvas sequentially from one shared list (we pick uniformly — same distribution); `tree_js_size` in old
 files is an attribute the current `TreeFunc` no longer has (ignored by both).
+
+**2026-08-23 — the rest of the family (14 more).** Compare on synthetic two-xform fixtures (`mkfix`: one xform = the
+variation, one linear) unless noted: `szubieta` 0.99 / 1.00 (both patterns), `gpattern` 0.98 / 1.00 (the side-count
+list is a string *resource*: `VariationDef.res` now reaches point-set builders and `derive`), `curliecue` 0.99 / 1.00
+(points + lines, n-gons, 4-fold symmetry), `gosperisland_js` 0.99 / 0.99 (level capped at 6: 6·7^level segments),
+`rsquares_js` 1.00 / 1.00, `arctruchet` 0.99 / 1.00 (seeded quarter-turn table), `triantruchet` 0.99 / 1.00 (seeded
+and string-driven), `meeple` 0.99 / 1.00, `natural_foam` 1.00 / 1.00 (bubble table; 3D), `geometricPrimitives`
+1.02 / 1.00 (the `frac(sin(…)·43758.5453)` cell hash runs through the double-float `hsin_` helper, now exported for
+hand ports in `src/core/wgslDf.ts`; a negative hash with `shape_mix_enable` hits no case in the Java switch and
+plots the origin — kept), `nsudoku` 0.97 / 0.99 (JWildfire's board comes from an *unseeded* Random, ours from
+java.util.Random(1000); the 1296-row transform machinery is exact), `mandala` 1.00 / blkMAE 0.7 / corr 1.00 on a
+grey-ramp palette and 1.03–1.05 / 1.00 with real palettes (the rotator-map orbits, step counts and java.awt.Color
+HSB/RGB colour maps are unit-tested against Java reflection probes), `mandala2` (step grid and colours exact by the
+same probes; its image is a lattice of single points, so the two renderers' treatment of isolated dots dominates the
+Compare numbers — 1.2–1.5), `point_mirror_symmetry` (exact without the crop, 0.42–0.74 with it: JWildfire keeps
+one ring of the last `buffer_size` valid points per render thread and feeds cropped points from it; ours is a
+per-walker ring of at most 32, a different sampling of the same set — approximate by design).
+
+Two lessons. (1) **Do colour maths on the CPU.** The first mandala port computed Java's HSBtoRGB / RGBtoHSB in WGSL;
+the functions returned Java's exact values in a stand-alone compute shader yet produced wrong hues inside the full
+kernel (fast-math lowering of the `switch`/`log` chain, presumably) — a grey-ramp palette made the shift
+measurable (our index mean 0.72 vs 0.45). The hue / packed RGB now live in the records and the kernel only copies.
+(2) **JWildfire's `saturation` ≠ 1 turns greys red**: `applyModSaturation` shifts HSL saturation and an achromatic
+pixel's hue is 0, so a grey palette renders red-tinted in JWildfire; keep fixtures at saturation 1.
+
+Leftover found with the RGB-direct controls: under a minimal header (brightness 4, gamma 4, white level 220) the
+already-verified direct-colour variations `dc_truchet` / `dc_menger` render at 0.82 / 0.92 of JWildfire's luma
+(structure 0.99–1.00), i.e. our direct-RGB path and the palette path are not treated identically by one of the
+tonemap stages — fixtures `_ps_rgbctl`, `_ps_rgbctl2`.
 
 Found on the way: **`gamma="0.0"`** (20 of 5433 corpus flames, JWildfire V4.10/V5.50 files) is not "default" in
 JWildfire — `GammaCorrectionFilter` keeps the exponent 0, i.e. `pow(intensity, 0) = 1`: a flat image at full alpha

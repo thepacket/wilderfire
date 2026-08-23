@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { pointSetFor, pointSetKeyFor, Marsaglia, JavaRandom, PSET_STRIDE, Turtle } from '../src/core/pointSets';
+import { pointSetFor, pointSetKeyFor, Marsaglia, JavaRandom, PSET_STRIDE, Turtle, mandalaColor } from '../src/core/pointSets';
 import { defaultFlame } from '../src/core/flame';
 import { defaultParams, VARIATIONS } from '../src/core/variations';
 import { compileFlame } from '../src/gpu/codegen';
@@ -103,6 +103,32 @@ describe('maurer_lines', () => {
     expect(c.wgsl).toContain('fn mlCurve(');
     expect(VARIATIONS.maurer_lines.params!.length).toBe(37);
     expect(VARIATIONS.maurer_lines.params![0].name).toBe('curve_mode');
+  });
+});
+
+describe('mandala colour maps', () => {
+  it('match java.awt.Color (HSBtoRGB / RGBtoHSB hue) for the three modes, probed from Java', () => {
+    // [n, HSB(frac(log n)) rgb, its hue, Color(n%91/90, n%123/122, n%17/16) rgb, its hue, HSB(frac(n/6.333333)) rgb]; 20001 = black in every mode
+    const rows: [number, number[], number, number[], number, number[]][] = [
+    [1, [255,38,38], 0, [3,2,16], 0.6785715, [255,244,38]],
+    [2, [73,38,255], 0.6935484, [6,4,32], 0.6785715, [61,255,38]],
+    [3, [255,166,38], 0.09831029, [9,6,48], 0.6785715, [38,255,221]],
+    [5, [38,113,255], 0.609063, [14,10,80], 0.6761904, [198,38,255]],
+    [7, [255,38,109], 0.9454685, [20,15,112], 0.6752577, [255,175,38]],
+    [10, [78,255,38], 0.3026114, [28,21,159], 0.6751208, [38,152,255]],
+    [50, [255,38,153], 0.9116743, [142,105,255], 0.7077778, [255,38,175]],
+    [100, [38,118,255], 0.6052227, [26,209,239], 0.5234742, [198,38,255]],
+    [1394, [160,255,38], 0.2396313, [82,86,0], 0.1744186, [255,175,38]],
+    [2390, [184,38,255], 0.7788019, [68,111,159], 0.5879121, [38,255,84]],
+    [20000, [255,38,164], 0.9032258, [201,155,128], 0.06164384, [255,38,175]],
+    [20001, [0,0,0], 0, [204,157,143], 0.03825137, [255,107,38]],
+    ];
+    for (const [n, c1, h1, c0, h0, c2] of rows) {
+      const m1 = mandalaColor(n, 1), m0 = mandalaColor(n, 0), m2 = mandalaColor(n, 2);
+      expect(m1.rgb).toEqual(c1); expect(m1.hue).toBeCloseTo(h1, 6);
+      if (n < 20001) { expect(m0.rgb).toEqual(c0); expect(m0.hue).toBeCloseTo(h0, 6); expect(m2.rgb).toEqual(c2); }
+      else { expect(m0.rgb).toEqual([0, 0, 0]); expect(m2.rgb).toEqual([0, 0, 0]); }
+    }
   });
 });
 
