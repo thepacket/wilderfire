@@ -351,3 +351,22 @@ describe('layer colouring options: smooth_gradient and gradient_map', () => {
     expect(normalizeFlame(JSON.parse(JSON.stringify(f)), GREY).layers[0].gradientMap?.lcolorAdd).toBe(0.5);
   });
 });
+
+describe('motion blur', () => {
+  it('round-trips the attributes and lays out JWildfire\'s sub-frames and weights', async () => {
+    const xml = '<flame name="m" size="64 64" scale="10" motion_blur_length="4" motion_blur_timestep="0.1" motion_blur_decay="0.5" fps="25"><xform weight="1" color="0.3" linear="1" coefs="1 0 0 1 0 0"/></flame>';
+    const f = importFlameText(xml, GREY).flame;
+    expect(f.motionBlur).toEqual({ length: 4, timeStep: 0.1, decay: 0.5 });
+    expect(roundTrip(f).flame.motionBlur).toEqual({ length: 4, timeStep: 0.1, decay: 0.5 });
+    expect(normalizeFlame(JSON.parse(JSON.stringify(f)), GREY).motionBlur?.length).toBe(4);
+    const { motionBlurFrames } = await import('../src/ui/motionBlur');
+    const times: number[] = [];
+    const frames = motionBlurFrames(f, { evalAt: (t) => { times.push(+t.toFixed(4)); return f; }, t: 2, fps: 25 })!;
+    expect(frames).toHaveLength(5);
+    expect(frames[0].weight).toBe(1);
+    // currTime = 50 + 4·0.1/2 = 50.2 frames, then −0.1 per packet → 50.1, 50.0, 49.9, 49.8 frames (÷25 s)
+    expect(times).toEqual([2.004, 2, 1.996, 1.992]);
+    expect(frames.slice(1).map((x) => +x.weight.toFixed(4))).toEqual([0.9912, 0.965, 0.9213, 0.86]); // 1 − p²·0.5·0.07/4 (0.99125 rounds down in binary)
+    expect(frames[1].flame.lowDensityBrightness).toBe(0);
+  });
+});

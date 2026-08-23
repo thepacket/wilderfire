@@ -6,6 +6,7 @@
 import { Muxer as WebMMuxer, ArrayBufferTarget as WebMTarget } from 'webm-muxer';
 import { Muxer as Mp4Muxer, ArrayBufferTarget as Mp4Target } from 'mp4-muxer';
 import type { Flame } from '../core/flame';
+import { renderMotionBlurred } from './motionBlur';
 import type { FlameRenderer } from '../gpu/renderer';
 
 /** What the Anim panel exposes for rendering: the timeline's span and the flame at a time. */
@@ -86,7 +87,7 @@ export async function renderVideo(renderer: FlameRenderer, tl: Timeline, o: Vide
 
   // fixed size: same samples per pixel as `passes` would give the canvas
   const spp = Math.max(4, Math.round((passes * renderer.nPoints * renderer.itersPerPass) / Math.max(canvasW * canvasH, 1)));
-  const off = o.size ? document.createElement('canvas') : null;
+  const off = o.size || tl.evalAt(tl.t0).motionBlur ? document.createElement('canvas') : null; // motion blur renders offscreen (sub-frames averaged)
   if (off) { off.width = width; off.height = height; }
   const offCtx = off?.getContext('2d') ?? null;
   const TILE = 1024, PAD = 8;
@@ -95,10 +96,16 @@ export async function renderVideo(renderer: FlameRenderer, tl: Timeline, o: Vide
     for (let i = 0; i < nFrames; i++) {
       if (o.signal?.aborted) throw new DOMException('Export cancelled', 'AbortError');
       const t = tl.t0 + Math.min(i / fps, tl.total);
-      renderer.setFlame(tl.evalAt(t));
+      const flameAt = tl.evalAt(t);
+      renderer.setFlame(flameAt);
       const stamp = { timestamp: Math.round((i * 1e6) / fps), duration: Math.round(1e6 / fps) };
       let frame: VideoFrame;
-      if (!off || !offCtx) {
+      if (flameAt.motionBlur && off && offCtx && width <= TILE && height <= TILE) {
+        // motion blur: the frame is the weighted average of its sub-frames (offscreen, one tile)
+        const px = await renderMotionBlurred(renderer, flameAt, { evalAt: tl.evalAt, t, fps }, width, height, spp);
+        offCtx.putImageData(new ImageData(px, width, height), 0, 0);
+        frame = new VideoFrame(off, stamp);
+      } else if (!off || !offCtx) {
         await renderer.stepExport(passes);
         // Capture must stay in the same task as the tonemap submit.
         frame = renderer.captureSync((cv) => new VideoFrame(cv, stamp));

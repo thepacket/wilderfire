@@ -491,8 +491,10 @@ export function buildRenderPanel(app: App, root: HTMLElement) {
     // the file exists (empty) from the moment the dialog closed: say so while the tiles render and the PNG is written
     const busy = progressToast(`Rendering ${fullW}×${fullH} PNG for ${target.name}… (the file stays empty until it is written)`);
     try {
+      const tl = app.flame.motionBlur ? app.timeline() : null;
       const blob = await renderHiRes(r, app.flame, {
         w: fullW, h: fullH, spp, transparent, curves: app.getCurves(),
+        ...(tl ? { motionBlur: { evalAt: tl.evalAt, t: tl.t0, fps: 25 } } : {}),
         onTile: (n, total) => {
           hiStatus.textContent = total > 1 ? `Hi-res: tile ${n}/${total} (${fullW}×${fullH})…` : `Hi-res: rendered ${fullW}×${fullH}, encoding…`;
           busy.set(total > 1 ? `Rendering ${fullW}×${fullH} PNG — tile ${n} of ${total}… (${target.name} stays empty until it is written)` : `Rendered ${fullW}×${fullH}, encoding…`);

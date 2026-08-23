@@ -36,6 +36,8 @@ export interface HiResOpts {
   signal?: AbortSignal;
   /** motion curves to embed with the flame in the PNG */
   curves?: import('../core/motion').MotionCurve[];
+  /** the timeline for a flame with motion blur (sub-frames around `t`); single-tile renders only */
+  motionBlur?: import('./motionBlur').MotionBlurCtx;
 }
 
 /**
@@ -74,11 +76,13 @@ export async function renderHiRes(renderer: FlameRenderer, flame: Flame, o: HiRe
       const pad = single ? 0 : PAD;
       const pw = tw + 2 * pad, ph = th + 2 * pad;
       const tiles = tilesX * tilesY, tileIdx = n;
-      const px = await renderer.renderRegion({
-        fullW, fullH, tileX: x0 - pad, tileY: y0 - pad,
-        tileW: pw, tileH: ph, spp: o.spp, transparent: o.transparent,
-        onProgress: o.onProgress && ((f) => o.onProgress!((tileIdx + f) / tiles)),
-      });
+      const px = single && o.motionBlur && flame.motionBlur
+        ? await (await import('./motionBlur')).renderMotionBlurred(renderer, flame, o.motionBlur, fullW, fullH, o.spp, o.transparent)
+        : await renderer.renderRegion({
+          fullW, fullH, tileX: x0 - pad, tileY: y0 - pad,
+          tileW: pw, tileH: ph, spp: o.spp, transparent: o.transparent,
+          onProgress: o.onProgress && ((f) => o.onProgress!((tileIdx + f) / tiles)),
+        });
       const img = single ? new ImageData(px, tw, th) : new ImageData(tw, th);
       if (!single) {
         for (let y = 0; y < th; y++) {

@@ -474,6 +474,7 @@ export function parseFlameXML(text: string, fallbackPalette: RGB[]): Flame[] {
     f.camBank = (numAttr('cam_roll') * 180) / Math.PI;
     f.camPersp = fe.hasAttribute('cam_persp') ? numAttr('cam_persp') : numAttr('cam_perspective'); // JWildfire also reads the old cam_perspective
     f.camPosX = numAttr('cam_pos_x');
+    { const mbl = Math.round(numAttr('motion_blur_length')); if (mbl > 0) f.motionBlur = { length: Math.min(64, mbl), timeStep: fe.hasAttribute('motion_blur_timestep') ? numAttr('motion_blur_timestep') : 0.05, decay: fe.hasAttribute('motion_blur_decay') ? numAttr('motion_blur_decay') : 0.03 }; }
     f.camPosY = numAttr('cam_pos_y');
     f.camPosZ = numAttr('cam_pos_z');
     f.preserveZ = numAttr('preserve_z') !== 0;
@@ -921,7 +922,7 @@ export function flameToXML(f: Flame, opts: XMLExportOpts = {}): string {
     `saturation="${fmt(f.saturation ?? 1)}" fg_opacity="${fmt(f.fgOpacity ?? 1)}" ` +
     `bg_transparency="${f.bgTransparency ? 1 : 0}" oversample="${f.oversample ?? 1}" ` + mixerAttrs(f) + (f.bgImage ? `background_image="${f.bgImage.replace(/&/g, '&amp;').replace(/"/g, '&quot;').replace(/</g, '&lt;')}" ` : '') +
     (f.author ? `meta_info_author="${esc(f.author)}" ` : '') + (f.created ? `meta_info_creation_time="${esc(f.created)}" ` : '') + (f.uuid ? `meta_info_uuid="${esc(f.uuid)}" ` : '') +
-    psymAttrs(f) +
+    psymAttrs(f) + (f.motionBlur ? `motion_blur_length="${f.motionBlur.length}" motion_blur_timestep="${fmt(f.motionBlur.timeStep)}" motion_blur_decay="${fmt(f.motionBlur.decay)}" ` : '') +
     `quality="200" brightness="${fmt(f.brightness)}" gamma="${fmt(f.gamma)}" gamma_threshold="${fmt(f.gammaThreshold)}" ` +
     `contrast="${fmt(f.contrast ?? 1)}" white_level="${fmt(f.whiteLevel ?? 220)}" low_density_brightness="${fmt(f.lowDensityBrightness ?? 0.24)}" ` +
     `vibrancy="${fmt(f.vibrancy)}" background="${fmt(f.background[0])} ${fmt(f.background[1])} ${fmt(f.background[2])}"` +

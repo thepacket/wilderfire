@@ -259,6 +259,9 @@ export interface Flame {
   oversample: number;
   /** JWildfire post symmetry, applied to the plotted point (DefaultRenderIterationState). */
   postSymmetry?: PostSymmetry;
+  /** JWildfire motion blur: `length` extra render packets at frame + length·timeStep/2 − p·timeStep (p = 1..length, in frames),
+   *  each layer weight scaled by 1 − p²·decay·0.07/length (≥ 0.01); rendered here as weighted sub-frame averages */
+  motionBlur?: { length: number; timeStep: number; decay: number };
   /** Provenance written by JWildfire (meta_info_author / meta_info_creation_time / meta_info_uuid) — kept through import/export. */
   author?: string;
   created?: string;
@@ -585,6 +588,7 @@ export function normalizeFlame(obj: any, fallbackPalette: RGB[]): Flame {
     ...(typeof obj?.author === 'string' && obj.author.trim() ? { author: obj.author.trim() } : {}),
     ...(typeof obj?.created === 'string' && obj.created.trim() ? { created: obj.created.trim() } : {}),
     ...(typeof obj?.uuid === 'string' && obj.uuid.trim() ? { uuid: obj.uuid.trim() } : {}),
+    ...(obj?.motionBlur && num(obj.motionBlur.length, 0) > 0 ? { motionBlur: { length: Math.min(64, Math.max(1, Math.round(num(obj.motionBlur.length, 0)))), timeStep: num(obj.motionBlur.timeStep, 0.05), decay: num(obj.motionBlur.decay, 0.03) } } : {}),
     ...(obj?.postSymmetry && ['X_AXIS', 'Y_AXIS', 'POINT'].includes(obj.postSymmetry.type) ? { postSymmetry: {
       type: obj.postSymmetry.type as 'X_AXIS' | 'Y_AXIS' | 'POINT',
       order: Math.min(64, Math.max(1, Math.round(num(obj.postSymmetry.order, 3)))),
