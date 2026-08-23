@@ -375,8 +375,11 @@ Compare (old → new): `_ct2` blkMAE 3.9 → 0.4, `_ct3` 1.17 → 0.99, `_ct4` 1
 (DIFFUSION → TARGET → TARGET, + NONE + TARGETG) 0.99 / corr 1.00; across fixtures + samples 14 flames moved, all
 towards JWildfire (TINA0019 2.4 → 0.4, Machine_0 1.1 → 0.3) bar noise. Left: `_ct_target2` (Fake Widow Spider, 17
 `line` xforms under xaos) 0.82 with a pre-existing coverage gap (0.14 vs 0.18: thin random-point lines, the
-isolated-dot class) though its structure improved (3.3 → 2.1); `Bokeh_0` shows a red excess (channel ratios 1.22 / 1.03
-/ 1.17) that predates this — to look at.
+isolated-dot class) though its structure improved (3.3 → 2.1). `Bokeh_0`'s `channel` flag (R 1.22, G 1.03, B 1.17) is
+not a colour error: the picture is green on black, so the red/blue means are tiny (4.0 vs 3.1, 8.8 vs 8.3) and a few
+hundred extra faint-fringe pixels (GLOBAL_SHARPENING + DOF, the DE-fringe class) move them by 20 % while green moves
+1 % — read the channel ratios against the channel means. `sunvoroni`'s region order stays approximate on purpose: no
+corpus flame uses the variation and an exact order means porting QuickHull3D itself.
 
 ## Image comparison (2026-08-17)
 
