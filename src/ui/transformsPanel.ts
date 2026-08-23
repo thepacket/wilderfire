@@ -3,6 +3,7 @@
 import { App, el, slider, numberInput, formatNum, XFORM_COLORS } from './common';
 import { compileFormula, formulaToWgsl } from '../core/formula';
 import { PLOT_FAMILIES, plotFormulas, plotPreset } from '../core/plots';
+import { cvarToWgsl, CVAR_DEFAULT_CODE } from '../core/cvar';
 import { sattractorFormulas } from '../core/sattractor';
 import { SATTRACTOR_PRESETS } from '../core/sattractorPresets';
 import type { XForm } from '../core/flame';
@@ -683,6 +684,26 @@ export function buildTransformsPanel(app: App, root: HTMLElement) {
             rebuildEditor();
           };
           row.append(reset);
+          item.append(row);
+        }
+        // c_var / pre_c_var / post_c_var: the complex function's Java method body (a resource; JWildfire's default until edited)
+        else if (VARIATIONS[vi.name]?.res?.includes('code') && vi.name.endsWith('c_var')) {
+          const row = el('div', 'var-params sattr-formulas');
+          const vp = el('span', 'vp');
+          const ta = el('textarea') as HTMLTextAreaElement;
+          ta.className = 'sattr-formula cvar-code'; ta.spellcheck = false; ta.rows = 6;
+          ta.value = vi.res?.code ?? CVAR_DEFAULT_CODE;
+          ta.title = 'public vec2 f(vec2 z) { … } over the c_* complex helpers (c_add, c_mul, c_exp, c_ln, c_sqrt, c_pow, c_sin, c_asin, …), vec2 locals and new vec2(re, im); compiled into the kernel';
+          ta.onchange = () => {
+            const text = ta.value.trim();
+            try { cvarToWgsl(text || CVAR_DEFAULT_CODE); } catch (e) { alert(`code: ${(e as Error).message}`); ta.classList.add('bad'); return; }
+            ta.classList.remove('bad');
+            if (text && text !== CVAR_DEFAULT_CODE) (vi.res ??= {}).code = text;
+            else if (vi.res) { delete vi.res.code; if (!Object.keys(vi.res).length) delete vi.res; }
+            app.commit();
+          };
+          vp.append(el('span', '', 'f(z)'), ta);
+          row.append(vp);
           item.append(row);
         }
         // sattractor3D: the x/y/z formulas (resources) — empty = the preset's (shown greyed); "↺ preset" reloads every
