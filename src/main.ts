@@ -136,7 +136,7 @@ async function boot() {
   shareBtn.title = 'Share: copy a link that opens this flame in WilderFire (the flame is in the link itself — nothing is uploaded)';
   const saveBtn = el('button', 'icon', '💾');
   saveBtn.title = 'Save to library';
-  const libBtn = el('button', '', '📚 Library');
+  const libBtn = el('button', '', 'Library');
 
   const undoBtn = el('button', 'icon', '↩');
   undoBtn.title = 'Undo (Ctrl/Cmd+Z)';
@@ -178,7 +178,7 @@ async function boot() {
     }
   });
 
-  const triBtn = el('button', '', '△ Triangles');
+  const triBtn = el('button', '', 'Triangles');
   const themeBtn = el('button', '', document.documentElement.dataset.theme === 'dark' ? '☀' : '🌙');
   themeBtn.title = 'Toggle theme';
   const setTheme = (next: 'dark' | 'light') => {
