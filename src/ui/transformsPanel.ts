@@ -26,7 +26,8 @@ export function buildTransformsPanel(app: App, root: HTMLElement) {
   layerSec.append(layerList);
   const layerBtns = el('div', 'btn-row');
   const addLayerBtn = el('button', '', '+ Layer');
-  const dupLayerBtn = el('button', '', 'Duplicate');
+  const dupLayerBtn = el('button', '', 'Dup');
+  dupLayerBtn.title = 'Duplicate the selected layer';
   const delLayerBtn = el('button', 'danger', 'Delete');
   const upLayerBtn = el('button', 'icon', '↑');
   const dnLayerBtn = el('button', 'icon', '↓');
