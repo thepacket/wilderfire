@@ -482,11 +482,19 @@ export function compileFlame(flame: Flame, nPoints: number): CompiledFlame {
   // rgbColor); 0.8 = a direct colour carried from an earlier iteration (0..255 scale; rgbColor is false again, so
   // TARGET/DISTANCE steps apply to it)
   const targetStep = (b: number, li: number, cvar: string) => `
-        if (rgbo.w < 0.9) { let tci = clamp(i32(${cvar} * 254.0 + 0.5), 0, 255); let cur_ = select(pal[${li * 256}u + u32(tci)].xyz, rgbo.xyz * select(1.0, 256.0 / 200.0, rgbo.w > 0.7), rgbo.w > 0.25); rgbo = vec4f(mix(vec3f(xd[${b + 66}u], xd[${b + 67}u], xd[${b + 68}u]), cur_, 1.0 - xd[${b + 13}u]), 0.5); }`;
+        if (rgbo.w < 0.9) { let cur_ = select(grad${li}(${cvar}).xyz, rgbo.xyz * select(1.0, 256.0 / 200.0, rgbo.w > 0.7), rgbo.w > 0.25); rgbo = vec4f(mix(vec3f(xd[${b + 66}u], xd[${b + 67}u], xd[${b + 68}u]), cur_, 1.0 - xd[${b + 13}u]), 0.5); }`;
   let funcs = dofDef ? dofShapeFn(dofDef) + '\n\n' : '';
   let iterFns = '';
   layers.forEach((ly, li) => {
     const info = infos[li];
+    // the gradient step's palette lookup: GradientColorStep steps ((int)(c·254 + 0.5), clamped); smooth_gradient
+    // (SmoothGradientColorStep) lerps between entry (int)(c·254) and the next, black outside the map
+    funcs += ly.smoothGradient
+      ? `fn grad${li}(c: f32) -> vec4f { let ci = c * 254.0; let l = i32(ci); let r = l + 1;
+  let lc = select(vec4f(0.0), pal[${li * 256}u + u32(clamp(l, 0, 255))], l >= 0 && l < 256);
+  let rc = select(vec4f(0.0), pal[${li * 256}u + u32(clamp(r, 0, 255))], r >= 0 && r < 256);
+  return vec4f(mix(lc.xyz, rc.xyz, ci - floor(ci)), 1.0); }\n\n`
+      : `fn grad${li}(c: f32) -> vec4f { return pal[${li * 256}u + u32(clamp(i32(c * 254.0 + 0.5), 0, 255))]; }\n\n`;
     ly.xforms.forEach((x, i) => {
       funcs += genXformFn(`applyX${li}_${i}`, x, info.bases[i], li * 256) + '\n\n';
     });
@@ -510,7 +518,7 @@ export function compileFlame(flame: Flame, nPoints: number): CompiledFlame {
       // the carried RGB: a gradient step (DIFFUSION/CYCLIC) replaces it with palette[index] — tier 0 — unless a direct-colour
       // variation then sets one; NONE keeps whatever the point carried; TARGET/DISTANCE read it after the variations
       const gstep = usesCarry && (ct === undefined || ct === 'CYCLIC') ? '\n        rgbo = vec4f(0.0);'
-        : ct === 'TARGETG' ? `\n        if (rgbo.w < 0.25) { rgbo = vec4f(pal[${li * 256}u + u32(clamp(i32(c * 254.0 + 0.5), 0, 255))].xyz, 0.5); } // the carried RGB is palette[index] as it was: pin it before TARGETG blends the index` : '';
+        : ct === 'TARGETG' ? `\n        if (rgbo.w < 0.25) { rgbo = vec4f(grad${li}(c).xyz, 0.5); } // the carried RGB is palette[index] as it was: pin it before TARGETG blends the index` : '';
       const dstep = ct === 'DISTANCE' ? `\n        if (rgbo.w < 0.9) { let dci = i32((xd[${b + 12}u] + length(np - p) * (2.0 - 2.0 * xd[${b + 13}u])) * 254.0 + 0.5) % 256; rgbo = vec4f(pal[${li * 256}u + u32(dci)].xyz, 0.5); }`
         : ct === 'TARGET' || ct === 'TARGETG' ? targetStep(b, li, 'c') : '';
       return `      case ${i}u: {
@@ -523,7 +531,7 @@ ${cstep}
     // final transforms run in sequence (JWildfire: each further final takes the previous output)
     const isTarget = (x: XForm) => x.colorType === 'TARGET' || x.colorType === 'TARGETG';
     const finalStep = (fn: string, base: number, input: string, fx: XForm) => `
-      {${fx.colorType === 'TARGETG' ? `\n        if (rgbo.w < 0.25) { rgbo = vec4f(pal[${li * 256}u + u32(clamp(i32(dc * 254.0 + 0.5), 0, 255))].xyz, 0.5); } // carried RGB = palette[index] as it was, before TARGETG blends the index` : ''}
+      {${fx.colorType === 'TARGETG' ? `\n        if (rgbo.w < 0.25) { rgbo = vec4f(grad${li}(dc).xyz, 0.5); } // carried RGB = palette[index] as it was, before TARGETG blends the index` : ''}
         ${fx.colorType === 'CYCLIC' ? `dc = fract(dc + (1.0 - 2.0 * xd[${base + 13}u]));` : fx.colorType === 'DISTANCE' || fx.colorType === 'TARGET' || fx.colorType === 'NONE' ? '' : `let fcs = xd[${base + 13}u];\n        dc = dc * (1.0 - fcs) + xd[${base + 12}u] * fcs;`}${usesMods ? `\n        dm = modBlend(dm, ${base}u);` : ''}${fx.colorType === undefined || fx.colorType === 'CYCLIC' ? '\n        rgbo = vec4f(0.0); // gradient step (DIFFUSION/CYCLIC): the carried RGB is replaced by palette[index] (a NONE final keeps it)' : ''}
       }
       dp = ${fn}(${input}, &dc, &rs, &hide, &rgbo);${fx.colorType === 'DISTANCE' ? `\n      if (rgbo.w < 0.9) { let dci = i32((xd[${base + 12}u] + length(dp - ${input}) * (2.0 - 2.0 * xd[${base + 13}u])) * 254.0 + 0.5) % 256; rgbo = vec4f(pal[${li * 256}u + u32(dci)].xyz, 0.5); }` : isTarget(fx) ? targetStep(base, li, 'dc') : ''}`;
@@ -666,14 +674,14 @@ ${solid ? `    // JWildfire solid rendering: no density — the nearest point pe
     if (drawn && P.shadow.x == 2u) { shadowSplat(dp); }
     else if (drawn && P.shadow.x == 1u && !bdone) { bdone = true; shadowSplat(dp); }
     if (visible && fx >= 0.0 && fy >= 0.0 && fx < f32(P.width) && fy < f32(P.height) && drawn) {
-      var col = pal[${li * 256}u + u32(clamp(i32(dc * 254.0 + 0.5), 0, 255))]; // JWildfire GradientColorStep: (int)(color·254 + 0.5), clamped
+      var col = grad${li}(dc); // the layer's gradient step (stepped, or smooth_gradient's lerp)
       if (rgbo.w > 0.25) { col = vec4f(clamp(rgbo.xyz, vec3f(0.0), vec3f(1.0)) * select(1.0, 256.0 / 200.0, rgbo.w > 0.7), 1.0); } // direct RGB is 0..255 in JWildfire, the palette 0..199.2 (RenderColor ×200/256): ×1.28 on our palette-relative scale; tier-0.5 colours are already palette-scale
       if (dz < 1.0) { col = vec4f(mix(P.dimColor.xyz, col.xyz, dz), col.w); }
       let lw = xd[${8 + li}u] * (200.0 / 256.0); // JWildfire RenderColor scale: the shading sees palette·200/256/255
       solidSplat(u32(fy) * P.width + u32(fx), cz, dp, col.xyz * lw, ${usesMat ? 'mt' : '0.0'});
     }` : `    if (visible && fx >= 0.0 && fy >= 0.0 && fx < f32(P.width) && fy < f32(P.height)) {
       let hi = (u32(fy) * P.width + u32(fx)) * 4u;
-      var col = pal[${li * 256}u + u32(clamp(i32(dc * 254.0 + 0.5), 0, 255))]; // JWildfire GradientColorStep: (int)(color·254 + 0.5), clamped
+      var col = grad${li}(dc); // the layer's gradient step (stepped, or smooth_gradient's lerp)
       if (rgbo.w > 0.25) { col = vec4f(clamp(rgbo.xyz, vec3f(0.0), vec3f(1.0)) * select(1.0, 256.0 / 200.0, rgbo.w > 0.7), 1.0); } // direct RGB is 0..255 in JWildfire, the palette 0..199.2 (RenderColor ×200/256): ×1.28 on our palette-relative scale; tier-0.5 colours are already palette-scale${usesMods ? '\n      col = vec4f(applyColorMods(col.xyz, dm), col.w);' : ''}
       if (dz < 1.0) { col = vec4f(mix(P.dimColor.xyz, col.xyz, dz), col.w); }
       let lw = op * xd[${8 + li}u]; // JWildfire layer weight: colour intensity multiplier (the density count is unaffected)

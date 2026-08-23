@@ -162,6 +162,11 @@ export interface Layer {
   palette: RGB[]; // 256 entries
   weight: number;   // JWildfire layer weight: multiplies the plotted colour intensity (all layers iterate equally)
   visible: boolean;
+  /** JWildfire smooth_gradient: the gradient step interpolates between neighbouring palette entries instead of stepping */
+  smoothGradient?: boolean;
+  /** JWildfire gradient map (TransformationGradientMapColorStep): the plot colour is an image sampled at the point's position;
+   *  `file` = basename in the image store (like bgImage). */
+  gradientMap?: { file: string; hOffset: number; hScale: number; vOffset: number; vScale: number; lcolorAdd: number; lcolorScale: number };
 }
 
 /** JWildfire channel mixer: curves over the per-pixel average raw colour (x = value·100 on a 0..25600 axis, y likewise).
@@ -358,7 +363,7 @@ export function flameSignature(f: Flame): string {
   const names = (l?: VarInstance[]) => (l ?? []).map((v) => v.name + (v.priority !== undefined ? '@' + v.priority : '') + (v.name === 'subflame_wf' ? '{' + strHash(v.res?.flame ?? '') + '}' : '')).join(',');
   const sig = (x: XForm) => `${names(x.preVariations)}<${names(x.variations)}>${names(x.postVariations)}` + (x.colorType ? '~' + x.colorType : '') + (x.wfield ? `~wf(${x.wfield.params.map((p) => p.varName + '.' + p.paramName).join(',')})` : '');
   return visibleLayers(f)
-    .map((l) => l.xforms.map(sig).join('|') + '#' + [l.final, ...l.moreFinals].map((x) => (x ? sig(x) : '-')).join('#'))
+    .map((l) => l.xforms.map(sig).join('|') + '#' + [l.final, ...l.moreFinals].map((x) => (x ? sig(x) : '-')).join('#') + (l.smoothGradient ? '~smooth' : '') + (l.gradientMap ? '~gmap' : ''))
     .join('@@') + (visibleLayers(f).some((l) => [...l.xforms, l.final, ...l.moreFinals].some((x) => x?.colorMods?.some((v) => v !== 0))) ? '~mods' : '')
     + (f.solid?.enabled ? '~solid' : '') + (usesMaterials(f) ? '~mat' : '')
     + (f.camDOF > 0 && f.camDOFShape && f.camDOFShape !== 'BUBBLE' ? `~dof(${f.camDOFShape},${(f.camDOFParams ?? []).map((v) => +v.toPrecision(6)).join(',')})` : '')
@@ -517,6 +522,8 @@ function normLayer(obj: any, fallbackPalette: RGB[]): Layer {
     palette: normPalette(obj, fallbackPalette),
     weight: Math.max(0, num(obj?.weight, 1)),
     visible: obj?.visible !== false,
+    ...(obj?.smoothGradient ? { smoothGradient: true } : {}),
+    ...(obj?.gradientMap && typeof obj.gradientMap.file === 'string' ? { gradientMap: { file: obj.gradientMap.file, hOffset: num(obj.gradientMap.hOffset, 0), hScale: num(obj.gradientMap.hScale, 1), vOffset: num(obj.gradientMap.vOffset, 0), vScale: num(obj.gradientMap.vScale, 1), lcolorAdd: num(obj.gradientMap.lcolorAdd, 0), lcolorScale: num(obj.gradientMap.lcolorScale, 0) } } : {}),
   };
 }
 

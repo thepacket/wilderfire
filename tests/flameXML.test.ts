@@ -330,3 +330,24 @@ describe('JWildfire colour types CYCLIC / DISTANCE', () => {
     expect(flameToXML(flame, { curves: [] })).toMatch(/<finalxform [^>]*color_type="NONE"/);
   });
 });
+
+describe('layer colouring options: smooth_gradient and gradient_map', () => {
+  it('round-trip on a flat file and on <layer> elements; the kernel gets the smooth lookup', async () => {
+    const xml = '<flame name="s" size="64 64" scale="10" smooth_gradient="1" gradient_map="C:\\\\maps\\\\tex.png" gradient_map_hoffset="0.1" gradient_map_hscale="2" gradient_map_voffset="-0.2" gradient_map_vscale="3" gradient_map_lcolor_add="0.5" gradient_map_lcolor_scale="0.25"><xform weight="1" color="0.3" linear="1" coefs="1 0 0 1 0 0"/></flame>';
+    const f = importFlameText(xml, GREY).flame;
+    const ly = f.layers[0];
+    expect(ly.smoothGradient).toBe(true);
+    expect(ly.gradientMap).toEqual({ file: 'tex.png', hOffset: 0.1, hScale: 2, vOffset: -0.2, vScale: 3, lcolorAdd: 0.5, lcolorScale: 0.25 });
+    const back = roundTrip(f).flame;
+    expect(back.layers[0].smoothGradient).toBe(true);
+    expect(back.layers[0].gradientMap?.file).toBe('tex.png');
+    expect(back.layers[0].gradientMap?.vScale).toBe(3);
+    const layered = '<flame name="l" size="64 64" scale="10"><layer weight="1" smooth_gradient="1"><xform weight="1" linear="1" coefs="1 0 0 1 0 0"/></layer><layer weight="1"><xform weight="1" spherical="1" coefs="1 0 0 1 0 0"/></layer></flame>';
+    const g = importFlameText(layered, GREY).flame;
+    expect(g.layers.map((l) => !!l.smoothGradient)).toEqual([true, false]);
+    expect(roundTrip(g).flame.layers.map((l) => !!l.smoothGradient)).toEqual([true, false]);
+    const { compileFlame } = await import('../src/gpu/codegen');
+    expect(compileFlame(g, 1024).wgsl).toContain('mix(lc.xyz, rc.xyz, ci - floor(ci))');
+    expect(normalizeFlame(JSON.parse(JSON.stringify(f)), GREY).layers[0].gradientMap?.lcolorAdd).toBe(0.5);
+  });
+});

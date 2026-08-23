@@ -643,11 +643,16 @@ export function parseFlameXML(text: string, fallbackPalette: RGB[]): Flame[] {
       const xf = Array.from(elm.querySelectorAll(':scope > xform')).slice(0, MAX_XFORMS)
         .map((xe, xi) => parseXFormEl(xe, ctx(`layers.${li}.xforms.${xi}`)));
       const fins = Array.from(elm.querySelectorAll(':scope > finalxform'));
+      // layer colouring options (JWildfire writes them on <layer>, or on <flame> for a single-layer flame)
+      const gmFile = (elm.getAttribute('gradient_map') ?? '').trim().split(/[\\/]/).pop() ?? '';
+      const gnum = (n: string, d: number) => { const v = parseFloat(elm.getAttribute(n) ?? ''); return isFinite(v) ? v : d; };
       return {
         xforms: xf.length ? xf : [defaultXForm()],
         final: fins.length ? parseXFormEl(fins[0], ctx(`layers.${li}.final`)) : null,
         moreFinals: fins.slice(1).map((fe) => parseXFormEl(fe)), // JWildfire: further finals, applied in sequence
         palette: parsePaletteEl(elm) ?? fallbackPalette,
+        ...(elm.getAttribute('smooth_gradient') === '1' ? { smoothGradient: true } : {}),
+        ...(gmFile ? { gradientMap: { file: gmFile, hOffset: gnum('gradient_map_hoffset', 0), hScale: gnum('gradient_map_hscale', 1), vOffset: gnum('gradient_map_voffset', 0), vScale: gnum('gradient_map_vscale', 1), lcolorAdd: gnum('gradient_map_lcolor_add', 0), lcolorScale: gnum('gradient_map_lcolor_scale', 0) } } : {}),
       };
     };
 
@@ -807,6 +812,13 @@ function xformToXML(x: XForm, tag: string, nXForms: number, extraAttrs: string[]
   return `   <${tag} ${attrs.join(' ')}/>`;
 }
 
+/** smooth_gradient / gradient_map_* (JWildfire layer attributes; on <flame> for a flat single-layer file) */
+function layerColorAttrs(ly: Layer): string {
+  let a = ly.smoothGradient ? ' smooth_gradient="1"' : '';
+  const g = ly.gradientMap;
+  if (g) a += ` gradient_map="${g.file.replace(/"/g, '')}" gradient_map_hoffset="${fmt(g.hOffset)}" gradient_map_hscale="${fmt(g.hScale)}" gradient_map_voffset="${fmt(g.vOffset)}" gradient_map_vscale="${fmt(g.vScale)}" gradient_map_lcolor_add="${fmt(g.lcolorAdd)}" gradient_map_lcolor_scale="${fmt(g.lcolorScale)}"`;
+  return a;
+}
 function paletteToXML(palette: RGB[], indent: string): string {
   let hex = '';
   for (let i = 0; i < 256; i++) {
@@ -913,7 +925,7 @@ export function flameToXML(f: Flame, opts: XMLExportOpts = {}): string {
     `quality="200" brightness="${fmt(f.brightness)}" gamma="${fmt(f.gamma)}" gamma_threshold="${fmt(f.gammaThreshold)}" ` +
     `contrast="${fmt(f.contrast ?? 1)}" white_level="${fmt(f.whiteLevel ?? 220)}" low_density_brightness="${fmt(f.lowDensityBrightness ?? 0.24)}" ` +
     `vibrancy="${fmt(f.vibrancy)}" background="${fmt(f.background[0])} ${fmt(f.background[1])} ${fmt(f.background[2])}"` +
-    bgAttrs(f) + solidAttrs(f) + timeAttrs + (flameCurveAttrs.length ? ' ' + flameCurveAttrs.join(' ') : '') + '>',
+    bgAttrs(f) + solidAttrs(f) + timeAttrs + (f.layers.length === 1 ? layerColorAttrs(f.layers[0]).trim() + (layerColorAttrs(f.layers[0]) ? ' ' : '') : '') + (flameCurveAttrs.length ? ' ' + flameCurveAttrs.join(' ') : '') + '>',
   );
   const writeLayerBody = (ly: Layer, li: number, indent: string) => {
     ly.xforms.forEach((x, xi) => {
@@ -932,7 +944,7 @@ export function flameToXML(f: Flame, opts: XMLExportOpts = {}): string {
     f.layers.forEach((ly, li) => {
       const lc = (buckets.get(`layers.${li}`) ?? []).filter((c) => c.rest === 'weight');
       const extra = lc.length ? ' ' + curveAttrs('weightCurve', lc[0].curve, fps).join(' ') : '';
-      lines.push(`   <layer weight="${fmt(ly.weight)}" visible="${ly.visible ? 1 : 0}" density="1"${extra}>`);
+      lines.push(`   <layer weight="${fmt(ly.weight)}" visible="${ly.visible ? 1 : 0}" density="1"${layerColorAttrs(ly)}${extra}>`);
       writeLayerBody(ly, li, '      ');
       lines.push('   </layer>');
     });
