@@ -23,7 +23,7 @@ const NON_VARIATION_ATTRS = new Set([
   'name', 'mirror_pre_post_translations',
   // JWildfire per-xform extras we do not model (mod_* colour modifiers ARE modelled: colorMods)
   'material', 'material_speed', 'mod_gamma', 'mod_gamma_speed', 'mod_contrast', 'mod_contrast_speed',
-  'mod_saturation', 'mod_saturation_speed', 'mod_hue', 'mod_hue_speed', 'color_type', 'target_color',
+  'mod_saturation', 'mod_saturation_speed', 'mod_hue', 'mod_hue_speed', 'color_type', 'target_color', 'targetcolor',
   'draw_mode', 'weighting_field_type', 'weighting_field_input', 'yzCoefs', 'zxCoefs', 'yzPost', 'zxPost',
 ]);
 /** JWildfire writes `<var>_fx_priority` per instance (priority override); we keep definition priorities. */
@@ -166,8 +166,9 @@ function parseXFormEl(elm: Element, ctx?: CurveCtx): XForm {
   // normal xforms) — a *final* xform defaults to NONE and leaves the colour alone; explicit NONE
   // (and the target/distance/cyclic modes we do not model) never blend towards `color`
   const ctype = (elm.getAttribute('color_type') ?? '').toUpperCase();
-  if (ctype === 'CYCLIC' || ctype === 'DISTANCE') x.colorType = ctype; // symmetry (1 − 2·colorSpeed) is their parameter
-  else if (ctype === 'NONE' || ctype === 'TARGET' || (elm.tagName.toLowerCase() === 'finalxform' && ctype !== 'DIFFUSION' && ctype !== 'TARGETG')) x.colorSpeed = 0;
+  if (ctype === 'CYCLIC' || ctype === 'DISTANCE' || ctype === 'TARGET' || ctype === 'TARGETG') x.colorType = ctype; // symmetry (1 − 2·colorSpeed) is their parameter
+  else if (ctype === 'NONE' || (elm.tagName.toLowerCase() === 'finalxform' && ctype !== 'DIFFUSION')) x.colorSpeed = 0;
+  if (ctype === 'TARGET' || ctype === 'TARGETG') { const tc = nums(elm.getAttribute('targetcolor')); x.targetColor = tc.length === 3 ? tc.map((v) => Math.min(1, Math.max(0, v))) as [number, number, number] : [0, 0, 0]; }
   const chaos = nums(elm.getAttribute('chaos'));
   if (chaos.length) x.xaos = chaos.map((v) => Math.max(0, v));
   // JWildfire solid-rendering material index (+ blend speed), like colour/color_speed
@@ -456,6 +457,9 @@ export function parseFlameXML(text: string, fallbackPalette: RGB[]): Flame[] {
     f.camDOFArea = Math.max(0, numOr('cam_dof_area', 0.5));
     f.camDOFExponent = Math.max(0.1, numOr('cam_dof_exponent', 2));
     f.camDOFScale = numOr('cam_dof_scale', 1);
+    f.camDOFShape = (fe.getAttribute('cam_dof_shape') ?? 'BUBBLE').toUpperCase() || 'BUBBLE';
+    f.camDOFRotate = numOr('cam_dof_rotate', 0);
+    f.camDOFParams = [1, 2, 3, 4, 5, 6].map((i) => numOr('cam_dof_param' + i, 0));
     f.camDOFFade = Math.min(1, Math.max(0, numOr('cam_dof_fade', 1)));
     f.newDOF = numAttr('new_dof') !== 0;
     f.focusX = numAttr('cam_xfocus'); f.focusY = numAttr('cam_yfocus'); f.focusZ = numAttr('cam_zfocus');
@@ -721,6 +725,7 @@ function xformToXML(x: XForm, tag: string, nXForms: number, extraAttrs: string[]
   attrs.push(`color_speed="${fmt(x.colorSpeed)}"`);
   attrs.push(`symmetry="${fmt(1 - 2 * x.colorSpeed)}"`);
   if (x.colorType) attrs.push(`color_type="${x.colorType}"`);
+  if (x.colorType === 'TARGET' || x.colorType === 'TARGETG') attrs.push(`targetcolor="${(x.targetColor ?? [0, 0, 0]).map(fmt).join(' ')}"`);
   else if (tag === 'finalxform' && x.colorSpeed > 0) attrs.push('color_type="DIFFUSION"'); // JWildfire finals default to NONE (no recolouring)
   if (x.wfield) {
     const w = x.wfield;
@@ -861,7 +866,8 @@ export function flameToXML(f: Flame, opts: XMLExportOpts = {}): string {
     `cam_pos_x="${fmt(f.camPosX)}" cam_pos_y="${fmt(f.camPosY)}" cam_pos_z="${fmt(f.camPosZ)}" preserve_z="${f.preserveZ ? 1 : 0}" ` +
     `cam_zpos="${fmt(f.camZ ?? 0)}" cam_xfocus="${fmt(f.focusX ?? 0)}" cam_yfocus="${fmt(f.focusY ?? 0)}" cam_zfocus="${fmt(f.focusZ ?? 0)}" ` +
     `cam_dof="${fmt(f.camDOF ?? 0)}" cam_dof_area="${fmt(f.camDOFArea ?? 0.5)}" cam_dof_exponent="${fmt(f.camDOFExponent ?? 2)}" new_dof="${f.newDOF ? 1 : 0}" ` +
-    `cam_dof_shape="BUBBLE" cam_dof_scale="${fmt(f.camDOFScale ?? 1)}" cam_dof_rotate="0" cam_dof_fade="${fmt(f.camDOFFade ?? 1)}" ` +
+    `cam_dof_shape="${f.camDOFShape ?? 'BUBBLE'}" cam_dof_scale="${fmt(f.camDOFScale ?? 1)}" cam_dof_rotate="${fmt(f.camDOFRotate ?? 0)}" cam_dof_fade="${fmt(f.camDOFFade ?? 1)}" ` +
+    (f.camDOFParams ?? [0, 0, 0, 0, 0, 0]).map((v, i) => `cam_dof_param${i + 1}="${fmt(v)}" `).join('') +
     `cam_zdimish="${fmt(f.dimishZ ?? 0)}" cam_zdimdist="${fmt(f.dimZDist ?? 0)}" cam_zdimcolor="${(f.dimZColor ?? [0, 0, 0]).map(fmt).join(' ')}" ` +
     `filter="${fmt(f.filterRadius ?? 0)}" filter_kernel="${normFilterKernel(f.filterKernel)}" ` +
     `filter_sharpness="${fmt(f.filterSharpness ?? 4)}" filter_low_density="${fmt(f.filterLowDensity ?? 0.025)}" ` +

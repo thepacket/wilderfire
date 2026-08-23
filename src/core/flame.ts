@@ -137,7 +137,9 @@ export interface XForm {
   materialSpeed?: number;
   /** JWildfire colour type beyond DIFFUSION/NONE: CYCLIC = colour index += symmetry (mod 1); DISTANCE = the plotted colour is
    *  the palette entry at color + |Δposition|·(symmetry+1) while the index stays. symmetry = 1 − 2·colorSpeed. */
-  colorType?: 'CYCLIC' | 'DISTANCE';
+  colorType?: 'CYCLIC' | 'DISTANCE' | 'TARGET' | 'TARGETG';
+  /** TARGET: the point's RGB is lerped towards this colour (0..1) by (symmetry + 1)/2; TARGETG: towards the palette entry at `color` */
+  targetColor?: [number, number, number];
   opacity: number;     // 0..1 plot opacity
   variations: VarInstance[];
   /** Optional variation stages evaluated BEFORE the main sum (transforming the
@@ -186,6 +188,10 @@ export interface Flame {
   camDOFArea: number;
   camDOFExponent: number;
   camDOFScale: number;
+  /** JWildfire DOF blur shape (BUBBLE = the plain disc); the shape's parameters come from camDOFParams (cam_dof_param1..6) */
+  camDOFShape?: string;
+  camDOFRotate?: number;
+  camDOFParams?: number[];
   camDOFFade: number;
   newDOF: boolean;
   focusX: number;
@@ -296,7 +302,7 @@ export function defaultFlame(palette: RGB[]): Flame {
     rotation: 0,
     camPitch: 0, camYaw: 0, camBank: 0, camPersp: 0, camPosX: 0, camPosY: 0, camPosZ: 0,
     preserveZ: false,
-    camDOF: 0, camDOFArea: 0.5, camDOFExponent: 2, camDOFScale: 1, camDOFFade: 1, newDOF: false,
+    camDOF: 0, camDOFArea: 0.5, camDOFExponent: 2, camDOFScale: 1, camDOFFade: 1, newDOF: false, camDOFShape: 'BUBBLE', camDOFRotate: 0, camDOFParams: [0, 0, 0, 0, 0, 0],
     focusX: 0, focusY: 0, focusZ: 0, camZ: 0,
     dimishZ: 0, dimZDist: 0, dimZColor: [0, 0, 0],
     brightness: 4,
@@ -343,6 +349,7 @@ export function flameSignature(f: Flame): string {
     .join('@@') + (visibleLayers(f).some((l) => [...l.xforms, l.final, ...l.moreFinals].some((x) => x?.colorMods?.some((v) => v !== 0))) ? '~mods' : '')
     + (f.solid?.enabled ? '~solid' : '') + (usesMaterials(f) ? '~mat' : '')
     + (visibleLayers(f).some((l) => [...l.xforms, l.final, ...l.moreFinals].some((x) => x?.colorType)) ? '~ctype' : '')
+    + (f.camDOF > 0 && f.camDOFShape && f.camDOFShape !== 'BUBBLE' ? `~dof(${f.camDOFShape},${(f.camDOFParams ?? []).map((v) => +v.toPrecision(6)).join(',')})` : '')
     // post-symmetry constants are baked into the kernel, so every field belongs in the signature
     + (f.postSymmetry ? `~psym(${f.postSymmetry.type},${f.postSymmetry.order},${f.postSymmetry.centreX},${f.postSymmetry.centreY},${f.postSymmetry.distance},${f.postSymmetry.rotation})` : '');
 }
@@ -402,7 +409,8 @@ function normXForm(x: any): XForm {
     opacity: clamp01(num(x?.opacity, 1)),
     variations: vars.length ? vars : d.variations,
   };
-  if (x?.colorType === 'CYCLIC' || x?.colorType === 'DISTANCE') out.colorType = x.colorType;
+  if (x?.colorType === 'CYCLIC' || x?.colorType === 'DISTANCE' || x?.colorType === 'TARGET' || x?.colorType === 'TARGETG') out.colorType = x.colorType;
+  if (Array.isArray(x?.targetColor) && x.targetColor.length === 3) out.targetColor = x.targetColor.map((v: unknown) => clamp01(num(v, 0))) as [number, number, number];
   if (num(x?.material, 0) !== 0) out.material = num(x.material, 0);
   if (num(x?.materialSpeed, 0) !== 0) out.materialSpeed = Math.min(1, Math.max(-1, num(x.materialSpeed, 0)));
   for (const k of ['yz', 'zx', 'yzPost', 'zxPost'] as const) {
@@ -506,6 +514,8 @@ export function normalizeFlame(obj: any, fallbackPalette: RGB[]): Flame {
     preserveZ: !!obj?.preserveZ,
     camDOF: Math.max(0, num(obj?.camDOF, 0)), camDOFArea: Math.max(0, num(obj?.camDOFArea, 0.5)),
     camDOFExponent: Math.max(0.1, num(obj?.camDOFExponent, 2)), camDOFScale: num(obj?.camDOFScale, 1),
+    camDOFShape: typeof obj?.camDOFShape === 'string' ? obj.camDOFShape : 'BUBBLE', camDOFRotate: num(obj?.camDOFRotate, 0),
+    camDOFParams: Array.isArray(obj?.camDOFParams) ? Array.from({ length: 6 }, (_, i) => num(obj.camDOFParams[i], 0)) : [0, 0, 0, 0, 0, 0],
     camDOFFade: clamp01(num(obj?.camDOFFade, 1)), newDOF: !!obj?.newDOF,
     focusX: num(obj?.focusX, 0), focusY: num(obj?.focusY, 0), focusZ: num(obj?.focusZ, 0), camZ: num(obj?.camZ, 0),
     dimishZ: Math.max(0, num(obj?.dimishZ, 0)), dimZDist: num(obj?.dimZDist, 0),

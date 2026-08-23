@@ -740,6 +740,7 @@ export class FlameRenderer {
     pf32.set([f.camPosX, f.camPosY, f.camPosZ, f.camPersp], 24);
     pf32[28] = f.camPersp;
     pf32[29] = f.camZ ?? 0;
+    pf32[30] = (f.camDOFRotate ?? 0) * Math.PI / 180; // DOF blur-shape rotation
     pf32.set([f.focusX ?? 0, f.focusY ?? 0, f.focusZ ?? 0, f.camDOFArea ?? 0.5], 32);
     pf32.set([dofOn ? 0.1 * f.camDOF * (f.camDOFScale ?? 1) : 0, f.camDOFExponent ?? 2, f.camDOFFade ?? 1, f.newDOF ? 1 : 0], 36);
     pf32.set([f.dimishZ ?? 0, f.dimZDist ?? 0, 0, 0], 40);

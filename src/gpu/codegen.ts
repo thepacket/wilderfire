@@ -21,7 +21,7 @@
 
 import type { Flame, XForm, VarInstance, Layer, PostSymmetry } from '../core/flame';
 import { visibleLayers, usesMaterials } from '../core/flame';
-import { VARIATIONS, DFLT_SUBFLAME_XML } from '../core/variations';
+import { VARIATIONS, DFLT_SUBFLAME_XML, type VariationDef } from '../core/variations';
 import { importFlameText } from '../core/flameXML';
 import { WFIELD_WGSL } from './wfield.wgsl';
 import { SOLID_KERNEL_WGSL, SOLID_PAY_WORDS } from './solid.wgsl';
@@ -76,9 +76,11 @@ function blockSize(x: XForm): number {
 }
 
 /** Module-scope WGSL (helper fns/consts) required by the variations of a flame, deduped by name. */
-function collectFuncs(layersAll: Layer[]): string {
+function collectFuncs(layersAll: Layer[], dofDef: ReturnType<typeof dofShapeDef> = null): string {
   const seen = new Set<string>();
   const parts: string[] = [];
+  // the DOF blur shape's variation helpers (its snippet is wrapped into dofShape_ below)
+  if (dofDef?.def.funcs && dofDef.def.funcNames) { for (const [nm, text] of splitItems(dofDef.def.funcs)) { if (!seen.has('item:' + nm)) { seen.add('item:' + nm); parts.push(text); } } }
   for (const ly of layersAll) {
     const xs = [...ly.xforms, ...(ly.final ? [ly.final] : []), ...ly.moreFinals];
     for (const x of xs) {
@@ -411,6 +413,7 @@ fn symApply(q: vec3f, i: u32) -> vec3f {
 }
 
 export function compileFlame(flame: Flame, nPoints: number): CompiledFlame {
+  const dofDef = dofShapeDef(flame);
   const layers = visibleLayers(flame);
   const usesMods = layers.some((ly) => [...ly.xforms, ...(ly.final ? [ly.final] : []), ...ly.moreFinals].some((x) => x.colorMods?.some((v) => v !== 0)));
   const solid = !!flame.solid?.enabled;
@@ -452,7 +455,13 @@ export function compileFlame(flame: Flame, nPoints: number): CompiledFlame {
   const dataSize = Math.max(off, 64);
 
   // ---- Per-layer code ----
-  let funcs = '';
+  // JWildfire TransformationTargetColorStep: unless a direct-colour variation set the RGB, the point's carried colour —
+  // the palette entry of its index (the previous gradient step) or the RGB a DISTANCE/TARGET step already gave it —
+  // is lerped towards the target (slots 66..68) by t = (symmetry + 1)/2 = 1 − colorSpeed; the result is a plot colour a
+  // later gradient step replaces (tier 0.5), like JWildfire's redColor/greenColor/blueColor
+  const targetStep = (b: number, li: number, cvar: string) => `
+        if (rgbo.w < 0.75) { let tci = clamp(i32(${cvar} * 254.0 + 0.5), 0, 255); let cur_ = select(pal[${li * 256}u + u32(tci)].xyz, rgbo.xyz, rgbo.w > 0.25); rgbo = vec4f(mix(vec3f(xd[${b + 66}u], xd[${b + 67}u], xd[${b + 68}u]), cur_, 1.0 - xd[${b + 13}u]), 0.5); }`;
+  let funcs = dofDef ? dofShapeFn(dofDef) + '\n\n' : '';
   let iterFns = '';
   layers.forEach((ly, li) => {
     const info = infos[li];
@@ -473,9 +482,11 @@ export function compileFlame(flame: Flame, nPoints: number): CompiledFlame {
       // JWildfire ColorType: DIFFUSION blends the index (default); CYCLIC adds the symmetry to the index (mod 1); DISTANCE keeps
       // the index and paints the palette entry at color + |Δp|·(symmetry+1) — a plot colour that a later gradient step
       // (DIFFUSION/CYCLIC final) replaces, unlike a direct-colour variation's (rgbo.w 0.5 vs 1)
+      // TARGET keeps the index (c1 = 1); TARGETG blends it like DIFFUSION
       const cstep = ct === 'CYCLIC' ? `        c = fract(c + (1.0 - 2.0 * xd[${b + 13}u]));`
-        : ct === 'DISTANCE' ? '' : `        let cs = xd[${b + 13}u];\n        c = c * (1.0 - cs) + xd[${b + 12}u] * cs;`;
-      const dstep = ct === 'DISTANCE' ? `\n        if (rgbo.w < 0.75) { let dci = i32((xd[${b + 12}u] + length(np - p) * (2.0 - 2.0 * xd[${b + 13}u])) * 254.0 + 0.5) % 256; rgbo = vec4f(pal[${li * 256}u + u32(dci)].xyz, 0.5); }` : '';
+        : ct === 'DISTANCE' || ct === 'TARGET' ? '' : `        let cs = xd[${b + 13}u];\n        c = c * (1.0 - cs) + xd[${b + 12}u] * cs;`;
+      const dstep = ct === 'DISTANCE' ? `\n        if (rgbo.w < 0.75) { let dci = i32((xd[${b + 12}u] + length(np - p) * (2.0 - 2.0 * xd[${b + 13}u])) * 254.0 + 0.5) % 256; rgbo = vec4f(pal[${li * 256}u + u32(dci)].xyz, 0.5); }`
+        : ct === 'TARGET' || ct === 'TARGETG' ? targetStep(b, li, 'c') : '';
       return `      case ${i}u: {
 ${cstep}
         op = xd[${b + 14}u];${usesMods ? `\n        m = modBlend(m, ${b}u);` : ''}${usesMat ? `\n        mt = mt * (1.0 + xd[${b + 65}u]) * 0.5 + xd[${b + 64}u] * (1.0 - xd[${b + 65}u]) * 0.5;` : ''}
@@ -483,11 +494,12 @@ ${cstep}
       }`;
     }).join('\n');
     // final transforms run in sequence (JWildfire: each further final takes the previous output)
+    const isTarget = (x: XForm) => x.colorType === 'TARGET' || x.colorType === 'TARGETG';
     const finalStep = (fn: string, base: number, input: string, fx: XForm) => `
       {
-        ${fx.colorType === 'CYCLIC' ? `dc = fract(dc + (1.0 - 2.0 * xd[${base + 13}u]));` : fx.colorType === 'DISTANCE' ? '' : `let fcs = xd[${base + 13}u];\n        dc = dc * (1.0 - fcs) + xd[${base + 12}u] * fcs;`}${usesMods ? `\n        dm = modBlend(dm, ${base}u);` : ''}${fx.colorType !== 'DISTANCE' && (fx.colorType === 'CYCLIC' || fx.colorSpeed > 0) ? '\n        if (rgbo.w < 0.75) { rgbo = vec4f(0.0); } // gradient step: a DISTANCE plot colour is replaced by palette[index]' : ''}
+        ${fx.colorType === 'CYCLIC' ? `dc = fract(dc + (1.0 - 2.0 * xd[${base + 13}u]));` : fx.colorType === 'DISTANCE' || fx.colorType === 'TARGET' ? '' : `let fcs = xd[${base + 13}u];\n        dc = dc * (1.0 - fcs) + xd[${base + 12}u] * fcs;`}${usesMods ? `\n        dm = modBlend(dm, ${base}u);` : ''}${fx.colorType !== 'DISTANCE' && !isTarget(fx) && (fx.colorType === 'CYCLIC' || fx.colorSpeed > 0) ? '\n        if (rgbo.w < 0.75) { rgbo = vec4f(0.0); } // gradient step: a DISTANCE plot colour is replaced by palette[index]' : ''}
       }
-      dp = ${fn}(${input}, &dc, &rs, &hide, &rgbo);${fx.colorType === 'DISTANCE' ? `\n      if (rgbo.w < 0.75) { let dci = i32((xd[${base + 12}u] + length(dp - ${input}) * (2.0 - 2.0 * xd[${base + 13}u])) * 254.0 + 0.5) % 256; rgbo = vec4f(pal[${li * 256}u + u32(dci)].xyz, 0.5); }` : ''}`;
+      dp = ${fn}(${input}, &dc, &rs, &hide, &rgbo);${fx.colorType === 'DISTANCE' ? `\n      if (rgbo.w < 0.75) { let dci = i32((xd[${base + 12}u] + length(dp - ${input}) * (2.0 - 2.0 * xd[${base + 13}u])) * 254.0 + 0.5) % 256; rgbo = vec4f(pal[${li * 256}u + u32(dci)].xyz, 0.5); }` : isTarget(fx) ? targetStep(base, li, 'dc') : ''}`;
     let finalBlock = ly.final ? finalStep(`applyF${li}`, info.finalBase, 'p', ly.final) : '';
     ly.moreFinals.forEach((fx, k) => { finalBlock += finalStep(`applyF${li}_${k}`, info.moreBases[k], 'dp', fx); }); // dp starts as p
 
@@ -591,9 +603,11 @@ ${symN > 1 ? `    // post symmetry: plot this point once per symmetry copy (shad
           if (P.dof.z >= 0.999999) { ff = rnd(&rs); }
           else if (P.dof.z > 1e-6) { if (rnd(&rs) <= P.dof.z) { ff = rnd(&rs); } }
           let dr = ff * P.dof.x * dist;
-          let ang = 6.28318530718 * rnd(&rs);
+${dofDef ? `          let off_ = dofShape_(vec2f(cx, cy), dr, ff, &rs);
+          px = cx + off_.x;
+          py = cy + off_.y;` : `          let ang = 6.28318530718 * rnd(&rs);
           px = cx + dr * cos(ang);
-          py = cy + dr * sin(ang);
+          py = cy + dr * sin(ang);`}
         }
       }
       rx = px / zr - P.centerX;
@@ -773,7 +787,7 @@ struct Params {
   camPos: vec4f, // xyz: camera position offset, w: camPersp
   camPersp: f32,
   camZ: f32,     // legacy DOF focus plane
-  _p2: f32,
+  dofRot: f32,   // DOF blur-shape rotation (radians)
   _p3: f32,
   focus: vec4f,  // xyz: DOF focus point, w: DOF area
   dof: vec4f,    // x: 0.1·camDOF·scale, y: exponent, z: fade, w: newDOF flag
@@ -809,7 +823,7 @@ var<private> df_zero: u32 = 0u;
 // true during a walker's first iterations after a (re)start — JWildfire's "first call" of a variation instance (pre_stabilize)
 var<private> wstart_: bool = false;
 
-${collectFuncs([...layers, ...subs.flatMap((sb) => (sb ? [sb.sf.layer] : []))])}
+${collectFuncs([...layers, ...subs.flatMap((sb) => (sb ? [sb.sf.layer] : []))], dofDef)}
 
 ${funcs}${subFuncs}${iterFns}
 @compute @workgroup_size(256)
@@ -864,7 +878,10 @@ ${lcases}
       }
     };
     let subIndex = 0; // subflame_wf instances in kernel order (matches `subs`)
-    const writeBlock = (x: XForm, B: number) => {
+    const writeBlock = (x: XForm, B: number, pal?: [number, number, number][]) => {
+      // JWildfire TARGET / TARGETG: the colour the point's RGB is pulled towards (TARGETG: the palette entry at `color`)
+      if (x.colorType === 'TARGET') { const t = x.targetColor ?? [0, 0, 0]; out[B + 66] = t[0]; out[B + 67] = t[1]; out[B + 68] = t[2]; }
+      else if (x.colorType === 'TARGETG' && pal) { const c = pal[Math.min(255, Math.max(0, Math.trunc(x.color * 254 + 0.5)))] ?? [0, 0, 0]; out[B + 66] = c[0]; out[B + 67] = c[1]; out[B + 68] = c[2]; }
       for (let i = 0; i < 6; i++) out[B + i] = x.affine[i];
       for (let i = 0; i < 6; i++) out[B + 6 + i] = x.post[i];
       out[B + 12] = x.color;
@@ -931,9 +948,9 @@ ${lcases}
       if (li >= infos.length) return;
       const info = infos[li];
       writeCdf(ly.xforms, info.cdfBase);
-      ly.xforms.forEach((x, i) => { if (i < info.bases.length) writeBlock(x, info.bases[i]); });
-      if (ly.final && info.finalBase >= 0) writeBlock(ly.final, info.finalBase);
-      ly.moreFinals.forEach((x, k) => { if (k < info.moreBases.length) writeBlock(x, info.moreBases[k]); });
+      ly.xforms.forEach((x, i) => { if (i < info.bases.length) writeBlock(x, info.bases[i], ly.palette); });
+      if (ly.final && info.finalBase >= 0) writeBlock(ly.final, info.finalBase, ly.palette);
+      ly.moreFinals.forEach((x, k) => { if (k < info.moreBases.length) writeBlock(x, info.moreBases[k], ly.palette); });
     });
     // subflame_wf: the sub-flames' tables/blocks/palettes (their structure is fixed at compile time; the sub-flame of an
     // instance whose XML changed since is a different signature → recompiled, so `subs` still matches)
@@ -941,13 +958,54 @@ ${lcases}
       if (!sb) return;
       const ly = sb.sf.layer;
       writeCdf(ly.xforms, sb.cdfBase);
-      ly.xforms.forEach((x, i) => writeBlock(x, sb.bases[i]));
-      sb.finals.forEach((x, j) => writeBlock(x, sb.finalBases[j]));
+      ly.xforms.forEach((x, i) => writeBlock(x, sb.bases[i], ly.palette));
+      sb.finals.forEach((x, j) => writeBlock(x, sb.finalBases[j], ly.palette));
       for (let i = 0; i < 256; i++) { const c = ly.palette[i] ?? [0, 0, 0]; out[sb.palBase + i * 3] = c[0]; out[sb.palBase + i * 3 + 1] = c[1]; out[sb.palBase + i * 3 + 2] = c[2]; }
     });
   };
 
   return { wgsl, dataSize, writeData, usesMods, solid, usesMat, usesMesh, usesPset };
+}
+
+// ---- JWildfire DOF blur shapes (DOFBlurShapeType): the DOF jitter is a blur *variation* applied with weight dr =
+// 0.1·cam_dof·dist·scale·fade — starblur, xheart_blur_wf, flower, taurus, cloverleaf_wf, sineblur, square — with the
+// flame's cam_dof_param1..6 as that variation's parameters, the offset rotated by cam_dof_rotate. BUBBLE is the plain
+// disc; shapes without a portable variation (NBLUR, SNOWFLAKE, CANNABISCURVE, PERLIN_NOISE, BRUSH_STROKE, SUBFLAME) fall
+// back to it. Each shape's quirks (abs / ×2 / ×0.25 on dr, a random input point, no rotation) follow its Java class.
+const DOF_SHAPES: Record<string, { v: string; params: string[]; dr: string; input: string; rotate: boolean; post?: string }> = {
+  STARBLUR: { v: 'starblur', params: ['power', 'range'], dr: 'dr', input: 's0', rotate: true },
+  HEART: { v: 'xheart_blur_wf', params: ['angle', 'ratio'], dr: 'abs(dr)', input: 's0', rotate: true },
+  FLOWER: { v: 'flower', params: ['holes', 'petals'], dr: 'abs(dr) * 2.0', input: 'vec2f(1.0 - 2.0 * rnd(rs), 1.0 - 2.0 * rnd(rs))', rotate: true },
+  TAURUS: { v: 'taurus', params: ['r', 'n', 'inv', 'sor'], dr: 'abs(dr) * 0.25', input: 'vec2f((6.283185307179586 - 12.566370614359172 * rnd(rs)) * ff, (6.283185307179586 - 12.566370614359172 * rnd(rs)) * ff)', rotate: true },
+  CLOVERLEAF: { v: 'cloverleaf_wf', params: [], dr: 'abs(dr)', input: 'vec2f((1.0 - 2.0 * rnd(rs)) * ff, (1.0 - 2.0 * rnd(rs)) * ff)', rotate: true },
+  SINEBLUR: { v: 'sineblur', params: ['power'], dr: 'dr', input: 's0', rotate: false },
+  RECT: { v: 'square', params: [], dr: 'dr', input: 's0', rotate: true, post: 'off.x = off.x * width_;' },
+};
+function dofShapeDef(flame: Flame): { shape: typeof DOF_SHAPES[string]; def: VariationDef; params: number[] } | null {
+  const name = flame.camDOFShape ?? 'BUBBLE';
+  if (!(flame.camDOF > 0) || name === 'BUBBLE') return null;
+  const shape = DOF_SHAPES[name]; if (!shape) return null;
+  const def = VARIATIONS[shape.v]; if (!def) return null;
+  return { shape, def, params: flame.camDOFParams ?? [0, 0, 0, 0, 0, 0] };
+}
+/** The shape as a WGSL function of the projected point and dr: a snippet wrapper like the oracle harness's */
+function dofShapeFn(d: NonNullable<ReturnType<typeof dofShapeDef>>): string {
+  const lit = (v: number) => { let s = String(v); if (!/[.e]/.test(s)) s += '.0'; if (/^-?\d+e/.test(s)) s = s.replace(/^(-?\d+)e/, '$1.0e'); return s; };
+  const p = (d.def.params ?? []).map((pd: { name: string; def: number }) => { const k = d.shape.params.indexOf(pd.name); return lit(k >= 0 ? d.params[k] : pd.def); });
+  const snippet = d.def.code('w_', p, () => '0.0');
+  const width = d.shape.v === 'square' ? lit(d.params[0]) : '1.0';
+  return `fn dofShape_(s0: vec2f, dr: f32, ff: f32, rs: ptr<function, u32>) -> vec2f {
+  var c: f32 = 0.5; var hide: bool = false; let cp = &c; let hd = &hide; var rgbo = vec4f(0.0); let rgb = &rgbo; let PALB_: u32 = 0u;
+  var t = ${d.shape.input}; var z_ = 0.0; var pz_ = 0.0;
+  var r2 = max(dot(t, t), 1e-12); var r = sqrt(r2); var th = atan2(t.x, t.y); var ph = atan2(t.y, t.x);
+  var v = vec2f(0.0, 0.0);
+  let w_ = ${d.shape.dr}; let width_ = ${width};
+  ${snippet}
+  var off = v;
+  ${d.shape.post ?? ''}
+  ${d.shape.rotate ? 'let ca_ = cos(P.dofRot); let sa_ = sin(P.dofRot); off = vec2f(off.x * ca_ - off.y * sa_, off.x * sa_ + off.y * ca_);' : ''}
+  return off;
+}`;
 }
 
 export const TONEMAP_WGSL = `// WilderFire tonemap: density-estimation filter + log-density + gamma/vibrancy
