@@ -44,12 +44,19 @@ in the stack.
   JWildfire's own GPU≠CPU snippet bugs are patched back to the Java, and
   shader hashes on cell ids run in double-float so cut/worley patterns
   match — see [`scripts/jwf-port/README.md`](scripts/jwf-port/README.md)).
-  The 50 JWildfire variations that are *not* implemented are listed with
-  their reason in `scripts/jwf-port/data/unportable.json` (user code compiled
-  at run time, external content such as sub-flames/images/meshes/SVG/text,
-  the remaining CPU-built point sets, …); the importer names the reason when a flame uses one.
-  Also ported: the TARGET / TARGETG colour types, JWildfire's DOF blur shapes, the channel mixer and
-  `background_image` (the picture from the browser's image store); `curliecue2`, whose transform steps one
+  **976 of JWildfire's 1,026 variations** are in the registry (938 transpiled +
+  38 hand ports: every CPU-built point set but `taprats`, meshes, sub-flames,
+  inversion, attractors). The 50 that are *not* are listed with their reason
+  in `scripts/jwf-port/data/unportable.json` — user code compiled at run time
+  (the plot family, `custom_wf`, `glsl_code`…), external content (images,
+  text, SVG, L-systems, brushes, further sub-flame variants), two engine-level
+  ones, `dc_triantess`, `taprats` — and the importer names the reason when a
+  flame uses one.
+  Also ported: the TARGET / TARGETG / NONE colour types with JWildfire's
+  carried colour, its DOF blur shapes, the channel mixer, `background_image`
+  and the **gradient map** (pictures from the browser's image store),
+  `smooth_gradient`, motion blur (sub-frames averaged in video and hi-res
+  exports); `curliecue2`, whose transform steps one
   global trajectory per call, is tabulated so short-lived GPU walkers draw the whole curlicue. 94 variations
   are hand-written ports on top of the mechanical ones; every port is checked against headless JWildfire with the
   image harness in `scripts/jwf-port` (`Compare.java`, `mkfix.mjs` fixtures, `extract2.mjs` corpus picks and the
