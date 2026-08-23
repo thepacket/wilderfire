@@ -100,6 +100,11 @@ export async function libAll(): Promise<LibEntry[]> {
   const tx = d.transaction(STORE, 'readonly');
   const all = await new Promise<LibEntry[]>((res, rej) => { const r = tx.objectStore(STORE).getAll(); r.onsuccess = () => res(r.result as LibEntry[]); r.onerror = () => rej(r.error); });
   const changed = blobifyThumbs(all);
+  // entries saved before provenance existed: the author still sits in the flame (meta_info_author) — lift it up
+  for (const e of all) {
+    const a = (e.flame as { author?: unknown } | null)?.author;
+    if (!e.author && typeof a === 'string' && a.trim()) { e.author = a.trim(); if (!changed.includes(e)) changed.push(e); }
+  }
   if (changed.length && !migratingThumbs) {
     migratingThumbs = true;
     void (async () => {
@@ -109,7 +114,7 @@ export async function libAll(): Promise<LibEntry[]> {
           for (const e of changed.slice(i, i + 500)) tx2.objectStore(STORE).put(e);
           await done(tx2);
         }
-        console.info(`Library: ${changed.length} thumbnail${changed.length === 1 ? '' : 's'} converted to binary.`);
+        console.info(`Library: ${changed.length} entr${changed.length === 1 ? 'y' : 'ies'} updated (binary thumbnails / author lifted from the flame).`);
       } catch (e) { console.warn('Library thumbnail conversion failed: ' + (e as Error).message); }
       finally { migratingThumbs = false; }
     })();
