@@ -269,7 +269,10 @@ in the stack.
   reported; the twenty variations whose parameter names contain spaces or
   dots — `glsl_*`, `crop_trapezoid`, `mobius_strip`, `flame_bulb` — are
   written verbatim the way JWildfire writes and reads them, so those files
-  are not strict XML, and the importer's lenient pass takes them back).
+  are not strict XML, and the importer's lenient pass takes them back — as
+  it takes packs that are `<flame>` elements simply concatenated without a
+  wrapper, and packs cut off before their closing tag, keeping the complete
+  flames; every file of a 1,600-pack community corpus now opens).
   Exports open a real **Save as… dialog** where the browser
   supports it (Chrome/Edge), falling back to a download elsewhere, and every
   save ends with a message over the canvas — file name and size, or the

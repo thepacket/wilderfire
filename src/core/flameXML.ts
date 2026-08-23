@@ -432,7 +432,18 @@ export function parseFlameXML(text: string, fallbackPalette: RGB[]): Flame[] {
   lastImportUnknown.length = 0;
   lastImportCurves.length = 0;
   let doc = new DOMParser().parseFromString(text, 'application/xml');
-  if (doc.querySelector('parsererror')) doc = new DOMParser().parseFromString(dedupeAttributes(text), 'application/xml');
+  if (doc.querySelector('parsererror')) {
+    // Repairs, in order: JWildfire's own non-XML attribute names (bubble#1#, names with spaces); packs that are <flame>
+    // elements simply concatenated (several roots, which XML forbids); a pack whose <flames> was never closed
+    // (truncated file — the complete flames before the cut are kept). JWildfire's regex reader accepts all of these.
+    const fixed = dedupeAttributes(text);
+    const body = fixed.replace(/^\s*<\?xml[^>]*\?>/, '');
+    const lastClose = body.lastIndexOf('</flame>');
+    for (const cand of [fixed, '<flames>' + body + '</flames>', ...(lastClose > 0 ? [body.slice(0, lastClose + 8) + '</flames>'] : [])]) {
+      doc = new DOMParser().parseFromString(cand, 'application/xml');
+      if (!doc.querySelector('parsererror')) break;
+    }
+  }
   if (doc.querySelector('parsererror')) {
     throw new Error('Not valid XML: ' + (doc.querySelector('parsererror')?.textContent ?? '').slice(0, 120));
   }

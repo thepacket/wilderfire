@@ -268,6 +268,25 @@ describe('JWildfire background gradients', () => {
   });
 });
 
+describe('pack repairs (JWildfire\'s regex reader accepts what XML forbids)', () => {
+  const one = (n: string) => `<flame name="${n}" size="64 64" scale="10"><xform weight="1" color="0.3" linear="1" coefs="1 0 0 1 0 0"/></flame>`;
+  it('concatenated root <flame> elements without a <flames> wrapper', () => {
+    expect(importFlameText(one('a') + '\n' + one('b') + '\n' + one('c'), GREY).count).toBe(3);
+    expect(importFlameText('<?xml version="1.0"?>\n' + one('a') + one('b'), GREY).count).toBe(2);
+  });
+  it('a <flames> pack that was never closed, or cut off inside a flame, keeps the complete flames', () => {
+    expect(importFlameText('<flames>\n' + one('a') + '\n' + one('b') + '\n', GREY).count).toBe(2);
+    const cut = '<flames>\n' + one('a') + '\n' + one('b').slice(0, 40);
+    const r = importFlameText(cut, GREY);
+    expect(r.count).toBe(1); expect(r.flame.name).toBe('a');
+  });
+  it('repeated variation instances written as name#1# and attribute names with spaces', () => {
+    const xml = '<flames><flame name="d" size="64 64" scale="10"><xform weight="1" color="0.3" linear="1" linear#1#="0.5" coefs="1 0 0 1 0 0"/></flame></flames>';
+    const f = importFlameText(xml, GREY).flame;
+    expect(f.layers[0].xforms[0].variations.map((v) => v.name + "=" + v.weight)).toEqual(["linear=1", "linear=0.5"]);
+  });
+});
+
 describe('JWildfire colour types CYCLIC / DISTANCE', () => {
   it('imports, keeps the symmetry, exports, and the kernel carries the colour rules', async () => {
     const xml = '<flame name="c" size="64 64" scale="10"><xform weight="1" color="0.3" symmetry="-0.83" color_type="DISTANCE" linear="1" coefs="1 0 0 1 0 0"/><xform weight="1" color="0.5" symmetry="0.25" color_type="CYCLIC" spherical="1" coefs="1 0 0 1 0 0"/><xform weight="1" color="0.5" color_type="NONE" linear="1" coefs="1 0 0 1 0 0"/></flame>';
