@@ -99,9 +99,9 @@ itself is order-dependent (`dc_circuits` accumulates a member `S` across
 points, `dc_gnarly` updates only 2 of its 6 gaussian summands — `& 5` — so its
 blur depends on the render's init randoms). Together with the 70 hand-written
 flam3 entries the app registry has 940 variations; with the hand ports of the point-set family, the meshes,
-the formula plots and knots3D (below) it holds **983 of JWildfire's 1,026**.
+the formula plots, c_var and knots3D (below) it holds **986 of JWildfire's 1,026**.
 
-### What is not ported (43)
+### What is not ported (40)
 
 `data/unportable.json` is the definitive list — every JWildfire variation is
 either in the registry or in that file with a category, and `gen.ts` writes it
@@ -110,7 +110,7 @@ variation was skipped. Categories:
 
 | category | count | why |
 |---|---|---|
-| user-code | 15 | compiles user-supplied *code* at run time — Java (`custom_wf`, `custom_wf_full`, `pre_/post_custom_wf`, `dc_code`), GLSL (`glsl_code`), or a Java method body over a Complex class (`c_var`/`pre_/post_c_var`, `ducks`, `f_complex`, `colordomain`, `cut_c`) or the `fract_formula_*` complex syntax; the WebGPU kernel has no run-time compiler. **The formula-text plot family IS ported** (`yplot2d_wf`, `yplot3d_wf`, `parplot2d_wf`, `polarplot2d_wf`, `polarplot3d_wf`, `isosfplot3d_wf`, see *The formula plot family* below) |
+| user-code | 12 | compiles user-supplied *code* at run time — Java (`custom_wf`, `custom_wf_full`, `pre_/post_custom_wf`, `dc_code`), GLSL (`glsl_code`), a Java method body over JWildfire's `Complex` class with mutating method chains (`ducks`, `f_complex`, `colordomain`, `cut_c`) or the `fract_formula_*` complex syntax; the WebGPU kernel has no run-time compiler. **The formula-text plot family IS ported** (`yplot2d_wf`, `yplot3d_wf`, `parplot2d_wf`, `polarplot2d_wf`, `polarplot3d_wf`, `isosfplot3d_wf`) **and so is `c_var`/`pre_c_var`/`post_c_var`** (a method body over the stateless `c_*` vec2 helpers), see *The formula plot family* below |
 | external-content | 24 | renders external content that would have to be uploaded to the GPU: sub-flames (`ringsubflame`, `glynns3subfl`), images (`post_bumpmap_wf`, `displacemap_wf`, `colormap_wf`, `kaleidoimg`, `plane_wf`, `wangtiles`), meshes (`terrain3D`, `metaballs3d_wf`; `sattractor3D` and `knots3D` ARE ported — their formulas run through the safe evaluator of src/core/formula.ts and the tubes are built on the CPU, src/core/sattractor.ts / src/core/knots.ts), `svg_wf`, `text_wf`, L-systems, brushes (`obj_mesh_wf` IS ported — the user loads the OBJ file into the browser's mesh store; `subflame_wf` IS ported — the sub-flame is compiled into the kernel) |
 | point-set | 1 | `taprats` (needs the csk.taprats tiling library, which the sparse JWildfire tree does not carry); `neuron3D` builds a seed-shuffled 512-entry Perlin permutation table per instance. **Ported through the point-set mechanism (see below):** `dragon_js`, `sunflower`, `scrambly`, `dla_wf`, `snowflake_wf`, `brownian_js`, `htree_js`, `koch_js`, `tree_js`, `hilbert_js`, `klein_group`, `grid3d_wf`, `maurer_lines` (lines render mode), `szubieta`, `gpattern`, `curliecue`, `gosperisland_js`, `rsquares_js`, `arctruchet`, `triantruchet`, `meeple`, `mandala`, `mandala2`, `nsudoku`, `natural_foam`, `geometricPrimitives`, `point_mirror_symmetry`, `neuron3D`, `sunvoroni` |
 | engine | 2 | needs an engine feature WilderFire lacks: a variation instantiating another (`sphtiling3v2`), `post_dcztransl` (no Java class) |
@@ -367,6 +367,23 @@ pipeline of `sattractor3D` (the mesh scale defaults to 0.02 like JWildfire's con
 of units across). A reflection probe of `Knots3DFunc.getMesh()` gave the same ring centres to 1e-2 for a degenerate
 5-step / 60-facet corpus knot. Compare: preset 7 0.98 / 0.2 / 1.00, a 32-xform / 5-layer corpus flame 1.00 / 0.3 /
 1.00, the 5-step knot flame 1.00 / 1.4 / 0.99.
+
+**c_var / pre_c_var / post_c_var** (`src/core/cvar.ts`, 6 corpus uses) carry their function as a Java method body —
+`public vec2 f(vec2 z) { vec2 a = c_add(c_inv(z), c_exp(c_inv(z))); return c_add(a, c_exp(new vec2(0.0, 0.0))); }` —
+over `js.glsl.glslFuncRunner`'s `c_*` complex helpers on `vec2`. That is a closed language: the port parses `vec2 <name> =
+<expr>;` declarations, reassignments and the `return`, with expressions made of `z`, the locals, `new vec2(<scalar>,
+<scalar>)` (scalars through the formula compiler), the `c_*` calls (overloads resolved by argument kind: `c_exp(base,
+c)`, `c_pow(c, vec2)`) and the `vec2` methods `.plus/.minus/.multiply/.division`, and emits WGSL over a line-for-line
+port of the helpers. The one trap: the runner has its *own* copies of the helpers (js.glsl.G's, which `java2cu` knows,
+differ), and its `c_to_polar` takes the argument from the runner's rational `atan2` approximation — the `G_atan2` story
+again — so every `c_ln`/`c_sqrt`/`c_pow`/`c_asin`… inherits it; with the exact `atan2` a `c_pow(z, 1.5)` fixture sat at
+0.77 / corr 0.88, with `G_atan2` 0.99 / 0.2 / 1.00. The point is *assigned* (`pVarTP = amount·f`, not added), mode 1 feeds
+a random point instead of the input, pre/post variants rewrite the affine / output point. Compare (grey-ramp fixtures):
+the default code 1.02 / 0.1 / 1.00, a `c_pow`/`c_log`/`c_sqrt` body with a method chain in mode 1 and mode 0 0.99 / 0.2–0.3 /
+1.00, `c_pow(z, 1.5)` 0.99 / 0.2 / 1.00, pre + post 1.00 / 0.2 / 1.00, corpus `c_var + log_tile2` 0.99 / 0.7 / 1.00. The
+other corpus flame (`csch` + `linear3D` + `c_var`, "Heart Deco") matches in structure (0.97 / corr 1.00) but not per
+channel (R 0.52 / G 1.56 / B 1.21) — with or without its colour modifiers and post symmetry, so not a c_var matter:
+an open colour item for a flame whose `csch` and `c_inv` restart the point often (fixtures `_cv_c1`, `_cv_c1n`, `_cv_c1m`).
 
 Two things found on the way. (1) **Offscreen renders of a not-yet-loaded mesh were empty**: `renderRegion` awaits
 `ready()`, which called `setFlame` to pack the freshly prepared mesh — but a `setFlame` during a region is *deferred* to

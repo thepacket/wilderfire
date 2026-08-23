@@ -26,7 +26,7 @@ in the stack.
 
 ## Features
 
-- **954 variations** — 84 hand-written entries (the flam3 classics, JWildfire's
+- **957 variations** — 87 hand-written entries (the flam3 classics, JWildfire's
   `obj_mesh_primitive_wf` — its 26 built-in meshes ship as compact binaries and are
   subdivided/smoothed exactly like JWildfire — `sattractor3D` — a strange attractor
   (21 JWildfire presets or your own x/y/z formulas) swept into a faceted tube on the
@@ -34,7 +34,8 @@ in the stack.
   `yplot2d_wf`, `yplot3d_wf`, `parplot2d_wf`, `polarplot2d_wf`, `polarplot3d_wf`,
   `isosfplot3d_wf` — JWildfire's 136 presets or your own formula text, compiled
   into the GPU kernel by a small Java-expression compiler (src/core/formula.ts)
-  instead of Janino — and `obj_mesh_wf` — your own OBJ
+  instead of Janino — `c_var` / `pre_c_var` / `post_c_var` — a complex function
+  written over JWildfire's `c_*` helpers, compiled the same way — and `obj_mesh_wf` — your own OBJ
   files, loaded into the browser from the transform editor —, `subflame_wf` — a
   whole flame nested as a variation, compiled into the same GPU kernel —,
   `inversion`, `mobius3D_with_inverse` and `pre_stabilize`) plus **938 JWildfire
@@ -48,12 +49,12 @@ in the stack.
   JWildfire's own GPU≠CPU snippet bugs are patched back to the Java, and
   shader hashes on cell ids run in double-float so cut/worley patterns
   match — see [`scripts/jwf-port/README.md`](scripts/jwf-port/README.md)).
-  **983 of JWildfire's 1,026 variations** are in the registry (938 transpiled +
-  45 hand ports: every CPU-built point set but `taprats`, meshes, the formula
-  plots, sub-flames, inversion, attractors). The 43 that are *not* are listed
+  **986 of JWildfire's 1,026 variations** are in the registry (938 transpiled +
+  48 hand ports: every CPU-built point set but `taprats`, meshes, the formula
+  plots, `c_var`, sub-flames, inversion, attractors). The 40 that are *not* are listed
   with their reason in `scripts/jwf-port/data/unportable.json` — user *code*
-  compiled at run time (`custom_wf`, `glsl_code`, `dc_code`, the complex-function
-  classes `c_var`/`ducks`/`f_complex`/`colordomain`/`fract_formula_*`), external content (images,
+  compiled at run time (`custom_wf`, `glsl_code`, `dc_code`, the Complex-class
+  methods of `ducks`/`f_complex`/`colordomain`/`cut_c`, `fract_formula_*`), external content (images,
   text, SVG, L-systems, brushes, further sub-flame variants), two engine-level
   ones, `dc_triantess`, `taprats` — and the importer names the reason when a
   flame uses one.

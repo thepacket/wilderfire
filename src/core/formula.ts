@@ -215,7 +215,7 @@ export function compileFormula(src: string): Formula {
 }
 
 // ---- WGSL backend ----
-const lit = (v: number): string => { if (!isFinite(v)) return v > 0 ? '3.4028235e38' : v < 0 ? '-3.4028235e38' : '0.0'; let s = String(v); if (!/[.e]/.test(s)) s += '.0'; if (/^-?\d+e/.test(s)) s = s.replace(/^(-?\d+)e/, '$1.0e'); return s; };
+const lit = (v: number): string => { if (!isFinite(v)) return v > 0 ? '3.0e38' : v < 0 ? '-3.0e38' : '0.0'; let s = String(v); if (!/[.e]/.test(s)) s += '.0'; if (/^-?\d+e/.test(s)) s = s.replace(/^(-?\d+)e/, '$1.0e'); return s; };
 /** MathLib function → WGSL expression of the f32 arguments; helpers named here must be in FORMULA_WGSL_FUNCS. */
 const WGSL_FN: Record<string, (a: string[]) => string> = {
   sin: (a) => `sin(${a[0]})`, cos: (a) => `cos(${a[0]})`, tan: (a) => `tan(${a[0]})`, asin: (a) => `asin(${a[0]})`, acos: (a) => `acos(${a[0]})`, atan: (a) => `atan(${a[0]})`,

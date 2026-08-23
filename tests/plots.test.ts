@@ -144,3 +144,43 @@ describe('plot family', () => {
     expect(warnings.some((w) => /yplot2d_wf: formula/.test(w))).toBe(true);
   });
 });
+
+describe('c_var (complex-function code)', () => {
+  const bodies = [
+    'import js.glsl.vec2;\npublic vec2 f(vec2 z)\n{\n  vec2 a=c_asin(c_inv(z));\nreturn c_sub(a,c_sin(new vec2(0.0, 0.0)));\n}',
+    'import js.glsl.vec2;\npublic vec2 f(vec2 z)\n{\n  vec2 a=c_add(c_conj(c_asin(z)),c_cos(c_conj(z)));\n  vec2 b=c_add(c_conj(a),c_asin(new vec2(1.20, 0.0)));\nreturn c_mul(a,b);\n}',
+    'import js.glsl.vec2;\npublic vec2 f(vec2 z)\n{\n // vec2 q = broken(;\n vec2 a=c_sub(c_inv(z),c_atan(c_exp(c_acos(z))));\nreturn c_add(a,c_atan(new vec2(-0.0, 0.0)));\n}',
+    'import js.glsl.vec2;\npublic vec2 f(vec2 z)\n{\n return c_pow(c_asin(z), c_sqrt(z));\n}',
+    'public vec2 f(vec2 w) { vec2 pow=new vec2(-2.0,-.60); return c_pow(w,pow).plus(c_exp(2.0, w)).multiply(0.5); }',
+    'public vec2 f(vec2 z) { z = z.plus(new vec2(1, 2)); return c_log(z, 10.0); }',
+  ];
+  it('compiles the corpus bodies, the default and method chains; rejects everything else', async () => {
+    const { cvarToWgsl, CVAR_DEFAULT_CODE } = await import('../src/core/cvar');
+    for (const b of bodies) expect(() => cvarToWgsl(b), b).not.toThrow();
+    expect(cvarToWgsl(bodies[3])).toBe('cv_ret = cv_powc(cv_asin(cv_z), cv_sqrt(cv_z));');
+    expect(cvarToWgsl(bodies[4])).toBe('let cv_l0 = vec2f((-2.0), (-0.6));\n    cv_ret = ((cv_powc(cv_z, cv_l0) + cv_expb(2.0, cv_z)) * 0.5);');
+    expect(cvarToWgsl(bodies[5])).toBe('let cv_l0 = (cv_z + vec2f(f32(1i), f32(2i)));\n    cv_ret = cv_log(cv_l0, 10.0);');
+    expect(cvarToWgsl(CVAR_DEFAULT_CODE)).toContain('cv_inv(cv_z)');
+    expect(() => cvarToWgsl('public vec2 f(vec2 z) { return z.x; }')).toThrow();
+    expect(() => cvarToWgsl('public vec2 f(vec2 z) { System.exit(0); return z; }')).toThrow();
+    expect(() => cvarToWgsl('public vec2 f(vec2 z) { return foo(z); }')).toThrow(/unknown function/);
+    expect(() => cvarToWgsl('public vec2 f(vec2 z) { vec2 a = z; }')).toThrow(/return/);
+  });
+  it('imports the code ressource, compiles the kernel with the c_* helpers once, and recompiles when the code changes', () => {
+    const xml = `<flame name="c" size="64 64" scale="10"><xform weight="1" c_var="1" c_var_mode="0" c_var_zoom="1" c_var_code="${hex(bodies[1])}" coefs="1 0 0 1 0 0"/>` +
+      `<xform weight="1" pre_c_var="1" linear="1" post_c_var="0.5" post_c_var_code="${hex(bodies[3])}" coefs="1 0 0 1 0 0"/></flame>`;
+    const { flame, unknown } = importFlameText(xml, GREY);
+    expect(unknown).toEqual([]);
+    const x0 = flame.layers[0].xforms[0];
+    expect(x0.variations[0].res?.code).toBe(bodies[1]);
+    expect(flame.layers[0].xforms[1].preVariations?.find((v) => v.name === 'pre_c_var')?.res).toBeUndefined(); // the default code is not stored
+    expect(flameToXML(flame)).toContain(`pre_c_var_code="${hex('import js.glsl.vec2;')}`); // but exported for JWildfire
+    const c = compileFlame(flame, 1024);
+    expect(c.wgsl).toContain('cv_conj(cv_asin(cv_z))');
+    expect((c.wgsl.match(/fn cv_mul\(/g) ?? []).length).toBe(1);
+    expect((c.wgsl.match(/fn powc\(/g) ?? []).length).toBe(1);
+    const sig = flameSignature(flame);
+    x0.variations[0].res!.code = bodies[0];
+    expect(flameSignature(flame)).not.toBe(sig);
+  });
+});

@@ -16,6 +16,7 @@ import type { JwfVariationDef } from './variations.jwf.ts';
 import { PSET_STRIDE, JavaRandom } from './pointSets';
 import { DF_HASH_FUNCS } from './wgslDf';
 import { PLOT_VARIATIONS } from './plots';
+import { CVAR_VARIATIONS } from './cvar';
 import { KNOTS3D_PRESETS } from './plotPresets';
 
 /** A variation instance as the registry sees it (src/core/flame.ts VarInstance without the import). */
@@ -257,6 +258,8 @@ export function kleinGenerators(P: Record<string, number>): number[] {
 const HAND_VARIATIONS: Record<string, VariationDef> = {
   // JWildfire's formula plot family (yplot2d_wf … isosfplot3d_wf): src/core/plots.ts
   ...PLOT_VARIATIONS,
+  // JWildfire's c_var / pre_c_var / post_c_var (a complex function written over js.glsl's c_* helpers): src/core/cvar.ts
+  ...CVAR_VARIATIONS,
   // ---- klein_group (Möbius generators a, b and their inverses from a recipe; one picked per point, optionally never
   // the inverse of the previous one — that memory is a per-thread private, like JWildfire's prev_matrix field) ----
   klein_group: {

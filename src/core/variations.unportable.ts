@@ -3,7 +3,6 @@
 
 export const UNPORTABLE: Record<string, string> = {
   "brush_stroke_wf": "renders external content (flame, image, mesh, SVG, text)",
-  "c_var": "runs user code / a formula at render time",
   "colordomain": "runs user code / a formula at render time",
   "colormap_wf": "renders external content (flame, image, mesh, SVG, text)",
   "custom_wf": "runs user code / a formula at render time",
@@ -29,12 +28,10 @@ export const UNPORTABLE: Record<string, string> = {
   "plane_wf": "renders external content (flame, image, mesh, SVG, text)",
   "post_brush_stroke_wf": "renders external content (flame, image, mesh, SVG, text)",
   "post_bumpmap_wf": "renders external content (flame, image, mesh, SVG, text)",
-  "post_c_var": "runs user code / a formula at render time",
   "post_colormap_wf": "renders external content (flame, image, mesh, SVG, text)",
   "post_custom_wf": "runs user code / a formula at render time",
   "post_dcztransl": "JWildfire pre+post inverse pair / nested variation",
   "post_displacemap_wf": "renders external content (flame, image, mesh, SVG, text)",
-  "pre_c_var": "runs user code / a formula at render time",
   "pre_custom_wf": "runs user code / a formula at render time",
   "pre_subflame_wf": "renders external content (flame, image, mesh, SVG, text)",
   "ringsubflame": "renders external content (flame, image, mesh, SVG, text)",
