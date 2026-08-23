@@ -163,6 +163,14 @@ export interface Layer {
   visible: boolean;
 }
 
+/** JWildfire channel mixer: curves over the per-pixel average raw colour (x = value·100 on a 0..25600 axis, y likewise).
+ *  RGB uses rr/gg/bb, BRIGHTNESS scales by rr(luma)/luma, FULL mixes all nine. Missing curves are JWildfire's defaults
+ *  (identity for rr/gg/bb, zero otherwise). */
+export type MixerKey = 'rr' | 'rg' | 'rb' | 'gr' | 'gg' | 'gb' | 'br' | 'bg' | 'bb';
+export const MIXER_KEYS: MixerKey[] = ['rr', 'rg', 'rb', 'gr', 'gg', 'gb', 'br', 'bg', 'bb'];
+export interface MixerCurve { points: [number, number][]; interp: 'spline' | 'linear' }
+export interface ChannelMixer { mode: 'RGB' | 'BRIGHTNESS' | 'FULL'; curves: Partial<Record<MixerKey, MixerCurve>> }
+
 export interface Flame {
   name: string;
   layers: Layer[];
@@ -237,6 +245,7 @@ export interface Flame {
   fgOpacity: number;
   /** JWildfire `bg_transparency`: the background stays transparent in the saved image. */
   bgTransparency: boolean;
+  mixer?: ChannelMixer;
   /** JWildfire `oversample` (spatial oversampling, 1–3): histogram supersampling factor. */
   oversample: number;
   /** JWildfire post symmetry, applied to the plotted point (DefaultRenderIterationState). */
@@ -373,6 +382,17 @@ export function scaleAffine(a: Affine, s: number): Affine {
 }
 
 const num = (v: unknown, d: number) => (typeof v === 'number' && isFinite(v) ? v : d);
+function normMixer(m: unknown): ChannelMixer | undefined {
+  const o = m as { mode?: unknown; curves?: Record<string, { points?: unknown; interp?: unknown }> } | undefined;
+  if (!o || (o.mode !== 'RGB' && o.mode !== 'BRIGHTNESS' && o.mode !== 'FULL')) return undefined;
+  const curves: Partial<Record<MixerKey, MixerCurve>> = {};
+  for (const k of MIXER_KEYS) {
+    const c = o.curves?.[k]; if (!c || !Array.isArray(c.points)) continue;
+    const pts = (c.points as unknown[]).filter((p): p is [number, number] => Array.isArray(p) && p.length === 2 && isFinite(p[0]) && isFinite(p[1])).map((p) => [num(p[0], 0), num(p[1], 0)] as [number, number]);
+    if (pts.length) curves[k] = { points: pts, interp: c.interp === 'linear' ? 'linear' : 'spline' };
+  }
+  return { mode: o.mode, curves };
+}
 const clamp01 = (v: number) => Math.min(1, Math.max(0, v));
 
 function normAffine(a: unknown, d: Affine): Affine {
@@ -515,6 +535,7 @@ export function normalizeFlame(obj: any, fallbackPalette: RGB[]): Flame {
     camDOF: Math.max(0, num(obj?.camDOF, 0)), camDOFArea: Math.max(0, num(obj?.camDOFArea, 0.5)),
     camDOFExponent: Math.max(0.1, num(obj?.camDOFExponent, 2)), camDOFScale: num(obj?.camDOFScale, 1),
     camDOFShape: typeof obj?.camDOFShape === 'string' ? obj.camDOFShape : 'BUBBLE', camDOFRotate: num(obj?.camDOFRotate, 0),
+    mixer: normMixer(obj?.mixer),
     camDOFParams: Array.isArray(obj?.camDOFParams) ? Array.from({ length: 6 }, (_, i) => num(obj.camDOFParams[i], 0)) : [0, 0, 0, 0, 0, 0],
     camDOFFade: clamp01(num(obj?.camDOFFade, 1)), newDOF: !!obj?.newDOF,
     focusX: num(obj?.focusX, 0), focusY: num(obj?.focusY, 0), focusZ: num(obj?.focusZ, 0), camZ: num(obj?.camZ, 0),

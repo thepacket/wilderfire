@@ -1029,6 +1029,7 @@ struct TP {
   bgGeom: vec4f, // x, y: this tile's origin in the full image; z, w: full image size (the gradient spans the full image)
   post: vec4f, // x: modSaturation (saturation − 1), y: alphaScale (foreground opacity), z: filter_low_density, w: filter_sharpness
   adapt: vec4f, // adaptive filtering (MITCHELL_SINEPOW): x on/off, y/z/w = low-density/smoothing/detail kernel sizes
+  mixer: vec4u, // JWildfire channel mixer: x mode (0 off, 1 RGB, 2 BRIGHTNESS, 3 FULL), y: LUT base in sfilt (9 × 257 floats)
 };
 
 // Two passes: fsA = DE + log-scale per pixel into an rgba16float texture,
@@ -1162,6 +1163,19 @@ fn adaptSelect(x: i32, y: i32) -> vec2u {
 
 // Density-estimation + JWildfire log scale for output pixel (x, y):
 // returns (r, g, b, intensity), all zero where nothing landed.
+// JWildfire channel mixer (LogDensityFilter + ColorFunc): the curves act on the pixel's *average* raw colour
+// (rp.red·100/count on the 0..25600 axis) and the result ×count replaces the colour sum before log scaling
+fn mixLut(k: u32, v: f32) -> f32 {
+  let x = clamp(v, 0.0, 256.0); let i = u32(floor(x)); let fr = x - floor(x); let b = T.mixer.y + k * 257u;
+  return mix(sfilt[b + min(i, 256u)], sfilt[b + min(i + 1u, 256u)], fr);
+}
+fn mixerMap(a: vec3f) -> vec3f {
+  let m = T.mixer.x;
+  if (m == 1u) { return vec3f(mixLut(0u, a.r), mixLut(4u, a.g), mixLut(8u, a.b)); }
+  if (m == 2u) { let br = 0.2990 * a.r + 0.5880 * a.g + 0.1130 * a.b; return a * select(1.0, mixLut(0u, br) / br, br > 1e-6); }
+  return vec3f(mixLut(0u, a.r) + mixLut(1u, a.g) + mixLut(2u, a.b), mixLut(3u, a.r) + mixLut(4u, a.g) + mixLut(5u, a.b), mixLut(6u, a.r) + mixLut(7u, a.g) + mixLut(8u, a.b));
+}
+
 fn logScaled(x: i32, y: i32) -> vec4f {
   let c0 = blockAt(x, y);
   var rgb = c0.rgb;
@@ -1203,6 +1217,7 @@ fn logScaled(x: i32, y: i32) -> vec4f {
       cnt = floor(sumA / wsum * os2 + 0.5) / os2;
     }
   }
+  if (T.mixer.x > 0u && cnt > 0.0) { rgb = mixerMap(rgb / cnt) * cnt; }
 
   if (cnt <= 0.0) {
     return vec4f(0.0);

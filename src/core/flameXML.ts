@@ -12,6 +12,7 @@
 //    <colors count data="…"/>, or 256 × <color index rgb="r g b"/>.
 
 import type { Flame, XForm, Layer, Affine, RGB, WeightingField, LightDiffFunc } from './flame';
+import { MIXER_KEYS, type MixerKey, type MixerCurve, type Flame as FlameT } from './flame';
 import { defaultXForm, defaultFlame, normalizeFlame, MAX_LAYERS, MAX_XFORMS, WFIELD_TYPES, defaultWeightingField, defaultSolidRender, defaultSolidMaterial, LIGHT_DIFF_FUNCS } from './flame';
 import { VARIATIONS } from './variations';
 import { normFilterKernel } from '../gpu/filters';
@@ -92,6 +93,20 @@ export const lastImportCurves: MotionCurve[] = [];
 const CURVE_SUFFIX_RE = /^(.+)_(enabled|view_xmin|view_xmax|view_ymin|view_ymax|interpolation|selected_idx|locked|point_count|parent_curve|x\d+|y\d+)$/;
 interface RawCurve { prefix: string; points: CurvePoint[]; interp: CurveInterp; enabled: boolean }
 
+/** JWildfire channel mixer attributes: mixer_mode + the nine curves in its curve-attribute family (x 0..25600, y likewise) */
+function mixerAttrs(f: { mixer?: { mode: string; curves: Partial<Record<MixerKey, MixerCurve>> } }): string {
+  if (!f.mixer) return 'mixer_mode="OFF" ';
+  const DEF: [number, number][] = [[0, 0], [6400, 6400], [12800, 12800], [19200, 19200], [25600, 25600]];
+  const ZERO: [number, number][] = [[0, 0], [6400, 0], [12800, 0], [19200, 0], [25600, 0]];
+  let s = `mixer_mode="${f.mixer.mode}" `;
+  for (const k of MIXER_KEYS) {
+    const c = f.mixer.curves[k] ?? { points: k[0] === k[1] ? DEF : ZERO, interp: 'spline' as const };
+    const p = `mixer_${k}_curve_`;
+    s += `${p}enabled="false" ${p}view_xmin="-1280" ${p}view_xmax="26880" ${p}view_ymin="-5120.0" ${p}view_ymax="30720.0" ${p}interpolation="${c.interp === 'linear' ? 'LINEAR' : 'SPLINE'}" ${p}selected_idx="0" ${p}locked="false" ${p}point_count="${c.points.length}" `;
+    c.points.forEach((pt, i) => { s += `${p}x${i}="${Math.round(pt[0])}" ${p}y${i}="${fmt(pt[1])}" `; });
+  }
+  return s;
+}
 /** Prefixes of every curve on the element (those with a `_point_count`). */
 function curvePrefixes(elm: Element): Set<string> {
   const s = new Set<string>();
@@ -600,10 +615,15 @@ export function parseFlameXML(text: string, fallbackPalette: RGB[]): Flame[] {
         focusXCurve: { key: 'focusX' }, focusYCurve: { key: 'focusY' }, focusZCurve: { key: 'focusZ' }, camZCurve: { key: 'camZ' },
         dimishZCurve: { key: 'dimishZ' }, dimZDistanceCurve: { key: 'dimZDist' },
       };
+      const mixerCurves: Partial<Record<MixerKey, MixerCurve>> = {};
       for (const rc of readCurves(fe, fps)) {
+        const mm = /^mixer_(rr|rg|rb|gr|gg|gb|br|bg|bb)_curve$/.exec(rc.prefix);
+        if (mm) { mixerCurves[mm[1] as MixerKey] = { points: rc.points.map((p) => [Math.round(p.t * fps), p.v] as [number, number]), interp: rc.interp === 'linear' ? 'linear' : 'spline' }; continue; }
         const m = FLAME_MAP[rc.prefix];
         if (m) pushCurve(rc, m.key, m.map);
       }
+      const mixMode = (fe.getAttribute('mixer_mode') ?? 'OFF').toUpperCase();
+      if (mixMode === 'RGB' || mixMode === 'BRIGHTNESS' || mixMode === 'FULL') f.mixer = { mode: mixMode, curves: mixerCurves };
     }
     const parseLayerContent = (elm: Element, li: number): Omit<Layer, 'weight' | 'visible'> => {
       const ctx = (base: string): CurveCtx | undefined => (isFirst ? { pathBase: base, fps } : undefined);
@@ -874,7 +894,7 @@ export function flameToXML(f: Flame, opts: XMLExportOpts = {}): string {
     `antialias_amount="${fmt(f.antialiasAmount ?? 0.25)}" antialias_radius="${fmt(f.antialiasRadius ?? 0.5)}" ` +
     `de_radius="${fmt(f.deRadius ?? 1)}" de_curve="${fmt(f.deCurve ?? 0.8)}" ` +
     `saturation="${fmt(f.saturation ?? 1)}" fg_opacity="${fmt(f.fgOpacity ?? 1)}" ` +
-    `bg_transparency="${f.bgTransparency ? 1 : 0}" oversample="${f.oversample ?? 1}" ` +
+    `bg_transparency="${f.bgTransparency ? 1 : 0}" oversample="${f.oversample ?? 1}" ` + mixerAttrs(f) +
     (f.author ? `meta_info_author="${esc(f.author)}" ` : '') + (f.created ? `meta_info_creation_time="${esc(f.created)}" ` : '') + (f.uuid ? `meta_info_uuid="${esc(f.uuid)}" ` : '') +
     psymAttrs(f) +
     `quality="200" brightness="${fmt(f.brightness)}" gamma="${fmt(f.gamma)}" gamma_threshold="${fmt(f.gammaThreshold)}" ` +

@@ -8,7 +8,9 @@
 
 // colour kernel at [0..), intensity kernel at [128..); the adaptive (MITCHELL_SINEPOW) kernels
 // follow at [256..) low-density, [384..) smoothing, [512..) detail
-export const FILT_FLOATS = 640;
+export const FILT_FLOATS = 640 + 9 * 257; // spatial filter weights, then the channel-mixer LUTs (MIX_LUT_BASE)
+export const MIX_LUT_BASE = 640;
+export const MIX_LUT_N = 257;
 export const FILT_ADAPT_LOW = 256;
 export const FILT_ADAPT_SMOOTH = 384;
 export const FILT_ADAPT_DETAIL = 512;

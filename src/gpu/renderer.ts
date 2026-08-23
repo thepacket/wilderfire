@@ -5,7 +5,9 @@
 import type { Flame } from '../core/flame';
 import { flameSignature, visibleLayers, MAX_LAYERS, LIGHT_DIFF_FUNCS } from '../core/flame';
 import { compileFlame, TONEMAP_WGSL, type CompiledFlame } from './codegen';
-import { buildSpatialFilters, solidFilterWeights, gaussianFilter1D, normFilterKernel, kernelCoeff, kernelSupport, FILT_FLOATS, type FilterKernel } from './filters';
+import { buildSpatialFilters, solidFilterWeights, gaussianFilter1D, normFilterKernel, kernelCoeff, kernelSupport, FILT_FLOATS, MIX_LUT_BASE, MIX_LUT_N, type FilterKernel } from './filters';
+import { MIXER_KEYS } from '../core/flame';
+import { evalCurve } from '../core/motion';
 import { SOLID_POST_WGSL, SOLID_TONEMAP_WGSL, SOLID_AO_WGSL, SOLID_SHADOW_WGSL, SOLID_PDOF_WGSL, SOLID_PDOF_BLIT_WGSL, SOLID_PAY_WORDS, SOLID_MAX_LIGHTS, SOLID_MAX_MATS, SOLID_FILT_FLOATS } from './solid.wgsl';
 import { flameMeshKeys, ensureMesh, meshSampler, meshLayout } from '../core/meshes';
 import { flamePointSetKeys, pointSetFor, pointSetLayout, PSET_STRIDE } from '../core/pointSets';
@@ -423,6 +425,7 @@ export class FlameRenderer {
       entries: [
         { binding: 0, resource: { buffer: this.tmBuf } },
         { binding: 1, resource: { buffer: this.histBuf } },
+        { binding: 2, resource: { buffer: this.filtBuf } }, // channel-mixer LUTs (pass A reads them)
       ],
     });
     this.rebuildComputeBG();
@@ -752,7 +755,7 @@ export class FlameRenderer {
     pf32.set([this.solid ? 0 : f.antialiasAmount ?? 0.25, this.solid ? 0 : f.antialiasRadius ?? 0.5, 0, 0], 48);
     this.device.queue.writeBuffer(this.paramsBuf, 0, pu32);
 
-    const tu32 = new Uint32Array(52);
+    const tu32 = new Uint32Array(56);
     const tf32 = new Float32Array(tu32.buffer);
     tu32[0] = tile ? tile.tileW : this.width; // output pixels; hist rows are width×os
     tu32[1] = tile ? tile.tileH : this.height;
@@ -794,6 +797,9 @@ export class FlameRenderer {
     tf32.set(bgWords, 20);
     // GammaCorrectionFilter: saturation is an HSL shift of (saturation − 1), clamped at −1;
     // foreground opacity scales alpha by 1 − atan(3·(v − 1))/1.25.
+    // JWildfire channel mixer: mode + where its LUTs sit in the filter buffer
+    tu32[52] = f.mixer ? ({ RGB: 1, BRIGHTNESS: 2, FULL: 3 } as Record<string, number>)[f.mixer.mode] ?? 0 : 0; tu32[53] = MIX_LUT_BASE;
+    this.uploadMixer(f);
     tf32[44] = Math.max(-1, (f.saturation ?? 1) - 1);
     tf32[45] = 1 - Math.atan(3 * ((f.fgOpacity ?? 1) - 1)) / 1.25;
     tf32[46] = f.filterLowDensity ?? 0.025;
@@ -1102,6 +1108,25 @@ export class FlameRenderer {
   }
 
   /** Upload the JWildfire spatial-filter kernels for the flame's settings; returns [Ncolour, Nintensity]. */
+  private mixKey = '';
+  /** The channel mixer's nine curves as 257-entry LUTs over the average raw colour 0..256 (JWildfire's x = value·100), y / 100 */
+  private uploadMixer(f: Flame) {
+    const key = f.mixer ? JSON.stringify(f.mixer) : '';
+    if (key === this.mixKey) return;
+    this.mixKey = key;
+    if (!f.mixer) return;
+    const lut = new Float32Array(9 * MIX_LUT_N);
+    MIXER_KEYS.forEach((k, ki) => {
+      const c = f.mixer!.curves[k];
+      for (let i = 0; i < MIX_LUT_N; i++) {
+        let v: number;
+        if (c) v = (evalCurve({ points: c.points.map((p) => ({ t: p[0], v: p[1] })), interp: c.interp } as Parameters<typeof evalCurve>[0], i * 100) ?? 0) / 100;
+        else v = k[0] === k[1] ? i : 0;
+        lut[ki * MIX_LUT_N + i] = v;
+      }
+    });
+    this.device.queue.writeBuffer(this.filtBuf, MIX_LUT_BASE * 4, lut);
+  }
   private uploadFilters(radius: number, kernel: FilterKernel) {
     const built = buildSpatialFilters(radius, kernel);
     const { weights, nc, ni, key } = built;
@@ -1109,6 +1134,7 @@ export class FlameRenderer {
     if (key !== this.filtKey) {
       this.filtKey = key;
       this.device.queue.writeBuffer(this.filtBuf, 0, weights);
+      this.mixKey = ''; // the weights array spans the whole buffer: re-upload the mixer LUTs
     }
     return built;
   }
@@ -1254,6 +1280,7 @@ export class FlameRenderer {
       entries: [
         { binding: 0, resource: { buffer: this.tmBuf } },
         { binding: 1, resource: { buffer: this.offHist } },
+        { binding: 2, resource: { buffer: this.filtBuf } },
       ],
     });
     if (!this.offTex || this.offTexW !== o.tileW || this.offTexH !== o.tileH) {
