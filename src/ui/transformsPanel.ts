@@ -26,10 +26,8 @@ export function buildTransformsPanel(app: App, root: HTMLElement) {
   layerSec.append(layerList);
   const layerBtns = el('div', 'btn-row');
   const addLayerBtn = el('button', '', '+ Layer');
-  const dupLayerBtn = el('button', '', 'Dup');
-  dupLayerBtn.title = 'Duplicate the selected layer';
-  const delLayerBtn = el('button', 'danger', 'Del');
-  delLayerBtn.title = 'Delete the selected layer';
+  const dupLayerBtn = el('button', '', 'Duplicate');
+  const delLayerBtn = el('button', 'danger', 'Delete');
   const upLayerBtn = el('button', 'icon', '↑');
   const dnLayerBtn = el('button', 'icon', '↓');
   upLayerBtn.title = 'Move layer up';
@@ -46,10 +44,8 @@ export function buildTransformsPanel(app: App, root: HTMLElement) {
 
   const btnRow = el('div', 'btn-row');
   const addBtn = el('button', '', '+ Add');
-  const dupBtn = el('button', '', 'Dup');
-  dupBtn.title = 'Duplicate the selected transform';
-  const delBtn = el('button', 'danger', 'Del');
-  delBtn.title = 'Delete the selected transform';
+  const dupBtn = el('button', '', 'Duplicate');
+  const delBtn = el('button', 'danger', 'Delete');
   const finalBtn = el('button', '', '');
   // Solo: preview only the selected transform's points (dynamics unchanged; the others just do not plot)
   const soloBtn = el('button', '', 'Solo');
