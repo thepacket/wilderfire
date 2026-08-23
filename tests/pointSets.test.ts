@@ -1,5 +1,6 @@
 import { describe, it, expect } from 'vitest';
-import { pointSetFor, pointSetKeyFor, Marsaglia, JavaRandom, PSET_STRIDE, Turtle, mandalaColor } from '../src/core/pointSets';
+import { pointSetFor, pointSetKeyFor, Marsaglia, JavaRandom, PSET_STRIDE, Turtle, mandalaColor, voronoiOfSunflower, earClip } from '../src/core/pointSets';
+import fs from 'fs';
 import { defaultFlame } from '../src/core/flame';
 import { defaultParams, VARIATIONS } from '../src/core/variations';
 import { compileFlame } from '../src/gpu/codegen';
@@ -129,6 +130,21 @@ describe('mandala colour maps', () => {
       if (n < 20001) { expect(m0.rgb).toEqual(c0); expect(m0.hue).toBeCloseTo(h0, 6); expect(m2.rgb).toEqual(c2); }
       else { expect(m0.rgb).toEqual([0, 0, 0]); expect(m2.rgb).toEqual([0, 0, 0]); }
     }
+  });
+});
+
+describe('sunvoroni', () => {
+  it('reproduces megamu.mesh.Voronoi on the 50 sunflower points (edge set, region vertex sets, triangle count; probed from JWildfire)', () => {
+    const J = JSON.parse(fs.readFileSync('tests/fixtures/sunvoroni50.json', 'utf8')) as { points: number[][]; edges: number[][]; regions: number[][][]; prims: number[][] };
+    const { points, edges, regions } = voronoiOfSunflower(50, 180);
+    points.forEach((p, i) => { expect(p[0]).toBeCloseTo(J.points[i][0], 6); expect(p[1]).toBeCloseTo(J.points[i][1], 6); });
+    const key = (e: number[]) => { const a = [e[0], e[1]], b = [e[2], e[3]]; const [p, q] = a[0] < b[0] || (a[0] === b[0] && a[1] < b[1]) ? [a, b] : [b, a]; return [...p, ...q].map((v) => v.toPrecision(5)).join(','); };
+    expect(edges.length).toBe(J.edges.length);
+    expect(new Set(edges.map(key))).toEqual(new Set(J.edges.map(key)));
+    const vkey = (r: number[][]) => r.map((v) => v[0].toPrecision(5) + ',' + v[1].toPrecision(5)).sort().join('|');
+    regions.forEach((r, i) => expect(vkey(r)).toBe(vkey(J.regions[i])));
+    const tris = regions.reduce((n, r) => n + earClip(r).length / 3, 0);
+    expect(tris).toBe(J.prims.filter((p) => p[0] === 3).length);
   });
 });
 

@@ -44,7 +44,7 @@ in the stack.
   JWildfire's own GPU≠CPU snippet bugs are patched back to the Java, and
   shader hashes on cell ids run in double-float so cut/worley patterns
   match — see [`scripts/jwf-port/README.md`](scripts/jwf-port/README.md)).
-  The 52 JWildfire variations that are *not* implemented are listed with
+  The 50 JWildfire variations that are *not* implemented are listed with
   their reason in `scripts/jwf-port/data/unportable.json` (user code compiled
   at run time, external content such as sub-flames/images/meshes/SVG/text,
   the remaining CPU-built point sets, …); the importer names the reason when a flame uses one.
@@ -52,7 +52,7 @@ in the stack.
   `mandala`, `mandala2`, `nsudoku`), the simulations (`dla_wf`, `snowflake_wf`, `natural_foam`), the `_js` turtle
   fractals (`dragon_js`, `koch_js`, `hilbert_js`, `htree_js`, `tree_js`, `brownian_js`, `gosperisland_js`,
   `rsquares_js`), the seeded tilings (`arctruchet`, `triantruchet`, `scrambly`, `grid3d_wf`) and `klein_group`,
-  `maurer_lines`, `meeple`, `geometricPrimitives`, `point_mirror_symmetry` — build their tables on the CPU exactly as
+  `maurer_lines`, `meeple`, `geometricPrimitives`, `point_mirror_symmetry`, `neuron3D`, `sunvoroni` — build their tables on the CPU exactly as
   JWildfire does (same seeded generators) and sample them on the GPU from one storage buffer.
   Parametric controls for every one, JWildfire-style **pre / normal / post
   priority** (per-instance overrides and the *prepost* inverse pairs), several

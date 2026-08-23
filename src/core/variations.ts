@@ -591,6 +591,159 @@ var<private> pms_n: i32 = 0;`,
     if (randSym % 2 == 0) { y = -y; }
     v = ${w} * vec2f(x * cos(rotRS) - y * sin(rotRS), y * cos(rotRS) + x * sin(rotRS)); pz_ = ${w} * z; }`,
   },
+  // ---- neuron3D (Neuron3DFunc): orbs on a 3D grid of hashed cells (java.util.Random(cellHash) decides cell type — the
+  // 48-bit seed is built with a 16-bit-limb multiply so large zooms match), noise-displaced spheres (seeded Perlin table
+  // in the pset buffer), and connectors to neighbouring orbs (java.util.Random(connHash)); assigns the output ----
+  neuron3D: {
+    params: [{ name: 'zoom', def: 10 }, { name: 'density', def: 0.5 }, { name: 'seed', def: 12345, int: true }, { name: 'radius', def: 0.4 }, { name: 'orbColor', def: 0.25 }, { name: 'type2_prob', def: 0.3 }, { name: 'radius2', def: 0.25 }, { name: 'orbColor2', def: 0.9 }, { name: 'noiseFreq', def: 12 }, { name: 'noiseAmp', def: 0.15 }, { name: 'turbulence', def: 0.8 }, { name: 'connectorThickness', def: 0.05 }, { name: 'connectorProb', def: 0.6 }, { name: 'connectorTexture', def: 0.1 }, { name: 'connectorTexFreq', def: 5 }, { name: 'lineColor', def: 0.75 }],
+    extra: 2, flags: ['pset', '3d', 'z', 'dc'], types: ['3D', 'DC'],
+    funcNames: ['jrand_', 'jrand_make', 'jrand_next', 'jrand_nextDouble', 'n3_mul48', 'n3_jrand48', 'n3_fade', 'n3_grad', 'n3_noise', 'n3_type'],
+    funcs: `struct jrand_ {
+  s0: i32,
+  s1: i32,
+  s2: i32,
+}
+
+fn jrand_make(seed: i32) -> jrand_ {
+  var r_: jrand_;
+  r_.s0 = ((seed & 65535) ^ 58989);
+  r_.s1 = (((seed >> 16) & 65535) ^ 57068);
+  r_.s2 = (select(0, 65535, (seed < 0)) ^ 5);
+  return r_;
+}
+
+fn jrand_next(r_: ptr<function, jrand_>, bits: i32) -> i32 {
+  var a0: u32 = u32((*r_).s0);
+  var a1: u32 = u32((*r_).s1);
+  var a2: u32 = u32((*r_).s2);
+  var t0: u32 = ((a0 * 58989) + 11);
+  var r0: u32 = (t0 & 65535);
+  var c0: u32 = (t0 >> 16);
+  var t1a: u32 = ((a0 * 57068) + c0);
+  var c1a: u32 = (t1a >> 16);
+  var t1b: u32 = ((a1 * 58989) + (t1a & 65535));
+  var r1: u32 = (t1b & 65535);
+  var c1: u32 = (c1a + (t1b >> 16));
+  var r2_: u32 = (((((a0 * 5) + (a1 * 57068)) + (a2 * 58989)) + c1) & 65535);
+  (*r_).s0 = i32(r0);
+  (*r_).s1 = i32(r1);
+  (*r_).s2 = i32(r2_);
+  var hi: u32 = ((r2_ << 16) | r1);
+  return i32((hi >> u32((32 - bits))));
+}
+
+fn jrand_nextDouble(r_: ptr<function, jrand_>) -> f32 {
+  return ((f32(jrand_next(r_, 26)) * (1.0 / 67108864.0)) + (f32(jrand_next(r_, 27)) * (1.0 / 9007199254740992.0)));
+}
+
+fn n3_mul48(a: i32, c: u32) -> vec2u {
+  let neg = a < 0; let m = u32(select(a, -a, neg));
+  let a0 = m & 65535u; let a1 = m >> 16u; let c0 = c & 65535u; let c1 = c >> 16u;
+  let p0 = a0 * c0; let p1 = a0 * c1 + a1 * c0; let p2 = a1 * c1;
+  let l0 = p0 & 65535u; let t1 = (p0 >> 16u) + (p1 & 65535u); let l1 = t1 & 65535u; let t2 = (t1 >> 16u) + (p1 >> 16u) + p2;
+  var lo = l0 | (l1 << 16u); var hi = t2 & 65535u;
+  if (neg) { lo = ~lo; hi = (~hi) & 65535u; lo = lo + 1u; if (lo == 0u) { hi = (hi + 1u) & 65535u; } }
+  return vec2u(lo, hi);
+}
+
+fn n3_jrand48(lo: u32, hi: u32) -> jrand_ {
+  var r_: jrand_;
+  r_.s0 = i32((lo & 65535u) ^ 58989u);
+  r_.s1 = i32(((lo >> 16u) & 65535u) ^ 57068u);
+  r_.s2 = i32((hi & 65535u) ^ 5u);
+  return r_;
+}
+
+fn n3_fade(t: f32) -> f32 { return t * t * t * (t * (t * 6.0 - 15.0) + 10.0); }
+
+fn n3_grad(hash: i32, x: f32, y: f32, z: f32) -> f32 {
+  let h = hash & 15;
+  let u = select(y, x, h < 8);
+  let v = select(select(z, x, h == 12 || h == 14), y, h < 4);
+  return select(-u, u, (h & 1) == 0) + select(-v, v, (h & 2) == 0);
+}
+
+fn n3_noise(tb: u32, xi: i32, xf: f32, yi: i32, yf: f32, zi: i32, zf: f32) -> f32 {
+  let X = xi & 255; let Y = yi & 255; let Z = zi & 255;
+  let u = n3_fade(xf); let v = n3_fade(yf); let w = n3_fade(zf);
+  let p = tb;
+  let A = i32(pset[p + u32(X)]) + Y; let AA = i32(pset[p + u32(A)]) + Z; let AB = i32(pset[p + u32(A + 1)]) + Z;
+  let B = i32(pset[p + u32(X + 1)]) + Y; let BA = i32(pset[p + u32(B)]) + Z; let BB = i32(pset[p + u32(B + 1)]) + Z;
+  let r1 = mix(n3_grad(i32(pset[p + u32(AA)]), xf, yf, zf), n3_grad(i32(pset[p + u32(BA)]), xf - 1.0, yf, zf), u);
+  let r2 = mix(n3_grad(i32(pset[p + u32(AB)]), xf, yf - 1.0, zf), n3_grad(i32(pset[p + u32(BB)]), xf - 1.0, yf - 1.0, zf), u);
+  let r3 = mix(n3_grad(i32(pset[p + u32(AA + 1)]), xf, yf, zf - 1.0), n3_grad(i32(pset[p + u32(BA + 1)]), xf - 1.0, yf, zf - 1.0), u);
+  let r4 = mix(n3_grad(i32(pset[p + u32(AB + 1)]), xf, yf - 1.0, zf - 1.0), n3_grad(i32(pset[p + u32(BB + 1)]), xf - 1.0, yf - 1.0, zf - 1.0), u);
+  return mix(mix(r1, r2, v), mix(r3, r4, v), w);
+}
+
+fn n3_type(ix: i32, iy: i32, iz: i32, seed: i32, density: f32, t2p: f32) -> i32 {
+  let h1 = n3_mul48(ix, 73856093u); let h2 = n3_mul48(iy, 19349663u); let h3 = n3_mul48(iz, 83492791u);
+  let lo = h1.x ^ h2.x ^ h3.x ^ u32(seed); let hi = h1.y ^ h2.y ^ h3.y ^ select(0u, 65535u, seed < 0);
+  var r_ = n3_jrand48(lo, hi);
+  if (jrand_nextDouble(&r_) < density) { if (jrand_nextDouble(&r_) < t2p) { return 2; } return 1; }
+  return 0;
+}`,
+    code: (w, p) => `{
+    let zoom = ${p[0]}; let density = ${p[1]}; let seed = i32(${p[2]}); let radius = ${p[3]}; let orbColor = ${p[4]}; let t2p = ${p[5]}; let radius2 = ${p[6]}; let orbColor2 = ${p[7]};
+    let nFreq = ${p[8]}; let nAmp = ${p[9]}; let turb = ${p[10]}; let cThick = ${p[11]}; let cProb = ${p[12]}; let cTex = ${p[13]}; let cTexFreq = ${p[14]}; let lineColor = ${p[15]};
+    let tb = u32(${p[16]}) * ${PSET_STRIDE}u;
+    var done = false; var outp = vec3f(0.0); var outc = 0.0;
+    for (var tries = 0; tries < 20 && !done; tries++) {
+      let ix = floor((rnd(rs) * 2.0 - 1.0) * zoom); let iy = floor((rnd(rs) * 2.0 - 1.0) * zoom); let iz = floor((rnd(rs) * 2.0 - 1.0) * zoom);
+      let st = n3_type(i32(ix), i32(iy), i32(iz), seed, density, t2p);
+      if (st == 0) { continue; }
+      let drawConn = rnd(rs) < 0.5;
+      if (drawConn && cThick > 0.0) {
+        let dx = i32(floor(rnd(rs) * 3.0)) - 1; let dy = i32(floor(rnd(rs) * 3.0)) - 1; let dz = i32(floor(rnd(rs) * 3.0)) - 1;
+        if (dx == 0 && dy == 0 && dz == 0) { continue; }
+        let nx = ix + f32(dx); let ny = iy + f32(dy); let nz = iz + f32(dz);
+        let nt = n3_type(i32(nx), i32(ny), i32(nz), seed, density, t2p);
+        if (nt == 0) { continue; }
+        let connHash = i32(ix) * 13 + i32(iy) * 31 + i32(iz) * 53 + i32(nx) * 71 + i32(ny) * 97 + i32(nz) * 113 + seed;
+        var cr = jrand_make(connHash);
+        if (jrand_nextDouble(&cr) < cProb) {
+          let sR = select(radius2, radius, st == 1); let nR = select(radius2, radius, nt == 1);
+          let c0 = vec3f(ix, iy, iz) + 0.5; let c1 = vec3f(nx, ny, nz) + 0.5;
+          let vn = c1 - c0; let vlen = length(vn);
+          if (vlen > 1e-9) {
+            let nrm = vn / vlen;
+            let s0 = c0 + nrm * sR; let e0 = c1 - nrm * nR; let cv = e0 - s0;
+            let t_ = rnd(rs); let pl = s0 + t_ * cv;
+            let r = rnd(rs) * cThick; let ang = rnd(rs) * 6.283185307179586;
+            var p1: vec3f;
+            if (abs(cv.x) < 1e-6 && abs(cv.z) < 1e-6) { p1 = vec3f(1.0, 0.0, 0.0); } else { p1 = vec3f(-cv.z, 0.0, cv.x); }
+            p1 = p1 / length(p1);
+            var p2 = vec3f(cv.y * p1.z - cv.z * p1.y, cv.z * p1.x - cv.x * p1.z, cv.x * p1.y - cv.y * p1.x);
+            p2 = p2 / length(p2);
+            var fp = pl + r * (cos(ang) * p1 + sin(ang) * p2);
+            if (cTex > 0.0) {
+              let na = t_ * cTexFreq; let nai = i32(floor(na)); let naf = na - floor(na);
+              let n1 = n3_noise(tb, nai, naf, connHash + 1, 0.2, connHash + 3, 0.4);
+              let n2 = n3_noise(tb, nai, naf, connHash + 5, 0.6, connHash + 7, 0.8);
+              fp += (p1 * n1 + p2 * n2) * cTex;
+            }
+            outp = fp / zoom; outc = lineColor; done = true; continue;
+          }
+        }
+      }
+      let cR = select(radius2, radius, st == 1); let cCol = select(orbColor2, orbColor, st == 1);
+      let r = cR * pow(rnd(rs), 1.0 / 3.0); let theta = rnd(rs) * 6.283185307179586; let phi = acos(2.0 * rnd(rs) - 1.0);
+      let cx = r * sin(phi) * cos(theta); let cy = r * sin(phi) * sin(theta); let cz = r * cos(phi);
+      let dist = sqrt(cx * cx + cy * cy + cz * cz);
+      let fx = cx * nFreq;
+      let qx = cx + turb * n3_noise(tb, i32(floor(fx)), fx - floor(fx), i32(floor(cy * nFreq)), cy * nFreq - floor(cy * nFreq), i32(floor(cz * nFreq)), cz * nFreq - floor(cz * nFreq));
+      let ax = fx + 5.2; let ay = cy * nFreq + 1.3; let az = cz * nFreq;
+      let qy = cy + turb * n3_noise(tb, i32(floor(ax)), ax - floor(ax), i32(floor(ay)), ay - floor(ay), i32(floor(az)), az - floor(az));
+      let bx = fx + 8.7; let by = cy * nFreq + 3.4; let bz = cz * nFreq + 4.6;
+      let qz = cz + turb * n3_noise(tb, i32(floor(bx)), bx - floor(bx), i32(floor(by)), by - floor(by), i32(floor(bz)), bz - floor(bz));
+      let wx = qx * nFreq; let wy = qy * nFreq; let wz = qz * nFreq;
+      let noise = n3_noise(tb, i32(floor(wx)), wx - floor(wx), i32(floor(wy)), wy - floor(wy), i32(floor(wz)), wz - floor(wz));
+      let newDist = dist + noise * nAmp;
+      if (dist > 1e-9) { let sc = newDist / dist; outp = vec3f(ix + 0.5 + cx * sc, iy + 0.5 + cy * sc, iz + 0.5 + cz * sc) / zoom; outc = cCol; done = true; }
+    }
+    if (done) { (*cp) = outc; }
+    v = ${w} * outp.xy; pz_ = ${w} * outp.z; }`,
+  },
   // ---- meeple (MeepleFunc): a random point on the outline of a meeple shape (14 control points, mirrored), optionally
   // filled towards the origin ----
   meeple: {
@@ -664,6 +817,12 @@ var<private> pms_n: i32 = 0;`,
     params: [{ name: 'Level', def: 5, int: true }, { name: 'thickness', def: 0.5 }, { name: 'size', def: 0.5 }, { name: 'angle', def: 0 }, { name: 'type', def: 4, int: true }],
     extra: 2, flags: ['pset', 'dc'], types: ['2D', 'SIMULATION', 'BASE_SHAPE'], funcNames: ['psetSample'], funcs: PSET_FUNCS,
     code: (w, p) => psetCode(w, p, 5, true),
+  },
+  // sunvoroni (SunflowerVoroniFunc): Voronoi cells of the sunflower points — outlines and/or ear-clipped fills
+  sunvoroni: {
+    params: [{ name: 'nPoints', def: 50, int: true }, { name: 'Iters', def: 3, int: true }, { name: 'angle', def: 180 }, { name: 'color mode', def: 0, int: true }, { name: 'outline', def: 0, int: true }, { name: 'fill', def: 1, int: true }, { name: 'outline color', def: 0.5 }],
+    extra: 2, flags: ['pset', 'dc'], types: ['SIMULATION', 'BASE_SHAPE'], funcNames: ['psetSample'], funcs: PSET_FUNCS,
+    code: (w, p) => psetCode(w, p, 7, true),
   },
   // szubieta (SZubietaFunc): the n-gon grid, output ×0.1
   szubieta: {

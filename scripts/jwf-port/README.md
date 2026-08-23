@@ -97,7 +97,7 @@ points, `dc_gnarly` updates only 2 of its 6 gaussian summands — `& 5` — so i
 blur depends on the render's init randoms). Together with the 70 hand-written
 flam3 entries the app registry has 940 variations.
 
-### What is not ported (52)
+### What is not ported (50)
 
 `data/unportable.json` is the definitive list — every JWildfire variation is
 either in the registry or in that file with a category, and `gen.ts` writes it
@@ -108,7 +108,7 @@ variation was skipped. Categories:
 |---|---|---|
 | user-code | 21 | compiles user-supplied code or a formula at run time (`custom_wf`, `dc_code`, `glsl_code`, `c_var`, `ducks`, `fract_formula_*`, the `yplot2d_wf`… plot family, `colordomain`); the WebGPU kernel has no run-time compiler |
 | external-content | 25 | renders external content that would have to be uploaded to the GPU: sub-flames (`ringsubflame`, `glynns3subfl`), images (`post_bumpmap_wf`, `displacemap_wf`, `colormap_wf`, `kaleidoimg`, `plane_wf`, `wangtiles`), meshes (`terrain3D`, `metaballs3d_wf`, `knots3D`; `sattractor3D` IS ported — its formulas run through a small safe evaluator, src/core/formula.ts, and the tube is built on the CPU, src/core/sattractor.ts), `svg_wf`, `text_wf`, L-systems, brushes (`obj_mesh_wf` IS ported — the user loads the OBJ file into the browser's mesh store; `subflame_wf` IS ported — the sub-flame is compiled into the kernel) |
-| point-set | 3 | `taprats` (needs the csk.taprats tiling library, not in the sparse JWildfire tree), `sunvoroni` (a Voronoi diagram of the sunflower points — JWildfire uses a quickhull jar), `neuron3D` (seed-shuffled Perlin table + 48-bit java.util.Random cell hashes); `neuron3D` builds a seed-shuffled 512-entry Perlin permutation table per instance. **Ported through the point-set mechanism (see below):** `dragon_js`, `sunflower`, `scrambly`, `dla_wf`, `snowflake_wf`, `brownian_js`, `htree_js`, `koch_js`, `tree_js`, `hilbert_js`, `klein_group`, `grid3d_wf`, `maurer_lines` (lines render mode), `szubieta`, `gpattern`, `curliecue`, `gosperisland_js`, `rsquares_js`, `arctruchet`, `triantruchet`, `meeple`, `mandala`, `mandala2`, `nsudoku`, `natural_foam`, `geometricPrimitives`, `point_mirror_symmetry` |
+| point-set | 1 | `taprats` (needs the csk.taprats tiling library, which the sparse JWildfire tree does not carry); `neuron3D` builds a seed-shuffled 512-entry Perlin permutation table per instance. **Ported through the point-set mechanism (see below):** `dragon_js`, `sunflower`, `scrambly`, `dla_wf`, `snowflake_wf`, `brownian_js`, `htree_js`, `koch_js`, `tree_js`, `hilbert_js`, `klein_group`, `grid3d_wf`, `maurer_lines` (lines render mode), `szubieta`, `gpattern`, `curliecue`, `gosperisland_js`, `rsquares_js`, `arctruchet`, `triantruchet`, `meeple`, `mandala`, `mandala2`, `nsudoku`, `natural_foam`, `geometricPrimitives`, `point_mirror_symmetry`, `neuron3D`, `sunvoroni` |
 | engine | 2 | needs an engine feature WilderFire lacks: a variation instantiating another (`sphtiling3v2`), `post_dcztransl` (no Java class) |
 | resource-params | 1 | `dc_triantess` keeps its colours as byte-array ressources |
 
@@ -241,6 +241,19 @@ same probes; its image is a lattice of single points, so the two renderers' trea
 Compare numbers — 1.2–1.5), `point_mirror_symmetry` (exact without the crop, 0.42–0.74 with it: JWildfire keeps
 one ring of the last `buffer_size` valid points per render thread and feeds cropped points from it; ours is a
 per-walker ring of at most 32, a different sampling of the same set — approximate by design).
+
+`neuron3D` 1.01 / blkMAE 0.5 / corr 1.00 and 0.97 / 1.4 / 1.00 (second seed, zoom 6, texture 0.25): the seed-shuffled
+Perlin permutation is a 512-entry table in the pset buffer; the cell type comes from `java.util.Random(cellHash)` whose
+48-bit seed (`ix·73856093 ^ iy·19349663 ^ iz·83492791 ^ seed` as Java longs) is rebuilt with a 16-bit-limb multiply
+(`n3_mul48`) so it matches for any zoom; connector hashes go through the ordinary 32-bit `jrand_make`; the noise
+arguments `connHash + 1.2` are split into integer and fractional parts before they reach f32. `sunvoroni` (JWildfire:
+megamu.mesh.Voronoi on a quickhull jar + csk.taprats Triangulate): a Bowyer–Watson insertion into megamu's far triangle
+(±8000) gives the same Delaunay faces, circumcentres by megamu's own formula, the cell outlines as lines and the cells
+ear-clipped exactly as `Triangulate.Process`; the 50-point case is unit-tested against a Java reflection probe (edge
+set, region vertex sets, triangle count). What the port cannot know is QuickHull's face order, which sets each region's
+starting vertex and orientation (the probe shows 29 counter-clockwise / 21 clockwise regions) — so the ear-clipping
+decomposition and the area-signed colours of mode 0 (`fmod(1 + area, 1)`: a or 1 − |a|) differ per cell: colour by
+index (mode 1) 0.99 / corr 0.96, area colours 1.03 / 0.89. `taprats` stays out (library not in the tree).
 
 Two lessons. (1) **Do colour maths on the CPU.** The first mandala port computed Java's HSBtoRGB / RGBtoHSB in WGSL;
 the functions returned Java's exact values in a stand-alone compute shader yet produced wrong hues inside the full

@@ -596,6 +596,123 @@ registerPointSet('natural_foam', (P) => {
   const w = new PointSetWriter(); w.raw(t); return w.done();
 });
 
+// neuron3D (Neuron3DFunc.PerlinNoise): the seed-shuffled 512-entry permutation table (java.util.Random(seed).nextInt)
+registerPointSet('neuron3D', (P) => {
+  const rnd = new JavaRandom(Math.trunc(P.seed ?? 12345));
+  const perm = Array.from({ length: 256 }, (_, i) => i);
+  for (let i = 255; i > 0; i--) { const k = rnd.nextInt(i + 1); const t = perm[k]; perm[k] = perm[i]; perm[i] = t; }
+  const w = new PointSetWriter(); w.raw([...perm, ...perm]); return w.done();
+});
+
+// ---- sunvoroni (SunflowerVoroniFunc + megamu.mesh.Voronoi + csk.taprats.geometry.Triangulate): the Voronoi diagram of the
+// sunflower points, bounded by megamu's three far points (±8000); cell outlines as lines, cells ear-clipped into triangles.
+// megamu gets the Delaunay faces from QuickHull3D on the lifted points; a Bowyer–Watson insertion into the far triangle
+// gives the same face set (general position), circumcentres by the same formula, (float) casts where megamu has them.
+// Unknown without the quickhull jar: QuickHull's face order, which picks each region's starting vertex and so the
+// ear-clipping decomposition and the per-triangle random colours (mode 2) — regions here start at the incident
+// triangle with the smallest angle and run counter-clockwise (megamu's come out counter-clockwise too).
+export function voronoiOfSunflower(nPoints: number, angle: number): { points: [number, number][]; edges: [number, number, number, number][]; regions: [number, number][][] } {
+  const F = Math.fround;
+  const ang = angle * (3 - Math.sqrt(5)), rmax = Math.sqrt(nPoints + 1) / 30;
+  const pts: [number, number][] = [];
+  for (let i = 0; i < nPoints; i++) { const r = Math.sqrt(i + 1) / 30, t = (i + 1) * ang * Math.PI / 180; pts.push([F(r * Math.cos(t) / rmax), F(r * Math.sin(t) / rmax)]); }
+  const all: [number, number][] = [...pts, [-8000, 0], [8000, 8000], [8000, -8000]];
+  const n = nPoints, fA = n, fB = n + 1, fC = n + 2;
+  // Bowyer–Watson into the far triangle
+  type Tri = { a: number; b: number; c: number; cx: number; cy: number; r2: number; alive: boolean };
+  const mk = (a: number, b: number, c: number): Tri => {
+    const [ax, ay] = all[a], [bx, by] = all[b], [cx0, cy0] = all[c];
+    const d = 2 * (ax * (by - cy0) + bx * (cy0 - ay) + cx0 * (ay - by));
+    const ux = ((ax * ax + ay * ay) * (by - cy0) + (bx * bx + by * by) * (cy0 - ay) + (cx0 * cx0 + cy0 * cy0) * (ay - by)) / d;
+    const uy = ((ax * ax + ay * ay) * (cx0 - bx) + (bx * bx + by * by) * (ax - cx0) + (cx0 * cx0 + cy0 * cy0) * (bx - ax)) / d;
+    return { a, b, c, cx: ux, cy: uy, r2: (ax - ux) * (ax - ux) + (ay - uy) * (ay - uy), alive: true };
+  };
+  let tris: Tri[] = [mk(fA, fB, fC)];
+  for (let p = 0; p < n; p++) {
+    const [px, py] = all[p];
+    const bad: Tri[] = [];
+    for (const t of tris) if (t.alive && (px - t.cx) * (px - t.cx) + (py - t.cy) * (py - t.cy) < t.r2) bad.push(t);
+    const edgeCount = new Map<string, [number, number]>();
+    for (const t of bad) { t.alive = false; for (const [u, v] of [[t.a, t.b], [t.b, t.c], [t.c, t.a]] as [number, number][]) { const k = u < v ? u + ':' + v : v + ':' + u; if (edgeCount.has(k)) edgeCount.delete(k); else edgeCount.set(k, [u, v]); } }
+    for (const [u, v] of edgeCount.values()) tris.push(mk(u, v, p));
+    if (tris.length > 4000) tris = tris.filter((t) => t.alive);
+  }
+  tris = tris.filter((t) => t.alive);
+  // megamu's dual points (circumcentres by its own formula, in double)
+  const dual: [number, number][] = tris.map((t) => {
+    const [x0, y0] = all[t.a], [x1, y1] = all[t.b], [x2, y2] = all[t.c];
+    const v1x = 2 * (x1 - x0), v1y = 2 * (y1 - y0), v1z = x0 * x0 - x1 * x1 + y0 * y0 - y1 * y1;
+    const v2x = 2 * (x2 - x0), v2y = 2 * (y2 - y0), v2z = x0 * x0 - x2 * x2 + y0 * y0 - y2 * y2;
+    const tx = v1y * v2z - v1z * v2y, ty = v1z * v2x - v1x * v2z, tz = v1x * v2y - v1y * v2x;
+    return [tx / tz, ty / tz];
+  });
+  // edges between triangles sharing an edge
+  const byEdge = new Map<string, number[]>();
+  tris.forEach((t, i) => { for (const [u, v] of [[t.a, t.b], [t.b, t.c], [t.c, t.a]] as [number, number][]) { const k = u < v ? u + ':' + v : v + ':' + u; (byEdge.get(k) ?? byEdge.set(k, []).get(k)!).push(i); } });
+  const edges: [number, number, number, number][] = [];
+  for (const [, ts] of byEdge) if (ts.length === 2) { const [i, j] = ts[0] > ts[1] ? ts : [ts[1], ts[0]]; edges.push([F(dual[i][0]), F(dual[i][1]), F(dual[j][0]), F(dual[j][1])]); }
+  // regions: the incident triangles of each point, counter-clockwise by angle around the point
+  const incident: number[][] = Array.from({ length: n }, () => []);
+  tris.forEach((t, i) => { for (const v of [t.a, t.b, t.c]) if (v < n) incident[v].push(i); });
+  const regions = incident.map((list, p) => {
+    const [px, py] = pts[p];
+    const ordered = list.map((i) => ({ i, a: Math.atan2(dual[i][1] - py, dual[i][0] - px) })).sort((u, v) => u.a - v.a);
+    return ordered.map((o) => [F(dual[o.i][0]), F(dual[o.i][1])] as [number, number]);
+  });
+  return { points: pts, edges, regions };
+}
+/** csk.taprats.geometry.Triangulate.Process (ear clipping, Snip / InsideTriangle as in the Java) → flat triangle list */
+export function earClip(contour: [number, number][]): [number, number][] {
+  const n = contour.length; if (n < 3) return [];
+  const area = (c: [number, number][]) => { let A = 0; for (let p = c.length - 1, q = 0; q < c.length; p = q++) A += c[p][0] * c[q][1] - c[q][0] * c[p][1]; return A * 0.5; };
+  const V = new Array<number>(n);
+  if (0 < area(contour)) for (let v = 0; v < n; v++) V[v] = v; else for (let v = 0; v < n; v++) V[v] = n - 1 - v;
+  const inside = (Ax: number, Ay: number, Bx: number, By: number, Cx: number, Cy: number, Px: number, Py: number) => {
+    const ax = Cx - Bx, ay = Cy - By, bx = Ax - Cx, by = Ay - Cy, cx = Bx - Ax, cy = By - Ay;
+    const apx = Px - Ax, apy = Py - Ay, bpx = Px - Bx, bpy = Py - By, cpx = Px - Cx, cpy = Py - Cy;
+    return ax * bpy - ay * bpx >= 0 && bx * cpy - by * cpx >= 0 && cx * apy - cy * apx >= 0;
+  };
+  const snip = (u: number, v: number, w: number, nv: number) => {
+    const [Ax, Ay] = contour[V[u]], [Bx, By] = contour[V[v]], [Cx, Cy] = contour[V[w]];
+    if (1e-10 > (Bx - Ax) * (Cy - Ay) - (By - Ay) * (Cx - Ax)) return false;
+    for (let p = 0; p < nv; p++) { if (p === u || p === v || p === w) continue; const [Px, Py] = contour[V[p]]; if (inside(Ax, Ay, Bx, By, Cx, Cy, Px, Py)) return false; }
+    return true;
+  };
+  const out: [number, number][] = [];
+  let nv = n, count = 2 * nv;
+  for (let v = nv - 1; nv > 2;) {
+    if (0 >= count--) break;
+    let u = v; if (nv <= u) u = 0;
+    v = u + 1; if (nv <= v) v = 0;
+    let w = v + 1; if (nv <= w) w = 0;
+    if (snip(u, v, w, nv)) {
+      out.push(contour[V[u]], contour[V[v]], contour[V[w]]);
+      for (let s = v, t = v + 1; t < nv; s++, t++) V[s] = V[t];
+      nv--; count = 2 * nv;
+    }
+  }
+  return out;
+}
+registerPointSet('sunvoroni', (P) => {
+  const nPoints = ilimit(P.nPoints ?? 50, 10, 1000), angle = limit(P.angle ?? 180, 0, 360), colormode = ilimit(P['color mode'] ?? 0, 0, 2);
+  let outline = ilimit(P.outline ?? 0, 0, 1); const fill = ilimit(P.fill ?? 1, 0, 1), outlinecolor = limit(P['outline color'] ?? 0.5, 0, 1);
+  if (outline === 0 && fill === 0) outline = 1;
+  const { edges, regions } = voronoiOfSunflower(nPoints, angle);
+  const w = new PointSetWriter();
+  if (outline === 1) for (const e of edges) w.line(e[0], e[1], e[2], e[3], 0, outlinecolor);
+  if (fill === 1) {
+    const area = (c: [number, number][]) => { let A = 0; for (let p = c.length - 1, q = 0; q < c.length; p = q++) A += c[p][0] * c[q][1] - c[q][0] * c[p][1]; return A * 0.5; };
+    regions.forEach((reg, i) => {
+      const a = area(reg); const rnd = new JavaRandom(Math.trunc(a));
+      let color = colormode === 0 ? ((1 + a) % 1 + 1) % 1 : colormode === 1 ? i / regions.length : 0;
+      if (colormode === 0) color = (1 + a) - Math.trunc(1 + a); // Java fmod keeps the sign
+      const t = earClip(reg);
+      for (let j = 0; j + 2 < t.length; j += 3) { if (colormode === 2) color = rnd.nextDouble(); w.triangle(t[j][0], t[j][1], t[j + 1][0], t[j + 1][1], t[j + 2][0], t[j + 2][1], color); }
+    });
+  }
+  return w.done();
+});
+
 // htree_js (HtreeFunc.draw): an H of `size` at the origin, four half-size H-trees at its tips, `level` deep
 registerPointSet('htree_js', (P) => {
   const segs: number[] = []; const size = P.size ?? 2;
