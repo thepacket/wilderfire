@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { pointSetFor, pointSetKeyFor, Marsaglia, JavaRandom, PSET_STRIDE, Turtle, mandalaColor, voronoiOfSunflower, earClip } from '../src/core/pointSets';
+import { pointSetFor, pointSetKeyFor, Marsaglia, JavaRandom, PSET_STRIDE, Turtle, mandalaColor, voronoiOfSunflower, earClip, CURLIECUE2_STEPS } from '../src/core/pointSets';
 import fs from 'fs';
 import { defaultFlame } from '../src/core/flame';
 import { defaultParams, VARIATIONS } from '../src/core/variations';
@@ -145,6 +145,22 @@ describe('sunvoroni', () => {
     regions.forEach((r, i) => expect(vkey(r)).toBe(vkey(J.regions[i])));
     const tris = regions.reduce((n, r) => n + earClip(r).length / 3, 0);
     expect(tris).toBe(J.prims.filter((p) => p[0] === 3).length);
+  });
+});
+
+describe('curliecue2', () => {
+  it('tabulates the trajectory: [N, 0, x1, y1, …], first step 0.001 along +x, a bounded curlicue', () => {
+    const s = pointSetFor(pointSetKeyFor({ name: 'curliecue2', params: { seed: 1000 } })!);
+    expect(s.data[0]).toBe(CURLIECUE2_STEPS);
+    expect(s.data[2]).toBeCloseTo(0.001, 9); expect(s.data[3]).toBe(0);
+    const sJ = new JavaRandom(1000).nextDouble();
+    // step 2: φ₁ = θ₀ = 0, so x₂ = 0.002; step 3: φ₂ = θ₁ = 2π·s
+    expect(s.data[4]).toBeCloseTo(0.002, 9);
+    expect(s.data[6]).toBeCloseTo(0.002 + 0.001 * Math.cos(2 * Math.PI * sJ), 7);
+    expect(s.data[7]).toBeCloseTo(0.001 * Math.sin(2 * Math.PI * sJ), 7);
+    let mx = 0; for (let k = 0; k < CURLIECUE2_STEPS; k++) mx = Math.max(mx, Math.abs(s.data[2 + 2 * k]), Math.abs(s.data[3 + 2 * k]));
+    expect(mx).toBeLessThan(50);
+    expect(s.count * PSET_STRIDE).toBeGreaterThanOrEqual(2 + 2 * CURLIECUE2_STEPS);
   });
 });
 

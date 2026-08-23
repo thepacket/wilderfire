@@ -255,6 +255,19 @@ starting vertex and orientation (the probe shows 29 counter-clockwise / 21 clock
 decomposition and the area-signed colours of mode 0 (`fmod(1 + area, 1)`: a or 1 − |a|) differ per cell: colour by
 index (mode 1) 0.99 / corr 0.96, area colours 1.03 / 0.89. `taprats` stays out (library not in the tree).
 
+**Short-walker variations (2026-08-23).** A JWildfire variation whose `transform` ignores its input and advances one
+global state per call draws, per render thread, the first Q steps of that state's trajectory, Q = the thread's iteration
+count; our 65k walkers each live a few hundred iterations, so the generated port only ever drew the first steps. Of the
+registry's stateful entries only `curliecue2` is of that kind (the attractors cover their invariant set from any start;
+`recurrenceplot`'s `oldx/oldy`, `dc_gnarly`'s six-deep random ring and `point_mirror_symmetry`'s ring are per-walker
+memory that works as such). It is now a point set: the trajectory (x += 0.001·cos φ, φ += θ, θ += 2π·s, s =
+java.util.Random(seed).nextDouble()) is tabulated for 2^20 steps (8 MB) and each point samples a uniform step — Q for a
+512 px / quality-100 render on 8 threads is ≈ 2.5 M iterations × the xform's share, so 2^20 is the Compare regime (a
+longer JWildfire render draws a longer curve: inherent). The Sanctuary Xmas 2022 snowflake flame went from corr 0.53
+to **1.00 / blkMAE 0.5 / corr 1.00**; the koch isolation from 0.70 to 1.00 / 1.1 / 1.00. `PREFER_HAND` keeps the hand
+entry over the generated one. The other "inherent" limit, f32 arithmetic, stays: WebGPU has no f64; the places where
+it matters (cell hashes, double-float sin) already run in two-float arithmetic.
+
 Two lessons. (1) **Do colour maths on the CPU.** The first mandala port computed Java's HSBtoRGB / RGBtoHSB in WGSL;
 the functions returned Java's exact values in a stand-alone compute shader yet produced wrong hues inside the full
 kernel (fast-math lowering of the `switch`/`log` chain, presumably) — a grey-ramp palette made the shift

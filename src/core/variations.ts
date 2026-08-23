@@ -818,6 +818,13 @@ fn n3_type(ix: i32, iy: i32, iz: i32, seed: i32, density: f32, t2p: f32) -> i32 
     extra: 2, flags: ['pset', 'dc'], types: ['2D', 'SIMULATION', 'BASE_SHAPE'], funcNames: ['psetSample'], funcs: PSET_FUNCS,
     code: (w, p) => psetCode(w, p, 5, true),
   },
+  // curliecue2 (CurliecueFunc2): a uniform step of the tabulated trajectory (see the builder); replaces the generated port,
+  // whose per-walker state only ever drew the first steps
+  curliecue2: {
+    params: [{ name: 'seed', def: 1000, int: true }],
+    extra: 2, flags: ['pset'], types: ['2D'],
+    code: (w, p) => `{ let tb_ = u32(${p[1]}) * ${PSET_STRIDE}u; let N_ = u32(pset[tb_]); if (N_ > 0u) { let k_ = min(u32(rnd(rs) * f32(N_)), N_ - 1u); v += ${w} * vec2f(pset[tb_ + 2u + 2u * k_], pset[tb_ + 3u + 2u * k_]); } }`,
+  },
   // sunvoroni (SunflowerVoroniFunc): Voronoi cells of the sunflower points — outlines and/or ear-clipped fills
   sunvoroni: {
     params: [{ name: 'nPoints', def: 50, int: true }, { name: 'Iters', def: 3, int: true }, { name: 'angle', def: 180 }, { name: 'color mode', def: 0, int: true }, { name: 'outline', def: 0, int: true }, { name: 'fill', def: 1, int: true }, { name: 'outline color', def: 0.5 }],
@@ -1607,6 +1614,7 @@ export const PREFER_HAND: Record<string, string> = {
   // code likewise). flam3/Apophysis multiply by weight and so do our presets
   // (Clockwork mixes linear .6 + rings .35) — keep flam3 semantics.
   rings: 'JWildfire ignores the weight; flam3/Apophysis apply it',
+  curliecue2: 'one global trajectory per instance: tabulated as a point set (the generated port only drew its first steps per walker)',
 };
 
 /** The registry. Hand-written entries are present from the start (fallbacks); the

@@ -713,6 +713,25 @@ registerPointSet('sunvoroni', (P) => {
   return w.done();
 });
 
+// curliecue2 (CurliecueFunc2): the transform ignores its input and advances one trajectory per call — x += 0.001·cos φ,
+// φ += θ, θ += 2π·s (s = java.util.Random(seed).nextDouble()) — so a JWildfire thread draws the first Q steps of the
+// curlicue, Q = its iteration count (≈ 2 million for a 512 px / quality-100 render). Our walkers are short-lived, so the
+// trajectory is tabulated instead (2^20 steps, [N, 0, x1, y1, …]) and every point samples a uniform step.
+export const CURLIECUE2_STEPS = 1 << 20;
+registerPointSet('curliecue2', (P) => {
+  const s = new JavaRandom(Math.trunc(P.seed ?? 1000)).nextDouble();
+  const N = CURLIECUE2_STEPS, tab = new Float32Array(2 + 2 * N);
+  tab[0] = N;
+  let x0 = 0, y0 = 0, theta = 0, phi = 0;
+  for (let k = 0; k < N; k++) {
+    x0 += 0.001 * Math.cos(phi); y0 += 0.001 * Math.sin(phi);
+    phi = (theta + phi) % (2 * Math.PI); theta = (theta + 2 * Math.PI * s) % (2 * Math.PI);
+    tab[2 + 2 * k] = x0; tab[3 + 2 * k] = y0;
+  }
+  const count = Math.ceil(tab.length / PSET_STRIDE), data = new Float32Array(count * PSET_STRIDE); data.set(tab);
+  return { data, count };
+});
+
 // htree_js (HtreeFunc.draw): an H of `size` at the origin, four half-size H-trees at its tips, `level` deep
 registerPointSet('htree_js', (P) => {
   const segs: number[] = []; const size = P.size ?? 2;
