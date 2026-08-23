@@ -49,7 +49,11 @@ in the stack.
   at run time, external content such as sub-flames/images/meshes/SVG/text,
   the remaining CPU-built point sets, …); the importer names the reason when a flame uses one.
   Also ported: the TARGET / TARGETG colour types, JWildfire's DOF blur shapes, the channel mixer and
-  `background_image` (the picture from the browser's image store).
+  `background_image` (the picture from the browser's image store); `curliecue2`, whose transform steps one
+  global trajectory per call, is tabulated so short-lived GPU walkers draw the whole curlicue. 94 variations
+  are hand-written ports on top of the mechanical ones; every port is checked against headless JWildfire with the
+  image harness in `scripts/jwf-port` (`Compare.java`, `mkfix.mjs` fixtures, `extract2.mjs` corpus picks and the
+  reflection probes in `probes/` that dump a variation's private tables).
   JWildfire's **point-set variations** — the `DrawFunc` family (`sunflower`, `szubieta`, `gpattern`, `curliecue`,
   `mandala`, `mandala2`, `nsudoku`), the simulations (`dla_wf`, `snowflake_wf`, `natural_foam`), the `_js` turtle
   fractals (`dragon_js`, `koch_js`, `hilbert_js`, `htree_js`, `tree_js`, `brownian_js`, `gosperisland_js`,
