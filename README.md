@@ -204,8 +204,10 @@ in the stack.
   blink) with whole-library JSON export/import for backups and moving between
   browsers, a name/author/source/tag **search**, names in natural order,
   keyboard navigation (arrows, Page Up/Down, Home/End, Enter loads), **Remove
-  duplicates** (identical parameters, first instance kept — one pass, not N²)
-  and **Empty library** (asks first). The grid is virtualised — only the cards
+  duplicates** (identical parameters, first instance kept — one pass, not N²),
+  **Render thumbnails** (re-renders the pictures of the flames shown with the
+  current engine — for entries saved before a renderer fix or whose picture is
+  missing; Stop keeps the ones done) and **Empty library** (asks first). The grid is virtualised — only the cards
   in view exist, so a library of thousands opens and scrolls like one of a
   dozen. **Favourites** (★ on the
   card or Space), free-form **tags** (🏷 on the card; "Tag all shown…" tags a

@@ -61,6 +61,33 @@ export async function addFlamesToLibrary(
   return entries.length;
 }
 
+/** Re-render the thumbnails of library entries with the current engine (entries saved before a renderer fix, or
+ *  whose picture failed). Writes are batched; `onProgress` may return false to stop — the ones done so far are kept.
+ *  Returns the number of thumbnails replaced. */
+export async function renderThumbnails(
+  app: App,
+  entries: LibEntry[],
+  onProgress?: (done: number, total: number, entry: LibEntry) => boolean | void,
+): Promise<number> {
+  let done = 0;
+  let pending: LibEntry[] = [];
+  const flush = async () => { if (pending.length) { await libPut(pending); done += pending.length; pending = []; } };
+  try {
+    for (const [i, e] of entries.entries()) {
+      try {
+        e.thumb = await offscreenThumb(app, normalizeFlame(e.flame, app.activeLayer.palette));
+        pending.push(e);
+      } catch { /* keep the old picture */ }
+      if (pending.length >= 25) await flush();
+      if (onProgress?.(i + 1, entries.length, e) === false) break;
+    }
+  } finally {
+    app.resumeRender();
+  }
+  await flush();
+  return done;
+}
+
 export function buildLibrary(app: App, anim: AnimAPI) {
   function thumbnail(size = 144): Promise<Blob> {
     // the copy out of the WebGPU canvas must happen inside captureSync (synchronously, after the
@@ -215,9 +242,32 @@ export function buildLibrary(app: App, anim: AnimAPI) {
       try { await libPut(changed); } catch (e) { alert('Could not save tags: ' + (e as Error).message); return; }
       refreshCollections(); applyFilter();
     };
+    const renderBtn = el('button', '', '🎨 Render thumbnails') as HTMLButtonElement;
+    renderBtn.title = 'Re-render the thumbnails of the flames shown (search + collection) with the current engine — for entries saved before a renderer fix, or whose picture is missing. Stop keeps the ones done so far';
+    renderBtn.onclick = async () => {
+      const list = vis.slice();
+      if (!list.length) return;
+      if (!confirm(`Re-render the thumbnails of the ${list.length} flame${list.length === 1 ? '' : 's'} shown?`)) return;
+      renderBtn.disabled = true;
+      let stop = false;
+      const stopBtn = el('button', 'danger', 'Stop');
+      stopBtn.onclick = () => { stop = true; };
+      renderBtn.after(stopBtn);
+      const t0 = performance.now();
+      try {
+        const n = await renderThumbnails(app, list, (done, total, e) => {
+          hint.textContent = `Rendering thumbnails… ${done}/${total} — ${e.name}`;
+          refreshCard(e);
+          return !stop && body.isConnected; // the dialog may have been closed meanwhile
+        });
+        hint.textContent = `${n} thumbnail${n === 1 ? '' : 's'} re-rendered in ${Math.round((performance.now() - t0) / 1000)} s.`;
+      } catch (e) { hint.textContent = 'Could not render thumbnails: ' + (e as Error).message; }
+      stopBtn.remove();
+      renderBtn.disabled = false;
+    };
     const tools2 = el('div', 'btn-row');
     tools.append(search, collSel, simBtn, galBtn);
-    tools2.append(expBtn, impBtn, tagAllBtn, dedupBtn, clearBtn, impFile);
+    tools2.append(expBtn, impBtn, tagAllBtn, dedupBtn, renderBtn, clearBtn, impFile);
     if (!entries.length) {
       const empty = el('div', 'hint', 'Empty — use 💾 Save to keep the current flame here, or drop .flame / .zip files on the canvas. Stored in your browser (IndexedDB). ');
       const link = el('a', '', 'Flame packs to get started: jwfsanctuary.club/downloads/flamepacks') as HTMLAnchorElement;
