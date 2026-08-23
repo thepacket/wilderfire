@@ -100,17 +100,17 @@ async function boot() {
   symmSel.title = 'Symmetry of the next random flame (JWildfire\'s random symmetry generators): None, one of the three at random, sparse (a third of the flames get one), or X axis / Y axis / Point';
   const wfieldSel = el('select', 'rand-style') as HTMLSelectElement;
   wfieldSel.title = 'Weighting field of the next random flame (JWildfire\'s random weighting-field generators): None, any noise at random, sparse (a third of the flames get one), or basic / cellular / fractal noise';
-  const randBtn = el('button', '', '🎲 Randomize');
+  const randBtn = el('button', '', 'Randomize');
   randBtn.onclick = async () => {
     if (randBtn.disabled) return;
     randBtn.disabled = true;
     try {
       const { sampleRandomFlame } = await import('./ui/randomSampler');
       // JWildfire's LOW batch quality (8 candidates, coverage ≥ 0.32) within a few seconds — every candidate costs a kernel compile
-      const f = await sampleRandomFlame(app, { style: styleSel.value, symmetry: (symmSel.value || 'sparse') as never, wfield: (wfieldSel.value || 'sparse') as never, quality: 'low', budgetMs: 3000, onProgress: (i, n) => { randBtn.textContent = `🎲 ${i}/${n}`; } });
+      const f = await sampleRandomFlame(app, { style: styleSel.value, symmetry: (symmSel.value || 'sparse') as never, wfield: (wfieldSel.value || 'sparse') as never, quality: 'low', budgetMs: 3000, onProgress: (i, n) => { randBtn.textContent = `${i}/${n}`; } });
       app.flameSource = undefined;
       app.setFlame(f);
-    } finally { randBtn.disabled = false; randBtn.textContent = '🎲 Randomize'; }
+    } finally { randBtn.disabled = false; randBtn.textContent = 'Randomize'; }
   };
   (async () => {
     const { RANDOM_STYLES } = await import('./core/randomStyles');
@@ -130,7 +130,7 @@ async function boot() {
   symmSel.onchange = () => localStorage.setItem(LS_SYMM, symmSel.value);
   wfieldSel.onchange = () => localStorage.setItem(LS_WFIELD, wfieldSel.value);
 
-  const mutBtn = el('button', '', '🧬 Mutate');
+  const mutBtn = el('button', '', 'Mutate');
   mutBtn.title = 'Explore mutations of the current flame';
   const shareBtn = el('button', 'icon', '🔗');
   shareBtn.title = 'Share: copy a link that opens this flame in WilderFire (the flame is in the link itself — nothing is uploaded)';
