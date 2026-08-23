@@ -100,7 +100,7 @@ async function boot() {
   symmSel.title = 'Symmetry of the next random flame (JWildfire\'s random symmetry generators): None, one of the three at random, sparse (a third of the flames get one), or X axis / Y axis / Point';
   const wfieldSel = el('select', 'rand-style') as HTMLSelectElement;
   wfieldSel.title = 'Weighting field of the next random flame (JWildfire\'s random weighting-field generators): None, any noise at random, sparse (a third of the flames get one), or basic / cellular / fractal noise';
-  const randBtn = el('button', 'primary', '🎲 Randomize');
+  const randBtn = el('button', '', '🎲 Randomize');
   randBtn.onclick = async () => {
     if (randBtn.disabled) return;
     randBtn.disabled = true;
