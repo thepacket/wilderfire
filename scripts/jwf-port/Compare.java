@@ -5,7 +5,8 @@
 //
 // Renders each <id>.flame with JWildfire at the manifest's size/quality (cached as
 // <id>.jwf.png), then prints one line per flame: mean luma of both, ratio, coverage
-// (fraction of non-background pixels), 16×16-block MAE (0-255), luma-histogram
+// (fraction of non-background pixels), 16×16-block MAE (0-255), luma-histogram,
+// per-channel mean ratios R/G/B (flag `channel` when a channel's ratio strays > 0.2 from the luma ratio)
 // intersection and a downscaled-greyscale correlation, plus flags. Nothing is judged
 // visually.
 import java.awt.image.BufferedImage;
@@ -43,6 +44,12 @@ public class Compare {
     }
     return l;
   }
+  /** per-channel means (R, G, B) — a luma ratio can hide a colour-scale error cancelling a pattern error */
+  static double[] channels(BufferedImage img) {
+    int w = img.getWidth(), h = img.getHeight(); double r = 0, g = 0, b = 0;
+    for (int y = 0; y < h; y++) for (int x = 0; x < w; x++) { int p = img.getRGB(x, y); r += (p >> 16) & 255; g += (p >> 8) & 255; b += p & 255; }
+    double n = (double) w * h; return new double[] { r / n, g / n, b / n };
+  }
   static double mean(double[][] l) { double s = 0; for (double[] r : l) for (double v : r) s += v; return s / (l.length * l[0].length); }
   static double cover(double[][] l) { double s = 0; for (double[] r : l) for (double v : r) if (v > 8) s++; return s / (l.length * l[0].length); }
   static double[][] blocks(double[][] l, int n) {
@@ -60,7 +67,7 @@ public class Compare {
     String manName = System.getenv("MANIFEST") != null ? System.getenv("MANIFEST") : "manifest.json";
     String man = new String(Tools.readFile(new File(out, manName).getPath()), "UTF-8");
     Matcher m = Pattern.compile("\\{[^{}]*\"id\":\\s*\"([^\"]+)\"[^{}]*\"w\":\\s*(\\d+)[^{}]*\"h\":\\s*(\\d+)[^{}]*\"quality\":\\s*([\\d.]+)[^{}]*\\}").matcher(man);
-    System.out.printf("%-28s %7s %7s %6s %6s %6s %7s %5s %5s  flags%n", "flame", "lumaWF", "lumaJW", "ratio", "covWF", "covJW", "blkMAE", "hist", "corr");
+    System.out.printf("%-28s %7s %7s %6s %6s %6s %7s %5s %5s  %-14s flags%n", "flame", "lumaWF", "lumaJW", "ratio", "covWF", "covJW", "blkMAE", "hist", "corr", "rgbRatio");
     int n = 0; List<String> flagged = new ArrayList<>();
     while (m.find()) {
       String id = m.group(1); int w = Integer.parseInt(m.group(2)), h = Integer.parseInt(m.group(3)); double q = Double.parseDouble(m.group(4));
@@ -89,10 +96,13 @@ public class Compare {
         if (ratio < 0.7 || ratio > 1.4) flags.add("brightness");
         if (Math.abs(ca - cb) > 0.15) flags.add("coverage");
         if (mae > 25) flags.add("blocks");
+        double[] cA = channels(wimg), cB = channels(jimg);
+        String rgbRatio = String.format("%.2f/%.2f/%.2f", (cA[0] + 1e-6) / (cB[0] + 1e-6), (cA[1] + 1e-6) / (cB[1] + 1e-6), (cA[2] + 1e-6) / (cB[2] + 1e-6));
         if (corr < 0.8) flags.add("structure");
+        for (int c = 0; c < 3; c++) { double rc = (cA[c] + 1e-6) / (cB[c] + 1e-6); if (cB[c] > 2 && Math.abs(rc - ratio) > 0.2) { flags.add("channel"); break; } }
         if (!flags.isEmpty()) flagged.add(id);
         n++;
-        System.out.printf("%-28s %7.1f %7.1f %6.2f %6.2f %6.2f %7.1f %5.2f %5.2f  %s%n", id, ma, mb, ratio, ca, cb, mae, hist, corr, String.join(" ", flags));
+        System.out.printf("%-28s %7.1f %7.1f %6.2f %6.2f %6.2f %7.1f %5.2f %5.2f  %-14s %s%n", id, ma, mb, ratio, ca, cb, mae, hist, corr, rgbRatio, String.join(" ", flags));
       } catch (Throwable e) {
         System.out.printf("%-28s ERROR %s%n", id, String.valueOf(e).replace('\n', ' '));
       }
