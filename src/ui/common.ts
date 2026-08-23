@@ -104,6 +104,10 @@ export class App {
   /** Engine settings bridge, registered by the Render tab (the assistant's get_engine / set_engine drive the same controls). */
   engine: EngineAPI | null = null;
   setCurves: (curves: MotionCurve[]) => void = () => {};
+  /** Animation transport (registered by the Anim panel): keyframe the current flame, play / stop. */
+  anim: { addKey(): void; play(): void; stop(): void; keyCount(): number } | null = null;
+  /** Theme bridge (registered by main): dark / light, persisted. */
+  theme: { get(): 'dark' | 'light'; set(t: 'dark' | 'light'): void } | null = null;
   /** The animation timeline (registered by the Anim panel) for offscreen video renders — null when nothing is animated. */
   timeline: () => { t0: number; total: number; evalAt: (t: number) => Flame } | null = () => null;
   private listeners: { ev: AppEvent; fn: (source: string) => void }[] = [];

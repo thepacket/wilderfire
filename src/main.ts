@@ -163,12 +163,13 @@ async function boot() {
   const triBtn = el('button', '', '△ Triangles');
   const themeBtn = el('button', '', document.documentElement.dataset.theme === 'dark' ? '☀' : '🌙');
   themeBtn.title = 'Toggle theme';
-  themeBtn.onclick = () => {
-    const next = document.documentElement.dataset.theme === 'dark' ? 'light' : 'dark';
+  const setTheme = (next: 'dark' | 'light') => {
     document.documentElement.dataset.theme = next;
     localStorage.setItem(LS_THEME, next);
     themeBtn.textContent = next === 'dark' ? '☀' : '🌙';
   };
+  app.theme = { get: () => (document.documentElement.dataset.theme === 'light' ? 'light' : 'dark'), set: setTheme };
+  themeBtn.onclick = () => setTheme(document.documentElement.dataset.theme === 'dark' ? 'light' : 'dark');
 
   const aboutBtn = el('button', 'icon', 'ⓘ');
   aboutBtn.title = 'About WilderFire';
@@ -346,6 +347,7 @@ async function boot() {
   buildRenderPanel(app, bodies[0]);
   buildPalettePanel(app, bodies[1]);
   const anim = buildAnimPanel(app, bodies[2], overlay);
+  app.anim = { addKey: () => anim.addKey(), play: () => anim.play(), stop: () => anim.stop(), keyCount: () => anim.keys.length };
   buildAIPanel(app, bodies[3]);
   if (saved?.anim) anim.setState(saved.anim as AnimState);
   const library = buildLibrary(app, anim);

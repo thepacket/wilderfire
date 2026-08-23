@@ -178,8 +178,14 @@ in the stack.
   sit in a caption that fades with the controls when the mouse is still
 - **AI assistant that acts** — with tools on (default), the model works through
   function calls: `apply_edits`, `set_camera`, `screenshot`, `variation_lookup`,
-  `library_search` / `library_similar` / `library_load` / `library_save`, `randomize`,
-  `mutate`, `undo`, `redo`, `share_link`, `export_png` (asks first), and
+  `library_search` / `library_similar` / `library_load` / `library_save` /
+  `library_update` (rename, favourite, tags) / `library_delete` (asks first),
+  `import_flame` (flame XML or JSON from the conversation — into the editor or,
+  as a pack, into the library), `randomize`, `mutate`, `undo`, `redo`,
+  `share_link`, `export_png` (asks first; the live render, or hi-res at a
+  given size and quality), `get_animation` / `animate` (motion curves on any
+  parameter path, points as [seconds, value]) / `animation_control` (keyframe,
+  play, stop), `set_theme`, and
   `get_engine` / `set_engine` for the live-render engine — quality cap,
   Stop-after, Draft/Final mode, speed, oversampling, DE preview, preview
   hold, adaptive budget, pause, re-render, reset — driving the Render tab's

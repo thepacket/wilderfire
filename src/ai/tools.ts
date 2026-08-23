@@ -64,7 +64,20 @@ export const TOOL_DEFS: ToolDef[] = [
   { type: 'function', function: { name: 'undo', description: 'Undo the last change to the flame.', parameters: { type: 'object', properties: {} } } },
   { type: 'function', function: { name: 'redo', description: 'Redo the change undone last.', parameters: { type: 'object', properties: {} } } },
   { type: 'function', function: { name: 'share_link', description: 'A link that opens the current flame in WilderFire (the flame is encoded in the URL itself; nothing is uploaded). Show it to the user.', parameters: { type: 'object', properties: {} } } },
-  { type: 'function', function: { name: 'export_png', description: 'Save the current render as a PNG file — the user is asked to confirm.', parameters: { type: 'object', properties: {} } } },
+  { type: 'function', function: { name: 'export_png', description: 'Save a PNG of the current flame — the user is asked to confirm. Without a size it saves the live render as shown; with width/height it renders offscreen at that size (hi-res, seconds to minutes) at `spp` samples per pixel (default 2000).',
+    parameters: { type: 'object', properties: { width: { ...num, description: 'pixels (optional, ≤ 16384)' }, height: { ...num, description: 'pixels (optional)' }, spp: { ...num, description: 'samples per pixel for a hi-res render (100…10000, default 2000)' }, transparent: { type: 'boolean' } } } } },
+  { type: 'function', function: { name: 'import_flame', description: 'Load a flame from text: JWildfire/Apophysis/flam3 .flame XML (one flame or a pack) or WilderFire JSON. The first flame goes into the editor; with toLibrary=true every flame of a pack is added to the library instead (thumbnails are rendered, a few seconds per dozen).',
+    parameters: { type: 'object', properties: { text: { ...str, description: 'the .flame XML or JSON' }, toLibrary: { type: 'boolean' } }, required: ['text'] } } },
+  { type: 'function', function: { name: 'library_update', description: 'Change a library entry: rename, favourite on/off, add or remove tags. Use ids from library_search.',
+    parameters: { type: 'object', properties: { id: str, name: str, fav: { type: 'boolean' }, addTags: { type: 'array', items: str }, removeTags: { type: 'array', items: str } }, required: ['id'] } } },
+  { type: 'function', function: { name: 'library_delete', description: 'Remove library entries (the user is asked to confirm; cannot be undone).',
+    parameters: { type: 'object', properties: { ids: { type: 'array', items: str } }, required: ['ids'] } } },
+  { type: 'function', function: { name: 'get_animation', description: 'The animation state: keyframes and the per-parameter motion curves (path, interpolation, points as [seconds, value]).', parameters: { type: 'object', properties: {} } } },
+  { type: 'function', function: { name: 'animate', description: 'Set a motion curve on one flame parameter (the same dotted paths apply_edits uses, e.g. camPitch, zoom, rotation, layers.0.xforms.1.weight, layers.0.xforms.0.variations.0.params.power, layers.0.final.affine.2): points [[seconds, value], …] replace the curve\'s points; remove=true deletes the curve. The timeline spans the curves\' times (and the keyframes, if any).',
+    parameters: { type: 'object', properties: { path: str, points: { type: 'array', items: { type: 'array', items: num } }, interp: { type: 'string', enum: ['spline', 'linear', 'smooth', 'step'] }, remove: { type: 'boolean' } }, required: ['path'] } } },
+  { type: 'function', function: { name: 'animation_control', description: 'Drive the animation: keyframe (store the current flame as a keyframe at the end of the timeline), play, stop.',
+    parameters: { type: 'object', properties: { action: { type: 'string', enum: ['keyframe', 'play', 'stop'] } }, required: ['action'] } } },
+  { type: 'function', function: { name: 'set_theme', description: 'Switch the interface theme.', parameters: { type: 'object', properties: { theme: { type: 'string', enum: ['dark', 'light'] } }, required: ['theme'] } } },
 ];
 
 function parseArgs(json: string): Record<string, unknown> {
@@ -226,14 +239,113 @@ export async function runTool(name: string, argsJson: string, env: ToolEnv): Pro
         return { text: `Share link (${(url.length / 1024).toFixed(1)} KB): ${url}` };
       }
       case 'export_png': {
-        if (!env.confirm(`Save a PNG of "${app.flame.name || 'untitled'}"?`)) return { text: 'The user declined the export.' };
+        const w = n('width'), h = n('height');
+        const hi = w !== undefined && h !== undefined && w >= 16 && h >= 16;
+        const spp = Math.max(100, Math.min(10000, n('spp') ?? 2000));
+        if (!env.confirm(hi ? `Render and save a ${Math.round(w)}×${Math.round(h)} PNG of "${app.flame.name || 'untitled'}" (${spp} spp)?` : `Save a PNG of "${app.flame.name || 'untitled'}"?`)) return { text: 'The user declined the export.' };
+        const { saveBlob } = await import('../ui/saveFile');
+        const base = (app.flame.name || 'wilderfire').replace(/[\\/:*?"<>|]+/g, '_');
+        if (hi) {
+          if (w > 16384 || h > 16384) return { text: 'Error: at most 16384 pixels a side.' };
+          const { renderHiRes } = await import('../ui/hiresExport');
+          const r = app.renderer;
+          r.exporting = true;
+          let blob: Blob;
+          try { blob = await renderHiRes(r, app.flame, { w: Math.round(w), h: Math.round(h), spp, transparent: a.transparent === true, curves: app.getCurves() }); }
+          finally { r.exporting = false; r.setFlame(app.flame); }
+          const name = `${base}-${Math.round(w)}x${Math.round(h)}.png`;
+          const ok = await saveBlob(blob, { suggestedName: name, description: 'PNG image', mime: 'image/png', ext: '.png' });
+          return { text: ok ? `Saved ${name} (${(blob.size / 1e6).toFixed(1)} MB).` : 'The save dialog was cancelled.' };
+        }
         const blob = await app.renderer.exportPNG();
         if (!blob) return { text: 'Nothing to export yet.' };
-        const { saveBlob } = await import('../ui/saveFile');
         const { pngWithFlame } = await import('../core/pngMeta');
-        const base = (app.flame.name || 'wilderfire').replace(/[\\/:*?"<>|]+/g, '_');
         const ok = await saveBlob(await pngWithFlame(blob, app.flame, app.getCurves()), { suggestedName: `${base}.png`, description: 'PNG image', mime: 'image/png', ext: '.png' });
         return { text: ok ? `Saved ${base}.png.` : 'The save dialog was cancelled.' };
+      }
+      case 'import_flame': {
+        const text = s('text') ?? '';
+        if (!text.trim()) return { text: 'Error: text is empty.' };
+        const { importFlameText } = await import('../core/flameXML');
+        const r = importFlameText(text, app.activeLayer.palette);
+        const unknown = r.unknown.length ? ` Unsupported variations skipped: ${r.unknown.slice(0, 8).join(', ')}${r.unknown.length > 8 ? '…' : ''}.` : '';
+        if (a.toLibrary === true) {
+          const { addFlamesToLibrary } = await import('../ui/library');
+          const added = await addFlamesToLibrary(app, r.flames, undefined, r.flames.map(() => 'assistant import'));
+          return { text: `Added ${added} flame${added === 1 ? '' : 's'} to the library.${unknown}` };
+        }
+        app.flameSource = 'assistant import';
+        app.setFlame(r.flame, 'ai');
+        if (r.curves.length) app.setCurves(r.curves);
+        return afterChange(env, `Loaded "${r.flame.name}"${r.count > 1 ? ` (the first of ${r.count} in the text; toLibrary=true adds them all)` : ''}.${unknown}`);
+      }
+      case 'library_update': {
+        const { libAll, libPut } = await import('../core/libraryStore');
+        const id = s('id') ?? '';
+        const e = (await libAll()).find((x) => x.id === id);
+        if (!e) return { text: `No library entry with id "${id}" — use library_search first.` };
+        const changed: string[] = [];
+        const name = s('name')?.trim(); if (name && name !== e.name) { e.name = name; changed.push('name'); }
+        if (typeof a.fav === 'boolean' && !!e.fav !== a.fav) { e.fav = a.fav; changed.push(a.fav ? 'favourite' : 'unfavourite'); }
+        const strs = (k: string) => (Array.isArray(a[k]) ? (a[k] as unknown[]).filter((t): t is string => typeof t === 'string').map((t) => t.trim()).filter(Boolean) : []);
+        const add = strs('addTags'), rm = strs('removeTags');
+        if (add.length || rm.length) { const before = (e.tags ?? []).join('\0'); e.tags = [...new Set([...(e.tags ?? []).filter((t) => !rm.includes(t)), ...add])]; if (e.tags.join('\0') !== before) changed.push('tags'); }
+        if (!changed.length) return { text: 'Nothing to change.' };
+        await libPut(e);
+        return { text: `Updated "${e.name}": ${changed.join(', ')}.${e.tags?.length ? ` Tags now: ${e.tags.join(', ')}.` : ''}` };
+      }
+      case 'library_delete': {
+        const { libAll, libDeleteMany } = await import('../core/libraryStore');
+        const ids = Array.isArray(a.ids) ? (a.ids as unknown[]).filter((t): t is string => typeof t === 'string') : [];
+        const all = await libAll();
+        const hits = all.filter((e) => ids.includes(e.id));
+        if (!hits.length) return { text: 'No matching library entries.' };
+        if (!env.confirm(`Remove ${hits.length} flame${hits.length === 1 ? '' : 's'} from the library?\n\n${hits.slice(0, 8).map((e) => '• ' + e.name).join('\n')}${hits.length > 8 ? '\n…' : ''}`)) return { text: 'The user declined the deletion.' };
+        await libDeleteMany(hits.map((e) => e.id));
+        return { text: `Removed ${hits.length} flame${hits.length === 1 ? '' : 's'}: ${hits.map((e) => e.name).join(', ')}.` };
+      }
+      case 'get_animation': {
+        const curves = app.getCurves();
+        const keys = app.anim?.keyCount() ?? 0;
+        if (!curves.length && !keys) return { text: 'No animation: no keyframes and no motion curves.' };
+        const lines = curves.map((c) => `${c.path} [${c.interp}${c.enabled === false ? ', off' : ''}]: ${c.points.map((p) => `[${+p.t.toFixed(3)}, ${+p.v.toFixed(4)}]`).join(' ')}`);
+        return { text: `${keys} keyframe${keys === 1 ? '' : 's'}; ${curves.length} motion curve${curves.length === 1 ? '' : 's'}${lines.length ? ':\n' + lines.join('\n') : '.'}` };
+      }
+      case 'animate': {
+        const path = s('path')?.trim();
+        if (!path) return { text: 'Error: path is required.' };
+        const { getParam } = await import('../core/motion');
+        if (getParam(app.flame, path) === undefined) return { text: `Error: "${path}" is not a numeric parameter of this flame (see get_flame for the paths).` };
+        const curves = app.getCurves().map((c) => ({ ...c, points: c.points.map((p) => ({ ...p })) }));
+        const i = curves.findIndex((c) => c.path === path);
+        if (a.remove === true) {
+          if (i < 0) return { text: `No curve on ${path}.` };
+          curves.splice(i, 1); app.setCurves(curves);
+          return { text: `Curve on ${path} removed.` };
+        }
+        const pts = Array.isArray(a.points) ? (a.points as unknown[]).filter((p): p is [number, number] => Array.isArray(p) && p.length === 2 && p.every((v) => typeof v === 'number' && Number.isFinite(v))).map(([t, v]) => ({ t, v })).sort((p, q) => p.t - q.t) : null;
+        const interp = s('interp');
+        const c = i >= 0 ? curves[i] : { path, points: [], interp: 'spline' as const };
+        if (pts) c.points = pts;
+        if (interp === 'spline' || interp === 'linear' || interp === 'smooth' || interp === 'step') c.interp = interp;
+        if (!c.points.length) return { text: 'Error: give points as [[seconds, value], …].' };
+        if (i < 0) curves.push(c);
+        app.setCurves(curves);
+        return { text: `${path}: ${c.points.length} point${c.points.length === 1 ? '' : 's'} over ${+c.points[0].t.toFixed(2)}–${+c.points[c.points.length - 1].t.toFixed(2)} s (${c.interp}). ${curves.length} curve${curves.length === 1 ? '' : 's'} in total.` };
+      }
+      case 'animation_control': {
+        if (!app.anim) return { text: 'The animation panel is not available in this view.' };
+        const act = s('action');
+        if (act === 'keyframe') { app.anim.addKey(); return { text: `Keyframe added (${app.anim.keyCount()} now).` }; }
+        if (act === 'play') { app.anim.play(); return { text: 'Playing.' }; }
+        if (act === 'stop') { app.anim.stop(); return { text: 'Stopped.' }; }
+        return { text: 'Error: action must be keyframe, play or stop.' };
+      }
+      case 'set_theme': {
+        const t = s('theme');
+        if (!app.theme || (t !== 'dark' && t !== 'light')) return { text: 'Error: theme must be dark or light.' };
+        app.theme.set(t);
+        return { text: `Theme: ${t}.` };
       }
       default:
         return { text: `Unknown tool "${name}".` };
