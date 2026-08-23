@@ -23607,13 +23607,17 @@ pz_ += (z * ${w});
   "glsl_mandala": {
     params: [{ name: "Density Pixels", def: 1000000, int: true }, { name: "mX", def: 0.025 }, { name: "mY", def: -0.001245675 }, { name: "scale", def: 2 }, { name: "sides", def: 12 }, { name: "multiply", def: 1.5 }, { name: "loops", def: 64 }, { name: "iR", def: 0, int: true }, { name: "iG", def: 0, int: true }, { name: "iB", def: 1, int: true }, { name: "Gradient", def: 0, int: true }],
     verified: true, priority: 0, flags: ["dc","rgb","state"], types: ["SIMULATION","DC","BASE_SHAPE"],
-    funcNames: ["jwx_glsl_mandala_scale_c","jwx_glsl_mandala_Density_Pixels_c","jwx_glsl_mandala_sides_c","jwx_glsl_mandala_multiply_c","jwx_glsl_mandala_mX_c","jwx_glsl_mandala_loops_c","jwx_glsl_mandala_mY_c","jwx_glsl_mandala_iR_c","jwx_glsl_mandala_iG_c","jwx_glsl_mandala_iB_c","jwx_glsl_mandala_inited_","jwx_glsl_mandala_resolutionY","atan2j","mmod2","G_Kscope","glsl_mandala_getRGBColor","dbl2int"],
+    funcNames: ["jwx_glsl_mandala_scale_c","jwx_glsl_mandala_Density_Pixels_c","jwx_glsl_mandala_sides_c","jwx_glsl_mandala_multiply_c","jwx_glsl_mandala_mX_c","jwx_glsl_mandala_loops_c","jwx_glsl_mandala_mY_c","jwx_glsl_mandala_iR_c","jwx_glsl_mandala_iG_c","jwx_glsl_mandala_iB_c","jwx_glsl_mandala_inited_","jwx_glsl_mandala_resolutionY","atan2j","G_atan2","mmod2","G_Kscope","glsl_mandala_getRGBColor","dbl2int"],
     funcs: `fn atan2j(y: f32, x: f32) -> f32 { if (x == 0.0 && y == 0.0) { return select(0.0, PI, (bitcast<u32>(x) >> 31u) == 1u) * select(1.0, -1.0, (bitcast<u32>(y) >> 31u) == 1u); } return atan2(y, x); }
+
+fn G_atan2(y: f32, x: f32) -> f32 { let c1 = PI / 4.0; let ay = abs(y); var ang: f32;
+  if (x >= 0.0) { let r = (x - ay) / (x + ay); ang = c1 - c1 * r; } else { let r = (x + ay) / (ay - x); ang = 3.0 * c1 - c1 * r; }
+  return select(ang, -ang, y < 0.0); }
 
 fn mmod2(a: vec2f, b: vec2f) -> vec2f { return a - b * floor(a / b); }
 
 fn G_Kscope(uv: vec2f, k: f32) -> vec2f {
-  var angle: f32 = abs((mmod(atan2j(uv.y, uv.x), (2.0 * k)) - k));
+  var angle: f32 = abs((mmod(G_atan2(uv.y, uv.x), (2.0 * k)) - k));
   return vec2f((length(uv) * cos(angle)), (length(uv) * sin(angle)));
 }
 
@@ -24214,7 +24218,7 @@ v.y += (${w} * ((f32(j) / f32(jwx_glsl_mandelbox2D_resolutionY)) - 0.5));
   "glsl_hoshi": {
     params: [{ name: "Density Pixels", def: 1000000, int: true }, { name: "Seed", def: 100000, int: true }, { name: "time", def: 10 }, { name: "Steps", def: 28, int: true }, { name: "Scale", def: 1.25 }, { name: "Translate", def: 1.5 }, { name: "Gradient", def: 0, int: true }],
     verified: true, priority: 0, flags: ["dc","rgb","state"], types: ["SIMULATION","DC","BASE_SHAPE"],
-    funcNames: ["jwx_glsl_hoshi_Density_Pixels_c","jwx_glsl_hoshi_Steps_c","jwx_glsl_hoshi_time_c","jwx_glsl_hoshi_inited_","jwx_glsl_hoshi_resolutionY","jwx_glsl_hoshi_fold","jwx_glsl_hoshi_translate","jwx_glsl_hoshi_scale","jrand_","atan2j","rndi","mmod2","smoothstepc","jrand_next","jrand_nextDouble","glsl_hoshi_random","glsl_hoshi_rotate","glsl_hoshi_hsv","glsl_hoshi_getRGBColor","dbl2int"],
+    funcNames: ["jwx_glsl_hoshi_Density_Pixels_c","jwx_glsl_hoshi_Steps_c","jwx_glsl_hoshi_time_c","jwx_glsl_hoshi_inited_","jwx_glsl_hoshi_resolutionY","jwx_glsl_hoshi_fold","jwx_glsl_hoshi_translate","jwx_glsl_hoshi_scale","jrand_","atan2j","rndi","mmod2","G_atan2","smoothstepc","jrand_next","jrand_nextDouble","glsl_hoshi_random","glsl_hoshi_rotate","glsl_hoshi_hsv","glsl_hoshi_getRGBColor","dbl2int"],
     funcs: `struct jrand_ {
   s0: i32,
   s1: i32,
@@ -24226,6 +24230,10 @@ fn atan2j(y: f32, x: f32) -> f32 { if (x == 0.0 && y == 0.0) { return select(0.0
 fn rndi(state: ptr<function, u32>) -> u32 { var x = *state; x ^= x << 13u; x ^= x >> 17u; x ^= x << 5u; *state = x; return x; }
 
 fn mmod2(a: vec2f, b: vec2f) -> vec2f { return a - b * floor(a / b); }
+
+fn G_atan2(y: f32, x: f32) -> f32 { let c1 = PI / 4.0; let ay = abs(y); var ang: f32;
+  if (x >= 0.0) { let r = (x - ay) / (x + ay); ang = c1 - c1 * r; } else { let r = (x + ay) / (ay - x); ang = 3.0 * c1 - c1 * r; }
+  return select(ang, -ang, y < 0.0); }
 
 fn smoothstepc(a: f32, b: f32, x: f32) -> f32 { if (a == b) { return step(a, x); } let t = clamp((x - a) / (b - a), 0.0, 1.0); return t * t * (3.0 - 2.0 * t); }
 
@@ -24281,7 +24289,7 @@ fn glsl_hoshi_getRGBColor(xp: i32, yp: i32) -> vec3f {
     p_ = ((p_ * vec2f(jwx_glsl_hoshi_scale)) - jwx_glsl_hoshi_translate);
     p_ = glsl_hoshi_rotate(p_, (3.14159 / ((((0.1 + (sin(((jwx_glsl_hoshi_time_c * 0.0005) + (f32(i) * 0.5000001))) * 0.4999)) + 0.5) + (10.0 / jwx_glsl_hoshi_time_c)) + (sin(jwx_glsl_hoshi_time_c) / 100.0))));
   }
-  var i: f32 = (((x * x) + atan2j(p_.y, p_.x)) + (jwx_glsl_hoshi_time_c * 0.02));
+  var i: f32 = (((x * x) + G_atan2(p_.y, p_.x)) + (jwx_glsl_hoshi_time_c * 0.02));
   var h: f32 = ((floor((i * 4.0)) / 8.0) + 1.107);
   h += ((smoothstepc(-0.1, 0.8, (mmod(((i * 2.0) / 5.0), (1.0 / 4.0)) * 900.0)) / 0.01) - 0.5);
   var color: vec3f = glsl_hoshi_hsv(h, 1.0, smoothstepc(-3.0, 3.0, (length(p_) * 1.0)));
@@ -24674,7 +24682,7 @@ v.y += (${w} * ((f32(j) / f32(jwx_glsl_starsfield_resolutionY)) - 0.5));
   "glsl_kaleidoscopic": {
     params: [{ name: "Density Pixels", def: 1000000, int: true }, { name: "Seed", def: 10000, int: true }, { name: "time", def: 0 }, { name: "Sides", def: 8, int: true }, { name: "zoom", def: 0 }, { name: "P1", def: 0 }, { name: "Radial", def: 0, int: true }, { name: "Gradient", def: 0, int: true }],
     verified: true, priority: 0, flags: ["dc","rgb","state"], types: ["SIMULATION","DC","BASE_SHAPE"],
-    funcNames: ["jwx_glsl_kaleidoscopic_time_c","jwx_glsl_kaleidoscopic_Density_Pixels_c","jwx_glsl_kaleidoscopic_zoom_c","jwx_glsl_kaleidoscopic_Radial_c","jwx_glsl_kaleidoscopic_P1_c","jwx_glsl_kaleidoscopic_inited_","jwx_glsl_kaleidoscopic_KA","jwx_glsl_kaleidoscopic_resolutionY","jrand_","atan2j","rndi","jrand_next","jrand_nextDouble","glsl_kaleidoscopic_random","glsl_kaleidoscopic_smallKoleidoscope","glsl_kaleidoscopic_getRGBColor","dbl2int"],
+    funcNames: ["jwx_glsl_kaleidoscopic_time_c","jwx_glsl_kaleidoscopic_Density_Pixels_c","jwx_glsl_kaleidoscopic_zoom_c","jwx_glsl_kaleidoscopic_Radial_c","jwx_glsl_kaleidoscopic_P1_c","jwx_glsl_kaleidoscopic_inited_","jwx_glsl_kaleidoscopic_KA","jwx_glsl_kaleidoscopic_resolutionY","jrand_","atan2j","rndi","G_atan2","jrand_next","jrand_nextDouble","glsl_kaleidoscopic_random","glsl_kaleidoscopic_smallKoleidoscope","glsl_kaleidoscopic_getRGBColor","dbl2int"],
     funcs: `struct jrand_ {
   s0: i32,
   s1: i32,
@@ -24684,6 +24692,10 @@ v.y += (${w} * ((f32(j) / f32(jwx_glsl_starsfield_resolutionY)) - 0.5));
 fn atan2j(y: f32, x: f32) -> f32 { if (x == 0.0 && y == 0.0) { return select(0.0, PI, (bitcast<u32>(x) >> 31u) == 1u) * select(1.0, -1.0, (bitcast<u32>(y) >> 31u) == 1u); } return atan2(y, x); }
 
 fn rndi(state: ptr<function, u32>) -> u32 { var x = *state; x ^= x << 13u; x ^= x >> 17u; x ^= x << 5u; *state = x; return x; }
+
+fn G_atan2(y: f32, x: f32) -> f32 { let c1 = PI / 4.0; let ay = abs(y); var ang: f32;
+  if (x >= 0.0) { let r = (x - ay) / (x + ay); ang = c1 - c1 * r; } else { let r = (x + ay) / (ay - x); ang = 3.0 * c1 - c1 * r; }
+  return select(ang, -ang, y < 0.0); }
 
 fn jrand_next(r_: ptr<function, jrand_>, bits: i32) -> i32 {
   var a0: u32 = u32((*r_).s0);
@@ -24715,7 +24727,7 @@ fn glsl_kaleidoscopic_random(r1: f32, r2_: f32) -> f32 {
 }
 
 fn glsl_kaleidoscopic_smallKoleidoscope(uv: vec2f) -> vec2f {
-  var angle: f32 = (abs((mmod(atan2j(uv.y, uv.x), (2.0 * jwx_glsl_kaleidoscopic_KA)) - jwx_glsl_kaleidoscopic_KA)) + (0.1 * jwx_glsl_kaleidoscopic_time_c));
+  var angle: f32 = (abs((mmod(G_atan2(uv.y, uv.x), (2.0 * jwx_glsl_kaleidoscopic_KA)) - jwx_glsl_kaleidoscopic_KA)) + (0.1 * jwx_glsl_kaleidoscopic_time_c));
   var uvr: vec2f = (vec2f(cos(angle), sin(angle)) * vec2f(length(uv)));
   return uvr;
 }
@@ -25746,12 +25758,16 @@ v.y += (${w} * ((f32(j) / f32(jwx_glsl_grid3D_resolutionY)) - 0.5));
   "glsl_hyperbolictile": {
     params: [{ name: "Density Pixels", def: 1000000, int: true }, { name: "Gradient", def: 0, int: true }],
     verified: true, priority: 0, flags: ["dc","rgb","state"], types: ["SIMULATION","DC","BASE_SHAPE"],
-    funcNames: ["jwx_glsl_hyperbolictile_Density_Pixels_c","jwx_glsl_hyperbolictile_inited_","jwx_glsl_hyperbolictile_resolutionY","atan2j","glsl_hyperbolictile_topolar","glsl_hyperbolictile_tocart","glsl_hyperbolictile_mirror","glsl_hyperbolictile_getRGBColor","dbl2int"],
+    funcNames: ["jwx_glsl_hyperbolictile_Density_Pixels_c","jwx_glsl_hyperbolictile_inited_","jwx_glsl_hyperbolictile_resolutionY","atan2j","G_atan2","glsl_hyperbolictile_topolar","glsl_hyperbolictile_tocart","glsl_hyperbolictile_mirror","glsl_hyperbolictile_getRGBColor","dbl2int"],
     funcs: `fn atan2j(y: f32, x: f32) -> f32 { if (x == 0.0 && y == 0.0) { return select(0.0, PI, (bitcast<u32>(x) >> 31u) == 1u) * select(1.0, -1.0, (bitcast<u32>(y) >> 31u) == 1u); } return atan2(y, x); }
+
+fn G_atan2(y: f32, x: f32) -> f32 { let c1 = PI / 4.0; let ay = abs(y); var ang: f32;
+  if (x >= 0.0) { let r = (x - ay) / (x + ay); ang = c1 - c1 * r; } else { let r = (x + ay) / (ay - x); ang = 3.0 * c1 - c1 * r; }
+  return select(ang, -ang, y < 0.0); }
 
 fn glsl_hyperbolictile_topolar(cart: vec2f) -> vec2f {
   var r_: f32 = sqrt(((cart.x * cart.x) + (cart.y * cart.y)));
-  var alpha: f32 = atan2j(cart.y, cart.x);
+  var alpha: f32 = G_atan2(cart.y, cart.x);
   return vec2f(r_, alpha);
 }
 
@@ -27437,15 +27453,19 @@ if ((${p[7]} == 1)) {
   "dc_mandala": {
     params: [{ name: "mX", def: 0.025 }, { name: "mY", def: -0.001245675 }, { name: "scale", def: 2 }, { name: "sides", def: 12, int: true }, { name: "multiply", def: 1, int: true }, { name: "loops", def: 64, int: true }, { name: "iR", def: 0, int: true }, { name: "iG", def: 0, int: true }, { name: "iB", def: 1, int: true }, { name: "ColorOnly", def: 0, int: true }, { name: "Gradient", def: 0, int: true }, { name: "scale_z", def: 0 }, { name: "offset_z", def: 0 }, { name: "reset_z", def: 1, int: true }],
     verified: true, priority: 0, flags: ["dc","rgb","z"], types: ["SIMULATION","DC","BASE_SHAPE"],
-    funcNames: ["read_imageStepMode","atan2j","mmod2","dc_mandala_kscope","dc_mandala_getRGBColor","dbl2int","greyscale","distance_color"],
+    funcNames: ["read_imageStepMode","atan2j","G_atan2","mmod2","dc_mandala_kscope","dc_mandala_getRGBColor","dbl2int","greyscale","distance_color"],
     funcs: `fn read_imageStepMode(base: u32, n: i32, t: f32) -> vec4f { return pal[base + u32(clamp(t, 0.0, 0.99999) * f32(max(n, 1)))]; }
 
 fn atan2j(y: f32, x: f32) -> f32 { if (x == 0.0 && y == 0.0) { return select(0.0, PI, (bitcast<u32>(x) >> 31u) == 1u) * select(1.0, -1.0, (bitcast<u32>(y) >> 31u) == 1u); } return atan2(y, x); }
 
+fn G_atan2(y: f32, x: f32) -> f32 { let c1 = PI / 4.0; let ay = abs(y); var ang: f32;
+  if (x >= 0.0) { let r = (x - ay) / (x + ay); ang = c1 - c1 * r; } else { let r = (x + ay) / (ay - x); ang = 3.0 * c1 - c1 * r; }
+  return select(ang, -ang, y < 0.0); }
+
 fn mmod2(a: vec2f, b: vec2f) -> vec2f { return a - b * floor(a / b); }
 
 fn dc_mandala_kscope(uv: vec2f, k: f32) -> vec2f {
-  var t_: f32 = mmod(atan2j(uv.y, uv.x), (2.0 * k));
+  var t_: f32 = mmod(G_atan2(uv.y, uv.x), (2.0 * k));
   var angle: f32 = abs((t_ - k));
   var t4: f32 = length(uv);
   var t1: vec2f = vec2f(t4, t4);
@@ -27873,12 +27893,16 @@ if ((${p[13]} == 1)) {
   "dc_hoshi": {
     params: [{ name: "seed", def: 100000, int: true }, { name: "time", def: 10 }, { name: "steps", def: 28, int: true }, { name: "scale", def: 1.25 }, { name: "translate", def: 1.5 }, { name: "ColorOnly", def: 0, int: true }, { name: "Gradient", def: 0, int: true }, { name: "scale_z", def: 0 }, { name: "offset_z", def: 0 }, { name: "reset_z", def: 1, int: true }],
     verified: true, priority: 0, flags: ["dc","rgb","z"], types: ["SIMULATION","DC","BASE_SHAPE"],
-    funcNames: ["read_imageStepMode","atan2j","mmod2","smoothstepc","dc_hoshi_rotate","dc_hoshi_hsv","dc_hoshi_getRGBColor","dbl2int","greyscale","distance_color"],
+    funcNames: ["read_imageStepMode","atan2j","mmod2","G_atan2","smoothstepc","dc_hoshi_rotate","dc_hoshi_hsv","dc_hoshi_getRGBColor","dbl2int","greyscale","distance_color"],
     funcs: `fn read_imageStepMode(base: u32, n: i32, t: f32) -> vec4f { return pal[base + u32(clamp(t, 0.0, 0.99999) * f32(max(n, 1)))]; }
 
 fn atan2j(y: f32, x: f32) -> f32 { if (x == 0.0 && y == 0.0) { return select(0.0, PI, (bitcast<u32>(x) >> 31u) == 1u) * select(1.0, -1.0, (bitcast<u32>(y) >> 31u) == 1u); } return atan2(y, x); }
 
 fn mmod2(a: vec2f, b: vec2f) -> vec2f { return a - b * floor(a / b); }
+
+fn G_atan2(y: f32, x: f32) -> f32 { let c1 = PI / 4.0; let ay = abs(y); var ang: f32;
+  if (x >= 0.0) { let r = (x - ay) / (x + ay); ang = c1 - c1 * r; } else { let r = (x + ay) / (ay - x); ang = 3.0 * c1 - c1 * r; }
+  return select(ang, -ang, y < 0.0); }
 
 fn smoothstepc(a: f32, b: f32, x: f32) -> f32 { if (a == b) { return step(a, x); } let t = clamp((x - a) / (b - a), 0.0, 1.0); return t * t * (3.0 - 2.0 * t); }
 
@@ -27906,7 +27930,7 @@ fn dc_hoshi_getRGBColor(p__in: vec2f, time: f32, steps: f32, scale: f32, transla
     p_ = ((p_ * vec2f(scale)) - vec2f(translate));
     p_ = dc_hoshi_rotate(p_, (3.14159 / ((((0.1 + (sin(((time * 0.0005) + (f32(i) * 0.5000001))) * 0.4999)) + 0.5) + (10.0 / time)) + (sin(time) / 100.0))));
   }
-  var i: f32 = (((x * x) + atan2j(p_.y, p_.x)) + (time * 0.02));
+  var i: f32 = (((x * x) + G_atan2(p_.y, p_.x)) + (time * 0.02));
   var h: f32 = ((floor((i * 4.0)) / 8.0) + 1.107);
   h += ((smoothstepc(-0.1, 0.8, (mmod(((i * 2.0) / 5.0), (1.0 / 4.0)) * 900.0)) / 0.01) - 0.5);
   var color: vec3f = dc_hoshi_hsv(h, 1.0, smoothstepc(-3.0, 3.0, (length(p_) * 1.0)));
@@ -28320,14 +28344,18 @@ if ((${p[8]} == 1)) {
   "dc_kaleidoscopic": {
     params: [{ name: "seed", def: 10000, int: true }, { name: "time", def: 0 }, { name: "sides", def: 8, int: true }, { name: "zoom", def: 1 }, { name: "p1", def: 0 }, { name: "radial", def: 1, int: true }, { name: "ColorOnly", def: 0, int: true }, { name: "Gradient", def: 0, int: true }, { name: "scale_z", def: 0 }, { name: "offset_z", def: 0 }, { name: "reset_z", def: 1, int: true }],
     verified: true, priority: 0, flags: ["dc","rgb","z"], types: ["SIMULATION","DC","BASE_SHAPE"],
-    funcNames: ["read_imageStepMode","atan2j","dc_kaleidoscopic_smallKoleidoscope","dc_kaleidoscopic_getRGBColor","dbl2int","greyscale","distance_color"],
+    funcNames: ["read_imageStepMode","atan2j","G_atan2","dc_kaleidoscopic_smallKoleidoscope","dc_kaleidoscopic_getRGBColor","dbl2int","greyscale","distance_color"],
     funcs: `fn read_imageStepMode(base: u32, n: i32, t: f32) -> vec4f { return pal[base + u32(clamp(t, 0.0, 0.99999) * f32(max(n, 1)))]; }
 
 fn atan2j(y: f32, x: f32) -> f32 { if (x == 0.0 && y == 0.0) { return select(0.0, PI, (bitcast<u32>(x) >> 31u) == 1u) * select(1.0, -1.0, (bitcast<u32>(y) >> 31u) == 1u); } return atan2(y, x); }
 
+fn G_atan2(y: f32, x: f32) -> f32 { let c1 = PI / 4.0; let ay = abs(y); var ang: f32;
+  if (x >= 0.0) { let r = (x - ay) / (x + ay); ang = c1 - c1 * r; } else { let r = (x + ay) / (ay - x); ang = 3.0 * c1 - c1 * r; }
+  return select(ang, -ang, y < 0.0); }
+
 fn dc_kaleidoscopic_smallKoleidoscope(uv: vec2f, time: f32, sides: f32) -> vec2f {
   var KA: f32 = (PI / sides);
-  var angle: f32 = (abs((mmod(atan2j(uv.y, uv.x), (2.0 * KA)) - KA)) + (0.1 * time));
+  var angle: f32 = (abs((mmod(G_atan2(uv.y, uv.x), (2.0 * KA)) - KA)) + (0.1 * time));
   var uvr: vec2f = (vec2f(cos(angle), sin(angle)) * vec2f(length(uv)));
   return uvr;
 }
@@ -29310,14 +29338,18 @@ if ((${p[7]} == 1)) {
   "dc_hyperbolictile": {
     params: [{ name: "zoom", def: 1 }, { name: "ColorOnly", def: 0, int: true }, { name: "Gradient", def: 0, int: true }, { name: "scale_z", def: 0 }, { name: "offset_z", def: 0 }, { name: "reset_z", def: 1, int: true }],
     verified: true, priority: 0, flags: ["dc","rgb","z"], types: ["SIMULATION","DC","BASE_SHAPE"],
-    funcNames: ["read_imageStepMode","atan2j","dc_hyperbolictile_topolar","dc_hyperbolictile_tocart","dc_hyperbolictile_mirror","dc_hyperbolictile_getRGBColor","dbl2int","greyscale","distance_color"],
+    funcNames: ["read_imageStepMode","atan2j","G_atan2","dc_hyperbolictile_topolar","dc_hyperbolictile_tocart","dc_hyperbolictile_mirror","dc_hyperbolictile_getRGBColor","dbl2int","greyscale","distance_color"],
     funcs: `fn read_imageStepMode(base: u32, n: i32, t: f32) -> vec4f { return pal[base + u32(clamp(t, 0.0, 0.99999) * f32(max(n, 1)))]; }
 
 fn atan2j(y: f32, x: f32) -> f32 { if (x == 0.0 && y == 0.0) { return select(0.0, PI, (bitcast<u32>(x) >> 31u) == 1u) * select(1.0, -1.0, (bitcast<u32>(y) >> 31u) == 1u); } return atan2(y, x); }
 
+fn G_atan2(y: f32, x: f32) -> f32 { let c1 = PI / 4.0; let ay = abs(y); var ang: f32;
+  if (x >= 0.0) { let r = (x - ay) / (x + ay); ang = c1 - c1 * r; } else { let r = (x + ay) / (ay - x); ang = 3.0 * c1 - c1 * r; }
+  return select(ang, -ang, y < 0.0); }
+
 fn dc_hyperbolictile_topolar(cart: vec2f) -> vec2f {
   var r_: f32 = sqrt(((cart.x * cart.x) + (cart.y * cart.y)));
-  var alpha: f32 = atan2j(cart.y, cart.x);
+  var alpha: f32 = G_atan2(cart.y, cart.x);
   return vec2f(r_, alpha);
 }
 
@@ -29757,13 +29789,17 @@ if ((${p[13]} == 1)) {
   "dc_ducks": {
     params: [{ name: "seed", def: 10000, int: true }, { name: "time", def: 10 }, { name: "zoom", def: 1 }, { name: "ColorOnly", def: 0, int: true }, { name: "Gradient", def: 0, int: true }, { name: "scale_z", def: 0 }, { name: "offset_z", def: 0 }, { name: "reset_z", def: 1, int: true }],
     verified: true, priority: 0, flags: ["dc","rgb","z"], types: ["SIMULATION","DC","BASE_SHAPE"],
-    funcNames: ["read_imageStepMode","atan2j","dc_ducks_Bfunc","dc_ducks_Ffunc","dc_ducks_getRGBColor","dbl2int","greyscale","distance_color"],
+    funcNames: ["read_imageStepMode","atan2j","G_atan2","dc_ducks_Bfunc","dc_ducks_Ffunc","dc_ducks_getRGBColor","dbl2int","greyscale","distance_color"],
     funcs: `fn read_imageStepMode(base: u32, n: i32, t: f32) -> vec4f { return pal[base + u32(clamp(t, 0.0, 0.99999) * f32(max(n, 1)))]; }
 
 fn atan2j(y: f32, x: f32) -> f32 { if (x == 0.0 && y == 0.0) { return select(0.0, PI, (bitcast<u32>(x) >> 31u) == 1u) * select(1.0, -1.0, (bitcast<u32>(y) >> 31u) == 1u); } return atan2(y, x); }
 
+fn G_atan2(y: f32, x: f32) -> f32 { let c1 = PI / 4.0; let ay = abs(y); var ang: f32;
+  if (x >= 0.0) { let r = (x - ay) / (x + ay); ang = c1 - c1 * r; } else { let r = (x + ay) / (ay - x); ang = 3.0 * c1 - c1 * r; }
+  return select(ang, -ang, y < 0.0); }
+
 fn dc_ducks_Bfunc(a: vec2f) -> vec2f {
-  return vec2f(log(length(a)), (atan2j(a.y, a.x) - 6.2));
+  return vec2f(log(length(a)), (G_atan2(a.y, a.x) - 6.2));
 }
 
 fn dc_ducks_Ffunc(uv: vec2f, time: f32) -> vec3f {
@@ -30026,15 +30062,19 @@ if ((${p[9]} == 1)) {
   "dc_tree": {
     params: [{ name: "levels", def: 20, int: true }, { name: "thicknes", def: 1000 }, { name: "style", def: 50 }, { name: "shift", def: 1.5 }, { name: "seed", def: 10000, int: true }, { name: "time", def: 0 }, { name: "zoom", def: 4 }, { name: "ColorOnly", def: 0, int: true }, { name: "Gradient", def: 0, int: true }, { name: "scale_z", def: 0 }, { name: "offset_z", def: 0 }, { name: "reset_z", def: 1, int: true }],
     verified: true, priority: 0, flags: ["dc","rgb","z"], types: ["SIMULATION","DC","BASE_SHAPE"],
-    funcNames: ["read_imageStepMode","atan2j","smoothstepc","dc_tree_po","dc_tree_ca","dc_tree_ln","dc_tree_getRGBColor","dbl2int","greyscale","distance_color"],
+    funcNames: ["read_imageStepMode","atan2j","G_atan2","smoothstepc","dc_tree_po","dc_tree_ca","dc_tree_ln","dc_tree_getRGBColor","dbl2int","greyscale","distance_color"],
     funcs: `fn read_imageStepMode(base: u32, n: i32, t: f32) -> vec4f { return pal[base + u32(clamp(t, 0.0, 0.99999) * f32(max(n, 1)))]; }
 
 fn atan2j(y: f32, x: f32) -> f32 { if (x == 0.0 && y == 0.0) { return select(0.0, PI, (bitcast<u32>(x) >> 31u) == 1u) * select(1.0, -1.0, (bitcast<u32>(y) >> 31u) == 1u); } return atan2(y, x); }
 
+fn G_atan2(y: f32, x: f32) -> f32 { let c1 = PI / 4.0; let ay = abs(y); var ang: f32;
+  if (x >= 0.0) { let r = (x - ay) / (x + ay); ang = c1 - c1 * r; } else { let r = (x + ay) / (ay - x); ang = 3.0 * c1 - c1 * r; }
+  return select(ang, -ang, y < 0.0); }
+
 fn smoothstepc(a: f32, b: f32, x: f32) -> f32 { if (a == b) { return step(a, x); } let t = clamp((x - a) / (b - a), 0.0, 1.0); return t * t * (3.0 - 2.0 * t); }
 
 fn dc_tree_po(v_: vec2f) -> vec2f {
-  return vec2f(length(v_), atan2j(v_.y, v_.x));
+  return vec2f(length(v_), G_atan2(v_.y, v_.x));
 }
 
 fn dc_tree_ca(u: vec2f) -> vec2f {
@@ -32252,12 +32292,16 @@ if ((${p[10]} == 1)) {
   "dc_fingerprint": {
     params: [{ name: "zoom", def: 50 }, { name: "seed", def: 10000, int: true }, { name: "time", def: 0 }, { name: "width", def: 0.8 }, { name: "ColorOnly", def: 0, int: true }, { name: "Gradient", def: 0, int: true }, { name: "scale_z", def: 0 }, { name: "offset_z", def: 0 }, { name: "reset_z", def: 1, int: true }],
     verified: true, priority: 0, flags: ["dc","rgb","z"], types: ["SIMULATION","DC","BASE_SHAPE"],
-    funcNames: ["read_imageStepMode","atan2j","smoothstepc","dc_fingerprint_hash2","dc_fingerprint_getRGBColor","dbl2int","greyscale","distance_color"],
+    funcNames: ["read_imageStepMode","atan2j","smoothstepc","G_atan2","dc_fingerprint_hash2","dc_fingerprint_getRGBColor","dbl2int","greyscale","distance_color"],
     funcs: `fn read_imageStepMode(base: u32, n: i32, t: f32) -> vec4f { return pal[base + u32(clamp(t, 0.0, 0.99999) * f32(max(n, 1)))]; }
 
 fn atan2j(y: f32, x: f32) -> f32 { if (x == 0.0 && y == 0.0) { return select(0.0, PI, (bitcast<u32>(x) >> 31u) == 1u) * select(1.0, -1.0, (bitcast<u32>(y) >> 31u) == 1u); } return atan2(y, x); }
 
 fn smoothstepc(a: f32, b: f32, x: f32) -> f32 { if (a == b) { return step(a, x); } let t = clamp((x - a) / (b - a), 0.0, 1.0); return t * t * (3.0 - 2.0 * t); }
+
+fn G_atan2(y: f32, x: f32) -> f32 { let c1 = PI / 4.0; let ay = abs(y); var ang: f32;
+  if (x >= 0.0) { let r = (x - ay) / (x + ay); ang = c1 - c1 * r; } else { let r = (x + ay) / (ay - x); ang = 3.0 * c1 - c1 * r; }
+  return select(ang, -ang, y < 0.0); }
 
 fn dc_fingerprint_hash2(p__in: vec2f) -> vec2f {
   var p_: vec2f = p__in;
@@ -32274,10 +32318,10 @@ fn dc_fingerprint_getRGBColor(uv_in: vec2f, time: f32, width: f32) -> vec3f {
   for (var i: i32 = 0; (i < 50); i++) {
     var s: f32 = sign(h.x);
     h = (dc_fingerprint_hash2(h) * vec2f(15.0, 20.0));
-    a += (s * atan2j((uv.x - h.x), (uv.y - h.y)));
+    a += (s * G_atan2((uv.x - h.x), (uv.y - h.y)));
   }
   uv = (uv + abs(dc_fingerprint_hash2(h)));
-  a += atan2j(uv.y, uv.x);
+  a += G_atan2(uv.y, uv.x);
   var p_: f32 = ((1.0 - bounds) * width);
   var s: f32 = min(0.3, p_);
   var l: f32 = (length(uv) + (0.319 * a));
@@ -32647,12 +32691,16 @@ if ((${p[9]} == 1)) {
   "dc_sunflower": {
     params: [{ name: "zoom", def: 7 }, { name: "step", def: 0.1 }, { name: "N", def: 30, int: true }, { name: "Polar", def: 1, int: true }, { name: "Dots", def: 1, int: true }, { name: "GridX", def: 1, int: true }, { name: "GridY", def: 1, int: true }, { name: "ColorOnly", def: 0, int: true }, { name: "Gradient", def: 0, int: true }, { name: "scale_z", def: 0 }, { name: "offset_z", def: 0 }, { name: "reset_z", def: 1, int: true }],
     verified: true, priority: 0, flags: ["dc","rgb","z"], types: ["SIMULATION","DC","BASE_SHAPE"],
-    funcNames: ["read_imageStepMode","atan2j","smoothstepc","dc_sunflower_line","dc_sunflower_L","dc_sunflower_S","dc_sunflower_getRGBColor","dbl2int","greyscale","distance_color"],
+    funcNames: ["read_imageStepMode","atan2j","smoothstepc","G_atan2","dc_sunflower_line","dc_sunflower_L","dc_sunflower_S","dc_sunflower_getRGBColor","dbl2int","greyscale","distance_color"],
     funcs: `fn read_imageStepMode(base: u32, n: i32, t: f32) -> vec4f { return pal[base + u32(clamp(t, 0.0, 0.99999) * f32(max(n, 1)))]; }
 
 fn atan2j(y: f32, x: f32) -> f32 { if (x == 0.0 && y == 0.0) { return select(0.0, PI, (bitcast<u32>(x) >> 31u) == 1u) * select(1.0, -1.0, (bitcast<u32>(y) >> 31u) == 1u); } return atan2(y, x); }
 
 fn smoothstepc(a: f32, b: f32, x: f32) -> f32 { if (a == b) { return step(a, x); } let t = clamp((x - a) / (b - a), 0.0, 1.0); return t * t * (3.0 - 2.0 * t); }
+
+fn G_atan2(y: f32, x: f32) -> f32 { let c1 = PI / 4.0; let ay = abs(y); var ang: f32;
+  if (x >= 0.0) { let r = (x - ay) / (x + ay); ang = c1 - c1 * r; } else { let r = (x + ay) / (ay - x); ang = 3.0 * c1 - c1 * r; }
+  return select(ang, -ang, y < 0.0); }
 
 fn dc_sunflower_line(p__in: vec2f, a: vec2f, b_in: vec2f) -> f32 {
   var p_: vec2f = p__in;
@@ -32681,7 +32729,7 @@ fn dc_sunflower_getRGBColor(U_in: vec2f, N: f32, step_: f32, GridX: f32, GridY: 
   var O: vec3f = vec3f(0.0, 0.0, 0.0);
   l = length(U);
   J.x = (l * 6.28);
-  U = (vec2f((atan2j(U.y, U.x) / 6.28), l) * vec2f(N));
+  U = (vec2f((G_atan2(U.y, U.x) / 6.28), l) * vec2f(N));
   w_ = 0.1;
   U.x += (r_ * floor((U.y + 0.5)));
   if ((GridX == 1.0)) {
@@ -32796,7 +32844,7 @@ if ((${p[11]} == 1)) {
   "dc_gabornoise": {
     params: [{ name: "seed", def: 10000, int: true }, { name: "time", def: 0 }, { name: "zoom", def: 20 }, { name: "ColorOnly", def: 0, int: true }, { name: "Gradient", def: 0, int: true }, { name: "scale_z", def: 0 }, { name: "offset_z", def: 0 }, { name: "reset_z", def: 1, int: true }],
     verified: true, priority: 0, flags: ["dc","rgb","z"], types: ["SIMULATION","DC","BASE_SHAPE"],
-    funcNames: ["Mat2","read_imageStepMode","atan2j","dc_gabornoise_hash","Mat2_Init","times","dc_gabornoise_getRGBColor","dbl2int","greyscale","distance_color"],
+    funcNames: ["Mat2","read_imageStepMode","atan2j","G_atan2","dc_gabornoise_hash","Mat2_Init","times","dc_gabornoise_getRGBColor","dbl2int","greyscale","distance_color"],
     funcs: `struct Mat2 {
   a00: f32,
   a01: f32,
@@ -32807,6 +32855,10 @@ if ((${p[11]} == 1)) {
 fn read_imageStepMode(base: u32, n: i32, t: f32) -> vec4f { return pal[base + u32(clamp(t, 0.0, 0.99999) * f32(max(n, 1)))]; }
 
 fn atan2j(y: f32, x: f32) -> f32 { if (x == 0.0 && y == 0.0) { return select(0.0, PI, (bitcast<u32>(x) >> 31u) == 1u) * select(1.0, -1.0, (bitcast<u32>(y) >> 31u) == 1u); } return atan2(y, x); }
+
+fn G_atan2(y: f32, x: f32) -> f32 { let c1 = PI / 4.0; let ay = abs(y); var ang: f32;
+  if (x >= 0.0) { let r = (x - ay) / (x + ay); ang = c1 - c1 * r; } else { let r = (x + ay) / (ay - x); ang = 3.0 * c1 - c1 * r; }
+  return select(ang, -ang, y < 0.0); }
 
 fn dc_gabornoise_hash(p_: f32) -> vec3f {
   return ((fract((sin((vec3f(63.31, 395.467, 1) * vec3f(p_))) * vec3f(43141.59265))) * vec3f(2.0)) - vec3f(1.0));
@@ -32837,7 +32889,7 @@ fn dc_gabornoise_getRGBColor(V: vec2f, time: f32) -> vec3f {
     t_ = times(&(M), t_);
     h.x = t_.x;
     h.y = t_.y;
-    a += (s * atan2j((U.x - h.x), (U.y - h.y)));
+    a += (s * G_atan2((U.x - h.x), (U.y - h.y)));
   }
   O = ((cos((vec3f(0.0, 23.0, 21.0) + vec3f(a))) * vec3f(0.6)) + vec3f(0.6));
   return O;
@@ -33077,7 +33129,7 @@ if ((${p[7]} == 1)) {
   "dc_moebiuslog": {
     params: [{ name: "zoom", def: 7 }, { name: "seed", def: 10000, int: true }, { name: "time", def: 0 }, { name: "Log", def: 1, int: true }, { name: "Moebius", def: 1, int: true }, { name: "scale", def: 5 }, { name: "angle", def: 5 }, { name: "ColorOnly", def: 0, int: true }, { name: "Gradient", def: 0, int: true }, { name: "scale_z", def: 0 }, { name: "offset_z", def: 0 }, { name: "reset_z", def: 1, int: true }],
     verified: true, priority: 0, flags: ["dc","rgb","z"], types: ["SIMULATION","DC","BASE_SHAPE"],
-    funcNames: ["Mat2","read_imageStepMode","atan2j","Mat2_Init","times","dc_moebiuslog_getRGBColor","dbl2int","greyscale","distance_color"],
+    funcNames: ["Mat2","read_imageStepMode","atan2j","G_atan2","Mat2_Init","times","dc_moebiuslog_getRGBColor","dbl2int","greyscale","distance_color"],
     funcs: `struct Mat2 {
   a00: f32,
   a01: f32,
@@ -33088,6 +33140,10 @@ if ((${p[7]} == 1)) {
 fn read_imageStepMode(base: u32, n: i32, t: f32) -> vec4f { return pal[base + u32(clamp(t, 0.0, 0.99999) * f32(max(n, 1)))]; }
 
 fn atan2j(y: f32, x: f32) -> f32 { if (x == 0.0 && y == 0.0) { return select(0.0, PI, (bitcast<u32>(x) >> 31u) == 1u) * select(1.0, -1.0, (bitcast<u32>(y) >> 31u) == 1u); } return atan2(y, x); }
+
+fn G_atan2(y: f32, x: f32) -> f32 { let c1 = PI / 4.0; let ay = abs(y); var ang: f32;
+  if (x >= 0.0) { let r = (x - ay) / (x + ay); ang = c1 - c1 * r; } else { let r = (x + ay) / (ay - x); ang = 3.0 * c1 - c1 * r; }
+  return select(ang, -ang, y < 0.0); }
 
 fn Mat2_Init(m: ptr<function, Mat2>, v00: f32, v10: f32, v01: f32, v11: f32) {
   (*m).a00 = v00;
@@ -33113,7 +33169,7 @@ fn dc_moebiuslog_getRGBColor(U_in: vec2f, Log: f32, Moebius: f32, angle: f32, sc
     U = (U + vec2f(0.5));
   }
   if ((Log == 1.0)) {
-    U = ((vec2f(0.5, -0.5) * vec2f(log(length((U + vec2f(0.5)))))) + (vec2f(angle, 1.0) * vec2f((atan2j(U.y, U.x) / 6.3))));
+    U = ((vec2f(0.5, -0.5) * vec2f(log(length((U + vec2f(0.5)))))) + (vec2f(angle, 1.0) * vec2f((G_atan2(U.y, U.x) / 6.3))));
   }
   var color: vec3f = vec3f(0.0, 0.0, 0.0);
   color = (color + vec3f(length(fract((U * vec2f(scale))))));
@@ -34234,10 +34290,14 @@ v.y = (${w} * y);
   "cut_fingerprint": {
     params: [{ name: "seed", def: 10000, int: true }, { name: "mode", def: 1, int: true }, { name: "zoom", def: 20 }, { name: "width", def: 0.8 }, { name: "invert", def: 0, int: true }],
     verified: true, priority: 0, flags: ["hide"], types: ["BASE_SHAPE","SIMULATION"],
-    funcNames: ["atan2j","smoothstepc","cut_fingerprint_hash2","cut_fingerprint_getRGBColor"],
+    funcNames: ["atan2j","smoothstepc","G_atan2","cut_fingerprint_hash2","cut_fingerprint_getRGBColor"],
     funcs: `fn atan2j(y: f32, x: f32) -> f32 { if (x == 0.0 && y == 0.0) { return select(0.0, PI, (bitcast<u32>(x) >> 31u) == 1u) * select(1.0, -1.0, (bitcast<u32>(y) >> 31u) == 1u); } return atan2(y, x); }
 
 fn smoothstepc(a: f32, b: f32, x: f32) -> f32 { if (a == b) { return step(a, x); } let t = clamp((x - a) / (b - a), 0.0, 1.0); return t * t * (3.0 - 2.0 * t); }
+
+fn G_atan2(y: f32, x: f32) -> f32 { let c1 = PI / 4.0; let ay = abs(y); var ang: f32;
+  if (x >= 0.0) { let r = (x - ay) / (x + ay); ang = c1 - c1 * r; } else { let r = (x + ay) / (ay - x); ang = 3.0 * c1 - c1 * r; }
+  return select(ang, -ang, y < 0.0); }
 
 fn cut_fingerprint_hash2(p__in: vec2f) -> vec2f {
   var p_: vec2f = p__in;
@@ -34254,10 +34314,10 @@ fn cut_fingerprint_getRGBColor(uv_in: vec2f, seed: f32, width: f32) -> vec3f {
   for (var i: i32 = 0; (i < 50); i++) {
     var s: f32 = sign(h.x);
     h = (cut_fingerprint_hash2(h) * vec2f(15.0, 20.0));
-    a += (s * atan2j((uv.x - h.x), (uv.y - h.y)));
+    a += (s * G_atan2((uv.x - h.x), (uv.y - h.y)));
   }
   uv = (uv + abs(cut_fingerprint_hash2(h)));
-  a += atan2j(uv.y, uv.x);
+  a += G_atan2(uv.y, uv.x);
   var p_: f32 = ((1.0 - bounds) * width);
   var s: f32 = min(0.3, p_);
   var l: f32 = (length(uv) + (0.319 * a));
@@ -34480,7 +34540,7 @@ v.y = (${w} * (y - py_center));
   "cut_shapes": {
     params: [{ name: "mode", def: 1, int: true }, { name: "type", def: 0, int: true }, { name: "contour", def: 1, int: true }, { name: "zoom", def: 1 }, { name: "invert", def: 0, int: true }, { name: "n", def: 3, int: true }, { name: "thick", def: 0.01 }, { name: "time", def: 0.5 }],
     verified: true, priority: 0, flags: ["hide"], types: ["2D","BASE_SHAPE","SIMULATION"],
-    funcNames: ["Mat2","smoothstepc","atan2j","cut_shapes_sdHexagram","cut_shapes_sdEquilateralTriangle","cut_shapes_sdStar","cut_shapes_sdCross","cut_shapes_sdOctogon","cut_shapes_sdHexagon","cut_shapes_sdPentagon","cut_shapes_sdVesica","cut_shapes_dot2","cut_shapes_sdTrapezoid","cut_shapes_sdTrapezoid_ov1","Mat2_Init","times","cut_shapes_sdArc","cut_shapes_ndot","cut_shapes_sdRhombus","cut_shapes_sdCircle","cut_shapes_sdBox"],
+    funcNames: ["Mat2","smoothstepc","atan2j","G_atan2","cut_shapes_sdHexagram","cut_shapes_sdEquilateralTriangle","cut_shapes_sdStar","cut_shapes_sdCross","cut_shapes_sdOctogon","cut_shapes_sdHexagon","cut_shapes_sdPentagon","cut_shapes_sdVesica","cut_shapes_dot2","cut_shapes_sdTrapezoid","cut_shapes_sdTrapezoid_ov1","Mat2_Init","times","cut_shapes_sdArc","cut_shapes_ndot","cut_shapes_sdRhombus","cut_shapes_sdCircle","cut_shapes_sdBox"],
     funcs: `struct Mat2 {
   a00: f32,
   a01: f32,
@@ -34491,6 +34551,10 @@ v.y = (${w} * (y - py_center));
 fn smoothstepc(a: f32, b: f32, x: f32) -> f32 { if (a == b) { return step(a, x); } let t = clamp((x - a) / (b - a), 0.0, 1.0); return t * t * (3.0 - 2.0 * t); }
 
 fn atan2j(y: f32, x: f32) -> f32 { if (x == 0.0 && y == 0.0) { return select(0.0, PI, (bitcast<u32>(x) >> 31u) == 1u) * select(1.0, -1.0, (bitcast<u32>(y) >> 31u) == 1u); } return atan2(y, x); }
+
+fn G_atan2(y: f32, x: f32) -> f32 { let c1 = PI / 4.0; let ay = abs(y); var ang: f32;
+  if (x >= 0.0) { let r = (x - ay) / (x + ay); ang = c1 - c1 * r; } else { let r = (x + ay) / (ay - x); ang = 3.0 * c1 - c1 * r; }
+  return select(ang, -ang, y < 0.0); }
 
 fn cut_shapes_sdHexagram(p__in: vec2f, r_: f32) -> f32 {
   var p_: vec2f = p__in;
@@ -34524,7 +34588,7 @@ fn cut_shapes_sdStar(p__in: vec2f, r_: f32, n: i32, m: f32) -> f32 {
   var en: f32 = (6.283185 / m);
   var acs: vec2f = vec2f(cos(an), sin(an));
   var ecs: vec2f = vec2f(cos(en), sin(en));
-  var bn: f32 = (mmod(atan2j(p_.x, p_.y), (2.0 * an)) - an);
+  var bn: f32 = (mmod(G_atan2(p_.x, p_.y), (2.0 * an)) - an);
   p_ = (vec2f(cos(bn), abs(sin(bn))) * vec2f(length(p_)));
   p_ = (p_ - (acs * vec2f(r_)));
   p_ = (p_ + (ecs * vec2f(clamp(-(dot(p_, ecs)), 0.0, ((r_ * acs.y) / ecs.y)))));
@@ -34792,13 +34856,17 @@ v.y = (${w} * y);
   "cut_pattern": {
     params: [{ name: "seed", def: 1000, int: true }, { name: "mode", def: 1, int: true }, { name: "time", def: 0.9 }, { name: "zoom", def: 0.5 }, { name: "invert", def: 0, int: true }],
     verified: true, priority: 0, flags: ["hide"], types: ["2D","BASE_SHAPE","SIMULATION"],
-    funcNames: ["Mat2","atan2j","Mat2_Init","times","cut_pattern_rotate2D","cut_pattern_rotateTilePattern"],
+    funcNames: ["Mat2","G_atan2","atan2j","Mat2_Init","times","cut_pattern_rotate2D","cut_pattern_rotateTilePattern"],
     funcs: `struct Mat2 {
   a00: f32,
   a01: f32,
   a10: f32,
   a11: f32,
 }
+
+fn G_atan2(y: f32, x: f32) -> f32 { let c1 = PI / 4.0; let ay = abs(y); var ang: f32;
+  if (x >= 0.0) { let r = (x - ay) / (x + ay); ang = c1 - c1 * r; } else { let r = (x + ay) / (ay - x); ang = 3.0 * c1 - c1 * r; }
+  return select(ang, -ang, y < 0.0); }
 
 fn atan2j(y: f32, x: f32) -> f32 { if (x == 0.0 && y == 0.0) { return select(0.0, PI, (bitcast<u32>(x) >> 31u) == 1u) * select(1.0, -1.0, (bitcast<u32>(y) >> 31u) == 1u); } return atan2(y, x); }
 
@@ -34856,7 +34924,7 @@ uv = fract(uv);
 uv = cut_pattern_rotateTilePattern(uv);
 var pos: vec2f = (vec2f(0.0, 5.0) - uv);
 var radius: f32 = length(pos);
-var angle: f32 = atan2j(pos.x, pos.y);
+var angle: f32 = G_atan2(pos.x, pos.y);
 var r_: f32 = sin((((radius * sin(((((uv.y * PI) * 5.0) + ${p[2]}) + cos((((sin(((uv.x * PI) * 3.0)) * PI) * 2.0) + sin(((uv.y * PI) * 15.0))))))) * 1.0) * sin(((uv.y * PI) + sin(((uv.x * PI) * 5.0))))));
 var b: f32 = ((cos((((r_ * PI) * 2.0) + (PI * 2.0))) * 0.9) + (sin((((r_ * PI) * 2.0) + (PI * 2.0))) * 0.7));
 var color: f32 = b;
@@ -35164,8 +35232,12 @@ v.y = (${w} * y);
   "cut_sqsplits": {
     params: [{ name: "seed", def: 1000, int: true }, { name: "mode", def: 1, int: true }, { name: "time", def: 0.9 }, { name: "zoom", def: 2 }, { name: "invert", def: 0, int: true }],
     verified: true, priority: 0, flags: ["hide"], types: ["2D","BASE_SHAPE","SIMULATION"],
-    funcNames: ["mmod2","atan2j"],
+    funcNames: ["mmod2","G_atan2","atan2j"],
     funcs: `fn mmod2(a: vec2f, b: vec2f) -> vec2f { return a - b * floor(a / b); }
+
+fn G_atan2(y: f32, x: f32) -> f32 { let c1 = PI / 4.0; let ay = abs(y); var ang: f32;
+  if (x >= 0.0) { let r = (x - ay) / (x + ay); ang = c1 - c1 * r; } else { let r = (x + ay) / (ay - x); ang = 3.0 * c1 - c1 * r; }
+  return select(ang, -ang, y < 0.0); }
 
 fn atan2j(y: f32, x: f32) -> f32 { if (x == 0.0 && y == 0.0) { return select(0.0, PI, (bitcast<u32>(x) >> 31u) == 1u) * select(1.0, -1.0, (bitcast<u32>(y) >> 31u) == 1u); } return atan2(y, x); }`,
     code: (w, p) => `{
@@ -35182,7 +35254,7 @@ var U: vec2f = vec2f((x * ${p[3]}), (y * ${p[3]}));
 var Uf: vec2f = (fract(U) - vec2f(0.5));
 var Ui: vec2f = floor(mmod2(U, vec2f(2.0)));
 var t_: f32 = (${p[2]} * 0.35);
-var a: f32 = (atan2j(Uf.x, Uf.y) / 6.3);
+var a: f32 = (G_atan2(Uf.x, Uf.y) / 6.3);
 var r_: f32 = fract(((t_ + t_) + (2.0 * select((1.0 - a), a, (Ui.x != Ui.y)))));
 var sharp: f32 = (180.0 * length(Uf));
 var k: f32 = (clamp(((r_ - 0.5) * sharp), 0.0, 1.0) + clamp((1.0 - (r_ * sharp)), 0.0, 1.0));
@@ -36367,7 +36439,7 @@ v.y = (${w} * y);
   "cut_truchetweaving": {
     params: [{ name: "randomize", def: 0, int: true }, { name: "mode", def: 1, int: true }, { name: "type", def: 0, int: true }, { name: "width", def: 0.15 }, { name: "zoom", def: 8 }, { name: "invert", def: 0, int: true }],
     verified: true, priority: 0, flags: ["hide"], types: ["2D","BASE_SHAPE","SIMULATION"],
-    funcNames: ["Mat2","mmod2","atan2j","df_add","op_","df_qts","df_ts","df_mulf","hsin_","df_mul","df_sin","df_cos","smoothstepc","cut_truchetweaving_N21","Mat2_Init","times","cut_truchetweaving_UvCirc","cut_truchetweaving_UvBeam","cut_truchetweaving_Truchet"],
+    funcNames: ["Mat2","mmod2","atan2j","df_add","op_","df_qts","df_ts","df_mulf","hsin_","df_mul","df_sin","df_cos","G_atan2","smoothstepc","cut_truchetweaving_N21","Mat2_Init","times","cut_truchetweaving_UvCirc","cut_truchetweaving_UvBeam","cut_truchetweaving_Truchet"],
     funcs: `struct Mat2 {
   a00: f32,
   a01: f32,
@@ -36435,6 +36507,10 @@ fn df_cos(x: vec2f) -> vec2f {
   return s;
 }
 
+fn G_atan2(y: f32, x: f32) -> f32 { let c1 = PI / 4.0; let ay = abs(y); var ang: f32;
+  if (x >= 0.0) { let r = (x - ay) / (x + ay); ang = c1 - c1 * r; } else { let r = (x + ay) / (ay - x); ang = 3.0 * c1 - c1 * r; }
+  return select(ang, -ang, y < 0.0); }
+
 fn smoothstepc(a: f32, b: f32, x: f32) -> f32 { if (a == b) { return step(a, x); } let t = clamp((x - a) / (b - a), 0.0, 1.0); return t * t * (3.0 - 2.0 * t); }
 
 fn cut_truchetweaving_N21(id: vec2f) -> f32 {
@@ -36453,7 +36529,7 @@ fn times(m: ptr<function, Mat2>, v_: vec2f) -> vec2f {
 }
 
 fn cut_truchetweaving_UvCirc(uv: vec2f, radius: f32, thickness: f32) -> vec4f {
-  var st: vec2f = vec2f(atan2j(uv.x, uv.y), length(uv));
+  var st: vec2f = vec2f(G_atan2(uv.x, uv.y), length(uv));
   var t_: f32 = (thickness / 2.0);
   var w_: f32 = 0.01;
   var r1: f32 = (radius - t_);
@@ -37262,10 +37338,14 @@ if ((${p[7]} == 1)) {
   "dc_butterflies": {
     params: [{ name: "seed", def: 1000, int: true }, { name: "time", def: 0 }, { name: "zoom", def: 1 }, { name: "red", def: 1 }, { name: "green", def: 1 }, { name: "blue", def: 1 }, { name: "ColorOnly", def: 0, int: true }, { name: "Gradient", def: 0, int: true }, { name: "scale_z", def: 0 }, { name: "offset_z", def: 0 }, { name: "reset_z", def: 1, int: true }],
     verified: true, priority: 0, flags: ["dc","rgb","z"], types: ["SIMULATION","DC","BASE_SHAPE"],
-    funcNames: ["read_imageStepMode","atan2j","powc","dc_butterflies_cpow","dc_butterflies_csin","dc_butterflies_func","dc_butterflies_getRGBColor","dbl2int","greyscale","distance_color"],
+    funcNames: ["read_imageStepMode","atan2j","G_atan2","powc","dc_butterflies_cpow","dc_butterflies_csin","dc_butterflies_func","dc_butterflies_getRGBColor","dbl2int","greyscale","distance_color"],
     funcs: `fn read_imageStepMode(base: u32, n: i32, t: f32) -> vec4f { return pal[base + u32(clamp(t, 0.0, 0.99999) * f32(max(n, 1)))]; }
 
 fn atan2j(y: f32, x: f32) -> f32 { if (x == 0.0 && y == 0.0) { return select(0.0, PI, (bitcast<u32>(x) >> 31u) == 1u) * select(1.0, -1.0, (bitcast<u32>(y) >> 31u) == 1u); } return atan2(y, x); }
+
+fn G_atan2(y: f32, x: f32) -> f32 { let c1 = PI / 4.0; let ay = abs(y); var ang: f32;
+  if (x >= 0.0) { let r = (x - ay) / (x + ay); ang = c1 - c1 * r; } else { let r = (x + ay) / (ay - x); ang = 3.0 * c1 - c1 * r; }
+  return select(ang, -ang, y < 0.0); }
 
 fn powc(x: f32, y: f32) -> f32 {
   if (x >= 0.0) { return pow(x, y); }
@@ -37277,7 +37357,7 @@ fn powc(x: f32, y: f32) -> f32 {
 
 fn dc_butterflies_cpow(z: vec2f, n: f32) -> vec2f {
   var r_: f32 = length(z);
-  var a: f32 = atan2j(z.y, z.x);
+  var a: f32 = G_atan2(z.y, z.x);
   return (vec2f(cos((a * n)), sin((a * n))) * vec2f(powc(r_, n)));
 }
 
@@ -37827,7 +37907,7 @@ v.y = (${w} * y);
   "cut_spiralcb": {
     params: [{ name: "time", def: 0 }, { name: "mode", def: 1, int: true }, { name: "zoom", def: 1 }, { name: "invert", def: 0, int: true }],
     verified: true, priority: 0, flags: ["hide"], types: ["2D","BASE_SHAPE","SIMULATION"],
-    funcNames: ["Mat2","atan2j","Mat2_Init","cut_spiralcb_rotate","times","cut_spiralcb_hill","cut_spiralcb_compute_spiral"],
+    funcNames: ["Mat2","atan2j","G_atan2","Mat2_Init","cut_spiralcb_rotate","times","cut_spiralcb_hill","cut_spiralcb_compute_spiral"],
     funcs: `struct Mat2 {
   a00: f32,
   a01: f32,
@@ -37836,6 +37916,10 @@ v.y = (${w} * y);
 }
 
 fn atan2j(y: f32, x: f32) -> f32 { if (x == 0.0 && y == 0.0) { return select(0.0, PI, (bitcast<u32>(x) >> 31u) == 1u) * select(1.0, -1.0, (bitcast<u32>(y) >> 31u) == 1u); } return atan2(y, x); }
+
+fn G_atan2(y: f32, x: f32) -> f32 { let c1 = PI / 4.0; let ay = abs(y); var ang: f32;
+  if (x >= 0.0) { let r = (x - ay) / (x + ay); ang = c1 - c1 * r; } else { let r = (x + ay) / (ay - x); ang = 3.0 * c1 - c1 * r; }
+  return select(ang, -ang, y < 0.0); }
 
 fn Mat2_Init(m: ptr<function, Mat2>, v00: f32, v10: f32, v01: f32, v11: f32) {
   (*m).a00 = v00;
@@ -37861,7 +37945,7 @@ fn cut_spiralcb_hill(t_: f32, w_: f32, p_: f32) -> f32 {
 fn cut_spiralcb_compute_spiral(uv_in: vec2f, time: f32) -> f32 {
   var uv: vec2f = uv_in;
   var fi: f32 = (length(uv) * 50.0);
-  var g: f32 = atan2j(uv.y, uv.x);
+  var g: f32 = G_atan2(uv.y, uv.x);
   var m: Mat2;
   m = cut_spiralcb_rotate((time * 7.0));
   uv = times(&(m), uv);
@@ -38188,10 +38272,14 @@ v.y = (${w} * (y - py_center));
   "cut_triskel": {
     params: [{ name: "mode", def: 1, int: true }, { name: "zoom", def: 1 }, { name: "invert", def: 0, int: true }],
     verified: true, priority: 0, flags: ["hide","z"], types: ["BASE_SHAPE","SIMULATION"],
-    funcNames: ["atan2j","smoothstepc"],
-    funcs: `fn atan2j(y: f32, x: f32) -> f32 { if (x == 0.0 && y == 0.0) { return select(0.0, PI, (bitcast<u32>(x) >> 31u) == 1u) * select(1.0, -1.0, (bitcast<u32>(y) >> 31u) == 1u); } return atan2(y, x); }
+    funcNames: ["G_atan2","smoothstepc","atan2j"],
+    funcs: `fn G_atan2(y: f32, x: f32) -> f32 { let c1 = PI / 4.0; let ay = abs(y); var ang: f32;
+  if (x >= 0.0) { let r = (x - ay) / (x + ay); ang = c1 - c1 * r; } else { let r = (x + ay) / (ay - x); ang = 3.0 * c1 - c1 * r; }
+  return select(ang, -ang, y < 0.0); }
 
-fn smoothstepc(a: f32, b: f32, x: f32) -> f32 { if (a == b) { return step(a, x); } let t = clamp((x - a) / (b - a), 0.0, 1.0); return t * t * (3.0 - 2.0 * t); }`,
+fn smoothstepc(a: f32, b: f32, x: f32) -> f32 { if (a == b) { return step(a, x); } let t = clamp((x - a) / (b - a), 0.0, 1.0); return t * t * (3.0 - 2.0 * t); }
+
+fn atan2j(y: f32, x: f32) -> f32 { if (x == 0.0 && y == 0.0) { return select(0.0, PI, (bitcast<u32>(x) >> 31u) == 1u) * select(1.0, -1.0, (bitcast<u32>(y) >> 31u) == 1u); } return atan2(y, x); }`,
     code: (w, p) => `{
 var x: f32;
 var y: f32;
@@ -38213,7 +38301,7 @@ for (var i: i32 = 0; (i < 3); i++) {
   U = vec2f(((vec4f(-0.5, 0.866, -0.866, -0.5).x * U.x) + (vec4f(-0.5, 0.866, -0.866, -0.5).z * U.y)), ((vec4f(-0.5, 0.866, -0.866, -0.5).y * U.x) + (vec4f(-0.5, 0.866, -0.866, -0.5).w * U.y)));
   A_ = (U + vec2f(0.03, -0.577));
   l = (3.0 * length(A_));
-  b = atan2j(A_.y, A_.x);
+  b = G_atan2(A_.y, A_.x);
   color = max(color, select(0.0, (0.5 + (0.5 * sin((b + (6.24 * l))))), ((l + fract(((b / 7.0) + 0.3))) < 2.0)));
 }
 color = (smoothstepc(0.0, 0.1, abs((color - 0.5))) - smoothstepc(0.8, 0.9, color));
@@ -38241,8 +38329,12 @@ if (false) {
   "cut_vasarely": {
     params: [{ name: "mode", def: 1, int: true }, { name: "zoom", def: 1 }, { name: "invert", def: 0, int: true }, { name: "size", def: 0.5 }],
     verified: true, priority: 0, flags: ["hide"], types: ["2D","BASE_SHAPE","SIMULATION"],
-    funcNames: ["atan2j"],
-    funcs: `fn atan2j(y: f32, x: f32) -> f32 { if (x == 0.0 && y == 0.0) { return select(0.0, PI, (bitcast<u32>(x) >> 31u) == 1u) * select(1.0, -1.0, (bitcast<u32>(y) >> 31u) == 1u); } return atan2(y, x); }`,
+    funcNames: ["G_atan2","atan2j"],
+    funcs: `fn G_atan2(y: f32, x: f32) -> f32 { let c1 = PI / 4.0; let ay = abs(y); var ang: f32;
+  if (x >= 0.0) { let r = (x - ay) / (x + ay); ang = c1 - c1 * r; } else { let r = (x + ay) / (ay - x); ang = 3.0 * c1 - c1 * r; }
+  return select(ang, -ang, y < 0.0); }
+
+fn atan2j(y: f32, x: f32) -> f32 { if (x == 0.0 && y == 0.0) { return select(0.0, PI, (bitcast<u32>(x) >> 31u) == 1u) * select(1.0, -1.0, (bitcast<u32>(y) >> 31u) == 1u); } return atan2(y, x); }`,
     code: (w, p) => `{
 var x: f32;
 var y: f32;
@@ -38258,8 +38350,8 @@ uv = (uv * vec2f(${p[1]}));
 var l: f32 = length(uv);
 var b: f32 = max(0.0, (2.0 - (l / ${p[3]})));
 var color: f32 = 0.0;
-color = select(color, ((color - 0.5) - sin(((l * sin(((atan2j(uv.y, uv.x) + 1.57) + ((4.0 * b) * b)))) * 150.0))), (abs(uv.x) < 1.0));
-color -= select(color, ((color - 0.5) - sin(((l * sin(((atan2j(uv.y, uv.x) + 1.57) + ((4.0 * b) * b)))) * 150.0))), (abs(uv.x) < 1.0));
+color = select(color, ((color - 0.5) - sin(((l * sin(((G_atan2(uv.y, uv.x) + 1.57) + ((4.0 * b) * b)))) * 150.0))), (abs(uv.x) < 1.0));
+color -= select(color, ((color - 0.5) - sin(((l * sin(((G_atan2(uv.y, uv.x) + 1.57) + ((4.0 * b) * b)))) * 150.0))), (abs(uv.x) < 1.0));
 (*hd) = false;
 if ((min(max(${p[2]}, 0.0), 1.0) == 0)) {
   if ((color < 0.1)) {
@@ -38281,8 +38373,12 @@ v.y = (${w} * y);
   "cut_web": {
     params: [{ name: "seed", def: 1000, int: true }, { name: "time", def: 0 }, { name: "mode", def: 1, int: true }, { name: "thick", def: 0.05 }, { name: "invert", def: 1, int: true }],
     verified: true, priority: 0, flags: ["hide"], types: ["2D","BASE_SHAPE","SIMULATION"],
-    funcNames: ["atan2j","mmod2","cut_web_eval","cut_web_getColour"],
+    funcNames: ["atan2j","G_atan2","mmod2","cut_web_eval","cut_web_getColour"],
     funcs: `fn atan2j(y: f32, x: f32) -> f32 { if (x == 0.0 && y == 0.0) { return select(0.0, PI, (bitcast<u32>(x) >> 31u) == 1u) * select(1.0, -1.0, (bitcast<u32>(y) >> 31u) == 1u); } return atan2(y, x); }
+
+fn G_atan2(y: f32, x: f32) -> f32 { let c1 = PI / 4.0; let ay = abs(y); var ang: f32;
+  if (x >= 0.0) { let r = (x - ay) / (x + ay); ang = c1 - c1 * r; } else { let r = (x + ay) / (ay - x); ang = 3.0 * c1 - c1 * r; }
+  return select(ang, -ang, y < 0.0); }
 
 fn mmod2(a: vec2f, b: vec2f) -> vec2f { return a - b * floor(a / b); }
 
@@ -38290,7 +38386,7 @@ fn cut_web_eval(p__in: vec2f, c: vec2f, strength: f32) -> vec2f {
   var p_: vec2f = p__in;
   p_ = (p_ - c);
   var l: f32 = log(length(p_));
-  var ang: f32 = atan2j(p_.y, p_.x);
+  var ang: f32 = G_atan2(p_.y, p_.x);
   return (vec2f(l, ang) * vec2f(strength));
 }
 
@@ -38548,8 +38644,10 @@ if (false) {
   "cut_magfield": {
     params: [{ name: "randomize", def: 0, int: true }, { name: "time", def: 0 }, { name: "density", def: 3 }, { name: "zoom", def: 3 }, { name: "mode", def: 1, int: true }, { name: "invert", def: 0, int: true }],
     verified: true, priority: 0, flags: ["hide"], types: ["2D","BASE_SHAPE","SIMULATION"],
-    funcNames: ["atan2j","powc","cut_magfield_rand","cut_magfield_force","cut_magfield_calcVelocity","cut_magfield_calcDerivative","cut_magfield_saturate"],
-    funcs: `fn atan2j(y: f32, x: f32) -> f32 { if (x == 0.0 && y == 0.0) { return select(0.0, PI, (bitcast<u32>(x) >> 31u) == 1u) * select(1.0, -1.0, (bitcast<u32>(y) >> 31u) == 1u); } return atan2(y, x); }
+    funcNames: ["G_atan2","powc","atan2j","cut_magfield_rand","cut_magfield_force","cut_magfield_calcVelocity","cut_magfield_calcDerivative","cut_magfield_saturate"],
+    funcs: `fn G_atan2(y: f32, x: f32) -> f32 { let c1 = PI / 4.0; let ay = abs(y); var ang: f32;
+  if (x >= 0.0) { let r = (x - ay) / (x + ay); ang = c1 - c1 * r; } else { let r = (x + ay) / (ay - x); ang = 3.0 * c1 - c1 * r; }
+  return select(ang, -ang, y < 0.0); }
 
 fn powc(x: f32, y: f32) -> f32 {
   if (x >= 0.0) { return pow(x, y); }
@@ -38558,6 +38656,8 @@ fn powc(x: f32, y: f32) -> f32 {
   let m = pow(-x, y);
   return select(m, -m, (i32(yi) & 1) != 0);
 }
+
+fn atan2j(y: f32, x: f32) -> f32 { if (x == 0.0 && y == 0.0) { return select(0.0, PI, (bitcast<u32>(x) >> 31u) == 1u) * select(1.0, -1.0, (bitcast<u32>(y) >> 31u) == 1u); } return atan2(y, x); }
 
 fn cut_magfield_rand(n: f32) -> f32 {
   return fract((sin(n) * 43758.5453123));
@@ -38612,7 +38712,7 @@ if ((min(max(${p[4]}, 0.0), 1.0) == 0)) {
 var p_: vec2f = vec2f((x * ${p[3]}), (y * ${p[3]}));
 spacing = (1.0 / (10.0 * min(max(${p[2]}, 1.0), 10.0)));
 var v_: vec2f = cut_magfield_calcVelocity(p_, ${p[1]});
-var a: f32 = ((atan2j(v_.x, v_.y) / PI) / 2.0);
+var a: f32 = ((G_atan2(v_.x, v_.y) / PI) / 2.0);
 var lines: f32 = fract((a / spacing));
 lines = (min(lines, (1.0 - lines)) * 2.0);
 lines /= (cut_magfield_calcDerivative(v_, p_, ${p[1]}) / spacing);
@@ -39568,8 +39668,12 @@ v.y = (${w} * y);
   "crop_stars": {
     params: [{ name: "radius", def: 0.35 }, { name: "n", def: 3, int: true }, { name: "r2", def: 0.333 }, { name: "invert", def: 0, int: true }],
     verified: true, priority: 0, flags: ["hide","z"], types: ["CROP"],
-    funcNames: ["atan2j","crop_stars_sdStar"],
+    funcNames: ["atan2j","G_atan2","crop_stars_sdStar"],
     funcs: `fn atan2j(y: f32, x: f32) -> f32 { if (x == 0.0 && y == 0.0) { return select(0.0, PI, (bitcast<u32>(x) >> 31u) == 1u) * select(1.0, -1.0, (bitcast<u32>(y) >> 31u) == 1u); } return atan2(y, x); }
+
+fn G_atan2(y: f32, x: f32) -> f32 { let c1 = PI / 4.0; let ay = abs(y); var ang: f32;
+  if (x >= 0.0) { let r = (x - ay) / (x + ay); ang = c1 - c1 * r; } else { let r = (x + ay) / (ay - x); ang = 3.0 * c1 - c1 * r; }
+  return select(ang, -ang, y < 0.0); }
 
 fn crop_stars_sdStar(p__in: vec2f, r_: f32, n: i32, m: f32) -> f32 {
   var p_: vec2f = p__in;
@@ -39577,7 +39681,7 @@ fn crop_stars_sdStar(p__in: vec2f, r_: f32, n: i32, m: f32) -> f32 {
   var en: f32 = (6.283185 / m);
   var acs: vec2f = vec2f(cos(an), sin(an));
   var ecs: vec2f = vec2f(cos(en), sin(en));
-  var bn: f32 = (mmod(atan2j(p_.x, p_.y), (2.0 * an)) - an);
+  var bn: f32 = (mmod(G_atan2(p_.x, p_.y), (2.0 * an)) - an);
   p_ = (vec2f(cos(bn), abs(sin(bn))) * vec2f(length(p_)));
   p_ = (p_ - (acs * vec2f(r_)));
   p_ = (p_ + (ecs * vec2f(clamp(-(dot(p_, ecs)), 0.0, ((r_ * acs.y) / ecs.y)))));
@@ -39620,8 +39724,12 @@ if (false) {
   "post_crop_stars": {
     params: [{ name: "radius", def: 0.35 }, { name: "n", def: 3, int: true }, { name: "r2", def: 0.333 }, { name: "invert", def: 0, int: true }],
     verified: true, priority: 1, flags: ["hide"], types: ["CROP","POST"],
-    funcNames: ["atan2j","post_crop_stars_sdStar"],
+    funcNames: ["atan2j","G_atan2","post_crop_stars_sdStar"],
     funcs: `fn atan2j(y: f32, x: f32) -> f32 { if (x == 0.0 && y == 0.0) { return select(0.0, PI, (bitcast<u32>(x) >> 31u) == 1u) * select(1.0, -1.0, (bitcast<u32>(y) >> 31u) == 1u); } return atan2(y, x); }
+
+fn G_atan2(y: f32, x: f32) -> f32 { let c1 = PI / 4.0; let ay = abs(y); var ang: f32;
+  if (x >= 0.0) { let r = (x - ay) / (x + ay); ang = c1 - c1 * r; } else { let r = (x + ay) / (ay - x); ang = 3.0 * c1 - c1 * r; }
+  return select(ang, -ang, y < 0.0); }
 
 fn post_crop_stars_sdStar(p__in: vec2f, r_: f32, n: i32, m: f32) -> f32 {
   var p_: vec2f = p__in;
@@ -39629,7 +39737,7 @@ fn post_crop_stars_sdStar(p__in: vec2f, r_: f32, n: i32, m: f32) -> f32 {
   var en: f32 = (6.283185 / m);
   var acs: vec2f = vec2f(cos(an), sin(an));
   var ecs: vec2f = vec2f(cos(en), sin(en));
-  var bn: f32 = (mmod(atan2j(p_.x, p_.y), (2.0 * an)) - an);
+  var bn: f32 = (mmod(G_atan2(p_.x, p_.y), (2.0 * an)) - an);
   p_ = (vec2f(cos(bn), abs(sin(bn))) * vec2f(length(p_)));
   p_ = (p_ - (acs * vec2f(r_)));
   p_ = (p_ + (ecs * vec2f(clamp(-(dot(p_, ecs)), 0.0, ((r_ * acs.y) / ecs.y)))));
@@ -42149,10 +42257,14 @@ v.y = (${w} * y);
   "cut_mandala": {
     params: [{ name: "seed", def: 1000, int: true }, { name: "mode", def: 1, int: true }, { name: "time", def: 0 }, { name: "zoom", def: 2 }, { name: "invert", def: 1, int: true }],
     verified: true, priority: 0, flags: ["hide"], types: ["2D","BASE_SHAPE","SIMULATION"],
-    funcNames: ["atan2j","mmod2","smoothstepc","cut_mandala_spiral","cut_mandala_rose","rose2","cut_mandala_circle"],
-    funcs: `fn atan2j(y: f32, x: f32) -> f32 { if (x == 0.0 && y == 0.0) { return select(0.0, PI, (bitcast<u32>(x) >> 31u) == 1u) * select(1.0, -1.0, (bitcast<u32>(y) >> 31u) == 1u); } return atan2(y, x); }
+    funcNames: ["G_atan2","mmod2","atan2j","smoothstepc","cut_mandala_spiral","cut_mandala_rose","rose2","cut_mandala_circle"],
+    funcs: `fn G_atan2(y: f32, x: f32) -> f32 { let c1 = PI / 4.0; let ay = abs(y); var ang: f32;
+  if (x >= 0.0) { let r = (x - ay) / (x + ay); ang = c1 - c1 * r; } else { let r = (x + ay) / (ay - x); ang = 3.0 * c1 - c1 * r; }
+  return select(ang, -ang, y < 0.0); }
 
 fn mmod2(a: vec2f, b: vec2f) -> vec2f { return a - b * floor(a / b); }
+
+fn atan2j(y: f32, x: f32) -> f32 { if (x == 0.0 && y == 0.0) { return select(0.0, PI, (bitcast<u32>(x) >> 31u) == 1u) * select(1.0, -1.0, (bitcast<u32>(y) >> 31u) == 1u); } return atan2(y, x); }
 
 fn smoothstepc(a: f32, b: f32, x: f32) -> f32 { if (a == b) { return step(a, x); } let t = clamp((x - a) / (b - a), 0.0, 1.0); return t * t * (3.0 - 2.0 * t); }
 
@@ -42205,7 +42317,7 @@ if ((min(max(${p[1]}, 0.0), 1.0) == 0)) {
   y = (rnd(rs) - 0.5);
 }
 var p_: vec2f = vec2f((x * ${p[3]}), (y * ${p[3]}));
-var f: vec2f = vec2f(sqrt(((p_.x * p_.x) + (p_.y * p_.y))), atan2j(p_.y, p_.x));
+var f: vec2f = vec2f(sqrt(((p_.x * p_.x) + (p_.y * p_.y))), G_atan2(p_.y, p_.x));
 var T0: f32 = cos((0.3 * ${p[2]}));
 var T1: f32 = (0.5 + (0.5 * cos((0.3 * ${p[2]}))));
 var T2: f32 = 1.0;

@@ -639,14 +639,14 @@ ${solid ? `    // JWildfire solid rendering: no density — the nearest point pe
     else if (drawn && P.shadow.x == 1u && !bdone) { bdone = true; shadowSplat(dp); }
     if (visible && fx >= 0.0 && fy >= 0.0 && fx < f32(P.width) && fy < f32(P.height) && drawn) {
       var col = pal[${li * 256}u + min(u32(clamp(dc, 0.0, 1.0) * 255.99), 255u)];
-      if (rgbo.w > 0.25) { col = vec4f(clamp(rgbo.xyz, vec3f(0.0), vec3f(1.0)), 1.0); }
+      if (rgbo.w > 0.25) { col = vec4f(clamp(rgbo.xyz, vec3f(0.0), vec3f(1.0)) * (256.0 / 200.0), 1.0); } // direct RGB is 0..255 in JWildfire, the palette 0..199.2 (RenderColor ×200/256): ×1.28 on our palette-relative scale
       if (dz < 1.0) { col = vec4f(mix(P.dimColor.xyz, col.xyz, dz), col.w); }
       let lw = xd[${8 + li}u] * (200.0 / 256.0); // JWildfire RenderColor scale: the shading sees palette·200/256/255
       solidSplat(u32(fy) * P.width + u32(fx), cz, dp, col.xyz * lw, ${usesMat ? 'mt' : '0.0'});
     }` : `    if (visible && fx >= 0.0 && fy >= 0.0 && fx < f32(P.width) && fy < f32(P.height)) {
       let hi = (u32(fy) * P.width + u32(fx)) * 4u;
       var col = pal[${li * 256}u + min(u32(clamp(dc, 0.0, 1.0) * 255.99), 255u)];
-      if (rgbo.w > 0.25) { col = vec4f(clamp(rgbo.xyz, vec3f(0.0), vec3f(1.0)), 1.0); }${usesMods ? '\n      col = vec4f(applyColorMods(col.xyz, dm), col.w);' : ''}
+      if (rgbo.w > 0.25) { col = vec4f(clamp(rgbo.xyz, vec3f(0.0), vec3f(1.0)) * (256.0 / 200.0), 1.0); } // direct RGB is 0..255 in JWildfire, the palette 0..199.2 (RenderColor ×200/256): ×1.28 on our palette-relative scale${usesMods ? '\n      col = vec4f(applyColorMods(col.xyz, dm), col.w);' : ''}
       if (dz < 1.0) { col = vec4f(mix(P.dimColor.xyz, col.xyz, dz), col.w); }
       let lw = op * xd[${8 + li}u]; // JWildfire layer weight: colour intensity multiplier (the density count is unaffected)
       // fixed-point colour accumulation is dithered so dim contributions (small weights/opacities) stay unbiased
@@ -733,13 +733,14 @@ fn subflame${k}(rs: ptr<function, u32>, cp: ptr<function, f32>, hd: ptr<function
   q = sub${k}_p; qc = sub${k}_c;
 ${fsteps}
   // colour: the sub-flame's palette entry (GradientColorStep, index·254 + 0.5) unless a direct-colour variation set one.
-  // JWildfire holds palette colours on the RenderColor scale (·200/256) and direct colours on 0..255; our plot scale is the
-  // palette's, so a palette colour passes through unscaled as an RGB colour but reads ·200/256 as a channel value
-  var srgb = qrgb.xyz; var chan = qrgb.xyz;
-  if (qrgb.w < 0.5) { let ci = u32(clamp(i32(qc * 254.0 + 0.5), 0, 255)) * 3u; srgb = vec3f(xd[${sb.palBase}u + ci], xd[${sb.palBase}u + ci + 1u], xd[${sb.palBase}u + ci + 2u]); chan = srgb * (200.0 / 256.0); }
+  // JWildfire holds palette colours on the RenderColor scale (·200/256) and direct colours on 0..255, and copies
+  // q.redColor verbatim; a direct colour here is on the 0..255 scale (1.0 = 255, the plot applies ×256/200), so a palette
+  // colour passes through as ·200/256 — the same value it reads as a channel
+  var chan = qrgb.xyz;
+  if (qrgb.w < 0.5) { let ci = u32(clamp(i32(qc * 254.0 + 0.5), 0, 255)) * 3u; chan = vec3f(xd[${sb.palBase}u + ci], xd[${sb.palBase}u + ci + 1u], xd[${sb.palBase}u + ci + 2u]) * (200.0 / 256.0); }
   *hd = qhide;
   if (cmode != -1) {
-    if (qrgb.w > 0.5 || cmode == -2) { *rgb = vec4f(srgb, 1.0); *cp = qc; }
+    if (qrgb.w > 0.5 || cmode == -2) { *rgb = vec4f(chan, 1.0); *cp = qc; }
     if (cmode == 0) { *cp = qc; }
     else if (cmode == 1) { *cp = chan.x; }
     else if (cmode == 2) { *cp = chan.y; }

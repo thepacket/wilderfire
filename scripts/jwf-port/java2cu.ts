@@ -309,7 +309,7 @@ __device__ void jcx_Acos(jcx_ *z) { jcx_Flip(z); jcx_AsinH(z); jcx_Flip(z); z->r
 __device__ void jcx_CPow(jcx_ *z, jcx_ ex) { if (ex.im == 0.f) { jcx_Pow(z, ex.re); return; } jcx_Log(z); jcx_Mul(z, ex); jcx_Exp(z); }`,
   jhashcode: '__device__ int jhashcode(int a) { return a; }', // Integer.hashCode(int) is the int itself
   jgcd: '__device__ int jgcd(int a, int b) { a = abs(a); b = abs(b); while (b != 0) { int t = a % b; a = b; b = t; } return a; }',
-  G_Kscope: '__device__ float2 G_Kscope(float2 uv, float k) { float angle = fabsf(mod(atan2f(uv.y, uv.x), 2.0f * k) - k); return make_float2(length(uv) * cosf(angle), length(uv) * sinf(angle)); }',
+  G_Kscope: '__device__ float2 G_Kscope(float2 uv, float k) { float angle = fabsf(mod(G_atan2(uv.y, uv.x), 2.0f * k) - k); return make_float2(length(uv) * cosf(angle), length(uv) * sinf(angle)); }',
   G_rot: '__device__ mat3_ G_rot(float3 s) { float sa = sinf(s.x), ca = cosf(s.x), sb = sinf(s.y), cb = cosf(s.y), sc = sinf(s.z), cc = cosf(s.z); return mat3_make(cb*cc, -cb*sc, sb, sa*sb*cc+ca*sc, -sa*sb*sc+ca*cc, -sa*cb, -ca*sb*cc+sa*sc, ca*sb*sc+sa*cc, ca*cb); }',
   G_app: '__device__ float3 G_app(float3 v, float k, mat3_ m) { for (int i = 0; i < 50; i++) { float3 mv = make_float3(m.a00 * v.x + m.a01 * v.y + m.a02 * v.z, m.a10 * v.x + m.a11 * v.y + m.a12 * v.z, m.a20 * v.x + m.a21 * v.y + m.a22 * v.z) * k; v = abs(mv / dot(v, v) * 0.5f - 0.5f) * 2.0f - 1.0f; } return v; }',
   // JWildfire's MarsagliaRandomGenerator (per-cell seeded randoms in de_stijl/greebles/quad): exact 32-bit port
@@ -883,7 +883,7 @@ function glslTokenize(s: string): Tok[] {
 const VEC_TYPES: Record<string, string> = { vec2: 'float2', vec3: 'float3', vec4: 'float4', mat2: 'float4', mat3: 'mat3_' };
 const G_MAP: Record<string, string> = { abs: 'abs', mod: 'mod', mix: 'mix', smoothstep: 'smoothstep', floor: 'floor', fract: 'fract', clamp: 'clamp', sin: 'sin', cos: 'cos', tan: 'tan',
   step: 'step', normalize: 'normalize', min: 'min', max: 'max', pow: 'pow', exp: 'exp', exp2: 'exp2', log2: 'log2', sign: 'sign', cross: 'cross', sqrt: 'sqrt', length: 'length', dot: 'dot', distance: 'distance',
-  trunc: 'trunc', round: 'round', ceil: 'ceil', reflect: 'reflect', tanh: 'tanh', sinh: 'sinh', cosh: 'cosh', invSqrt: 'rsqrtf', atan2: 'atan2f' };
+  trunc: 'trunc', round: 'round', ceil: 'ceil', reflect: 'reflect', tanh: 'tanh', sinh: 'sinh', cosh: 'cosh', invSqrt: 'rsqrtf', atan2: 'G_atan2' }; // G.atan2 is js.glsl's rational approximation (data/g-atan2.json)
 const VEC_BINOPS: Record<string, string> = { plus: '+', add: '+', minus: '-', multiply: '*', division: '/' };
 // js.glsl matrices: mat2 travels as float4 (a00, a10, a01, a11 — the constructor order), mat3 as the
 // struct mat3_ (LIB.mat3). `.times()` needs to know which operand is the matrix, so declared variable /
@@ -983,7 +983,7 @@ class GlslExpr {
     }
     if (t.v === 'G' && this.at('.')) {
       this.eat('.'); const fn = this.eat().v; const a = this.args();
-      if (fn === 'atan') return a.length === 2 ? `atan2f(${a[0]}, ${a[1]})` : `atanf(${a[0]})`;
+      if (fn === 'atan') return a.length === 2 ? `atanf((${a[0]}) / (${a[1]}))` : `atanf(${a[0]})`; // G.atan(n, d) = atan(n/d), no quadrant
       if (fn === 'Kscope') return `G_Kscope(${a.join(', ')})`;
       if (fn === 'rot') return `G_rot(${a[0]})`;
       if (fn === 'app') return `G_app(${a.join(', ')})`;

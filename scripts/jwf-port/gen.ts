@@ -37,6 +37,8 @@ const dump: DumpVar[] = readFileSync(join(dataDir, 'jwf-variations.jsonl'), 'utf
 const javaPorts = new Map<string, { gpuCode: string; preCode?: string; gpuFunctions: string; extraParams: string[]; note: string }>();
 try { for (const l of readFileSync(join(dataDir, 'jwf-java-ports.jsonl'), 'utf8').trim().split('\n')) { const p = JSON.parse(l); javaPorts.set(p.name, p); } } catch { /* none */ }
 const kernelLib = readFileSync(join(dataDir, 'kernel-lib.cu'), 'utf8');
+// variations whose Java angles come from js.glsl G.atan2 (an approximation): their snippets' atan2 → G_atan2 helper
+const gAtan2 = new Set<string>(JSON.parse(readFileSync(join(dataDir, 'g-atan2.json'), 'utf8')).variations as string[]);
 // Oracle verdicts (written by the in-browser harness); absent → nothing is verified.
 let verified = new Set<string>();
 try { verified = new Set<string>(JSON.parse(readFileSync(join(here, 'verified.json'), 'utf8')).jwf); } catch { /* first run */ }
@@ -229,6 +231,14 @@ for (let v0 of dump) {
       let code = (ovCode ?? v0.gpuCode ?? '').replace(/varpar->/g, '__');
       for (const [bad, good] of Object.entries(al)) code = code.replace(new RegExp(`__${v0.name}_${bad}(?![A-Za-z0-9_])`, 'g'), `__${v0.name}_${good}`);
       ovCode = code;
+    }
+    if (gAtan2.has(v0.name)) {
+      // the CPU's angles are js.glsl G.atan2 (rational approximation); JWildfire's GPU snippet calls the exact atan2f
+      const toG = (t: string) => t.replace(/(?<![\w.])atan2f?\s*\(/g, 'G_atan2(');
+      const code = toG((ovCode ?? v0.gpuCode ?? '').replace(/varpar->/g, '__'));
+      const funcs = toG(v0.gpuFunctions ?? '');
+      if (!code.includes('G_atan2') && !funcs.includes('G_atan2')) throw new Error(`g-atan2.json: ${v0.name} has no atan2 call`);
+      ovCode = code; v0 = { ...v0, gpuFunctions: funcs };
     }
   }
   // DC_BaseFunc family (dc_* shader-art variations): JWildfire's GPU snippets sample

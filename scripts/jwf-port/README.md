@@ -29,6 +29,7 @@ JWildfire source ──Oracle.java─▶ oracle-out.jsonl ◀── oracle-spec.
 | `data/jwf-variations.jsonl` | Metadata + GPU code for all 1026 JWildfire variations (name, params/defaults/int-ness, priority, types, GPU code, helper functions). Produced by `Dump.java`; checked in so regeneration does not need Java. |
 | `data/kernel-lib.cu` | Helper library extracted from JWildfire's `Flam4_3dKernal_TemplateJWF.cu` (Complex/Mat2/Jacobi/noise/misc); transpiled on demand. |
 | `java2cu.ts`, `data/jwf-java-ports.jsonl` | Java → CUDA-dialect pre-processor for the variations that have *no* GPU snippet in JWildfire: extracts fields, params (from `setParameter`), `init()`, helper methods and `transform()` from the Java class, rewrites the Java idioms (`pAffineTP.x`→`__x`, `pVarTP.x`→`__px`, `pAmount`→`__amount_`, `pContext.random()`, `Math.*`/MathLib statics, `sinAndCos`, `this.` fields, locals shadowing fields, `random(Integer.MAX_VALUE)`→31-bit `RANDINT`), replays setParameter-derived fields, turns per-instance state (attractors) into per-thread `varpar->` state initialised on the first call, and copies helper-used params/fields into state. GLSL-style Java (js.glsl `vec2`/`vec3`/`vec4` objects, `G.*` statics, `new mat2(…)` in `.times()`) goes through a small expression parser that turns method chains into vector arithmetic (`crop_*`, `glsl_*`, `truchetflow`); the abstract `GLSLFunc` parent's fields/params are merged in. Plain-data inner classes (`Point`, `Double2`, `RandXYData`, `SinCosPair`, …) become WGSL structs with maker/setter functions; JWildfire's `XYZPoint`, `DoubleWrapperWF`, `MarsagliaRandomGenerator` and `java.util.Random` are built-in structs (`jxyz_`, `jdw_`, `jmrg_`, `jrand_` — the last two are exact 32-bit / 48-bit-LCG ports so per-cell seeded randoms match the Java); js.glsl `mat2`/`mat3` travel as `float4` / a `mat3_` struct (`.times()` resolves matrix·vector by tracked operand kinds); helpers taking `pAffineTP`/`pVarTP` are inlined at their call sites; array/object helper params become pointers; `pXForm.getXYCoeff*()` reads the affine; static-final constants are inlined and constant tables hoisted to module scope; `long` maps to `int` (seeds/hashes); pre-priority ports refresh `__r2/__r/__phi/__theta` after rewriting the input like JWildfire's own pre snippets. JWildfire *prepost* variations (`prepost_blob`/`mobius`/`circlize`/`affine`: `invtransform()` runs as a pre step on the affine point, `transform()` as a post step on the output) get two snippets — `preCode` (the inverse + precalc refresh) and `gpuCode` — that the codegen runs at priority −2 and 2 of the same stage; the oracle tests the inverse as its own `name~inv` entry (Oracle.java calls `invtransform`) and `gen.ts` requires both verdicts. Output feeds `gen.ts` exactly like a dump entry. Needs the JWildfire source tree (`--jwf`). |
+| `data/g-atan2.json` | The variations whose CPU code takes its angles from js.glsl `G.atan2` — JWildfire's GLSL-helper class implements it as a rational approximation, not `Math.atan2` (see *Direct colour scale and G.atan2*). `gen.ts` rewrites every scalar `atan2f`/`atan2` in those entries' snippets to the `G_atan2` kernel helper (`cwgsl.ts`); `java2cu.ts` maps `G.atan2` / `G.Kscope` there directly. Regenerate by grepping the Java tree (the note inside says how). |
 | `data/fastnoise.cu` | FastNoise (JWildfire's Flam4 template CUDA port of Auburn's FastNoise_Java; all noise types) + `wfieldValue()` for weighting fields; `gen.ts` transpiles it to `src/gpu/wfield.wgsl.ts`. |
 | `data/unportable.json` | The JWildfire variations WilderFire deliberately does not implement, by category (see *What is not ported*); `gen.ts` checks it against the registry and emits `src/core/variations.unportable.ts` for the importer. |
 | `bindings.ts` | The snippet environment (magic `__x/__px/…`, weight, params, per-thread state → WGSL) shared by `gen.ts` and the regression tests. |
@@ -305,16 +306,46 @@ measurable (our index mean 0.72 vs 0.45). The hue / packed RGB now live in the r
 (2) **JWildfire's `saturation` ≠ 1 turns greys red**: `applyModSaturation` shifts HSL saturation and an achromatic
 pixel's hue is 0, so a grey palette renders red-tinted in JWildfire; keep fixtures at saturation 1.
 
-Leftover found with the RGB-direct controls: under a minimal header (brightness 4, gamma 4, white level 220) the
-already-verified direct-colour variations `dc_truchet` / `dc_menger` render at 0.82 / 0.92 of JWildfire's luma
-(structure 0.99–1.00), i.e. our direct-RGB path and the palette path are not treated identically by one of the
-tonemap stages — fixtures `_ps_rgbctl`, `_ps_rgbctl2`.
+Leftover found with the RGB-direct controls (resolved 2026-08-23, see *Direct colour scale and G.atan2* below): under a
+minimal header the already-verified direct-colour variations `dc_truchet` / `dc_menger` rendered at 0.82 / 0.92 of
+JWildfire's luma — fixtures `_ps_rgbctl`, `_ps_rgbctl2`, now 0.99 / 0.99.
 
 Found on the way: **`gamma="0.0"`** (20 of 5433 corpus flames, JWildfire V4.10/V5.50 files) is not "default" in
 JWildfire — `GammaCorrectionFilter` keeps the exponent 0, i.e. `pow(intensity, 0) = 1`: a flat image at full alpha
 above the threshold. The importer used to reject it and keep gamma 4 (renders at 0.5–0.6 of JWildfire's luma); now
 gamma 0 is kept, both tonemaps use exponent 0 for it (`gpow` keeps 0⁰ = 1 under fast-math), the JSON normaliser
 preserves it. `_ps_brownian_js` went from 0.51 / blkMAE 69 / corr 0.83 to 1.01 / 3.9 / 0.97.
+
+### Direct colour scale and G.atan2 (2026-08-23)
+
+Two engine findings from the `_ps_rgbctl` leftover, both root causes rather than tonemap tuning:
+
+* **Direct RGB is on a different scale from the palette in JWildfire.** `RGBPalette.createRenderPalette` stores every
+  palette entry as `RenderColor = rgb · 200/256` (0..199.2) and `TransformationGradientColorStep` plots that; a
+  direct-colour variation (`DC_BaseFunc` and the `GLSL*`/`mandala`/`maurer_lines`/`colormap_wf`/… families — all of
+  them write 0..255 ints: `dbl2int`, `Color.getRed()`, pixel channels) puts its raw value into `redColor` and
+  `plotPoint` uses it unchanged. So a direct white is 255 where a palette white is 199.2: direct colours are ×1.28
+  brighter. Our histogram held both on the palette's scale (`rgbo` 1.0 = palette white) and the tonemap's
+  ×199.2/whiteLevel then applied to both. Now the plot multiplies a direct colour by 256/200 (codegen, both the density
+  and the solid splat; before the colour modifiers, whose gamma/contrast formulas work on JWildfire's absolute values),
+  and `subflame_wf`'s pass-through hands a sub-palette colour over as ·200/256 — JWildfire copies `q.redColor`
+  verbatim, so a CM_FLAME (-2) sub point carries the RenderColor-scale value (`_sub5`, a `_sub3` variant with
+  `color_mode="-2"`: 1.14 vs `_sub3`'s 1.15 — identical in both renderers). TARGET / DISTANCE plot colours come from
+  `targetRenderColor` / the palette (RenderColor scale) and keep `w = 0.5`, i.e. unscaled. `_ps_rgbctl` 0.82 → 0.99,
+  `_ps_rgbctl2` 0.92 → 0.99, and per-channel means of the PNG pairs now agree to ±0.1.
+* **js.glsl `G.atan2` is an approximation.** JWildfire's GLSL-helper class `js.glsl.G` implements `atan2` as the
+  rational approximation `π/4 − π/4·(x−|y|)/(x+|y|)` (x ≥ 0) / `3π/4 − π/4·(x+|y|)/(|y|−x)` (x < 0), signed by y —
+  up to 0.07 rad off — and `G.Kscope` uses it too; `G.atan(n, d)` is `atan(n/d)` (no quadrant). The CPU render the
+  corpus is authored against uses these, but JWildfire's own GPU snippets call the exact `atan2f`, and java2cu used
+  to map `G.atan2` there as well. For `dc_ducks` (50 chaotic iterations of `(log|e|, atan2 − 6.2)`) the exact atan2
+  produces a different colour pattern: per channel, our red/green means were 22.6/22.9 vs JWildfire's 19.1/18.8 with
+  a histogram peak in the wrong bin (f32 vs f64 was ruled out by an emulation: same bin counts). The 28 verified
+  variations whose Java uses `G.atan2`/`G.Kscope` (`data/g-atan2.json`: `cut_*`, `dc_*`, `glsl_*`, `crop_stars`,
+  `post_crop_stars`) now go through a `G_atan2` WGSL helper; the oracle keeps all 28 at pass (26 at 1.000). Compare:
+  `_ps_ducks` (before, scale fix alone) 1.39 / blkMAE 8.8 → **0.99 / 0.4 / corr 1.00** with the per-channel
+  histograms matching bin for bin; `Machine_1` (corpus, dc_ducks + yin_yang) 1.04 / 2.4 / 0.95 → 0.99 / 0.5 / 1.00;
+  `_ps_hoshi`, `_ps_kaleid`, `_ps_cutweb` 0.99 / corr 1.00. Lesson: when a luma ratio looks "close enough", check
+  the channels — the 0.78 scale error and the pattern error were cancelling in `Machine_1`.
 
 ## Image comparison (2026-08-17)
 

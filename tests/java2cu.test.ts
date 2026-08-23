@@ -115,6 +115,24 @@ describe('java2cu: Complex, pointer propagation, null guards, setParameter local
   });
 });
 
+describe('java2cu: js.glsl G helpers', () => {
+  const d: DumpVar = { name: 'reg_glsl', params: [{ name: 'zoom', def: 1, int: false }, { name: 'invert', def: 0, int: true }], priority: 0 };
+
+  it('G.atan2 → the G_atan2 approximation helper (also inside G.Kscope), G.atan(n, d) → atan(n/d), Math.atan2 stays exact', () => {
+    const { p, wgsl } = port('RegGlslFunc.java', d);
+    expect(p.gpuCode).toContain('G_atan2(k.y, k.x)');
+    expect(p.gpuCode).toContain('atanf((k.y) / (k.x))');
+    expect(p.gpuCode).toContain('atan2f(y, x)');
+    expect(p.gpuCode).toContain('G_Kscope(u, 0.7)');
+    expect(p.gpuFunctions).toContain('G_atan2(uv.y, uv.x)');            // Kscope's angle
+    expect(wgsl.functions).toContain('fn G_atan2(y: f32, x: f32) -> f32');
+    expect(wgsl.code).toContain('G_atan2(k.y, k.x)');
+    expect(wgsl.code).toContain('atan2j(y, x)');
+    expect(p.gpuCode).toMatchSnapshot('cuda');
+    expect(wgsl.code).toMatchSnapshot('wgsl');
+  });
+});
+
 describe('java2cu: parse errors are reported, not silently ported', () => {
   it('rejects a class without transform()', async () => {
     const src = fixture('RegDemoFunc.java').replace('public void transform(', 'public void transformX(');

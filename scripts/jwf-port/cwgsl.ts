@@ -745,6 +745,9 @@ for (const [cn, wn] of Object.entries({ step: 'step', distance: 'distance', refl
 // through the `atan2j` helper (vector calls stay native).
 BUILTINS.atan2f = (a, em) => (isVec(a[0].ty) || isVec(a[1].ty)) ? binaryF('atan2')(a, em) : { c: `atan2j(${em.toF32(a[0])}, ${em.toF32(a[1])})`, ty: F32 };
 BUILTINS.atan2 = BUILTINS.atan2f;
+// js.glsl G.atan2 (JWildfire's GLSL-style Java helpers): a rational approximation, not Math.atan2 — the CPU result the
+// corpus is authored against (data/g-atan2.json lists the variations; gen.ts / java2cu route their calls here)
+BUILTINS.G_atan2 = (a, em) => { if (a.length !== 2 || isVec(a[0].ty) || isVec(a[1].ty)) fail('G_atan2 expects 2 scalars'); return { c: `G_atan2(${em.toF32(a[0])}, ${em.toF32(a[1])})`, ty: F32 }; };
 // C powf: negative bases with integer-valued exponents are defined (WGSL pow is NaN there)
 BUILTINS.powf = (a, em) => {
   if (a.length !== 2) fail('powf expects 2 args');
@@ -955,6 +958,9 @@ export const HELPER_FUNCS: Record<string, string> = {
   //     an integer add of the runtime zero `df_zero` (set opaquely by the kernel entry point), which
   //     the optimiser cannot see through; every intermediate whose rounding matters goes through it.
   //     fma() is fused (tested) and used as is.
+  G_atan2: `fn G_atan2(y: f32, x: f32) -> f32 { let c1 = PI / 4.0; let ay = abs(y); var ang: f32;
+  if (x >= 0.0) { let r = (x - ay) / (x + ay); ang = c1 - c1 * r; } else { let r = (x + ay) / (ay - x); ang = 3.0 * c1 - c1 * r; }
+  return select(ang, -ang, y < 0.0); }`,
   atan2j: `fn atan2j(y: f32, x: f32) -> f32 { if (x == 0.0 && y == 0.0) { return select(0.0, PI, (bitcast<u32>(x) >> 31u) == 1u) * select(1.0, -1.0, (bitcast<u32>(y) >> 31u) == 1u); } return atan2(y, x); }`,
   op_: `fn op_(v: f32) -> f32 { return bitcast<f32>(bitcast<u32>(v) + df_zero); }`,
   df_qts: `fn df_qts(a0: f32, b0: f32) -> vec2f { let a = op_(a0); let b = op_(b0); let s = op_(a + b); return vec2f(s, b - op_(s - a)); }`,

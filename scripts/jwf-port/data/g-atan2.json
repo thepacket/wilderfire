@@ -1,0 +1,33 @@
+{
+ "note": "Variations whose CPU (Java) code takes its angles from js.glsl G.atan2 — a rational approximation (pi/4*(1-(x-|y|)/(x+|y|)) per half-plane, up to 0.07 rad off; G.Kscope uses it too) — not java.lang.Math.atan2. The .flame corpus is authored against the CPU, so gen.ts rewrites every scalar atan2f/atan2 call in these entries' GPU snippets (JWildfire's own snippets call the exact atan2f) to the G_atan2 kernel helper, and java2cu maps G.atan2 / G.Kscope the same way. Regenerate: grep -l 'G\\.atan2\\|G\\.Kscope' <jwf>/src/org/jwildfire/create/tina/variation/*.java -> getName(), minus commented-out uses (bulge) and unportable entries (kaleidoimg).",
+ "variations": [
+  "crop_stars",
+  "cut_fingerprint",
+  "cut_magfield",
+  "cut_mandala",
+  "cut_pattern",
+  "cut_shapes",
+  "cut_spiralcb",
+  "cut_sqsplits",
+  "cut_triskel",
+  "cut_truchetweaving",
+  "cut_vasarely",
+  "cut_web",
+  "dc_butterflies",
+  "dc_ducks",
+  "dc_fingerprint",
+  "dc_gabornoise",
+  "dc_hoshi",
+  "dc_hyperbolictile",
+  "dc_kaleidoscopic",
+  "dc_mandala",
+  "dc_moebiuslog",
+  "dc_sunflower",
+  "dc_tree",
+  "glsl_hoshi",
+  "glsl_hyperbolictile",
+  "glsl_kaleidoscopic",
+  "glsl_mandala",
+  "post_crop_stars"
+ ]
+}

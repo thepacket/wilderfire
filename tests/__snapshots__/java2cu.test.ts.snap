@@ -41,6 +41,63 @@ exports[`java2cu: Complex, pointer propagation, null guards, setParameter locals
 "
 `;
 
+exports[`java2cu: js.glsl G helpers > G.atan2 → the G_atan2 approximation helper (also inside G.Kscope), G.atan(n, d) → atan(n/d), Math.atan2 stays exact > cuda 1`] = `
+"float x = __x;
+float y = __y;
+float2 u = make_float2((x * __reg_glsl_zoom), (y * __reg_glsl_zoom));
+float2 k = G_Kscope(u, 0.7);
+float a = G_atan2(k.y, k.x);
+float b = atanf((k.y) / (k.x));
+float c = atan2f(y, x);
+float color = fract((((a / 7.0) + (b * 0.1)) + (c * 0.01)));
+__doHide = false;
+if ((__reg_glsl_invert == 0)){
+if ((color > 0.5)){
+x = 0;
+y = 0;
+__doHide = true;
+}
+}
+else{
+if ((color <= 0.5)){
+x = 0;
+y = 0;
+__doHide = true;
+}
+}
+__px = (__amount_ * x);
+__py = (__amount_ * y);
+"
+`;
+
+exports[`java2cu: js.glsl G helpers > G.atan2 → the G_atan2 approximation helper (also inside G.Kscope), G.atan(n, d) → atan(n/d), Math.atan2 stays exact > wgsl 1`] = `
+"  var x: f32 = t.x;
+  var y: f32 = t.y;
+  var u: vec2f = vec2f((x * \${p[0]}), (y * \${p[0]}));
+  var k: vec2f = G_Kscope(u, 0.7);
+  var a: f32 = G_atan2(k.y, k.x);
+  var b: f32 = atan((k.y / k.x));
+  var c: f32 = atan2j(y, x);
+  var color: f32 = fract((((a / 7.0) + (b * 0.1)) + (c * 0.01)));
+  (*hd) = false;
+  if ((\${p[1]} == 0)) {
+    if ((color > 0.5)) {
+      x = 0;
+      y = 0;
+      (*hd) = true;
+    }
+  } else {
+    if ((color <= 0.5)) {
+      x = 0;
+      y = 0;
+      (*hd) = true;
+    }
+  }
+  v.x = (\${w} * x);
+  v.y = (\${w} * y);
+"
+`;
+
 exports[`java2cu: params, constants, helpers, state > replays init(), inlines static-final constants, ports long→int, threads params into helpers, keeps written fields as state > cuda 1`] = `
 "varpar->reg_demo_dist_c = __reg_demo_dist;
 float invPower = 0;

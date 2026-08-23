@@ -86,6 +86,21 @@ describe('registry: pipeline records agree', () => {
     expect(Object.keys(UNPORTABLE).length).toBe(Object.keys(unportable.variations).length);
   });
 
+  it('g-atan2.json entries (CPU angles from js.glsl G.atan2, an approximation) use the G_atan2 helper and nothing else does', () => {
+    const gAtan2 = JSON.parse(readFileSync(resolve(root, 'scripts/jwf-port/data/g-atan2.json'), 'utf8')) as { variations: string[] };
+    const ps = Array.from({ length: 64 }, (_, i) => `P${i}`);
+    const text = (v: typeof JWF_VARIATIONS[string]) => v.code(A(0), ps, A) + (v.funcs ?? '') + (v.preCode ? v.preCode(A(0), ps, A) : '');
+    for (const name of gAtan2.variations) {
+      expect(JWF_VARIATIONS, name).toHaveProperty(name);
+      const t = text(JWF_VARIATIONS[name]);
+      expect(t.includes('G_atan2('), name).toBe(true);
+      expect(/(?<![\w.])atan2j?\(/.test(t.replace(/fn atan2j\([^\n]*/, '')), `${name}: exact atan2 left`).toBe(false); // (the atan2j helper's own body excepted)
+      expect(JWF_VARIATIONS[name].funcs ?? '', name).toContain('fn G_atan2(');
+    }
+    const uses = new Set(gAtan2.variations);
+    for (const name of jwfNames) if (!uses.has(name)) expect(text(JWF_VARIATIONS[name]).includes('G_atan2('), name).toBe(false);
+  });
+
   it('the app registry prefers verified ports over hand-written entries except PREFER_HAND', () => {
     for (const name of Object.keys(HAND_VARIATIONS)) {
       const jwf = JWF_VARIATIONS[name];
