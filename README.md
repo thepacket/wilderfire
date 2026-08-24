@@ -9,7 +9,7 @@ Free software under the **LGPL-2.1-or-later** · © 2026 Andre Paquette ·
 **pull requests are not accepted** (issues and forks are welcome — see
 [CONTRIBUTING.md](CONTRIBUTING.md)).
 
-![WilderFire — a julian/spherical flame in the editor, with the transform panel, triangle overlay and AI assistant](docs/hero.jpg)
+![WilderFire — an elliptic/linearT3D flame in the editor, with the layer and transform panels on the left and the camera/DOF/tone controls on the right](docs/hero.jpg)
 
 ## Why WebGPU (and no wasm)
 
