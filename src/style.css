@@ -9,6 +9,7 @@
   --border: #2a2e3a;
   --danger: #ff5470;
   --shadow: rgba(0, 0, 0, 0.5);
+  --rand-fg: #ffb454; /* the random-flame group in the header */
   color-scheme: dark;
 }
 
@@ -23,6 +24,7 @@
   --border: #d4d8e0;
   --danger: #d3244a;
   --shadow: rgba(0, 0, 0, 0.15);
+  --rand-fg: #a35f08; /* darker than --accent2: this is text on the light control background */
   color-scheme: light;
 }
 
@@ -53,6 +55,9 @@ html, body {
 .header .spacer { flex: 1; }
 .header select, .header button { height: 30px; }
 .header .rand-style { max-width: 120px; }
+/* The random-flame group (Randomize, its three generator lists, Mutate) reads as one set, apart from the
+   file/view controls around it. */
+.header .rand-ctl, .header .rand-ctl option { color: var(--rand-fg); }
 
 /* ---------- Main layout ---------- */
 .main { flex: 1; display: flex; min-height: 0; }

@@ -92,15 +92,15 @@ async function boot() {
 
   // Random flame styles: JWildfire's generators (src/core/randomStyles.ts) or WilderFire's own
   const LS_STYLE = 'wilderfire.randomStyle';
-  const styleSel = el('select', 'rand-style') as HTMLSelectElement;
+  const styleSel = el('select', 'rand-style rand-ctl') as HTMLSelectElement;
   styleSel.title = 'Style of the next random flame — "Any" picks one of JWildfire\'s generators at random; "WilderFire" is the built-in contractive randomizer';
   // JWildfire's random-batch companions: a post symmetry and a weighting field, each drawn by a generator of its own
   const LS_SYMM = 'wilderfire.randomSymmetry', LS_WFIELD = 'wilderfire.randomWField';
-  const symmSel = el('select', 'rand-style') as HTMLSelectElement;
+  const symmSel = el('select', 'rand-style rand-ctl') as HTMLSelectElement;
   symmSel.title = 'Symmetry of the next random flame (JWildfire\'s random symmetry generators): None, one of the three at random, sparse (a third of the flames get one), or X axis / Y axis / Point';
-  const wfieldSel = el('select', 'rand-style') as HTMLSelectElement;
+  const wfieldSel = el('select', 'rand-style rand-ctl') as HTMLSelectElement;
   wfieldSel.title = 'Weighting field of the next random flame (JWildfire\'s random weighting-field generators): None, any noise at random, sparse (a third of the flames get one), or basic / cellular / fractal noise';
-  const randBtn = el('button', '', 'Randomize');
+  const randBtn = el('button', 'rand-ctl', 'Randomize');
   randBtn.onclick = async () => {
     if (randBtn.disabled) return;
     randBtn.disabled = true;
@@ -130,7 +130,7 @@ async function boot() {
   symmSel.onchange = () => localStorage.setItem(LS_SYMM, symmSel.value);
   wfieldSel.onchange = () => localStorage.setItem(LS_WFIELD, wfieldSel.value);
 
-  const mutBtn = el('button', '', 'Mutate');
+  const mutBtn = el('button', 'rand-ctl', 'Mutate');
   mutBtn.title = 'Explore mutations of the current flame';
   const shareBtn = el('button', 'icon', '🔗');
   shareBtn.title = 'Share: copy a link that opens this flame in WilderFire (the flame is in the link itself — nothing is uploaded)';
