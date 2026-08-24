@@ -695,7 +695,11 @@ export class FlameRenderer {
     this.liveMs = 0;
     this.offShadowsReady = false;
     this.emaSps = 0;
-    this.needsPresent = true;
+    // A reset must NOT force a present: the frame loop's gate keeps the last image on screen until the
+    // new accumulation reaches minDisplaySpp. Forcing one here made every pointermove of a drag present
+    // a histogram with ~0 samples — the flame blinked away to a sparse haze for the whole drag. While
+    // paused no frames follow the reset, so there it still has to present.
+    this.needsPresent = this.paused;
     this.reseedPoints(100); // live: a shorter fuse keeps drags snappy (exports use the full 200)
     const enc = this.device.createCommandEncoder();
     enc.clearBuffer(this.histBuf);
@@ -1534,7 +1538,10 @@ export class FlameRenderer {
     // frame as long as we don't fetch a new current texture.
     const sppAfter = this.samples / Math.max(w * h, 1);
     const due = performance.now() - this.lastPresentT >= 2 * this.presentMs - 1;
-    const present = !accumulate || !this.hasPresented || this.needsPresent || (due && sppAfter >= this.minDisplaySpp);
+    // ...and a flame too heavy to reach minDisplaySpp between two resets would freeze the view for the
+    // whole drag, so show what there is once the frozen image gets this old.
+    const stale = performance.now() - this.lastPresentT > 500;
+    const present = !accumulate || !this.hasPresented || this.needsPresent || (due && (sppAfter >= this.minDisplaySpp || stale));
     if (present) {
       const view = this.context.getCurrentTexture().createView();
       this.presentTo(enc, view, accumulate);
