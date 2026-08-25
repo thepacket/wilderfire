@@ -61,13 +61,14 @@ async function boot() {
   randBtn.onclick = async () => {
     if (randBtn.disabled) return;
     randBtn.disabled = true;
+    randBtn.classList.add('busy'); // amber while it draws; how many candidates it took is the sampler's business
     try {
       const { sampleRandomFlame } = await import('./ui/randomSampler');
       // JWildfire's LOW batch quality (8 candidates, coverage ≥ 0.32) within a few seconds — every candidate costs a kernel compile
-      const f = await sampleRandomFlame(app, { style: randOpts.style, symmetry: randOpts.symmetry as never, wfield: randOpts.wfield as never, quality: 'low', budgetMs: 3000, onProgress: (i, n) => { randBtn.textContent = `${i}/${n}`; } });
+      const f = await sampleRandomFlame(app, { style: randOpts.style, symmetry: randOpts.symmetry as never, wfield: randOpts.wfield as never, quality: 'low', budgetMs: 3000 });
       app.flameSource = undefined;
       app.setFlame(f);
-    } finally { randBtn.disabled = false; randBtn.textContent = 'Randomize'; }
+    } finally { randBtn.disabled = false; randBtn.classList.remove('busy'); }
   };
   const randSplit = el('div', 'rand-split');
   randSplit.append(randBtn, randOpts.root);

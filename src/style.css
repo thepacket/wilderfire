@@ -9,6 +9,7 @@
   --border: #2a2e3a;
   --danger: #ff5470;
   --shadow: rgba(0, 0, 0, 0.5);
+  --busy-fg: #ffb454; /* a button working on something (Randomize while it draws) */
   color-scheme: dark;
 }
 
@@ -23,6 +24,7 @@
   --border: #d4d8e0;
   --danger: #d3244a;
   --shadow: rgba(0, 0, 0, 0.15);
+  --busy-fg: #a35f08; /* darker than the dark theme's: this is text on a light control background */
   color-scheme: light;
 }
 
@@ -53,6 +55,8 @@ html, body {
 .header .spacer { flex: 1; }
 .header select, .header button { height: 30px; }
 /* Randomize and the caret opening its generator settings share a border, so they read as one split button. */
+/* A button that is working: the label stays put and only its colour says so. */
+.header button.busy { color: var(--busy-fg); }
 .rand-split { display: flex; }
 .rand-split > button:first-child { border-top-right-radius: 0; border-bottom-right-radius: 0; }
 .rand-split > .rand-caret {
