@@ -13,6 +13,7 @@ import { buildAIPanel } from './ui/aiPanel';
 import { buildAnimPanel, type AnimState } from './ui/animPanel';
 import { buildLibrary, loadAutosave, restoreFlame } from './ui/library';
 import { buildMutate } from './ui/mutate';
+import { createRandomOptions } from './ui/randomOptions';
 import { buildOverlay } from './ui/overlay';
 import { loadJwfVariations } from './core/variations';
 
@@ -90,47 +91,25 @@ async function boot() {
     }
   };
 
-  // Random flame styles: JWildfire's generators (src/core/randomStyles.ts) or WilderFire's own
-  const LS_STYLE = 'wilderfire.randomStyle';
-  const styleSel = el('select', 'rand-style rand-ctl') as HTMLSelectElement;
-  styleSel.title = 'Style of the next random flame — "Any" picks one of JWildfire\'s generators at random; "WilderFire" is the built-in contractive randomizer';
-  // JWildfire's random-batch companions: a post symmetry and a weighting field, each drawn by a generator of its own
-  const LS_SYMM = 'wilderfire.randomSymmetry', LS_WFIELD = 'wilderfire.randomWField';
-  const symmSel = el('select', 'rand-style rand-ctl') as HTMLSelectElement;
-  symmSel.title = 'Symmetry of the next random flame (JWildfire\'s random symmetry generators): None, one of the three at random, sparse (a third of the flames get one), or X axis / Y axis / Point';
-  const wfieldSel = el('select', 'rand-style rand-ctl') as HTMLSelectElement;
-  wfieldSel.title = 'Weighting field of the next random flame (JWildfire\'s random weighting-field generators): None, any noise at random, sparse (a third of the flames get one), or basic / cellular / fractal noise';
-  const randBtn = el('button', 'rand-ctl', 'Randomize');
+  // Random flame: the button, plus a caret opening the generator settings (style / symmetry / weighting
+  // field) — see ui/randomOptions.ts for why they are not in the header itself.
+  const randOpts = createRandomOptions();
+  const randBtn = el('button', '', 'Randomize');
   randBtn.onclick = async () => {
     if (randBtn.disabled) return;
     randBtn.disabled = true;
     try {
       const { sampleRandomFlame } = await import('./ui/randomSampler');
       // JWildfire's LOW batch quality (8 candidates, coverage ≥ 0.32) within a few seconds — every candidate costs a kernel compile
-      const f = await sampleRandomFlame(app, { style: styleSel.value, symmetry: (symmSel.value || 'sparse') as never, wfield: (wfieldSel.value || 'sparse') as never, quality: 'low', budgetMs: 3000, onProgress: (i, n) => { randBtn.textContent = `${i}/${n}`; } });
+      const f = await sampleRandomFlame(app, { style: randOpts.style, symmetry: randOpts.symmetry as never, wfield: randOpts.wfield as never, quality: 'low', budgetMs: 3000, onProgress: (i, n) => { randBtn.textContent = `${i}/${n}`; } });
       app.flameSource = undefined;
       app.setFlame(f);
     } finally { randBtn.disabled = false; randBtn.textContent = 'Randomize'; }
   };
-  (async () => {
-    const { RANDOM_STYLES } = await import('./core/randomStyles');
-    const byName = [...RANDOM_STYLES].sort((a, b) => a.name.localeCompare(b.name)); // JWildfire lists its generators alphabetically
-    for (const [value, label] of [['any', 'Any style'], ['wilderfire', 'WilderFire'], ...byName.map((s) => [s.id, s.name] as [string, string])]) {
-      const o = el('option', '', label) as HTMLOptionElement; o.value = value; styleSel.append(o);
-    }
-    styleSel.value = localStorage.getItem(LS_STYLE) ?? 'any';
-    if (!styleSel.value) styleSel.value = 'any';
-    const { SYMMETRY_KINDS, WFIELD_KINDS } = await import('./core/mutations');
-    for (const k of SYMMETRY_KINDS) { const o = el('option', '', 'Symmetry: ' + k.name) as HTMLOptionElement; o.value = k.id; symmSel.append(o); }
-    for (const k of WFIELD_KINDS) { const o = el('option', '', 'Field: ' + k.name) as HTMLOptionElement; o.value = k.id; wfieldSel.append(o); }
-    symmSel.value = localStorage.getItem(LS_SYMM) ?? 'sparse'; if (!symmSel.value) symmSel.value = 'sparse'; // JWildfire's defaults: "(All, sparse)" for both
-    wfieldSel.value = localStorage.getItem(LS_WFIELD) ?? 'sparse'; if (!wfieldSel.value) wfieldSel.value = 'sparse';
-  })();
-  styleSel.onchange = () => localStorage.setItem(LS_STYLE, styleSel.value);
-  symmSel.onchange = () => localStorage.setItem(LS_SYMM, symmSel.value);
-  wfieldSel.onchange = () => localStorage.setItem(LS_WFIELD, wfieldSel.value);
+  const randSplit = el('div', 'rand-split');
+  randSplit.append(randBtn, randOpts.root);
 
-  const mutBtn = el('button', 'rand-ctl', 'Mutate');
+  const mutBtn = el('button', '', 'Mutate');
   mutBtn.title = 'Explore mutations of the current flame';
   const shareBtn = el('button', 'icon', '🔗');
   shareBtn.title = 'Share: copy a link that opens this flame in WilderFire (the flame is in the link itself — nothing is uploaded)';
@@ -230,7 +209,7 @@ async function boot() {
   };
   nameInp.addEventListener('change', () => { app.flame.name = nameInp.value.trim(); app.commitTone('name'); showName(); });
   nameInp.addEventListener('keydown', (e) => { if (e.key === 'Enter' || e.key === 'Escape') { if (e.key === 'Escape') showName(); nameInp.blur(); } });
-  header.append(logo, presetSel, styleSel, symmSel, wfieldSel, randBtn, mutBtn, undoBtn, redoBtn, nameInp, provEl, shareBtn, saveBtn, libBtn, triBtn, themeBtn, aboutBtn);
+  header.append(logo, presetSel, randSplit, mutBtn, undoBtn, redoBtn, nameInp, provEl, shareBtn, saveBtn, libBtn, triBtn, themeBtn, aboutBtn);
 
   // ---------- Layout ----------
   const main = el('div', 'main');
