@@ -1,7 +1,8 @@
 // Flame library (IndexedDB, see ../core/libraryStore.ts) + session autosave (localStorage).
 import { App, el, openModal } from './common';
 import { normalizeFlame, type Flame } from '../core/flame';
-import { libAll, libPut, libDelete, libDeleteMany, libClear, packOf, type LibEntry, thumbSrc, releaseThumbSrcs, thumbDataUrl, type Thumb } from '../core/libraryStore';
+import { libAll, libPut, libDelete, libDeleteMany, libClear, packOf, sampleThumbPut, type LibEntry, thumbSrc, releaseThumbSrcs, thumbDataUrl, type Thumb } from '../core/libraryStore';
+import { sampleEntries, isSample, SAMPLE_COUNT } from './sampleLib';
 import { flameSignature, rankSimilar, type FlameSig } from '../core/similarity';
 
 /** Signatures cached per entry id (a library entry's flame never changes; a re-save makes a new id). */
@@ -214,11 +215,46 @@ export function buildLibrary(app: App, anim: AnimAPI) {
       const add = (value: string, label: string, group?: HTMLOptGroupElement) => { const o = el('option', '', label) as HTMLOptionElement; o.value = value; (group ?? collSel).append(o); };
       add('all', `All flames (${entries.length})`);
       add('fav', `★ Favourites (${favs})`);
+      add('samples', `◆ Samples (${SAMPLE_COUNT})`); // the built-in flames, see ./sampleLib.ts
       add('similar', similarTo ? `≈ Similar to: ${similarTo.name}` : '≈ Similar to the current flame');
       if (tags.size) { const g = el('optgroup') as HTMLOptGroupElement; g.label = 'Tags'; for (const [t, n] of [...tags].sort((a, b) => byName.compare(a[0], b[0]))) add('tag:' + t, `${t} (${n})`, g); collSel.append(g); }
       if (packs.size) { const g = el('optgroup') as HTMLOptGroupElement; g.label = 'Packs'; for (const [k, n] of [...packs].sort((a, b) => byName.compare(a[0], b[0]))) add('pack:' + k, `${k} (${n})`, g); collSel.append(g); }
       collSel.value = [...collSel.options].some((o) => o.value === collection) ? collection : (collection = 'all');
     };
+    // The built-in flames: loaded (and their pictures rendered) the first time the collection is shown.
+    let samples: LibEntry[] = [];
+    let samplesLoading = false;
+    const ensureSamples = async () => {
+      if (samples.length || samplesLoading) return;
+      samplesLoading = true;
+      hint.textContent = 'Loading the built-in flames…';
+      try { samples = await sampleEntries(); }
+      catch (e) { hint.textContent = 'Could not load the built-in flames: ' + (e as Error).message; return; }
+      finally { samplesLoading = false; }
+      applyFilter();
+      void renderSampleThumbs(samples.filter((e) => !e.thumb));
+    };
+    // One render per missing picture, cached in IndexedDB — so this costs something once and nothing
+    // afterwards. It never touches the user's own entries.
+    let thumbing = false;
+    const renderSampleThumbs = async (list: LibEntry[]) => {
+      if (thumbing || !list.length) return;
+      thumbing = true;
+      try {
+        for (const [i, e] of list.entries()) {
+          if (!body.isConnected) break; // dialog closed: stop, keep what is cached
+          try {
+            const thumb = await offscreenThumb(app, normalizeFlame(e.flame, app.activeLayer.palette));
+            e.thumb = thumb;
+            await sampleThumbPut(e.id, thumb);
+          } catch { /* leave this one without a picture */ }
+          hint.textContent = `Rendering the sample pictures… ${i + 1}/${list.length} — ${e.name}`;
+          refreshCard(e);
+        }
+      } finally { thumbing = false; app.resumeRender(); }
+      if (body.isConnected) applyFilter();
+    };
+
     // "More like this": rank the library by similarity to a target — the current flame (the
     // standing option) or a selected card (the ≈ button); the 60 best show in score order.
     let similarTo: { name: string; sig: FlameSig; id?: string } | null = null;
@@ -227,6 +263,7 @@ export function buildLibrary(app: App, anim: AnimAPI) {
     collSel.onchange = () => {
       collection = collSel.value;
       if (collection === 'similar' && !similarTo) similarTo = { name: app.flame.name || 'the current flame', sig: flameSignature(app.flame) };
+      if (collection === 'samples') void ensureSamples();
       applyFilter(); body.focus();
     };
     const simBtn = el('button', '', '≈ Similar');
@@ -254,6 +291,7 @@ export function buildLibrary(app: App, anim: AnimAPI) {
       const list = vis.slice();
       if (!list.length) return;
       if (!confirm(`Re-render the thumbnails of the ${list.length} flame${list.length === 1 ? '' : 's'} shown?`)) return;
+      if (collection === 'samples') { await renderSampleThumbs(list); return; } // cached apart from the library
       renderBtn.disabled = true;
       let stop = false;
       const stopBtn = el('button', 'danger', 'Stop');
@@ -274,13 +312,15 @@ export function buildLibrary(app: App, anim: AnimAPI) {
     const tools2 = el('div', 'btn-row');
     tools.append(search, collSel, simBtn, galBtn);
     tools2.append(expBtn, impBtn, tagAllBtn, dedupBtn, renderBtn, clearBtn, impFile);
+    // An empty library is not an empty dialog any more: the built-in flames are there to start from, so
+    // the note explains how to fill it and the grid opens on ◆ Samples.
+    let emptyNote: HTMLElement | null = null;
     if (!entries.length) {
-      const empty = el('div', 'hint', 'Empty — use 💾 Save to keep the current flame here, or drop .flame / .zip files on the canvas. Stored in your browser (IndexedDB). ');
+      emptyNote = el('div', 'hint', 'Your library is empty — use 💾 Save to keep the current flame here, or drop .flame / .zip files on the canvas. Stored in your browser (IndexedDB). ');
       const link = el('a', '', 'Flame packs to get started: jwfsanctuary.club/downloads/flamepacks') as HTMLAnchorElement;
       link.href = 'https://www.jwfsanctuary.club/downloads/flamepacks/'; link.target = '_blank'; link.rel = 'noopener';
-      empty.append(link);
-      body.append(tools, tools2, empty);
-      return;
+      emptyNote.append(link);
+      if (collection === 'all') collection = 'samples';
     }
     // ---- Virtualised grid: only the rows in view exist as DOM; everything else is arithmetic ----
     // Cards are absolutely positioned in a spacer whose height is rows × rowH, so the scrollbar
@@ -305,15 +345,17 @@ export function buildLibrary(app: App, anim: AnimAPI) {
       grid.style.height = `${Math.max(0, rows() * (rowH + GAP) - GAP)}px`;
     };
     const makeCard = (e: LibEntry, i: number): HTMLElement => {
+      const smp = isSample(e);
       const item = el('div', 'lib-item');
       item.dataset.id = e.id;
       const img = el('img') as HTMLImageElement;
       if (e.thumb) img.src = thumbSrc(e.thumb); else img.alt = e.name;
       const meta = el('div', 'lib-meta');
-      const prov = [e.author ? 'by ' + e.author : '', e.source ?? ''].filter(Boolean).join(' · ');
+      // a sample has no date of its own; its origin goes in that line instead
+      const prov = [e.author ? 'by ' + e.author : '', smp ? '' : e.source ?? ''].filter(Boolean).join(' · ');
       const tagsEl = el('div', 'lib-tags', (e.tags ?? []).join(' · ') || '\u00a0');
       const score = similarScores.get(e.id);
-      meta.append(el('div', 'lib-name', e.name), el('div', 'lib-date', score !== undefined ? `≈ ${Math.round(score * 100)} % similar` : new Date(e.date).toLocaleString()), el('div', 'lib-prov', prov || '\u00a0'), tagsEl);
+      meta.append(el('div', 'lib-name', e.name), el('div', 'lib-date', score !== undefined ? `≈ ${Math.round(score * 100)} % similar` : smp ? e.source ?? 'built-in' : new Date(e.date).toLocaleString()), el('div', 'lib-prov', prov || '\u00a0'), tagsEl);
       meta.title = [e.name, e.author ? 'Author: ' + e.author : '', e.source ? 'Source: ' + e.source : '', e.tags?.length ? 'Tags: ' + e.tags.join(', ') : ''].filter(Boolean).join('\n');
       const fav = el('button', 'lib-fav' + (e.fav ? ' on' : ''), e.fav ? '★' : '☆');
       fav.title = 'Favourite (Space on the selected card)';
@@ -323,7 +365,8 @@ export function buildLibrary(app: App, anim: AnimAPI) {
       tagBtn.onclick = (ev) => { ev.stopPropagation(); editTags(e); };
       const del = el('button', 'lib-del danger', '✕');
       del.onclick = (ev) => { ev.stopPropagation(); remove(e); };
-      item.append(img, meta, fav, tagBtn, del);
+      // ★ / 🏷 / ✕ all write to the flame store, which a sample never enters
+      if (smp) item.append(img, meta); else item.append(img, meta, fav, tagBtn, del);
       item.onclick = () => load(e);
       item.onmouseenter = () => select(idx.get(e.id) ?? i, false);
       return item;
@@ -424,6 +467,8 @@ export function buildLibrary(app: App, anim: AnimAPI) {
         const pool = entries.filter((en) => en.id !== target.id && textHit(en)).map((en) => ({ item: en, sig: sigOf(en) }));
         const ranked = rankSimilar(target.sig, pool, 60);
         vis = ranked.map((r) => { similarScores.set(r.item.id, r.score); return r.item; });
+      } else if (collection === 'samples') {
+        vis = q ? samples.filter(textHit) : samples;
       } else {
         vis = collection === 'all' && !q ? entries : entries.filter((en) => inCollection(en) && textHit(en));
       }
@@ -434,8 +479,10 @@ export function buildLibrary(app: App, anim: AnimAPI) {
       const where = collection === 'all' ? '' : ` in ${collSel.selectedOptions[0]?.label.replace(/ \(\d+\)$/, '') ?? collection}`;
       hint.textContent = (collection === 'similar' && similarTo
         ? `${vis.length} most similar to "${similarTo.name}"${q ? ` among names matching "${q}"` : ''}, best first`
-        : q || collection !== 'all' ? `${vis.length} of ${n} flame${n === 1 ? '' : 's'}${where}${q ? ' match' : ''}` : `${n} flame${n === 1 ? '' : 's'}`) +
-        ' — arrows move, Enter loads, Space ★, Delete removes, Esc closes';
+        : collection === 'samples'
+          ? (samplesLoading ? 'Loading the built-in flames…' : `${vis.length} built-in flame${vis.length === 1 ? '' : 's'}${q ? ' match' : ''} — WilderFire's own presets; they are not part of your library`)
+          : q || collection !== 'all' ? `${vis.length} of ${n} flame${n === 1 ? '' : 's'}${where}${q ? ' match' : ''}` : `${n} flame${n === 1 ? '' : 's'}`) +
+        (collection === 'samples' ? ' — arrows move, Enter loads, Esc closes' : ' — arrows move, Enter loads, Space ★, Delete removes, Esc closes');
       layout();
       render();
       saveView();
@@ -446,10 +493,11 @@ export function buildLibrary(app: App, anim: AnimAPI) {
       if (ev.key === 'Enter' || ev.key === 'ArrowDown') { ev.preventDefault(); body.focus(); select(0); }
       ev.stopPropagation(); // typing must not drive the grid
     });
-    body.append(tools, tools2, hint, grid);
+    body.append(tools, tools2, ...(emptyNote ? [emptyNote] : []), hint, grid);
     body.addEventListener('scroll', () => { saveView(); scheduleRender(); }, { passive: true });
     new ResizeObserver(() => { layout(); render(); }).observe(grid);
     refreshCollections();
+    if (collection === 'samples') void ensureSamples();
     const wanted = view.scrollTop; // applyFilter saves the (still zero) scroll, so keep it first
     applyFilter();
     // back to the page the dialog was closed on (twice: the row height is only exact once real cards
@@ -475,8 +523,8 @@ export function buildLibrary(app: App, anim: AnimAPI) {
         case 'Home': select(0); break;
         case 'End': select(vis.length - 1); break;
         case 'Enter': if (sel >= 0) load(vis[sel]); break;
-        case ' ': if (sel >= 0) toggleFav(vis[sel]); break;
-        case 'Delete': case 'Backspace': if (sel >= 0) remove(vis[sel]); break;
+        case ' ': if (sel >= 0 && !isSample(vis[sel])) toggleFav(vis[sel]); break;
+        case 'Delete': case 'Backspace': if (sel >= 0 && !isSample(vis[sel])) remove(vis[sel]); break;
         case 'Escape': close(); break;
         case '/': search.focus(); search.select(); break;
         default:

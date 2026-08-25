@@ -32,7 +32,7 @@ licence rather than a permissive one.
 | GPU helper library | `scripts/jwf-port/data/kernel-lib.cu` | JWildfire `Flam4_3dKernal_TemplateJWF.cu` | LGPL-2.1-or-later |
 | Hand corrections that restore JWildfire CPU semantics | `scripts/jwf-port/overrides.ts` | derived from JWildfire Java sources | LGPL-2.1-or-later |
 | 26 mesh primitives for `obj_mesh_primitive_wf` (converted from JWildfire's `.obj` files by `scripts/jwf-port/mesh2bin.ts`; subdivision/smoothing/sampling in `src/core/meshes.ts` ported from `SimpleMesh`/`OBJMeshUtil`/`AbstractOBJMeshWFFunc`) | `public/mesh/*.bin`, `src/core/meshes.ts` | JWildfire `src/org/jwildfire/create/tina/variation/mesh/*.obj` | LGPL-2.1-or-later |
-| 33 bundled sample flames (the Tests menu) | `public/flames/TINA00xx.flame`, `src/core/samples.ts` | JWildfire `resources/flames/` (unmodified copies) | LGPL-2.1-or-later |
+| 33 bundled sample flames (shipped in `public/flames`) | `public/flames/TINA00xx.flame`, `src/core/samples.ts` | JWildfire `resources/flames/` (unmodified copies) | LGPL-2.1-or-later |
 | Test fixture flames | `scripts/jwf-port/testflames/*.flame` | generated with JWildfire's random-flame generators | LGPL-2.1-or-later |
 | `Dump.java`, `Oracle.java` | `scripts/jwf-port/` | link against JWildfire classes at build time (JWildfire itself is not redistributed here) | LGPL-2.1-or-later |
 | The 70 hand-written "classic" variations | `src/core/variations.ts` | written from the published flam3 / Apophysis formulas (Draves & Reckase, *The Fractal Flame Algorithm*) | original code, LGPL-2.1-or-later as part of WilderFire |

@@ -51,45 +51,8 @@ async function boot() {
   const w2 = el('span', 'wf-fire', 'Fire');
   logo.append(w1, w2);
 
-  const presetSel = el('select') as HTMLSelectElement;
-  {
-    const o = el('option', '', 'Tests') as HTMLOptionElement;
-    o.value = '';
-    presetSel.append(o);
-    presetSel.title = 'Test flames: the sample flames bundled with JWildfire';
-  }
-  // one list: the authored flames first, then the JWildfire sample flames (src/core/samples.ts)
-  PRESETS.forEach((p, i) => {
-    const o = el('option', '', p.name) as HTMLOptionElement;
-    o.value = 'p:' + i;
-    presetSel.append(o);
-  });
-  const { JWF_SAMPLES } = await import('./core/samples');
-  JWF_SAMPLES.forEach((s, i) => {
-    const o = el('option', '', s.name) as HTMLOptionElement;
-    o.value = 'j:' + i;
-    presetSel.append(o);
-  });
-  const loadSample = async (s: { file: string; name: string }) => {
-    const { importFlameText } = await import('./core/flameXML');
-    const text = await (await fetch('/flames/' + s.file)).text();
-    const { flame } = importFlameText(text, app.activeLayer.palette);
-    flame.name = s.name;
-    app.setFlame(flame);
-  };
-  presetSel.onchange = async () => {
-    const v = presetSel.value;
-    app.flameSource = undefined;
-    if (v.startsWith('p:')) {
-      const p = PRESETS[parseInt(v.slice(2))];
-      if (p) app.setFlame(p.make());
-    } else if (v.startsWith('j:')) {
-      const s = JWF_SAMPLES[parseInt(v.slice(2))];
-      if (!s) return;
-      // the selected test's name stays displayed (the select keeps its value)
-      try { await loadSample(s); } catch (e) { console.error('Sample load failed:', e); presetSel.value = ''; }
-    }
-  };
+  // The built-in flames live in the Library dialog's ◆ Samples collection now — with pictures and
+  // search — instead of a 59-line "Tests" list in the header. A first visit opens on PRESETS[0].
 
   // Random flame: the button, plus a caret opening the generator settings (style / symmetry / weighting
   // field) — see ui/randomOptions.ts for why they are not in the header itself.
@@ -182,7 +145,7 @@ async function boot() {
       Specific, clearly delimited parts derive from
       <a href="https://github.com/thargor6/JWildfire" target="_blank" rel="noopener">JWildfire</a>
       (© Andreas Maschke and contributors, LGPL 2.1+): the mathematical formulas of the ported variations,
-      the GPU helper library they use, the tone-mapping and solid-rendering (lighting) formulas, the random flame styles, and the sample flames in the Tests menu.
+      the GPU helper library they use, the tone-mapping and solid-rendering (lighting) formulas, the random flame styles, and the sample flames shipped with the app.
       That is why the whole project carries the LGPL. The full list of third-party material is in
       <a href="https://github.com/thepacket/wilderfire/blob/main/NOTICE.md" target="_blank" rel="noopener">NOTICE.md</a>.</p>
     <p>Looking for flames? The JWildfire community shares hundreds of packs at
@@ -209,7 +172,7 @@ async function boot() {
   };
   nameInp.addEventListener('change', () => { app.flame.name = nameInp.value.trim(); app.commitTone('name'); showName(); });
   nameInp.addEventListener('keydown', (e) => { if (e.key === 'Enter' || e.key === 'Escape') { if (e.key === 'Escape') showName(); nameInp.blur(); } });
-  header.append(logo, presetSel, randSplit, mutBtn, undoBtn, redoBtn, nameInp, provEl, shareBtn, saveBtn, libBtn, triBtn, themeBtn, aboutBtn);
+  header.append(logo, randSplit, mutBtn, undoBtn, redoBtn, nameInp, provEl, shareBtn, saveBtn, libBtn, triBtn, themeBtn, aboutBtn);
 
   // ---------- Layout ----------
   const main = el('div', 'main');
@@ -315,8 +278,8 @@ async function boot() {
       console.warn('The link carried a flame that could not be read.');
     }
   } catch (e) { console.warn('Share link:', e); }
-  // first visit (no autosave): start on the first sample flame; the built-in fallback stays if the fetch fails
-  if (!saved && !linked) loadSample(JWF_SAMPLES[0]).then(() => { presetSel.value = 'j:0'; }).catch((e) => console.warn('Sample load failed:', e));
+  // first visit (no autosave): app.flame is already PRESETS[0] — name its origin like a library load does
+  if (!saved && !linked) app.flameSource = 'WilderFire preset';
 
   // Size canvas to container
   const fit = () => {

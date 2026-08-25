@@ -290,7 +290,7 @@ in the stack.
   filter by pack, click to use. Gradient presets, IQ-cosine **random palettes**, hue rotation, a
   **draggable stop editor**, invert, and **.ugr / .map gradient import and
   export** (a .ugr gradient pack opens a chooser)
-- **Tests menu: the 33 sample flames bundled with the
+- **The 33 sample flames bundled with the
   [JWildfire repository](https://github.com/thargor6/JWildfire)**
   (`resources/flames/TINA0001–TINA0033`, © Andreas Maschke, LGPL 2.1+),
   shipped with the app, loaded through the `.flame` importer and verified

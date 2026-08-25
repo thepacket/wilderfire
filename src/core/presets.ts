@@ -1,4 +1,4 @@
-// Authored WilderFire flames, listed above the JWildfire tests in the Tests menu
+// Authored WilderFire flames, listed above the JWildfire samples in the library's ◆ Samples collection
 // (the first one is also the synchronous startup fallback).
 import type { Flame } from './flame';
 import { normalizeFlame } from './flame';

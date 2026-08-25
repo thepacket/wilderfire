@@ -32,18 +32,20 @@ const DB = 'wilderfire';
 const STORE = 'library';
 const MESHES = 'meshes';
 const IMAGES = 'images';
+const STHUMBS = 'sampleThumbs'; // built-in samples: entry id → thumbnail Blob (the flames themselves are code/files; only their pictures are worth caching)
 const LS_LEGACY = 'wilderfire.library';
 
 let dbp: Promise<IDBDatabase> | null = null;
 function db(): Promise<IDBDatabase> {
   if (dbp) return dbp;
   dbp = new Promise((res, rej) => {
-    const req = indexedDB.open(DB, 3);
+    const req = indexedDB.open(DB, 4);
     req.onupgradeneeded = () => {
       const d = req.result;
       if (!d.objectStoreNames.contains(STORE)) d.createObjectStore(STORE, { keyPath: 'id' }).createIndex('date', 'date');
       if (!d.objectStoreNames.contains(MESHES)) d.createObjectStore(MESHES);
       if (!d.objectStoreNames.contains(IMAGES)) d.createObjectStore(IMAGES); // reflection maps (file name → image Blob)
+      if (!d.objectStoreNames.contains(STHUMBS)) d.createObjectStore(STHUMBS);
     };
     req.onsuccess = () => res(req.result);
     req.onerror = () => rej(req.error ?? new Error('IndexedDB unavailable'));
@@ -168,6 +170,36 @@ async function migrateLegacy(d: IDBDatabase): Promise<void> {
   for (const e of legacy) if (e && typeof e.id === 'string') tx.objectStore(STORE).put(e);
   await done(tx);
   localStorage.removeItem(LS_LEGACY);
+}
+
+// ---- thumbnails of the built-in sample flames (the library's "Samples" collection) ----
+// Kept out of the flame store so the samples never mix into the user's library — they cannot be
+// deleted, tagged, exported or counted with it; only their pictures live here, rendered once.
+export async function sampleThumbAll(): Promise<Map<string, Blob>> {
+  const d = await db();
+  const tx = d.transaction(STHUMBS, 'readonly');
+  const st = tx.objectStore(STHUMBS);
+  const [keys, vals] = await Promise.all([
+    new Promise<IDBValidKey[]>((res, rej) => { const r = st.getAllKeys(); r.onsuccess = () => res(r.result); r.onerror = () => rej(r.error); }),
+    new Promise<Blob[]>((res, rej) => { const r = st.getAll(); r.onsuccess = () => res(r.result as Blob[]); r.onerror = () => rej(r.error); }),
+  ]);
+  return new Map(keys.map((k, i) => [String(k), vals[i]]));
+}
+/** Drop cached pictures whose flame is no longer offered (the built-in list changed). */
+export async function sampleThumbPrune(keep: string[]): Promise<void> {
+  const d = await db();
+  const tx = d.transaction(STHUMBS, 'readwrite');
+  const st = tx.objectStore(STHUMBS);
+  const keys = await new Promise<IDBValidKey[]>((res, rej) => { const r = st.getAllKeys(); r.onsuccess = () => res(r.result); r.onerror = () => rej(r.error); });
+  const wanted = new Set(keep);
+  for (const k of keys) if (!wanted.has(String(k))) st.delete(k);
+  await done(tx);
+}
+export async function sampleThumbPut(id: string, thumb: Blob): Promise<void> {
+  const d = await db();
+  const tx = d.transaction(STHUMBS, 'readwrite');
+  tx.objectStore(STHUMBS).put(thumb, id);
+  await done(tx);
 }
 
 // ---- user meshes (obj_mesh_wf) ----
