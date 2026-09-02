@@ -1,5 +1,5 @@
 blank_issues_enabled: true
 contact_links:
-  - name: Read this first — pull requests are not accepted
+  - name: How to contribute
     url: https://github.com/thepacket/wilderfire/blob/main/CONTRIBUTING.md
-    about: How to report bugs and fidelity gaps; forking is welcome.
+    about: How to report bugs and fidelity gaps, and how to open a pull request.

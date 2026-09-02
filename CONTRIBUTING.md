@@ -3,17 +3,18 @@
 Thanks for your interest in WilderFire. Please read this before opening
 anything.
 
-## Pull requests are not accepted
+## Pull requests
 
-WilderFire is developed by a single maintainer and **does not accept pull
-requests**. Any pull request opened against this repository will be closed
-automatically. This is not a judgement on your work — it keeps the project's
-direction, licensing provenance and review load manageable.
+Pull requests are welcome. Keep each one focused on a single bug or feature,
+describe what it changes and how you checked it (a `.flame` that shows the
+difference before and after is ideal), and expect a review that may ask for
+changes. For a larger idea, open an issue first so the direction can be agreed
+before you spend time on it.
 
-If you want to change WilderFire, **fork it**. The licence (LGPL-2.1-or-later,
-see [LICENSE](LICENSE)) lets you modify and redistribute your fork freely as
-long as you keep the licence and notices intact. Please rename your fork so it
-is not confused with this project.
+If you would rather take WilderFire in your own direction, **fork it**. The
+licence (LGPL-2.1-or-later, see [LICENSE](LICENSE)) lets you modify and
+redistribute your fork freely as long as you keep the licence and notices
+intact. Please rename a fork so it is not confused with this project.
 
 ## Bug reports and ideas
 
@@ -38,6 +39,6 @@ marked **security** rather than emailing.
 
 ## Licence of contributions
 
-Because pull requests are not accepted there is no contributor licence
-agreement. Anything you post in an issue (flames, snippets, ideas) is assumed
-to be offered under the project licence so it can be used to fix the problem.
+There is no contributor licence agreement. By opening a pull request, or by
+posting flames, snippets or ideas in an issue, you agree that they are offered
+under the project licence (LGPL-2.1-or-later) so they can be used.

@@ -6,7 +6,7 @@ Everything runs client-side; nothing ever touches a server.
 Live at [wilderfire.fly.dev](https://wilderfire.fly.dev).
 
 Free software under the **LGPL-2.1-or-later** · © 2026 Andre Paquette ·
-**pull requests are not accepted** (issues and forks are welcome — see
+issues, pull requests and forks are welcome (see
 [CONTRIBUTING.md](CONTRIBUTING.md)).
 
 ![WilderFire — an elliptic/linearT3D flame in the editor, with the layer and transform panels on the left and the engine and export controls on the right](docs/hero.jpg)
@@ -422,7 +422,7 @@ list of third-party material is in [NOTICE.md](NOTICE.md).
 
 ## Contributing
 
-**Pull requests are not accepted** and are closed automatically. Bug reports,
-fidelity gaps (a `.flame` that renders differently than in flam3 / Apophysis /
-JWildfire) and feature ideas are welcome as issues; forks are welcome under
-the licence. Details in [CONTRIBUTING.md](CONTRIBUTING.md).
+Pull requests are welcome, and so are bug reports, fidelity gaps (a `.flame`
+that renders differently than in flam3 / Apophysis / JWildfire) and feature
+ideas as issues; forks are welcome under the licence. Details in
+[CONTRIBUTING.md](CONTRIBUTING.md).
